@@ -28,9 +28,8 @@ pub(crate) struct AnthropicDecodeEnvelope {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AnthropicErrorEnvelope {
     pub message: String,
-    pub code: Option<String>,
     pub error_type: Option<String>,
-    pub param: Option<String>,
+    pub request_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
