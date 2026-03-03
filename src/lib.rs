@@ -1,5 +1,5 @@
 pub mod core;
-pub mod providers;
+pub mod protocols;
 pub mod runtime;
 pub mod transport;
 
