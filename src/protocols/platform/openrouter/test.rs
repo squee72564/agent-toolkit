@@ -40,6 +40,19 @@ fn maps_openrouter_encode_error_into_adapter_error() {
 }
 
 #[test]
+fn maps_openrouter_upstream_error_into_adapter_error() {
+    let translator_error = OpenRouterTranslatorError::Decode(OpenAiSpecError::Upstream {
+        message: "provider failure".to_string(),
+    });
+    let adapter_error: crate::protocols::error::AdapterError = translator_error.into();
+
+    assert_eq!(adapter_error.protocol, AdapterProtocol::OpenRouter);
+    assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
+    assert_eq!(adapter_error.kind, AdapterErrorKind::Upstream);
+    assert_eq!(adapter_error.message, "provider failure");
+}
+
+#[test]
 fn openrouter_translator_reuses_openai_spec_encoder() {
     let translator = OpenRouterTranslator;
     let encoded = translator

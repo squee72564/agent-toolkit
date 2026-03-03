@@ -31,6 +31,19 @@ fn maps_openai_decode_error_into_adapter_error() {
 }
 
 #[test]
+fn maps_openai_upstream_error_into_adapter_error() {
+    let translator_error = OpenAiTranslatorError::Decode(OpenAiSpecError::Upstream {
+        message: "provider said no".to_string(),
+    });
+    let adapter_error: crate::protocols::error::AdapterError = translator_error.into();
+
+    assert_eq!(adapter_error.protocol, AdapterProtocol::OpenAI);
+    assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
+    assert_eq!(adapter_error.kind, AdapterErrorKind::Upstream);
+    assert_eq!(adapter_error.message, "provider said no");
+}
+
+#[test]
 fn openai_translator_is_constructible() {
     let _ = OpenAiTranslator;
 }

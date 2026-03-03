@@ -3,6 +3,8 @@ use std::error::Error as StdError;
 use serde_json::Value;
 use thiserror::Error;
 
+use crate::core::types::ResponseFormat;
+
 pub(crate) mod decode;
 pub(crate) mod encode;
 mod schema_rules;
@@ -18,6 +20,15 @@ pub(crate) struct OpenAiEncodedRequest {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct OpenAiDecodeEnvelope {
     pub body: Value,
+    pub requested_response_format: ResponseFormat,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OpenAiErrorEnvelope {
+    pub message: String,
+    pub code: Option<String>,
+    pub error_type: Option<String>,
+    pub param: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,6 +36,7 @@ pub(crate) enum OpenAiSpecErrorKind {
     Validation,
     Encode,
     Decode,
+    Upstream,
     ProtocolViolation,
     UnsupportedFeature,
 }
@@ -45,6 +57,8 @@ pub(crate) enum OpenAiSpecError {
         #[source]
         source: Option<Box<dyn StdError + Send + Sync>>,
     },
+    #[error("upstream error: {message}")]
+    Upstream { message: String },
     #[error("protocol violation: {message}")]
     ProtocolViolation { message: String },
     #[error("unsupported feature: {message}")]
@@ -74,6 +88,19 @@ impl OpenAiSpecError {
         }
     }
 
+    pub(crate) fn decode(message: impl Into<String>) -> Self {
+        Self::Decode {
+            message: message.into(),
+            source: None,
+        }
+    }
+
+    pub(crate) fn upstream(message: impl Into<String>) -> Self {
+        Self::Upstream {
+            message: message.into(),
+        }
+    }
+
     pub(crate) fn unsupported_feature(message: impl Into<String>) -> Self {
         Self::UnsupportedFeature {
             message: message.into(),
@@ -85,6 +112,7 @@ impl OpenAiSpecError {
             Self::Validation { .. } => OpenAiSpecErrorKind::Validation,
             Self::Encode { .. } => OpenAiSpecErrorKind::Encode,
             Self::Decode { .. } => OpenAiSpecErrorKind::Decode,
+            Self::Upstream { .. } => OpenAiSpecErrorKind::Upstream,
             Self::ProtocolViolation { .. } => OpenAiSpecErrorKind::ProtocolViolation,
             Self::UnsupportedFeature { .. } => OpenAiSpecErrorKind::UnsupportedFeature,
         }
@@ -95,6 +123,7 @@ impl OpenAiSpecError {
             Self::Validation { message } => message,
             Self::Encode { message, .. } => message,
             Self::Decode { message, .. } => message,
+            Self::Upstream { message } => message,
             Self::ProtocolViolation { message } => message,
             Self::UnsupportedFeature { message } => message,
         }

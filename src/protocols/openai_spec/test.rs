@@ -7,9 +7,11 @@ use crate::core::types::{
     ToolResultContent,
 };
 
-use super::OpenAiSpecError;
+use super::decode::decode_openai_response;
 use super::encode::encode_openai_request;
 use super::schema_rules::is_strict_compatible_schema;
+use super::OpenAiSpecError;
+use super::{OpenAiDecodeEnvelope, OpenAiSpecErrorKind};
 
 fn base_request(messages: Vec<Message>) -> Request {
     Request {
@@ -149,4 +151,150 @@ fn serializes_assistant_tool_call_and_tool_result() {
 
     assert_eq!(input[0]["type"], json!("function_call"));
     assert_eq!(input[1]["type"], json!("function_call_output"));
+}
+
+#[test]
+fn decode_top_level_error_maps_to_upstream() {
+    let envelope = OpenAiDecodeEnvelope {
+        body: json!({
+            "error": {
+                "message": "Bad API key",
+                "type": "invalid_request_error",
+                "code": "invalid_api_key"
+            }
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let error = decode_openai_response(&envelope).expect_err("decode should fail");
+    assert_eq!(error.kind(), OpenAiSpecErrorKind::Upstream);
+    assert!(error.message().contains("openai error:"));
+    assert!(error.message().contains("invalid_api_key"));
+}
+
+#[test]
+fn decode_in_progress_status_uses_interpolated_message() {
+    let envelope = OpenAiDecodeEnvelope {
+        body: json!({
+            "status": "in_progress",
+            "model": "gpt-4.1-mini",
+            "output": []
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let error = decode_openai_response(&envelope).expect_err("decode should fail");
+
+    match error {
+        OpenAiSpecError::Decode { message, .. } => {
+            assert!(message.contains("in_progress"));
+            assert!(!message.contains("{status}"));
+        }
+        _ => panic!("expected decode error variant"),
+    }
+}
+
+#[test]
+fn decode_unknown_output_item_is_ignored_with_warning() {
+    let envelope = OpenAiDecodeEnvelope {
+        body: json!({
+            "status": "completed",
+            "model": "gpt-4.1-mini",
+            "output": [
+                {
+                    "type": "message",
+                    "content": [
+                        { "type": "output_text", "text": "hello" }
+                    ]
+                },
+                {
+                    "type": "new_item_type",
+                    "payload": { "value": 1 }
+                }
+            ]
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let response = decode_openai_response(&envelope).expect("decode should succeed");
+    assert_eq!(response.output.content.len(), 1);
+    assert_eq!(
+        response
+            .warnings
+            .iter()
+            .any(|w| w.code == "openai.decode.unknown_output_item"),
+        true
+    );
+}
+
+#[test]
+fn decode_unknown_message_part_is_ignored_with_warning() {
+    let envelope = OpenAiDecodeEnvelope {
+        body: json!({
+            "status": "completed",
+            "model": "gpt-4.1-mini",
+            "output": [
+                {
+                    "type": "message",
+                    "content": [
+                        { "type": "output_text", "text": "hello" },
+                        { "type": "audio", "url": "https://example.com/a.wav" }
+                    ]
+                }
+            ]
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let response = decode_openai_response(&envelope).expect("decode should succeed");
+    assert_eq!(response.output.content.len(), 1);
+    assert_eq!(
+        response
+            .warnings
+            .iter()
+            .any(|w| w.code == "openai.decode.unknown_message_part"),
+        true
+    );
+}
+
+#[test]
+fn decode_invalid_tool_call_arguments_falls_back_to_string_with_warning() {
+    let envelope = OpenAiDecodeEnvelope {
+        body: json!({
+            "status": "completed",
+            "model": "gpt-4.1-mini",
+            "output": [
+                {
+                    "type": "function_call",
+                    "call_id": "call_1",
+                    "name": "lookup_weather",
+                    "arguments": "{invalid-json"
+                }
+            ]
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let response = decode_openai_response(&envelope).expect("decode should succeed");
+    assert_eq!(response.finish_reason, crate::FinishReason::ToolCalls);
+    assert_eq!(
+        response
+            .warnings
+            .iter()
+            .any(|w| w.code == "openai.decode.invalid_tool_call_arguments"),
+        true
+    );
+
+    let first = response
+        .output
+        .content
+        .first()
+        .expect("content should include tool call");
+    match first {
+        ContentPart::ToolCall { tool_call } => {
+            assert_eq!(tool_call.name, "lookup_weather");
+            assert_eq!(tool_call.arguments_json, json!("{invalid-json"));
+        }
+        _ => panic!("expected first output content part to be a tool call"),
+    }
 }

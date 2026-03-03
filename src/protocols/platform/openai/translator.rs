@@ -59,6 +59,7 @@ fn map_spec_error_kind(kind: OpenAiSpecErrorKind) -> AdapterErrorKind {
         OpenAiSpecErrorKind::Validation => AdapterErrorKind::Validation,
         OpenAiSpecErrorKind::Encode => AdapterErrorKind::Encode,
         OpenAiSpecErrorKind::Decode => AdapterErrorKind::Decode,
+        OpenAiSpecErrorKind::Upstream => AdapterErrorKind::Upstream,
         OpenAiSpecErrorKind::ProtocolViolation => AdapterErrorKind::ProtocolViolation,
         OpenAiSpecErrorKind::UnsupportedFeature => AdapterErrorKind::UnsupportedFeature,
     }
