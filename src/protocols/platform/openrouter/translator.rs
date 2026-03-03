@@ -51,22 +51,15 @@ pub(crate) struct OpenRouterOverrides {
     pub extra: Map<String, Value>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct OpenRouterTranslator {
     overrides: OpenRouterOverrides,
 }
 
 impl OpenRouterTranslator {
+    #[cfg(test)]
     pub(crate) fn new(overrides: OpenRouterOverrides) -> Self {
         Self { overrides }
-    }
-}
-
-impl Default for OpenRouterTranslator {
-    fn default() -> Self {
-        Self {
-            overrides: OpenRouterOverrides::default(),
-        }
     }
 }
 

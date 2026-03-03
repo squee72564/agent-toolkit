@@ -62,6 +62,7 @@ pub(crate) enum OpenAiSpecError {
     Upstream { message: String },
     #[error("protocol violation: {message}")]
     ProtocolViolation { message: String },
+    #[allow(dead_code)]
     #[error("unsupported feature: {message}")]
     UnsupportedFeature { message: String },
 }
@@ -102,6 +103,7 @@ impl OpenAiSpecError {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn unsupported_feature(message: impl Into<String>) -> Self {
         Self::UnsupportedFeature {
             message: message.into(),

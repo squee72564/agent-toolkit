@@ -16,8 +16,8 @@ const REQUEST_ID_HEADER_KEY: &str = "transport.request_id_header";
 const CUSTOM_HEADER_PREFIX: &str = "transport.header.";
 
 struct HeaderConfig {
-    headers: HeaderMap,            // outbound
-    request_id_header: HeaderName, // inbound extration rule
+    headers: HeaderMap,             // outbound
+    _request_id_header: HeaderName, // inbound extraction rule
 }
 
 pub enum TransportError {
@@ -139,7 +139,7 @@ impl HttpTransport {
 
         Ok(HeaderConfig {
             headers,
-            request_id_header,
+            _request_id_header: request_id_header,
         })
     }
 
@@ -260,7 +260,7 @@ fn apply_auth(
         }
         (AuthStyle::Basic, AuthCredentials::Token(token)) => {
             // Here token is assumed to be username:password
-            let encoded = base64::engine::general_purpose::STANDARD.encode(&token);
+            let encoded = base64::engine::general_purpose::STANDARD.encode(token);
             let value = format!("Basic {encoded}");
             headers.insert(AUTHORIZATION, HeaderValue::from_str(&value)?);
             Ok(())

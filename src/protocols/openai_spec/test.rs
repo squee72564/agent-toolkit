@@ -353,12 +353,11 @@ fn decode_unknown_output_item_is_ignored_with_warning() {
 
     let response = decode_openai_response(&envelope).expect("decode should succeed");
     assert_eq!(response.output.content.len(), 1);
-    assert_eq!(
+    assert!(
         response
             .warnings
             .iter()
-            .any(|w| w.code == "openai.decode.unknown_output_item"),
-        true
+            .any(|w| w.code == "openai.decode.unknown_output_item")
     );
 }
 
@@ -383,12 +382,11 @@ fn decode_unknown_message_part_is_ignored_with_warning() {
 
     let response = decode_openai_response(&envelope).expect("decode should succeed");
     assert_eq!(response.output.content.len(), 1);
-    assert_eq!(
+    assert!(
         response
             .warnings
             .iter()
-            .any(|w| w.code == "openai.decode.unknown_message_part"),
-        true
+            .any(|w| w.code == "openai.decode.unknown_message_part")
     );
 }
 
@@ -412,12 +410,11 @@ fn decode_invalid_tool_call_arguments_falls_back_to_string_with_warning() {
 
     let response = decode_openai_response(&envelope).expect("decode should succeed");
     assert_eq!(response.finish_reason, crate::FinishReason::ToolCalls);
-    assert_eq!(
+    assert!(
         response
             .warnings
             .iter()
-            .any(|w| w.code == "openai.decode.invalid_tool_call_arguments"),
-        true
+            .any(|w| w.code == "openai.decode.invalid_tool_call_arguments")
     );
 
     let first = response
