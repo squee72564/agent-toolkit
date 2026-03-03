@@ -140,7 +140,7 @@ pub struct RuntimeWarning {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ProviderRequest {
+pub struct Request {
     pub model_id: String,
     pub messages: Vec<Message>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -163,7 +163,7 @@ pub struct ProviderRequest {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ProviderResponse {
+pub struct Response {
     pub output: AssistantOutput,
     pub usage: Usage,
     pub model: String,
