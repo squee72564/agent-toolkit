@@ -6,8 +6,8 @@ use reqwest::header::{
     InvalidHeaderValue,
 };
 use reqwest::{Method, StatusCode};
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 //use serde::Serialize;
 //use serde::de::DeserializeOwned;
 
@@ -24,7 +24,7 @@ pub enum TransportError {
     InvalidHeaderName,
     InvalidHeaderValue,
     Request(reqwest::Error),
-    Serialization
+    Serialization,
 }
 
 impl From<reqwest::Error> for TransportError {
@@ -211,7 +211,8 @@ impl HttpTransport {
     where
         TResp: DeserializeOwned,
     {
-        self.execute_json_request(platform, Method::GET, url, None, ctx).await
+        self.execute_json_request(platform, Method::GET, url, None, ctx)
+            .await
     }
 
     pub async fn post_json<TReq, TResp>(
@@ -225,9 +226,9 @@ impl HttpTransport {
         TReq: Serialize + ?Sized,
         TResp: DeserializeOwned,
     {
-
         let payload = serde_json::to_vec(body).map_err(|_| TransportError::Serialization)?;
-        self.execute_json_request(platform, Method::POST, url, Some(payload), ctx).await
+        self.execute_json_request(platform, Method::POST, url, Some(payload), ctx)
+            .await
     }
 
     async fn sleep_before_retry(&self, attempt: u8) {
