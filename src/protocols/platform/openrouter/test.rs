@@ -62,3 +62,21 @@ fn openrouter_translator_reuses_openai_spec_encoder() {
     assert_eq!(encoded.body["model"], "openai/gpt-4.1-mini");
     assert!(encoded.body["input"].is_array());
 }
+
+#[test]
+fn openrouter_translator_preserves_openai_encode_warnings() {
+    let translator = OpenRouterTranslator;
+    let mut request = base_request();
+    request.top_p = Some(0.9);
+
+    let encoded = translator
+        .encode_request(&request)
+        .expect("encoding should succeed");
+
+    assert!(
+        encoded
+            .warnings
+            .iter()
+            .any(|w| w.code == "openai.encode.ignored_top_p")
+    );
+}

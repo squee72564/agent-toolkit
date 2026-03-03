@@ -3,14 +3,14 @@ use std::collections::BTreeMap;
 use serde_json::json;
 
 use crate::core::types::{
-    ContentPart, Message, MessageRole, Request, ResponseFormat, ToolCall, ToolChoice, ToolResult,
-    ToolResultContent,
+    ContentPart, Message, MessageRole, Request, ResponseFormat, ToolCall, ToolChoice,
+    ToolDefinition, ToolResult, ToolResultContent,
 };
 
+use super::OpenAiSpecError;
 use super::decode::decode_openai_response;
 use super::encode::encode_openai_request;
 use super::schema_rules::is_strict_compatible_schema;
-use super::OpenAiSpecError;
 use super::{OpenAiDecodeEnvelope, OpenAiSpecErrorKind};
 
 fn base_request(messages: Vec<Message>) -> Request {
@@ -42,6 +42,141 @@ fn encode_simple_user_text_message() {
     assert_eq!(encoded.body["model"], json!("gpt-4.1-mini"));
     assert_eq!(encoded.body["text"]["format"]["type"], json!("text"));
     assert_eq!(encoded.body["input"].as_array().map(Vec::len), Some(1));
+}
+
+#[test]
+fn encode_warnings_empty_for_basic_request() {
+    let request = base_request(vec![Message {
+        role: MessageRole::User,
+        content: vec![ContentPart::Text {
+            text: "hello".to_string(),
+        }],
+    }]);
+
+    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+
+    assert!(encoded.warnings.is_empty());
+}
+
+#[test]
+fn encode_warns_when_top_p_ignored() {
+    let mut request = base_request(vec![Message {
+        role: MessageRole::User,
+        content: vec![ContentPart::Text {
+            text: "hello".to_string(),
+        }],
+    }]);
+    request.top_p = Some(0.8);
+
+    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+
+    assert!(
+        encoded
+            .warnings
+            .iter()
+            .any(|w| w.code == "openai.encode.ignored_top_p")
+    );
+}
+
+#[test]
+fn encode_warns_when_stop_ignored() {
+    let mut request = base_request(vec![Message {
+        role: MessageRole::User,
+        content: vec![ContentPart::Text {
+            text: "hello".to_string(),
+        }],
+    }]);
+    request.stop = vec!["END".to_string()];
+
+    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+
+    assert!(
+        encoded
+            .warnings
+            .iter()
+            .any(|w| w.code == "openai.encode.ignored_stop")
+    );
+}
+
+#[test]
+fn encode_warns_when_tool_schema_not_strict_compatible() {
+    let mut request = base_request(vec![Message {
+        role: MessageRole::User,
+        content: vec![ContentPart::Text {
+            text: "hello".to_string(),
+        }],
+    }]);
+    request.tools = vec![ToolDefinition {
+        name: "lookup_weather".to_string(),
+        description: None,
+        parameters_schema: json!({
+            "anyOf": [
+                {
+                    "type": "object",
+                    "properties": { "city": { "type": "string" } },
+                    "required": ["city"],
+                    "additionalProperties": false
+                }
+            ]
+        }),
+    }];
+
+    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+
+    assert_eq!(encoded.body["tools"][0]["strict"], json!(false));
+    assert!(
+        encoded
+            .warnings
+            .iter()
+            .any(|w| w.code == "openai.encode.non_strict_tool_schema")
+    );
+}
+
+#[test]
+fn encode_emits_multiple_warnings_together() {
+    let mut request = base_request(vec![Message {
+        role: MessageRole::User,
+        content: vec![ContentPart::Text {
+            text: "hello".to_string(),
+        }],
+    }]);
+    request.top_p = Some(0.8);
+    request.stop = vec!["END".to_string()];
+    request.tools = vec![ToolDefinition {
+        name: "lookup_weather".to_string(),
+        description: None,
+        parameters_schema: json!({
+            "anyOf": [
+                {
+                    "type": "object",
+                    "properties": { "city": { "type": "string" } },
+                    "required": ["city"],
+                    "additionalProperties": false
+                }
+            ]
+        }),
+    }];
+
+    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+
+    assert!(
+        encoded
+            .warnings
+            .iter()
+            .any(|w| w.code == "openai.encode.ignored_top_p")
+    );
+    assert!(
+        encoded
+            .warnings
+            .iter()
+            .any(|w| w.code == "openai.encode.ignored_stop")
+    );
+    assert!(
+        encoded
+            .warnings
+            .iter()
+            .any(|w| w.code == "openai.encode.non_strict_tool_schema")
+    );
 }
 
 #[test]

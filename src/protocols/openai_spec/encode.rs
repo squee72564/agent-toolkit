@@ -1,8 +1,8 @@
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 use crate::core::types::{
-    ContentPart, MessageRole, Request, ResponseFormat, ToolChoice, ToolDefinition, ToolResult,
-    ToolResultContent,
+    ContentPart, MessageRole, Request, ResponseFormat, RuntimeWarning, ToolChoice, ToolDefinition,
+    ToolResult, ToolResultContent,
 };
 
 use super::schema_rules::{canonicalize_json, is_strict_compatible_schema, stable_json_string};
@@ -11,9 +11,10 @@ use super::{OpenAiEncodedRequest, OpenAiSpecError};
 pub(crate) fn encode_openai_request(
     req: &Request,
 ) -> Result<OpenAiEncodedRequest, OpenAiSpecError> {
+    let mut warnings = Vec::new();
     let text_format = map_response_format(req)?;
     let tool_choice = map_tool_choice(req)?;
-    let tools = map_tools(req)?;
+    let tools = map_tools(req, &mut warnings)?;
     let input = map_messages(req)?;
 
     if input.is_empty() {
@@ -44,8 +45,25 @@ pub(crate) fn encode_openai_request(
         body.insert("metadata".to_string(), json!(req.metadata));
     }
 
+    if req.top_p.is_some() {
+        push_warning(
+            &mut warnings,
+            "openai.encode.ignored_top_p",
+            "top_p is currently not mapped for OpenAI Responses API and was ignored",
+        );
+    }
+
+    if !req.stop.is_empty() {
+        push_warning(
+            &mut warnings,
+            "openai.encode.ignored_stop",
+            "stop sequences are currently not mapped for OpenAI Responses API and were ignored",
+        );
+    }
+
     Ok(OpenAiEncodedRequest {
         body: Value::Object(body),
+        warnings,
     })
 }
 
@@ -100,17 +118,23 @@ fn map_tool_choice(req: &Request) -> Result<Value, OpenAiSpecError> {
     }
 }
 
-fn map_tools(req: &Request) -> Result<Vec<Value>, OpenAiSpecError> {
+fn map_tools(
+    req: &Request,
+    warnings: &mut Vec<RuntimeWarning>,
+) -> Result<Vec<Value>, OpenAiSpecError> {
     let mut tools = Vec::new();
 
     for tool in &req.tools {
-        tools.push(map_tool_definition(tool)?);
+        tools.push(map_tool_definition(tool, warnings)?);
     }
 
     Ok(tools)
 }
 
-fn map_tool_definition(tool: &ToolDefinition) -> Result<Value, OpenAiSpecError> {
+fn map_tool_definition(
+    tool: &ToolDefinition,
+    warnings: &mut Vec<RuntimeWarning>,
+) -> Result<Value, OpenAiSpecError> {
     if tool.name.trim().is_empty() {
         return Err(OpenAiSpecError::validation(
             "tool definition requires non-empty name",
@@ -125,6 +149,16 @@ fn map_tool_definition(tool: &ToolDefinition) -> Result<Value, OpenAiSpecError> 
     }
 
     let strict = is_strict_compatible_schema(&tool.parameters_schema);
+    if !strict {
+        push_warning(
+            warnings,
+            "openai.encode.non_strict_tool_schema",
+            format!(
+                "tool '{}' schema is not strict-compatible; emitted strict=false",
+                tool.name
+            ),
+        );
+    }
 
     let mut payload = Map::new();
     payload.insert("type".to_string(), Value::String("function".to_string()));
@@ -278,4 +312,11 @@ fn serialize_tool_result_output(tool_result: &ToolResult) -> Result<String, Open
             Ok(lines.join("\n"))
         }
     }
+}
+
+fn push_warning(warnings: &mut Vec<RuntimeWarning>, code: &str, message: impl Into<String>) {
+    warnings.push(RuntimeWarning {
+        code: code.to_string(),
+        message: message.into(),
+    });
 }

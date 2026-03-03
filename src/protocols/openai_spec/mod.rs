@@ -3,7 +3,7 @@ use std::error::Error as StdError;
 use serde_json::Value;
 use thiserror::Error;
 
-use crate::core::types::ResponseFormat;
+use crate::core::types::{ResponseFormat, RuntimeWarning};
 
 pub(crate) mod decode;
 pub(crate) mod encode;
@@ -15,6 +15,7 @@ mod test;
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct OpenAiEncodedRequest {
     pub body: Value,
+    pub warnings: Vec<RuntimeWarning>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
