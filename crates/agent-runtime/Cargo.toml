@@ -1,0 +1,14 @@
+[package]
+name = "agent-runtime"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+agent-core = { path = "../agent-core" }
+agent-providers = { path = "../agent-providers" }
+agent-transport = { path = "../agent-transport" }
+dotenvy.workspace = true
+reqwest.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
