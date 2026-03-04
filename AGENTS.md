@@ -1,5 +1,6 @@
 # AGENTS.md
 
+
 ## Rust Commands
 Use these before submitting changes:
 
@@ -15,3 +16,12 @@ cargo test --all-targets --all-features
 ```bash
 cargo fmt --all
 ```
+
+## Test Organization
+Keep tests out of implementation files to reduce file bloat and keep production code focused.
+
+- Do not add `#[cfg(test)] mod tests` blocks inside `src/lib.rs`, `src/mod.rs`, or other implementation files.
+- Put tests in dedicated test files, not inline modules.
+- Preferred locations:
+  - crate-level/integration tests in `tests/*.rs`
+  - module-level tests in sibling files such as `src/**/test.rs` or `src/**/*_test.rs`
