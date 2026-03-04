@@ -5,6 +5,23 @@ use serde_json::json;
 
 use super::*;
 
+fn runtime_error(
+    kind: RuntimeErrorKind,
+    provider: Option<ProviderId>,
+    status_code: Option<u16>,
+    provider_code: Option<&str>,
+) -> RuntimeError {
+    RuntimeError {
+        kind,
+        message: "test error".to_string(),
+        provider,
+        status_code,
+        request_id: None,
+        provider_code: provider_code.map(ToString::to_string),
+        source: None,
+    }
+}
+
 #[test]
 fn message_input_from_str_creates_user_message() {
     let input = MessageCreateInput::from("hello");
@@ -16,27 +33,158 @@ fn message_input_from_str_creates_user_message() {
 fn fallback_policy_matches_transport_or_retryable_status() {
     let policy = FallbackPolicy::default();
 
-    let transport_error = RuntimeError {
-        kind: RuntimeErrorKind::Transport,
-        message: "transport".to_string(),
-        provider: Some(ProviderId::OpenAi),
-        status_code: None,
-        request_id: None,
-        provider_code: None,
-        source: None,
-    };
+    let transport_error = runtime_error(
+        RuntimeErrorKind::Transport,
+        Some(ProviderId::OpenAi),
+        None,
+        None,
+    );
     assert!(policy.should_fallback(&transport_error));
 
-    let rate_limit_error = RuntimeError {
-        kind: RuntimeErrorKind::Upstream,
-        message: "rate limited".to_string(),
-        provider: Some(ProviderId::OpenAi),
-        status_code: Some(429),
-        request_id: None,
-        provider_code: None,
-        source: None,
-    };
+    let rate_limit_error = runtime_error(
+        RuntimeErrorKind::Upstream,
+        Some(ProviderId::OpenAi),
+        Some(429),
+        None,
+    );
     assert!(policy.should_fallback(&rate_limit_error));
+}
+
+#[test]
+fn fallback_policy_rules_only_retry_on_error_kind() {
+    let policy = FallbackPolicy::default()
+        .with_mode(FallbackMode::RulesOnly)
+        .with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Upstream));
+
+    let error = runtime_error(
+        RuntimeErrorKind::Upstream,
+        Some(ProviderId::OpenAi),
+        None,
+        None,
+    );
+    assert!(policy.should_fallback(&error));
+}
+
+#[test]
+fn fallback_policy_rules_only_stop_prevents_fallback() {
+    let policy = FallbackPolicy::default()
+        .with_mode(FallbackMode::RulesOnly)
+        .with_rule(FallbackRule::stop_on_kind(RuntimeErrorKind::Upstream));
+
+    let error = runtime_error(
+        RuntimeErrorKind::Upstream,
+        Some(ProviderId::OpenAi),
+        Some(429),
+        None,
+    );
+    assert!(!policy.should_fallback(&error));
+}
+
+#[test]
+fn fallback_policy_rules_match_provider_code() {
+    let policy = FallbackPolicy::default()
+        .with_mode(FallbackMode::RulesOnly)
+        .with_rule(FallbackRule::retry_on_provider_code("rate_limit_exceeded"));
+
+    let matching_error = runtime_error(
+        RuntimeErrorKind::Upstream,
+        Some(ProviderId::OpenAi),
+        None,
+        Some("rate_limit_exceeded"),
+    );
+    assert!(policy.should_fallback(&matching_error));
+
+    let non_matching_error = runtime_error(
+        RuntimeErrorKind::Upstream,
+        Some(ProviderId::OpenAi),
+        None,
+        Some("insufficient_quota"),
+    );
+    assert!(!policy.should_fallback(&non_matching_error));
+}
+
+#[test]
+fn fallback_policy_rules_can_scope_to_provider() {
+    let policy = FallbackPolicy::default()
+        .with_mode(FallbackMode::RulesOnly)
+        .with_rule(FallbackRule::retry_on_status(429).for_provider(ProviderId::OpenRouter));
+
+    let openrouter_error = runtime_error(
+        RuntimeErrorKind::Upstream,
+        Some(ProviderId::OpenRouter),
+        Some(429),
+        None,
+    );
+    assert!(policy.should_fallback(&openrouter_error));
+
+    let openai_error = runtime_error(
+        RuntimeErrorKind::Upstream,
+        Some(ProviderId::OpenAi),
+        Some(429),
+        None,
+    );
+    assert!(!policy.should_fallback(&openai_error));
+}
+
+#[test]
+fn fallback_policy_rules_use_first_match_precedence() {
+    let policy = FallbackPolicy::default()
+        .with_mode(FallbackMode::RulesOnly)
+        .with_rule(FallbackRule::stop_on_kind(RuntimeErrorKind::Upstream))
+        .with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Upstream));
+
+    let error = runtime_error(
+        RuntimeErrorKind::Upstream,
+        Some(ProviderId::OpenAi),
+        Some(429),
+        None,
+    );
+    assert!(!policy.should_fallback(&error));
+}
+
+#[test]
+fn fallback_policy_legacy_only_ignores_rules() {
+    let policy = FallbackPolicy::default()
+        .with_mode(FallbackMode::LegacyOnly)
+        .with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Validation));
+
+    let error = runtime_error(
+        RuntimeErrorKind::Validation,
+        Some(ProviderId::OpenAi),
+        None,
+        None,
+    );
+    assert!(!policy.should_fallback(&error));
+}
+
+#[test]
+fn fallback_policy_legacy_or_rules_applies_rule_when_legacy_does_not() {
+    let policy = FallbackPolicy::default()
+        .with_mode(FallbackMode::LegacyOrRules)
+        .with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Validation));
+
+    let error = runtime_error(
+        RuntimeErrorKind::Validation,
+        Some(ProviderId::OpenAi),
+        None,
+        None,
+    );
+    assert!(policy.should_fallback(&error));
+}
+
+#[test]
+fn fallback_policy_rules_only_no_match_does_not_fallback() {
+    let policy = FallbackPolicy::default()
+        .with_mode(FallbackMode::RulesOnly)
+        .with_rule(FallbackRule::retry_on_status(500));
+
+    let error = runtime_error(
+        RuntimeErrorKind::Upstream,
+        Some(ProviderId::OpenAi),
+        Some(429),
+        None,
+    );
+    assert!(!policy.should_fallback(&error));
 }
 
 #[test]
