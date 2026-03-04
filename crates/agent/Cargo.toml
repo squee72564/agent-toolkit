@@ -1,0 +1,15 @@
+[package]
+name = "agent_toolkit"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = []
+live-tests = []
+
+[dependencies]
+agent-core = { path = "../agent-core" }
+agent-providers = { path = "../agent-providers" }
+agent-runtime = { path = "../agent-runtime" }
+agent-tools = { path = "../agent-tools" }
+agent-transport = { path = "../agent-transport" }
