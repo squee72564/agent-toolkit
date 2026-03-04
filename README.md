@@ -121,6 +121,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+### Rule-based routing fallback
+
+```rust
+use agent_toolkit::{
+    AgentToolkit, FallbackMode, FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig,
+    ProviderId, SendOptions, Target,
+};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let toolkit = AgentToolkit::builder()
+        .with_openai(ProviderConfig::new(std::env::var("OPENAI_API_KEY")?).with_default_model("gpt-5-mini"))
+        .with_openrouter(ProviderConfig::new(std::env::var("OPENROUTER_API_KEY")?))
+        .build()?;
+
+    let fallback_policy = FallbackPolicy::new(vec![Target::new(ProviderId::OpenRouter)])
+        .with_mode(FallbackMode::RulesOnly)
+        .with_rule(FallbackRule::retry_on_status(429))
+        .with_rule(FallbackRule::retry_on_provider_code("rate_limit_exceeded"));
+
+    let response = toolkit
+        .messages()
+        .create(
+            MessageCreateInput::user("Write one sentence about Rust."),
+            SendOptions::for_target(Target::new(ProviderId::OpenAi))
+                .with_fallback_policy(fallback_policy),
+        )
+        .await?;
+
+    println!("model: {}", response.model);
+    Ok(())
+}
+```
 ## Workspace Layout
 
 ```text
