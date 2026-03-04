@@ -13,10 +13,113 @@ pub(crate) struct ChosenFixture {
 }
 
 fn fixture_responses_root(provider: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("data")
-        .join(provider)
-        .join("responses")
+    resolve_fixture_responses_root(provider)
+}
+
+pub(crate) fn resolve_fixture_responses_root(provider: &str) -> PathBuf {
+    let cwd = std::env::current_dir().unwrap_or_else(|err| {
+        panic!("failed to determine current working directory for fixture discovery: {err}")
+    });
+    let env_override = std::env::var_os("AGENT_PROVIDERS_FIXTURE_ROOT").map(PathBuf::from);
+    resolve_fixture_responses_root_from(provider, &cwd, env_override.as_deref(), true)
+}
+
+pub(crate) fn resolve_fixture_responses_root_from(
+    provider: &str,
+    cwd: &Path,
+    env_override: Option<&Path>,
+    include_manifest_fallback: bool,
+) -> PathBuf {
+    let mut attempted = Vec::new();
+
+    if let Some(root) = env_override {
+        let primary = root.join(provider).join("responses");
+        attempted.push(primary.clone());
+        if primary.is_dir() {
+            return canonicalize_if_possible(primary);
+        }
+
+        let fallback = root.join("data").join(provider).join("responses");
+        attempted.push(fallback.clone());
+        if fallback.is_dir() {
+            return canonicalize_if_possible(fallback);
+        }
+    }
+
+    for base in ancestry_from(cwd) {
+        let data_relative = base.join("data").join(provider).join("responses");
+        attempted.push(data_relative.clone());
+        if data_relative.is_dir() {
+            return canonicalize_if_possible(data_relative);
+        }
+
+        let workspace_relative = base
+            .join("crates")
+            .join("agent-providers")
+            .join("data")
+            .join(provider)
+            .join("responses");
+        attempted.push(workspace_relative.clone());
+        if workspace_relative.is_dir() {
+            return canonicalize_if_possible(workspace_relative);
+        }
+    }
+
+    if include_manifest_fallback {
+        if let Some(manifest_dir) = option_env!("CARGO_MANIFEST_DIR") {
+            for base in ancestry_from(Path::new(manifest_dir)) {
+                let data_relative = base.join("data").join(provider).join("responses");
+                attempted.push(data_relative.clone());
+                if data_relative.is_dir() {
+                    return canonicalize_if_possible(data_relative);
+                }
+
+                let workspace_relative = base
+                    .join("crates")
+                    .join("agent-providers")
+                    .join("data")
+                    .join(provider)
+                    .join("responses");
+                attempted.push(workspace_relative.clone());
+                if workspace_relative.is_dir() {
+                    return canonicalize_if_possible(workspace_relative);
+                }
+            }
+        }
+    }
+
+    panic!(
+        "failed to resolve fixture responses root for provider='{provider}'. current_dir='{}'. AGENT_PROVIDERS_FIXTURE_ROOT={}. attempted paths:\n{}",
+        cwd.display(),
+        env_override.map_or_else(|| "<unset>".to_string(), |path| path.display().to_string()),
+        format_attempted_paths(&attempted)
+    );
+}
+
+fn ancestry_from(start: &Path) -> Vec<PathBuf> {
+    let mut ancestry = Vec::new();
+    let mut current = Some(start);
+    while let Some(path) = current {
+        ancestry.push(path.to_path_buf());
+        current = path.parent();
+    }
+    ancestry
+}
+
+fn canonicalize_if_possible(path: PathBuf) -> PathBuf {
+    fs::canonicalize(&path).unwrap_or(path)
+}
+
+fn format_attempted_paths(attempted: &[PathBuf]) -> String {
+    if attempted.is_empty() {
+        return "  (none)".to_string();
+    }
+
+    attempted
+        .iter()
+        .map(|path| format!("  - {}", path.display()))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn read_json(path: &Path) -> Value {
