@@ -6,5 +6,9 @@ edition.workspace = true
 [dependencies]
 agent-core = { path = "../agent-core" }
 async-trait.workspace = true
+jsonschema = "0.18"
 serde_json.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
