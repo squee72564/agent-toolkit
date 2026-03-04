@@ -1,6 +1,8 @@
-# agent_toolkit
+# agent_toolkit (WIP)
 
-Minimal Rust workspace for provider-agnostic agent infrastructure.
+Minimal Rust workspace for providing basic agent building primitives.
+
+This is an educational repository and is not intended to be used for production code.
 
 ## High-level Usage
 
