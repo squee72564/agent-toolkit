@@ -5,8 +5,10 @@ use async_trait::async_trait;
 use serde_json::Value;
 use thiserror::Error;
 
+mod builder;
 mod schema;
 
+pub use builder::{BuiltTool, ToolBuilder, ToolBuilderError};
 pub use schema::{CompiledToolSchema, ToolArgsValidationError, ToolSchemaError, ValidationIssue};
 
 #[derive(Debug, Clone, PartialEq)]
