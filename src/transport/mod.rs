@@ -1,3 +1,5 @@
 pub mod http;
 
-pub use http::{HttpTransport, HttpTransportBuilder, RetryPolicy, TransportError};
+pub use http::{
+    HttpJsonResponse, HttpTransport, HttpTransportBuilder, RetryPolicy, TransportError,
+};

@@ -8,6 +8,8 @@ use reqwest::header::{
 use reqwest::{Method, StatusCode};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde_json::Value;
+use thiserror::Error;
 //use serde::Serialize;
 //use serde::de::DeserializeOwned;
 
@@ -16,14 +18,26 @@ const REQUEST_ID_HEADER_KEY: &str = "transport.request_id_header";
 const CUSTOM_HEADER_PREFIX: &str = "transport.header.";
 
 struct HeaderConfig {
-    headers: HeaderMap,             // outbound
-    _request_id_header: HeaderName, // inbound extraction rule
+    headers: HeaderMap,            // outbound
+    request_id_header: HeaderName, // inbound extraction rule
 }
 
+#[derive(Debug, Clone)]
+pub struct HttpJsonResponse {
+    pub status: StatusCode,
+    pub body: Value,
+    pub request_id: Option<String>,
+}
+
+#[derive(Debug, Error)]
 pub enum TransportError {
+    #[error("invalid header name")]
     InvalidHeaderName,
+    #[error("invalid header value")]
     InvalidHeaderValue,
+    #[error("request error: {0}")]
     Request(reqwest::Error),
+    #[error("serialization error")]
     Serialization,
 }
 
@@ -139,7 +153,7 @@ impl HttpTransport {
 
         Ok(HeaderConfig {
             headers,
-            _request_id_header: request_id_header,
+            request_id_header,
         })
     }
 
@@ -229,6 +243,67 @@ impl HttpTransport {
         let payload = serde_json::to_vec(body).map_err(|_| TransportError::Serialization)?;
         self.execute_json_request(platform, Method::POST, url, Some(payload), ctx)
             .await
+    }
+
+    pub async fn post_json_value<TReq>(
+        &self,
+        platform: &PlatformConfig,
+        url: &str,
+        body: &TReq,
+        ctx: &AdapterContext,
+    ) -> Result<HttpJsonResponse, TransportError>
+    where
+        TReq: Serialize + ?Sized,
+    {
+        let payload = serde_json::to_vec(body).map_err(|_| TransportError::Serialization)?;
+        let header_config = self.build_header_config(platform, ctx)?;
+        let mut attempt: u8 = 0;
+
+        loop {
+            attempt += 1;
+
+            let request_builder = self
+                .client
+                .request(Method::POST, url)
+                .timeout(self.timeout)
+                .headers(header_config.headers.clone())
+                .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
+                .body(payload.clone());
+
+            let response = match request_builder.send().await {
+                Ok(resp) => resp,
+                Err(err) => {
+                    if attempt < self.retry_policy.max_attempts && is_retryable_transport(&err) {
+                        self.sleep_before_retry(attempt).await;
+                        continue;
+                    }
+
+                    return Err(TransportError::Request(err));
+                }
+            };
+
+            let status = response.status();
+            if !status.is_success()
+                && attempt < self.retry_policy.max_attempts
+                && self.retry_policy.should_retry_status(status)
+            {
+                self.sleep_before_retry(attempt).await;
+                continue;
+            }
+
+            let request_id = response
+                .headers()
+                .get(&header_config.request_id_header)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string);
+            let body = response.json::<Value>().await?;
+
+            return Ok(HttpJsonResponse {
+                status,
+                body,
+                request_id,
+            });
+        }
     }
 
     async fn sleep_before_retry(&self, attempt: u8) {
