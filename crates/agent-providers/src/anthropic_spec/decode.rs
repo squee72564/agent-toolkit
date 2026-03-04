@@ -1,8 +1,7 @@
 use serde_json::{Map, Value};
 
 use agent_core::types::{
-    AssistantOutput, ContentPart, FinishReason, Response, ResponseFormat, RuntimeWarning, ToolCall,
-    Usage,
+    AssistantOutput, ContentPart, FinishReason, Response, ResponseFormat, RuntimeWarning, Usage,
 };
 
 use super::schema_rules::{canonicalize_json, extract_first_json_object, stable_json_string};
@@ -202,13 +201,11 @@ fn decode_content_block(
                 ));
             }
 
-            content.push(ContentPart::ToolCall {
-                tool_call: ToolCall {
-                    id: id.to_string(),
-                    name: name.to_string(),
-                    arguments_json: input,
-                },
-            });
+            content.push(ContentPart::tool_call(
+                id.to_string(),
+                name.to_string(),
+                input,
+            ));
             Ok(())
         }
         "thinking" | "redacted_thinking" => {

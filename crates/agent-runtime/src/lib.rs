@@ -6,8 +6,8 @@ use std::time::Duration;
 use thiserror::Error;
 
 use agent_core::types::{
-    AdapterContext, AuthCredentials, Message, MessageRole, PlatformConfig, ProviderId, Request,
-    Response, ResponseFormat, ToolChoice, ToolDefinition,
+    AdapterContext, AuthCredentials, Message, PlatformConfig, ProviderId, Request, Response,
+    ResponseFormat, ToolChoice, ToolDefinition,
 };
 use agent_providers::adapter::{ProviderAdapter, adapter_for};
 use agent_providers::error::{AdapterError, AdapterErrorKind};
@@ -310,10 +310,7 @@ impl MessageCreateInput {
 
 impl From<String> for MessageCreateInput {
     fn from(text: String) -> Self {
-        Self::new(vec![Message {
-            role: MessageRole::User,
-            content: vec![agent_core::types::ContentPart::Text { text }],
-        }])
+        Self::new(vec![Message::user_text(text)])
     }
 }
 

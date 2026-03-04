@@ -1,8 +1,7 @@
 use serde_json::{Map, Value};
 
 use agent_core::types::{
-    AssistantOutput, ContentPart, FinishReason, Response, ResponseFormat, RuntimeWarning, ToolCall,
-    Usage,
+    AssistantOutput, ContentPart, FinishReason, Response, ResponseFormat, RuntimeWarning, Usage,
 };
 
 use super::{OpenAiDecodeEnvelope, OpenAiErrorEnvelope, OpenAiSpecError};
@@ -253,13 +252,11 @@ fn decode_output_tool_call(
         }
     };
 
-    content.push(ContentPart::ToolCall {
-        tool_call: ToolCall {
-            id: call_id.to_string(),
-            name: name.to_string(),
-            arguments_json,
-        },
-    });
+    content.push(ContentPart::tool_call(
+        call_id.to_string(),
+        name.to_string(),
+        arguments_json,
+    ));
 
     Ok(())
 }

@@ -10,7 +10,7 @@ use crate::translator_contract::ProtocolTranslator;
 use agent_core::types::ProviderId;
 use agent_core::types::{
     AssistantOutput, ContentPart, FinishReason, Request, Response, ResponseFormat, RuntimeWarning,
-    ToolCall, Usage,
+    Usage,
 };
 use thiserror::Error;
 
@@ -538,13 +538,7 @@ fn decode_openrouter_tool_calls(
             None => Value::Object(Map::new()),
         };
 
-        content.push(ContentPart::ToolCall {
-            tool_call: ToolCall {
-                id,
-                name: name.to_string(),
-                arguments_json,
-            },
-        });
+        content.push(ContentPart::tool_call(id, name.to_string(), arguments_json));
     }
 
     Ok(())

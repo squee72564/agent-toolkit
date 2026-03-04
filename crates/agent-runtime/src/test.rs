@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use agent_core::types::MessageRole;
+
 use super::*;
 
 #[test]
