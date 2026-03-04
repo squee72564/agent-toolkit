@@ -104,6 +104,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             ContentPart::ToolCall { tool_call } => {
                 println!("tool call: {} {}", tool_call.name, tool_call.arguments_json);
+                convo.push_assistant_tool_call(
+                    tool_call.id.clone(),
+                    tool_call.name.clone(),
+                    tool_call.arguments_json.clone(),
+                );
                 let output = registry
                     .execute_validated(&tool_call.name, tool_call.arguments_json)
                     .await?;
