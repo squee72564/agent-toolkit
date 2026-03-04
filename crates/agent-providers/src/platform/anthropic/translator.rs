@@ -3,9 +3,9 @@ use crate::anthropic_spec::encode::encode_anthropic_request;
 use crate::anthropic_spec::{
     AnthropicDecodeEnvelope, AnthropicEncodedRequest, AnthropicSpecError, AnthropicSpecErrorKind,
 };
-use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation, AdapterProtocol};
+use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
 use crate::translator_contract::ProtocolTranslator;
-use agent_core::types::{Request, Response};
+use agent_core::types::{ProviderId, Request, Response};
 use thiserror::Error;
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -46,7 +46,7 @@ impl From<AnthropicTranslatorError> for AdapterError {
 
         AdapterError::with_source(
             map_spec_error_kind(spec_error.kind()),
-            AdapterProtocol::Anthropic,
+            ProviderId::Anthropic,
             operation,
             spec_error.message().to_string(),
             error,

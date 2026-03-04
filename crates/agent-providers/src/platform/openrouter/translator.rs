@@ -1,12 +1,13 @@
 use serde_json::{Map, Value};
 
-use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation, AdapterProtocol};
+use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
 use crate::openai_spec::decode::decode_openai_response;
 use crate::openai_spec::encode::encode_openai_request;
 use crate::openai_spec::{
     OpenAiDecodeEnvelope, OpenAiEncodedRequest, OpenAiSpecError, OpenAiSpecErrorKind,
 };
 use crate::translator_contract::ProtocolTranslator;
+use agent_core::types::ProviderId;
 use agent_core::types::{
     AssistantOutput, ContentPart, FinishReason, Request, Response, ResponseFormat, RuntimeWarning,
     ToolCall, Usage,
@@ -124,7 +125,7 @@ impl From<OpenRouterTranslatorError> for AdapterError {
 
         AdapterError::with_source(
             map_spec_error_kind(spec_error.kind()),
-            AdapterProtocol::OpenRouter,
+            ProviderId::OpenRouter,
             operation,
             spec_error.message().to_string(),
             error,

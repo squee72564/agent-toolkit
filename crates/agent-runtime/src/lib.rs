@@ -3,29 +3,15 @@ use std::error::Error as StdError;
 use std::sync::Arc;
 use std::time::Duration;
 
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use thiserror::Error;
 
 use agent_core::types::{
-    AdapterContext, AuthCredentials, AuthStyle, Message, MessageRole, PlatformConfig, ProtocolKind,
-    Request, Response, ResponseFormat, ToolChoice, ToolDefinition,
+    AdapterContext, AuthCredentials, Message, MessageRole, PlatformConfig, ProviderId, Request,
+    Response, ResponseFormat, ToolChoice, ToolDefinition,
 };
-use agent_providers::anthropic_spec::AnthropicDecodeEnvelope;
-use agent_providers::error::{AdapterError, AdapterErrorKind, AdapterProtocol};
-use agent_providers::openai_spec::OpenAiDecodeEnvelope;
-use agent_providers::platform::anthropic::translator::AnthropicTranslator;
-use agent_providers::platform::openai::translator::OpenAiTranslator;
-use agent_providers::platform::openrouter::translator::OpenRouterTranslator;
-use agent_providers::translator_contract::ProtocolTranslator;
+use agent_providers::adapter::{ProviderAdapter, adapter_for};
+use agent_providers::error::{AdapterError, AdapterErrorKind};
 use agent_transport::{HttpJsonResponse, HttpTransport, RetryPolicy, TransportError};
-
-const OPENAI_BASE_URL: &str = "https://api.openai.com";
-const ANTHROPIC_BASE_URL: &str = "https://api.anthropic.com";
-const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api";
-
-const OPENAI_ENDPOINT_PATH: &str = "/v1/responses";
-const ANTHROPIC_ENDPOINT_PATH: &str = "/v1/messages";
-const OPENROUTER_ENDPOINT_PATH: &str = "/v1/chat/completions";
 
 const OPENAI_API_KEY_ENV: &str = "OPENAI_API_KEY";
 const OPENAI_BASE_URL_ENV: &str = "OPENAI_BASE_URL";
@@ -36,13 +22,6 @@ const ANTHROPIC_MODEL_ENV: &str = "ANTHROPIC_MODEL";
 const OPENROUTER_API_KEY_ENV: &str = "OPENROUTER_API_KEY";
 const OPENROUTER_BASE_URL_ENV: &str = "OPENROUTER_BASE_URL";
 const OPENROUTER_MODEL_ENV: &str = "OPENROUTER_MODEL";
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ProviderId {
-    OpenAi,
-    Anthropic,
-    OpenRouter,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Target {
@@ -191,11 +170,12 @@ impl RuntimeError {
         let status_code = error.status_code;
         let request_id = error.request_id.clone();
         let provider_code = error.provider_code.clone();
+        let provider = error.provider;
 
         Self {
             kind: map_adapter_error_kind(error.kind),
             message: error.message.clone(),
-            provider: Some(map_adapter_protocol(error.protocol)),
+            provider: Some(provider),
             status_code,
             request_id,
             provider_code,
@@ -924,6 +904,7 @@ impl BaseClientBuilder {
     }
 
     fn build_runtime(self, provider: ProviderId) -> Result<ProviderRuntime, RuntimeError> {
+        let adapter = adapter_for(provider);
         let api_key = self.api_key.ok_or_else(|| {
             RuntimeError::configuration(format!("missing API key for provider {provider:?}"))
         })?;
@@ -952,13 +933,15 @@ impl BaseClientBuilder {
         let transport = transport_builder.build();
         let base_url = self
             .base_url
-            .unwrap_or_else(|| default_base_url_for_provider(provider).to_string());
-        let platform = platform_config_for_provider(provider, base_url)?;
+            .unwrap_or_else(|| adapter.default_base_url().to_string());
+        let platform = adapter
+            .platform_config(base_url)
+            .map_err(|error| RuntimeError::configuration(error.message))?;
 
         Ok(ProviderRuntime {
             provider,
+            adapter,
             platform,
-            endpoint_path: endpoint_path_for_provider(provider),
             auth_token: api_key,
             default_model: self.default_model,
             transport,
@@ -1031,8 +1014,8 @@ impl ProviderClient {
 #[derive(Debug, Clone)]
 struct ProviderRuntime {
     provider: ProviderId,
+    adapter: &'static dyn ProviderAdapter,
     platform: PlatformConfig,
-    endpoint_path: &'static str,
     auth_token: String,
     default_model: Option<String>,
     transport: HttpTransport,
@@ -1079,22 +1062,11 @@ impl ProviderRuntime {
             metadata,
             auth_token: Some(AuthCredentials::Token(self.auth_token.clone())),
         };
-        let url = join_url(&self.platform.base_url, self.endpoint_path);
+        let url = join_url(&self.platform.base_url, self.adapter.endpoint_path());
 
-        let provider_response = match self.provider {
-            ProviderId::OpenAi => {
-                self.execute_openai_attempt(&request, &url, &adapter_context)
-                    .await
-            }
-            ProviderId::Anthropic => {
-                self.execute_anthropic_attempt(&request, &url, &adapter_context)
-                    .await
-            }
-            ProviderId::OpenRouter => {
-                self.execute_openrouter_attempt(&request, &url, &adapter_context)
-                    .await
-            }
-        };
+        let provider_response = self
+            .execute_adapter_attempt(&request, &url, &adapter_context)
+            .await;
 
         match provider_response {
             Ok((response, http_response)) => ProviderAttemptOutcome::Success {
@@ -1148,80 +1120,25 @@ impl ProviderRuntime {
         )))
     }
 
-    async fn execute_openai_attempt(
+    async fn execute_adapter_attempt(
         &self,
         request: &Request,
         url: &str,
         adapter_context: &AdapterContext,
     ) -> Result<(Response, HttpJsonResponse), RuntimeError> {
-        let translator = OpenAiTranslator;
-        let encoded = translator
+        let encoded = self
+            .adapter
             .encode_request(request)
-            .map_err(|error| RuntimeError::from_adapter(error.into()))?;
+            .map_err(RuntimeError::from_adapter)?;
         let provider_response = self
             .transport
             .post_json_value(&self.platform, url, &encoded.body, adapter_context)
             .await
             .map_err(|error| RuntimeError::from_transport(self.provider, error))?;
-        let envelope = OpenAiDecodeEnvelope {
-            body: provider_response.body.clone(),
-            requested_response_format: request.response_format.clone(),
-        };
-        let mut response = translator.decode_request(&envelope).map_err(|error| {
-            self.runtime_error_from_adapter(error.into(), Some(&provider_response))
-        })?;
-        prepend_encode_warnings(&mut response, encoded.warnings);
-        Ok((response, provider_response))
-    }
-
-    async fn execute_anthropic_attempt(
-        &self,
-        request: &Request,
-        url: &str,
-        adapter_context: &AdapterContext,
-    ) -> Result<(Response, HttpJsonResponse), RuntimeError> {
-        let translator = AnthropicTranslator;
-        let encoded = translator
-            .encode_request(request)
-            .map_err(|error| RuntimeError::from_adapter(error.into()))?;
-        let provider_response = self
-            .transport
-            .post_json_value(&self.platform, url, &encoded.body, adapter_context)
-            .await
-            .map_err(|error| RuntimeError::from_transport(self.provider, error))?;
-        let envelope = AnthropicDecodeEnvelope {
-            body: provider_response.body.clone(),
-            requested_response_format: request.response_format.clone(),
-        };
-        let mut response = translator.decode_request(&envelope).map_err(|error| {
-            self.runtime_error_from_adapter(error.into(), Some(&provider_response))
-        })?;
-        prepend_encode_warnings(&mut response, encoded.warnings);
-        Ok((response, provider_response))
-    }
-
-    async fn execute_openrouter_attempt(
-        &self,
-        request: &Request,
-        url: &str,
-        adapter_context: &AdapterContext,
-    ) -> Result<(Response, HttpJsonResponse), RuntimeError> {
-        let translator = OpenRouterTranslator::default();
-        let encoded = translator
-            .encode_request(request)
-            .map_err(|error| RuntimeError::from_adapter(error.into()))?;
-        let provider_response = self
-            .transport
-            .post_json_value(&self.platform, url, &encoded.body, adapter_context)
-            .await
-            .map_err(|error| RuntimeError::from_transport(self.provider, error))?;
-        let envelope = OpenAiDecodeEnvelope {
-            body: provider_response.body.clone(),
-            requested_response_format: request.response_format.clone(),
-        };
-        let mut response = translator.decode_request(&envelope).map_err(|error| {
-            self.runtime_error_from_adapter(error.into(), Some(&provider_response))
-        })?;
+        let mut response = self
+            .adapter
+            .decode_response(&provider_response.body, &request.response_format)
+            .map_err(|error| self.runtime_error_from_adapter(error, Some(&provider_response)))?;
         prepend_encode_warnings(&mut response, encoded.warnings);
         Ok((response, provider_response))
     }
@@ -1284,65 +1201,6 @@ fn trimmed_non_empty(value: &str) -> Option<&str> {
     }
 }
 
-fn default_base_url_for_provider(provider: ProviderId) -> &'static str {
-    match provider {
-        ProviderId::OpenAi => OPENAI_BASE_URL,
-        ProviderId::Anthropic => ANTHROPIC_BASE_URL,
-        ProviderId::OpenRouter => OPENROUTER_BASE_URL,
-    }
-}
-
-fn endpoint_path_for_provider(provider: ProviderId) -> &'static str {
-    match provider {
-        ProviderId::OpenAi => OPENAI_ENDPOINT_PATH,
-        ProviderId::Anthropic => ANTHROPIC_ENDPOINT_PATH,
-        ProviderId::OpenRouter => OPENROUTER_ENDPOINT_PATH,
-    }
-}
-
-fn platform_config_for_provider(
-    provider: ProviderId,
-    base_url: String,
-) -> Result<PlatformConfig, RuntimeError> {
-    let request_id_header = match provider {
-        ProviderId::OpenAi | ProviderId::OpenRouter => HeaderName::from_static("x-request-id"),
-        ProviderId::Anthropic => HeaderName::from_static("request-id"),
-    };
-
-    let mut default_headers = HeaderMap::new();
-    if provider == ProviderId::Anthropic {
-        default_headers.insert(
-            HeaderName::from_static("anthropic-version"),
-            HeaderValue::from_static("2023-06-01"),
-        );
-    }
-
-    let auth_style = match provider {
-        ProviderId::OpenAi | ProviderId::OpenRouter => AuthStyle::Bearer,
-        ProviderId::Anthropic => AuthStyle::ApiKeyHeader(HeaderName::from_static("x-api-key")),
-    };
-
-    let protocol = match provider {
-        ProviderId::Anthropic => ProtocolKind::Anthropic,
-        ProviderId::OpenAi | ProviderId::OpenRouter => ProtocolKind::OpenAI,
-    };
-
-    let trimmed_base_url = base_url.trim().to_string();
-    if trimmed_base_url.is_empty() {
-        return Err(RuntimeError::configuration(format!(
-            "base_url is empty for provider {provider:?}"
-        )));
-    }
-
-    Ok(PlatformConfig {
-        protocol,
-        base_url: trimmed_base_url,
-        auth_style,
-        request_id_header,
-        default_headers,
-    })
-}
-
 fn map_adapter_error_kind(kind: AdapterErrorKind) -> RuntimeErrorKind {
     match kind {
         AdapterErrorKind::Validation => RuntimeErrorKind::Validation,
@@ -1352,14 +1210,6 @@ fn map_adapter_error_kind(kind: AdapterErrorKind) -> RuntimeErrorKind {
         AdapterErrorKind::UnsupportedFeature => RuntimeErrorKind::UnsupportedFeature,
         AdapterErrorKind::Upstream => RuntimeErrorKind::Upstream,
         AdapterErrorKind::Transport => RuntimeErrorKind::Transport,
-    }
-}
-
-fn map_adapter_protocol(protocol: AdapterProtocol) -> ProviderId {
-    match protocol {
-        AdapterProtocol::OpenAI => ProviderId::OpenAi,
-        AdapterProtocol::Anthropic => ProviderId::Anthropic,
-        AdapterProtocol::OpenRouter => ProviderId::OpenRouter,
     }
 }
 

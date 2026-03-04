@@ -2,9 +2,10 @@ use std::collections::BTreeMap;
 
 use serde_json::{Map, json};
 
-use crate::error::{AdapterErrorKind, AdapterOperation, AdapterProtocol};
+use crate::error::{AdapterErrorKind, AdapterOperation};
 use crate::openai_spec::{OpenAiDecodeEnvelope, OpenAiSpecError};
 use crate::translator_contract::ProtocolTranslator;
+use agent_core::types::ProviderId;
 use agent_core::types::{ContentPart, Message, MessageRole, Request, ResponseFormat, ToolChoice};
 
 use super::translator::{OpenRouterOverrides, OpenRouterTranslator, OpenRouterTranslatorError};
@@ -35,7 +36,7 @@ fn maps_openrouter_encode_error_into_adapter_error() {
         OpenRouterTranslatorError::Encode(OpenAiSpecError::validation("bad request"));
     let adapter_error: crate::error::AdapterError = translator_error.into();
 
-    assert_eq!(adapter_error.protocol, AdapterProtocol::OpenRouter);
+    assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
     assert_eq!(adapter_error.operation, AdapterOperation::EncodeRequest);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Validation);
     assert_eq!(adapter_error.message, "bad request");
@@ -48,7 +49,7 @@ fn maps_openrouter_upstream_error_into_adapter_error() {
     });
     let adapter_error: crate::error::AdapterError = translator_error.into();
 
-    assert_eq!(adapter_error.protocol, AdapterProtocol::OpenRouter);
+    assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Upstream);
     assert_eq!(adapter_error.message, "provider failure");

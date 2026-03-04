@@ -1,11 +1,11 @@
-use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation, AdapterProtocol};
+use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
 use crate::openai_spec::decode::decode_openai_response;
 use crate::openai_spec::encode::encode_openai_request;
 use crate::openai_spec::{
     OpenAiDecodeEnvelope, OpenAiEncodedRequest, OpenAiSpecError, OpenAiSpecErrorKind,
 };
 use crate::translator_contract::ProtocolTranslator;
-use agent_core::types::{Request, Response};
+use agent_core::types::{ProviderId, Request, Response};
 use thiserror::Error;
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -46,7 +46,7 @@ impl From<OpenAiTranslatorError> for AdapterError {
 
         AdapterError::with_source(
             map_spec_error_kind(spec_error.kind()),
-            AdapterProtocol::OpenAI,
+            ProviderId::OpenAi,
             operation,
             spec_error.message().to_string(),
             error,

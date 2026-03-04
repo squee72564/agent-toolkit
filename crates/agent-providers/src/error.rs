@@ -1,13 +1,7 @@
 use std::error::Error as StdError;
 
+use agent_core::types::ProviderId;
 use thiserror::Error;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AdapterProtocol {
-    OpenAI,
-    OpenRouter,
-    Anthropic,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AdapterOperation {
@@ -29,10 +23,10 @@ pub enum AdapterErrorKind {
 }
 
 #[derive(Debug, Error)]
-#[error("{protocol:?}::{operation:?}::{kind:?}: {message}")]
+#[error("{provider:?}::{operation:?}::{kind:?}: {message}")]
 pub struct AdapterError {
     pub kind: AdapterErrorKind,
-    pub protocol: AdapterProtocol,
+    pub provider: ProviderId,
     pub operation: AdapterOperation,
     pub message: String,
     #[source]
@@ -45,13 +39,13 @@ pub struct AdapterError {
 impl AdapterError {
     pub fn new(
         kind: AdapterErrorKind,
-        protocol: AdapterProtocol,
+        provider: ProviderId,
         operation: AdapterOperation,
         message: impl Into<String>,
     ) -> Self {
         Self {
             kind,
-            protocol,
+            provider,
             operation,
             message: message.into(),
             source: None,
@@ -63,7 +57,7 @@ impl AdapterError {
 
     pub fn with_source<E>(
         kind: AdapterErrorKind,
-        protocol: AdapterProtocol,
+        provider: ProviderId,
         operation: AdapterOperation,
         message: impl Into<String>,
         source: E,
@@ -73,7 +67,7 @@ impl AdapterError {
     {
         Self {
             kind,
-            protocol,
+            provider,
             operation,
             message: message.into(),
             source: Some(Box::new(source)),

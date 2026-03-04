@@ -1,5 +1,6 @@
-use crate::error::{AdapterErrorKind, AdapterOperation, AdapterProtocol};
+use crate::error::{AdapterErrorKind, AdapterOperation};
 use crate::openai_spec::OpenAiSpecError;
+use agent_core::types::ProviderId;
 
 use super::translator::{OpenAiTranslator, OpenAiTranslatorError};
 
@@ -9,7 +10,7 @@ fn maps_openai_encode_error_into_adapter_error() {
         OpenAiTranslatorError::Encode(OpenAiSpecError::validation("bad request"));
     let adapter_error: crate::error::AdapterError = translator_error.into();
 
-    assert_eq!(adapter_error.protocol, AdapterProtocol::OpenAI);
+    assert_eq!(adapter_error.provider, ProviderId::OpenAi);
     assert_eq!(adapter_error.operation, AdapterOperation::EncodeRequest);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Validation);
     assert_eq!(adapter_error.message, "bad request");
@@ -24,7 +25,7 @@ fn maps_openai_decode_error_into_adapter_error() {
     });
     let adapter_error: crate::error::AdapterError = translator_error.into();
 
-    assert_eq!(adapter_error.protocol, AdapterProtocol::OpenAI);
+    assert_eq!(adapter_error.provider, ProviderId::OpenAi);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Decode);
     assert_eq!(adapter_error.message, "bad response");
@@ -37,7 +38,7 @@ fn maps_openai_upstream_error_into_adapter_error() {
     });
     let adapter_error: crate::error::AdapterError = translator_error.into();
 
-    assert_eq!(adapter_error.protocol, AdapterProtocol::OpenAI);
+    assert_eq!(adapter_error.provider, ProviderId::OpenAi);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Upstream);
     assert_eq!(adapter_error.message, "provider said no");
