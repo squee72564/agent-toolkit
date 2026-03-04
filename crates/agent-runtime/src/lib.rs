@@ -326,6 +326,175 @@ impl From<Vec<Message>> for MessageCreateInput {
     }
 }
 
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Conversation {
+    messages: Vec<Message>,
+}
+
+impl Conversation {
+    /// Creates an empty conversation.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use agent_runtime::Conversation;
+    ///
+    /// let conversation = Conversation::new();
+    /// assert!(conversation.is_empty());
+    /// ```
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Creates a conversation from an existing message history.
+    pub fn from_messages(messages: Vec<Message>) -> Self {
+        Self { messages }
+    }
+
+    /// Creates a conversation initialized with one user text message.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use agent_runtime::Conversation;
+    ///
+    /// let conversation = Conversation::with_user_text("Hello");
+    /// assert_eq!(conversation.len(), 1);
+    /// ```
+    pub fn with_user_text(text: impl Into<String>) -> Self {
+        Self::from_messages(vec![Message::user_text(text)])
+    }
+
+    pub fn len(&self) -> usize {
+        self.messages.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.messages.is_empty()
+    }
+
+    pub fn messages(&self) -> &[Message] {
+        &self.messages
+    }
+
+    pub fn clone_messages(&self) -> Vec<Message> {
+        self.messages.clone()
+    }
+
+    pub fn push_message(&mut self, message: Message) {
+        self.messages.push(message);
+    }
+
+    pub fn extend_messages<I>(&mut self, messages: I)
+    where
+        I: IntoIterator<Item = Message>,
+    {
+        self.messages.extend(messages);
+    }
+
+    pub fn push_user_text(&mut self, text: impl Into<String>) {
+        self.push_message(Message::user_text(text));
+    }
+
+    pub fn push_system_text(&mut self, text: impl Into<String>) {
+        self.push_message(Message::system_text(text));
+    }
+
+    pub fn push_assistant_text(&mut self, text: impl Into<String>) {
+        self.push_message(Message::assistant_text(text));
+    }
+
+    pub fn push_assistant_tool_call(
+        &mut self,
+        id: impl Into<String>,
+        name: impl Into<String>,
+        arguments_json: serde_json::Value,
+    ) {
+        self.push_message(Message::assistant_tool_call(id, name, arguments_json));
+    }
+
+    pub fn push_tool_result_json(
+        &mut self,
+        tool_call_id: impl Into<String>,
+        value: serde_json::Value,
+    ) {
+        self.push_message(Message::tool_result_json(tool_call_id, value));
+    }
+
+    pub fn push_tool_result_text(
+        &mut self,
+        tool_call_id: impl Into<String>,
+        text: impl Into<String>,
+    ) {
+        self.push_message(Message::tool_result_text(tool_call_id, text));
+    }
+
+    pub fn clear(&mut self) {
+        self.messages.clear();
+    }
+
+    /// Creates a `MessageCreateInput` that preserves this conversation's messages.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use agent_runtime::Conversation;
+    ///
+    /// let mut conversation = Conversation::with_user_text("What's 2 + 2?");
+    /// conversation.push_assistant_text("4");
+    ///
+    /// let input = conversation.to_input();
+    /// assert_eq!(input.messages.len(), 2);
+    /// assert!(input.model.is_none());
+    /// ```
+    pub fn to_input(&self) -> MessageCreateInput {
+        MessageCreateInput::new(self.clone_messages())
+    }
+
+    /// Consumes this conversation and converts it into a `MessageCreateInput`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use agent_runtime::Conversation;
+    /// use serde_json::json;
+    ///
+    /// let mut conversation = Conversation::with_user_text("Search for Rust traits");
+    /// conversation.push_assistant_tool_call("call_1", "search", json!({ "q": "rust traits" }));
+    /// conversation.push_tool_result_text("call_1", "Found official Rust book chapter.");
+    ///
+    /// let input = conversation.into_input();
+    /// assert_eq!(input.messages.len(), 3);
+    /// ```
+    pub fn into_input(self) -> MessageCreateInput {
+        MessageCreateInput::new(self.messages)
+    }
+}
+
+impl From<Vec<Message>> for Conversation {
+    fn from(messages: Vec<Message>) -> Self {
+        Self::from_messages(messages)
+    }
+}
+
+impl From<Conversation> for Vec<Message> {
+    fn from(conversation: Conversation) -> Self {
+        conversation.messages
+    }
+}
+
+impl From<Conversation> for MessageCreateInput {
+    fn from(conversation: Conversation) -> Self {
+        conversation.into_input()
+    }
+}
+
+impl From<&Conversation> for MessageCreateInput {
+    fn from(conversation: &Conversation) -> Self {
+        conversation.to_input()
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct ProviderConfig {
     pub api_key: String,

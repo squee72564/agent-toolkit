@@ -21,9 +21,10 @@ pub mod tools {
 pub use agent_core::types::*;
 pub use agent_runtime::{
     AgentToolkit, AgentToolkitBuilder, AnthropicClient, AnthropicClientBuilder, AttemptMeta,
-    FallbackPolicy, MessageCreateInput, MessagesApi, OpenAiClient, OpenAiClientBuilder,
-    OpenRouterClient, OpenRouterClientBuilder, ProviderConfig, ResponseMeta, RouterMessagesApi,
-    RuntimeError, RuntimeErrorKind, SendOptions, Target, anthropic, openai, openrouter,
+    Conversation, FallbackPolicy, MessageCreateInput, MessagesApi, OpenAiClient,
+    OpenAiClientBuilder, OpenRouterClient, OpenRouterClientBuilder, ProviderConfig, ResponseMeta,
+    RouterMessagesApi, RuntimeError, RuntimeErrorKind, SendOptions, Target, anthropic, openai,
+    openrouter,
 };
 pub use agent_transport::{
     HttpJsonResponse, HttpTransport, HttpTransportBuilder, RetryPolicy, TransportError,
