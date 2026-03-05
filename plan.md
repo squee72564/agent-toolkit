@@ -152,7 +152,7 @@ Harden every Rust file in a controlled, repeatable cycle: discover risk, apply f
 ### crate: `agent-tools`
 - [x] crates/agent-tools/src/builder.rs
 - [x] crates/agent-tools/src/lib.rs
-- [ ] crates/agent-tools/src/schema.rs
+- [x] crates/agent-tools/src/schema.rs
 - [ ] crates/agent-tools/tests/registry_test.rs
 - [ ] crates/agent-tools/tests/schema_test.rs
 - [ ] crates/agent-tools/tests/tool_builder_test.rs
