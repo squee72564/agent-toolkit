@@ -2,6 +2,15 @@
 name = "agent-runtime"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Runtime client builders and routing primitives for agent-toolkit."
 
 [dependencies]
 agent-core = { path = "../agent-core" }
@@ -12,3 +21,6 @@ reqwest.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+
+[lints]
+workspace = true

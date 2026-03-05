@@ -2,6 +2,15 @@
 name = "agent_toolkit"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Facade crate re-exporting the agent-toolkit workspace APIs."
 
 [features]
 default = []
@@ -13,3 +22,6 @@ agent-providers = { path = "../agent-providers" }
 agent-runtime = { path = "../agent-runtime" }
 agent-tools = { path = "../agent-tools" }
 agent-transport = { path = "../agent-transport" }
+
+[lints]
+workspace = true

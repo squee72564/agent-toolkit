@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_live_tests:
+        description: "Run credentialed live tests"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust from rust-toolchain.toml
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Cache Rust artifacts
+        uses: swatinem/rust-cache@v2
+
+      - name: cargo check
+        run: cargo check --workspace --all-targets --locked
+
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy all targets
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: cargo test
+        run: cargo test --workspace --all-targets --all-features
+
+      - name: cargo doc
+        run: RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --document-private-items
+
+  clippy_strict_non_test:
+    name: clippy_strict_non_test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust from rust-toolchain.toml
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Cache Rust artifacts
+        uses: swatinem/rust-cache@v2
+
+      - name: Deny unwrap/expect/panic on non-test targets
+        run: cargo clippy --workspace --lib --bins --all-features -- -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic
+
+  msrv_floor:
+    name: msrv_floor
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust 1.85 floor
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: "1.85.0"
+
+      - name: Cache Rust artifacts
+        uses: swatinem/rust-cache@v2
+
+      - name: cargo check msrv floor
+        run: cargo check --workspace --all-targets --locked
+
+  live_tests:
+    name: live_tests
+    runs-on: ubuntu-latest
+    if: >-
+      ${{
+        (github.event_name == 'workflow_dispatch' && (inputs.run_live_tests == true || inputs.run_live_tests == 'true')) ||
+        vars.RUN_LIVE_TESTS == 'true'
+      }}
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust from rust-toolchain.toml
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Cache Rust artifacts
+        uses: swatinem/rust-cache@v2
+
+      - name: Preflight required credentials
+        id: preflight
+        shell: bash
+        run: |
+          missing=()
+          for var in OPENAI_API_KEY ANTHROPIC_API_KEY OPENROUTER_API_KEY; do
+            if [ -z "${!var}" ]; then
+              missing+=("$var")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping live tests: missing required credentials: ${missing[*]}"
+          else
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "All required credentials are present; running live tests."
+          fi
+
+      - name: Run live tests
+        if: steps.preflight.outputs.should_run == 'true'
+        run: cargo test -p agent_toolkit --features live-tests
+
+      - name: Live tests skipped
+        if: steps.preflight.outputs.should_run != 'true'
+        run: echo "live_tests job completed with deterministic skip."

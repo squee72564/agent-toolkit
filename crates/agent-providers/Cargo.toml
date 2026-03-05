@@ -2,6 +2,15 @@
 name = "agent-providers"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Provider protocol adapters and translations for agent-toolkit."
 
 [dependencies]
 agent-core = { path = "../agent-core" }
@@ -12,3 +21,6 @@ thiserror.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true
+
+[lints]
+workspace = true

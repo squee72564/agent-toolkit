@@ -321,3 +321,50 @@ Observer precedence is `SendOptions::with_observer(...)` > `AgentToolkit::builde
 - `agent-runtime`: high-level clients (`openai()`, `anthropic()`, `openrouter()`), toolkit routing/fallback orchestration, and unified adapter-driven execution flow.
 - `agent-transport`: HTTP transport implementation with retry support, auth/header handling, and JSON request/response helpers.
 - `agent-tools`: lightweight tool trait and registry primitives for tool integration.
+
+## TODO 
+- built-in tool-execution loop (agent-runner) over Response::ToolCalls.
+- streaming responses API (token/tool-call deltas).
+- preserve and expose reasoning/thinking content instead of dropping it.
+- multimodal input support (images/files in message content)
+
+## Release-readiness quality gates
+
+This workspace uses deterministic release-readiness gates in CI:
+
+1. `cargo check --workspace --all-targets --locked`
+2. `cargo fmt --all -- --check`
+3. `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+4. `cargo clippy --workspace --lib --all-features -- -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic`
+5. `cargo test --workspace --all-targets --all-features`
+6. `RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --document-private-items`
+
+`clippy::unwrap_used`, `clippy::expect_used`, and `clippy::panic` are intentionally enforced on non-test targets in this milestone. Existing test code remains outside full migration scope for now.
+
+## Deterministic vs live tests
+
+The default CI quality path is deterministic and does not make outbound provider calls.
+
+Live provider tests are opt-in and only run when explicitly requested in workflow dispatch or when `RUN_LIVE_TESTS=true` is configured in repository variables. The live test contract requires:
+
+- `OPENAI_API_KEY`
+- `ANTHROPIC_API_KEY`
+- `OPENROUTER_API_KEY`
+
+If credentials are missing, the `live_tests` job exits with a clear deterministic skip message.
+
+## Toolchain and compatibility policy
+
+- Toolchain source of truth: `rust-toolchain.toml` (`stable`, with `rustfmt` + `clippy`).
+- Workspace compatibility floor: `rust-version = "1.85"`.
+- Workspace lint policy is centralized in root `Cargo.toml` and inherited in all crates via `[lints] workspace = true`.
+
+## Publish-readiness metadata
+
+Workspace crate metadata is normalized for release readiness (license, repository/homepage/documentation, readme, keywords, categories, descriptions).
+
+Maintainers can validate publish readiness per crate using:
+
+```bash
+cargo publish --dry-run -p <crate-name>
+```
