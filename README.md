@@ -155,6 +155,71 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+### Observability hooks
+
+```rust
+use std::sync::Arc;
+
+use agent_toolkit::{
+    openai, AgentToolkit, MessageCreateInput, ProviderConfig, RequestEndEvent, RequestStartEvent,
+    RuntimeObserver, SendOptions, Target, ProviderId,
+};
+
+#[derive(Debug)]
+struct PrintObserver;
+
+impl RuntimeObserver for PrintObserver {
+    fn on_request_start(&self, event: &RequestStartEvent) {
+        println!("request started: provider={:?} model={:?}", event.provider, event.model);
+    }
+
+    fn on_request_end(&self, event: &RequestEndEvent) {
+        println!(
+            "request ended: status={:?} error_kind={:?}",
+            event.status_code, event.error_kind
+        );
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let observer: Arc<dyn RuntimeObserver> = Arc::new(PrintObserver);
+
+    let client = openai()
+        .api_key(std::env::var("OPENAI_API_KEY")?)
+        .default_model("gpt-5-mini")
+        .observer(observer.clone())
+        .build()?;
+
+    let _ = client
+        .messages()
+        .create(MessageCreateInput::user("Say hi in five words."))
+        .await?;
+
+    let toolkit = AgentToolkit::builder()
+        .with_openai(
+            ProviderConfig::new(std::env::var("OPENAI_API_KEY")?).with_default_model("gpt-5-mini"),
+        )
+        .observer(observer.clone())
+        .build()?;
+
+    let per_call_observer: Arc<dyn RuntimeObserver> = Arc::new(PrintObserver);
+    let _ = toolkit
+        .messages()
+        .create(
+            MessageCreateInput::user("One sentence about Rust."),
+            SendOptions::for_target(Target::new(ProviderId::OpenAi))
+                .with_observer(per_call_observer),
+        )
+        .await?;
+
+    Ok(())
+}
+```
+
+Observer precedence is `SendOptions::with_observer(...)` > `AgentToolkit::builder().observer(...)` > provider-client builder `.observer(...)`. Observer callback panics are isolated and never propagate into request results.
+
 ## Workspace Layout
 
 ```text

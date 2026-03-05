@@ -191,6 +191,7 @@ fn fallback_policy_rules_only_no_match_does_not_fallback() {
 fn router_requires_explicit_target_without_policy() {
     let toolkit = AgentToolkit {
         clients: HashMap::new(),
+        observer: None,
     };
     let error = toolkit
         .resolve_targets(&SendOptions::default())
@@ -362,4 +363,71 @@ fn conversation_messages_and_clone_messages_expose_expected_views() {
     assert_eq!(borrowed, cloned.as_slice());
     assert_eq!(borrowed[0], Message::user_text("u1"));
     assert_eq!(borrowed[1], Message::assistant_text("a1"));
+}
+
+#[derive(Debug)]
+struct ObserverStub;
+
+impl RuntimeObserver for ObserverStub {}
+
+#[test]
+fn resolve_observer_for_request_uses_expected_precedence() {
+    let client_observer: std::sync::Arc<dyn RuntimeObserver> = std::sync::Arc::new(ObserverStub);
+    let toolkit_observer: std::sync::Arc<dyn RuntimeObserver> = std::sync::Arc::new(ObserverStub);
+    let send_observer: std::sync::Arc<dyn RuntimeObserver> = std::sync::Arc::new(ObserverStub);
+
+    let resolved_send = resolve_observer_for_request(
+        Some(&client_observer),
+        Some(&toolkit_observer),
+        Some(&send_observer),
+    )
+    .expect("send observer should resolve");
+    assert!(std::sync::Arc::ptr_eq(resolved_send, &send_observer));
+
+    let resolved_toolkit =
+        resolve_observer_for_request(Some(&client_observer), Some(&toolkit_observer), None)
+            .expect("toolkit observer should resolve");
+    assert!(std::sync::Arc::ptr_eq(resolved_toolkit, &toolkit_observer));
+
+    let resolved_client = resolve_observer_for_request(Some(&client_observer), None, None)
+        .expect("client observer should resolve");
+    assert!(std::sync::Arc::ptr_eq(resolved_client, &client_observer));
+
+    let resolved_none = resolve_observer_for_request(None, None, None);
+    assert!(resolved_none.is_none());
+}
+
+#[test]
+fn send_options_with_observer_keeps_clone_and_partial_eq_pointer_semantics() {
+    let observer: std::sync::Arc<dyn RuntimeObserver> = std::sync::Arc::new(ObserverStub);
+    let options = SendOptions::for_target(Target::new(ProviderId::OpenAi)).with_observer(observer);
+
+    let cloned = options.clone();
+    assert_eq!(options, cloned);
+    assert!(options.observer.is_some());
+
+    let other_observer: std::sync::Arc<dyn RuntimeObserver> = std::sync::Arc::new(ObserverStub);
+    let different =
+        SendOptions::for_target(Target::new(ProviderId::OpenAi)).with_observer(other_observer);
+    assert_ne!(options, different);
+}
+
+#[test]
+fn terminal_failure_error_returns_underlying_for_fallback_exhausted() {
+    let terminal = RuntimeError {
+        kind: RuntimeErrorKind::Upstream,
+        message: "terminal upstream error".to_string(),
+        provider: Some(ProviderId::OpenAi),
+        status_code: Some(503),
+        request_id: Some("req_terminal".to_string()),
+        provider_code: Some("rate_limit_exceeded".to_string()),
+        source: None,
+    };
+
+    let wrapped = RuntimeError::fallback_exhausted(terminal);
+    let extracted = terminal_failure_error(&wrapped);
+
+    assert_eq!(extracted.kind, RuntimeErrorKind::Upstream);
+    assert_eq!(extracted.status_code, Some(503));
+    assert_eq!(extracted.request_id.as_deref(), Some("req_terminal"));
 }

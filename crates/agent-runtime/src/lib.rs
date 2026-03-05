@@ -228,11 +228,78 @@ impl Default for FallbackPolicy {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub trait RuntimeObserver: Send + Sync {
+    fn on_request_start(&self, _event: &RequestStartEvent) {}
+    fn on_attempt_start(&self, _event: &AttemptStartEvent) {}
+    fn on_attempt_success(&self, _event: &AttemptSuccessEvent) {}
+    fn on_attempt_failure(&self, _event: &AttemptFailureEvent) {}
+    fn on_request_end(&self, _event: &RequestEndEvent) {}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequestStartEvent {
+    pub request_id: Option<String>,
+    pub provider: Option<ProviderId>,
+    pub model: Option<String>,
+    pub target_index: Option<usize>,
+    pub attempt_index: Option<usize>,
+    pub elapsed: Duration,
+    pub first_target: Option<ProviderId>,
+    pub resolved_target_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttemptStartEvent {
+    pub request_id: Option<String>,
+    pub provider: Option<ProviderId>,
+    pub model: Option<String>,
+    pub target_index: Option<usize>,
+    pub attempt_index: Option<usize>,
+    pub elapsed: Duration,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttemptSuccessEvent {
+    pub request_id: Option<String>,
+    pub provider: Option<ProviderId>,
+    pub model: Option<String>,
+    pub target_index: Option<usize>,
+    pub attempt_index: Option<usize>,
+    pub elapsed: Duration,
+    pub status_code: Option<u16>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttemptFailureEvent {
+    pub request_id: Option<String>,
+    pub provider: Option<ProviderId>,
+    pub model: Option<String>,
+    pub target_index: Option<usize>,
+    pub attempt_index: Option<usize>,
+    pub elapsed: Duration,
+    pub error_kind: Option<RuntimeErrorKind>,
+    pub error_message: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequestEndEvent {
+    pub request_id: Option<String>,
+    pub provider: Option<ProviderId>,
+    pub model: Option<String>,
+    pub target_index: Option<usize>,
+    pub attempt_index: Option<usize>,
+    pub elapsed: Duration,
+    pub status_code: Option<u16>,
+    pub error_kind: Option<RuntimeErrorKind>,
+    pub error_message: Option<String>,
+}
+
+#[derive(Clone, Default)]
 pub struct SendOptions {
     pub target: Option<Target>,
     pub fallback_policy: Option<FallbackPolicy>,
     pub metadata: BTreeMap<String, String>,
+    pub observer: Option<Arc<dyn RuntimeObserver>>,
 }
 
 impl SendOptions {
@@ -246,6 +313,56 @@ impl SendOptions {
     pub fn with_fallback_policy(mut self, fallback_policy: FallbackPolicy) -> Self {
         self.fallback_policy = Some(fallback_policy);
         self
+    }
+
+    pub fn with_observer(mut self, observer: Arc<dyn RuntimeObserver>) -> Self {
+        self.observer = Some(observer);
+        self
+    }
+}
+
+impl std::fmt::Debug for SendOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SendOptions")
+            .field("target", &self.target)
+            .field("fallback_policy", &self.fallback_policy)
+            .field("metadata", &self.metadata)
+            .field("observer", &self.observer.as_ref().map(|_| "configured"))
+            .finish()
+    }
+}
+
+impl PartialEq for SendOptions {
+    fn eq(&self, other: &Self) -> bool {
+        self.target == other.target
+            && self.fallback_policy == other.fallback_policy
+            && self.metadata == other.metadata
+            && match (&self.observer, &other.observer) {
+                (Some(lhs), Some(rhs)) => Arc::ptr_eq(lhs, rhs),
+                (None, None) => true,
+                _ => false,
+            }
+    }
+}
+
+impl Eq for SendOptions {}
+
+fn resolve_observer_for_request<'a>(
+    client_observer: Option<&'a Arc<dyn RuntimeObserver>>,
+    toolkit_observer: Option<&'a Arc<dyn RuntimeObserver>>,
+    send_observer: Option<&'a Arc<dyn RuntimeObserver>>,
+) -> Option<&'a Arc<dyn RuntimeObserver>> {
+    send_observer.or(toolkit_observer).or(client_observer)
+}
+
+fn safe_call_observer(
+    observer: Option<&Arc<dyn RuntimeObserver>>,
+    call: impl FnOnce(&dyn RuntimeObserver),
+) {
+    if let Some(observer) = observer {
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            call(observer.as_ref());
+        }));
     }
 }
 
@@ -848,6 +965,11 @@ impl OpenAiClientBuilder {
         self
     }
 
+    pub fn observer(mut self, observer: Arc<dyn RuntimeObserver>) -> Self {
+        self.inner.observer = Some(observer);
+        self
+    }
+
     pub fn build(self) -> Result<OpenAiClient, RuntimeError> {
         let provider_runtime = self.inner.build_runtime(ProviderId::OpenAi)?;
         Ok(OpenAiClient {
@@ -889,6 +1011,11 @@ impl AnthropicClientBuilder {
 
     pub fn client(mut self, client: reqwest::Client) -> Self {
         self.inner.client = Some(client);
+        self
+    }
+
+    pub fn observer(mut self, observer: Arc<dyn RuntimeObserver>) -> Self {
+        self.inner.observer = Some(observer);
         self
     }
 
@@ -936,6 +1063,11 @@ impl OpenRouterClientBuilder {
         self
     }
 
+    pub fn observer(mut self, observer: Arc<dyn RuntimeObserver>) -> Self {
+        self.inner.observer = Some(observer);
+        self
+    }
+
     pub fn build(self) -> Result<OpenRouterClient, RuntimeError> {
         let provider_runtime = self.inner.build_runtime(ProviderId::OpenRouter)?;
         Ok(OpenRouterClient {
@@ -976,9 +1108,19 @@ impl MessagesApi<'_> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AgentToolkit {
     clients: HashMap<ProviderId, ProviderClient>,
+    observer: Option<Arc<dyn RuntimeObserver>>,
+}
+
+impl std::fmt::Debug for AgentToolkit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AgentToolkit")
+            .field("clients", &self.clients)
+            .field("observer", &self.observer.as_ref().map(|_| "configured"))
+            .finish()
+    }
 }
 
 impl AgentToolkit {
@@ -1005,18 +1147,95 @@ impl AgentToolkit {
         request: Request,
         options: SendOptions,
     ) -> Result<(Response, ResponseMeta), RuntimeError> {
+        let request_started_at = std::time::Instant::now();
         let targets = self.resolve_targets(&options)?;
+        let first_client_observer = targets
+            .first()
+            .and_then(|target| self.clients.get(&target.provider))
+            .and_then(|client| client.runtime.observer.as_ref());
+        let request_observer = resolve_observer_for_request(
+            first_client_observer,
+            self.observer.as_ref(),
+            options.observer.as_ref(),
+        );
+        let request_start_event = RequestStartEvent {
+            request_id: None,
+            provider: targets.first().map(|target| target.provider),
+            model: targets
+                .first()
+                .and_then(|target| target.model.clone())
+                .or_else(|| {
+                    if request.model_id.is_empty() {
+                        None
+                    } else {
+                        Some(request.model_id.clone())
+                    }
+                }),
+            target_index: None,
+            attempt_index: None,
+            elapsed: request_started_at.elapsed(),
+            first_target: targets.first().map(|target| target.provider),
+            resolved_target_count: targets.len(),
+        };
+        safe_call_observer(request_observer, |observer| {
+            observer.on_request_start(&request_start_event)
+        });
+
         let fallback_policy = options.fallback_policy.clone();
         let mut attempts = Vec::new();
         let mut last_error: Option<RuntimeError> = None;
 
         for (index, target) in targets.iter().enumerate() {
             let Some(client) = self.clients.get(&target.provider) else {
-                return Err(RuntimeError::target_resolution(format!(
+                let error = RuntimeError::target_resolution(format!(
                     "provider {:?} is not registered",
                     target.provider
-                )));
+                ));
+                let request_end_event = RequestEndEvent {
+                    request_id: error.request_id.clone(),
+                    provider: Some(target.provider),
+                    model: target.model.clone().or_else(|| {
+                        if request.model_id.is_empty() {
+                            None
+                        } else {
+                            Some(request.model_id.clone())
+                        }
+                    }),
+                    target_index: Some(index),
+                    attempt_index: Some(index),
+                    elapsed: request_started_at.elapsed(),
+                    status_code: error.status_code,
+                    error_kind: Some(error.kind),
+                    error_message: Some(error.message.clone()),
+                };
+                safe_call_observer(request_observer, |runtime_observer| {
+                    runtime_observer.on_request_end(&request_end_event);
+                });
+                return Err(error);
             };
+            let observer = resolve_observer_for_request(
+                client.runtime.observer.as_ref(),
+                self.observer.as_ref(),
+                options.observer.as_ref(),
+            );
+            let attempt_started_at = std::time::Instant::now();
+            let attempt_start_event = AttemptStartEvent {
+                request_id: None,
+                provider: Some(target.provider),
+                model: target.model.clone().or_else(|| {
+                    if request.model_id.is_empty() {
+                        None
+                    } else {
+                        Some(request.model_id.clone())
+                    }
+                }),
+                target_index: Some(index),
+                attempt_index: Some(index),
+                elapsed: attempt_started_at.elapsed(),
+            };
+            safe_call_observer(observer, |runtime_observer| {
+                runtime_observer.on_attempt_start(&attempt_start_event);
+            });
 
             let attempt = client
                 .runtime
@@ -1029,6 +1248,19 @@ impl AgentToolkit {
 
             match attempt {
                 ProviderAttemptOutcome::Success { response, meta } => {
+                    let attempt_success_event = AttemptSuccessEvent {
+                        request_id: meta.request_id.clone(),
+                        provider: Some(meta.provider),
+                        model: Some(meta.model.clone()),
+                        target_index: Some(index),
+                        attempt_index: Some(index),
+                        elapsed: attempt_started_at.elapsed(),
+                        status_code: meta.status_code,
+                    };
+                    safe_call_observer(observer, |runtime_observer| {
+                        runtime_observer.on_attempt_success(&attempt_success_event);
+                    });
+
                     attempts.push(meta.clone());
                     let response_meta = ResponseMeta {
                         selected_provider: meta.provider,
@@ -1037,9 +1269,38 @@ impl AgentToolkit {
                         request_id: meta.request_id.clone(),
                         attempts,
                     };
+
+                    let request_end_event = RequestEndEvent {
+                        request_id: response_meta.request_id.clone(),
+                        provider: Some(response_meta.selected_provider),
+                        model: Some(response_meta.selected_model.clone()),
+                        target_index: Some(index),
+                        attempt_index: Some(index),
+                        elapsed: request_started_at.elapsed(),
+                        status_code: response_meta.status_code,
+                        error_kind: None,
+                        error_message: None,
+                    };
+                    safe_call_observer(observer, |runtime_observer| {
+                        runtime_observer.on_request_end(&request_end_event);
+                    });
                     return Ok((response, response_meta));
                 }
                 ProviderAttemptOutcome::Failure { error, meta } => {
+                    let attempt_failure_event = AttemptFailureEvent {
+                        request_id: meta.request_id.clone(),
+                        provider: Some(meta.provider),
+                        model: Some(meta.model.clone()),
+                        target_index: Some(index),
+                        attempt_index: Some(index),
+                        elapsed: attempt_started_at.elapsed(),
+                        error_kind: meta.error_kind,
+                        error_message: meta.error_message.clone(),
+                    };
+                    safe_call_observer(observer, |runtime_observer| {
+                        runtime_observer.on_attempt_failure(&attempt_failure_event);
+                    });
+
                     attempts.push(meta);
                     let should_continue = index + 1 < targets.len()
                         && fallback_policy
@@ -1053,13 +1314,46 @@ impl AgentToolkit {
             }
         }
 
-        match last_error {
+        let result = match last_error {
             Some(error) if attempts.len() > 1 => Err(RuntimeError::fallback_exhausted(error)),
             Some(error) => Err(error),
             None => Err(RuntimeError::target_resolution(
                 "no target providers were resolved for this request",
             )),
+        };
+
+        if let Err(error) = &result {
+            let terminal_error = terminal_failure_error(error);
+            let terminal_provider = terminal_error
+                .provider
+                .or_else(|| attempts.last().map(|attempt| attempt.provider));
+            let terminal_observer = terminal_provider
+                .and_then(|provider| self.clients.get(&provider))
+                .and_then(|client| {
+                    resolve_observer_for_request(
+                        client.runtime.observer.as_ref(),
+                        self.observer.as_ref(),
+                        options.observer.as_ref(),
+                    )
+                });
+            let terminal_index = attempts.len().checked_sub(1);
+            let request_end_event = RequestEndEvent {
+                request_id: terminal_error.request_id.clone(),
+                provider: terminal_provider,
+                model: attempts.last().map(|attempt| attempt.model.clone()),
+                target_index: terminal_index,
+                attempt_index: terminal_index,
+                elapsed: request_started_at.elapsed(),
+                status_code: terminal_error.status_code,
+                error_kind: Some(terminal_error.kind),
+                error_message: Some(terminal_error.message.clone()),
+            };
+            safe_call_observer(terminal_observer, |runtime_observer| {
+                runtime_observer.on_request_end(&request_end_event);
+            });
         }
+
+        result
     }
 
     fn resolve_targets(&self, options: &SendOptions) -> Result<Vec<Target>, RuntimeError> {
@@ -1100,11 +1394,12 @@ impl AgentToolkit {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct AgentToolkitBuilder {
     openai: Option<ProviderConfig>,
     anthropic: Option<ProviderConfig>,
     openrouter: Option<ProviderConfig>,
+    observer: Option<Arc<dyn RuntimeObserver>>,
 }
 
 impl AgentToolkitBuilder {
@@ -1123,22 +1418,36 @@ impl AgentToolkitBuilder {
         self
     }
 
+    pub fn observer(mut self, observer: Arc<dyn RuntimeObserver>) -> Self {
+        self.observer = Some(observer);
+        self
+    }
+
     pub fn build(self) -> Result<AgentToolkit, RuntimeError> {
+        let AgentToolkitBuilder {
+            openai,
+            anthropic,
+            openrouter,
+            observer,
+        } = self;
         let mut clients = HashMap::new();
 
-        if let Some(config) = self.openai {
-            let runtime = BaseClientBuilder::from_provider_config(config)
-                .build_runtime(ProviderId::OpenAi)?;
+        if let Some(config) = openai {
+            let mut runtime_builder = BaseClientBuilder::from_provider_config(config);
+            runtime_builder.observer = observer.clone();
+            let runtime = runtime_builder.build_runtime(ProviderId::OpenAi)?;
             clients.insert(ProviderId::OpenAi, ProviderClient::new(runtime));
         }
-        if let Some(config) = self.anthropic {
-            let runtime = BaseClientBuilder::from_provider_config(config)
-                .build_runtime(ProviderId::Anthropic)?;
+        if let Some(config) = anthropic {
+            let mut runtime_builder = BaseClientBuilder::from_provider_config(config);
+            runtime_builder.observer = observer.clone();
+            let runtime = runtime_builder.build_runtime(ProviderId::Anthropic)?;
             clients.insert(ProviderId::Anthropic, ProviderClient::new(runtime));
         }
-        if let Some(config) = self.openrouter {
-            let runtime = BaseClientBuilder::from_provider_config(config)
-                .build_runtime(ProviderId::OpenRouter)?;
+        if let Some(config) = openrouter {
+            let mut runtime_builder = BaseClientBuilder::from_provider_config(config);
+            runtime_builder.observer = observer.clone();
+            let runtime = runtime_builder.build_runtime(ProviderId::OpenRouter)?;
             clients.insert(ProviderId::OpenRouter, ProviderClient::new(runtime));
         }
 
@@ -1148,7 +1457,7 @@ impl AgentToolkitBuilder {
             ));
         }
 
-        Ok(AgentToolkit { clients })
+        Ok(AgentToolkit { clients, observer })
     }
 }
 
@@ -1194,7 +1503,7 @@ impl RouterMessagesApi<'_> {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 struct BaseClientBuilder {
     api_key: Option<String>,
     base_url: Option<String>,
@@ -1202,6 +1511,7 @@ struct BaseClientBuilder {
     retry_policy: Option<RetryPolicy>,
     timeout: Option<Duration>,
     client: Option<reqwest::Client>,
+    observer: Option<Arc<dyn RuntimeObserver>>,
 }
 
 impl BaseClientBuilder {
@@ -1213,6 +1523,7 @@ impl BaseClientBuilder {
             retry_policy: config.retry_policy,
             timeout: config.timeout,
             client: None,
+            observer: None,
         }
     }
 
@@ -1258,7 +1569,22 @@ impl BaseClientBuilder {
             auth_token: api_key,
             default_model: self.default_model,
             transport,
+            observer: self.observer,
         })
+    }
+}
+
+impl std::fmt::Debug for BaseClientBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BaseClientBuilder")
+            .field("api_key", &self.api_key.as_ref().map(|_| "<redacted>"))
+            .field("base_url", &self.base_url)
+            .field("default_model", &self.default_model)
+            .field("retry_policy", &self.retry_policy)
+            .field("timeout", &self.timeout)
+            .field("client", &self.client.as_ref().map(|_| "configured"))
+            .field("observer", &self.observer.as_ref().map(|_| "configured"))
+            .finish()
     }
 }
 
@@ -1303,28 +1629,123 @@ impl ProviderClient {
         &self,
         request: Request,
     ) -> Result<(Response, ResponseMeta), RuntimeError> {
+        let request_started_at = std::time::Instant::now();
+        let observer = resolve_observer_for_request(self.runtime.observer.as_ref(), None, None);
+        let request_start_event = RequestStartEvent {
+            request_id: None,
+            provider: Some(self.runtime.provider),
+            model: if request.model_id.is_empty() {
+                None
+            } else {
+                Some(request.model_id.clone())
+            },
+            target_index: None,
+            attempt_index: None,
+            elapsed: request_started_at.elapsed(),
+            first_target: Some(self.runtime.provider),
+            resolved_target_count: 1,
+        };
+        safe_call_observer(observer, |runtime_observer| {
+            runtime_observer.on_request_start(&request_start_event);
+        });
+        let attempt_started_at = std::time::Instant::now();
+        let attempt_start_event = AttemptStartEvent {
+            request_id: None,
+            provider: Some(self.runtime.provider),
+            model: if request.model_id.is_empty() {
+                None
+            } else {
+                Some(request.model_id.clone())
+            },
+            target_index: Some(0),
+            attempt_index: Some(0),
+            elapsed: attempt_started_at.elapsed(),
+        };
+        safe_call_observer(observer, |runtime_observer| {
+            runtime_observer.on_attempt_start(&attempt_start_event);
+        });
+
         let attempt = self
             .runtime
             .execute_attempt(request, None, BTreeMap::new())
             .await;
 
         match attempt {
-            ProviderAttemptOutcome::Success { response, meta } => Ok((
-                response,
-                ResponseMeta {
+            ProviderAttemptOutcome::Success { response, meta } => {
+                let attempt_success_event = AttemptSuccessEvent {
+                    request_id: meta.request_id.clone(),
+                    provider: Some(meta.provider),
+                    model: Some(meta.model.clone()),
+                    target_index: Some(0),
+                    attempt_index: Some(0),
+                    elapsed: attempt_started_at.elapsed(),
+                    status_code: meta.status_code,
+                };
+                safe_call_observer(observer, |runtime_observer| {
+                    runtime_observer.on_attempt_success(&attempt_success_event);
+                });
+                let response_meta = ResponseMeta {
                     selected_provider: meta.provider,
                     selected_model: meta.model.clone(),
                     status_code: meta.status_code,
                     request_id: meta.request_id.clone(),
                     attempts: vec![meta],
-                },
-            )),
-            ProviderAttemptOutcome::Failure { error, .. } => Err(error),
+                };
+                let request_end_event = RequestEndEvent {
+                    request_id: response_meta.request_id.clone(),
+                    provider: Some(response_meta.selected_provider),
+                    model: Some(response_meta.selected_model.clone()),
+                    target_index: Some(0),
+                    attempt_index: Some(0),
+                    elapsed: request_started_at.elapsed(),
+                    status_code: response_meta.status_code,
+                    error_kind: None,
+                    error_message: None,
+                };
+                safe_call_observer(observer, |runtime_observer| {
+                    runtime_observer.on_request_end(&request_end_event);
+                });
+
+                Ok((response, response_meta))
+            }
+            ProviderAttemptOutcome::Failure { error, meta } => {
+                let attempt_failure_event = AttemptFailureEvent {
+                    request_id: meta.request_id.clone(),
+                    provider: Some(meta.provider),
+                    model: Some(meta.model.clone()),
+                    target_index: Some(0),
+                    attempt_index: Some(0),
+                    elapsed: attempt_started_at.elapsed(),
+                    error_kind: meta.error_kind,
+                    error_message: meta.error_message,
+                };
+                safe_call_observer(observer, |runtime_observer| {
+                    runtime_observer.on_attempt_failure(&attempt_failure_event);
+                });
+
+                let terminal_error = terminal_failure_error(&error);
+                let request_end_event = RequestEndEvent {
+                    request_id: terminal_error.request_id.clone(),
+                    provider: terminal_error.provider,
+                    model: Some(meta.model),
+                    target_index: Some(0),
+                    attempt_index: Some(0),
+                    elapsed: request_started_at.elapsed(),
+                    status_code: terminal_error.status_code,
+                    error_kind: Some(terminal_error.kind),
+                    error_message: Some(terminal_error.message.clone()),
+                };
+                safe_call_observer(observer, |runtime_observer| {
+                    runtime_observer.on_request_end(&request_end_event);
+                });
+
+                Err(error)
+            }
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct ProviderRuntime {
     provider: ProviderId,
     adapter: &'static dyn ProviderAdapter,
@@ -1332,6 +1753,20 @@ struct ProviderRuntime {
     auth_token: String,
     default_model: Option<String>,
     transport: HttpTransport,
+    observer: Option<Arc<dyn RuntimeObserver>>,
+}
+
+impl std::fmt::Debug for ProviderRuntime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProviderRuntime")
+            .field("provider", &self.provider)
+            .field("platform", &self.platform)
+            .field("auth_token", &"<redacted>")
+            .field("default_model", &self.default_model)
+            .field("transport", &self.transport)
+            .field("observer", &self.observer.as_ref().map(|_| "configured"))
+            .finish()
+    }
 }
 
 enum ProviderAttemptOutcome {
@@ -1524,6 +1959,16 @@ fn map_adapter_error_kind(kind: AdapterErrorKind) -> RuntimeErrorKind {
         AdapterErrorKind::Upstream => RuntimeErrorKind::Upstream,
         AdapterErrorKind::Transport => RuntimeErrorKind::Transport,
     }
+}
+
+fn terminal_failure_error(error: &RuntimeError) -> &RuntimeError {
+    if error.kind == RuntimeErrorKind::FallbackExhausted
+        && let Some(source) = error.source_ref()
+        && let Some(terminal_error) = source.downcast_ref::<RuntimeError>()
+    {
+        return terminal_error;
+    }
+    error
 }
 
 fn read_env(key: &str) -> Option<String> {
