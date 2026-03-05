@@ -1,6 +1,7 @@
 use agent_core::types::ToolDefinition;
 use agent_tools::{CompiledToolSchema, ToolArgsValidationError, ToolSchemaError};
 use serde_json::json;
+use std::cmp::Ordering;
 
 fn test_definition(schema: serde_json::Value) -> ToolDefinition {
     ToolDefinition {
@@ -26,8 +27,30 @@ fn compiles_valid_object_schema() {
 }
 
 #[test]
+fn compiles_valid_object_schema_when_root_type_is_union_with_object() {
+    let definition = test_definition(json!({
+        "type": ["null", "object"],
+        "properties": {
+            "query": { "type": "string" }
+        }
+    }));
+
+    let compiled = CompiledToolSchema::from_definition(&definition);
+    assert!(compiled.is_ok());
+}
+
+#[test]
 fn fails_when_root_is_not_object_schema() {
     let definition = test_definition(json!("not-a-schema-object"));
+    let error = CompiledToolSchema::from_definition(&definition).unwrap_err();
+    assert!(matches!(error, ToolSchemaError::RootSchemaMustBeObject));
+}
+
+#[test]
+fn fails_when_root_type_union_does_not_include_object() {
+    let definition = test_definition(json!({
+        "type": ["null", "string"]
+    }));
     let error = CompiledToolSchema::from_definition(&definition).unwrap_err();
     assert!(matches!(error, ToolSchemaError::RootSchemaMustBeObject));
 }
@@ -118,4 +141,40 @@ fn validate_args_accepts_valid_payload() {
     let schema = compiled_test_schema();
     let result = schema.validate_args(&json!({"query": "rust", "count": 3}));
     assert!(result.is_ok());
+}
+
+#[test]
+fn validate_args_reports_sorted_issues_and_stable_message() {
+    let schema = compiled_test_schema();
+    let error = schema
+        .validate_args(&json!({
+            "count": "three",
+            "extra": true
+        }))
+        .unwrap_err();
+
+    match error {
+        ToolArgsValidationError::ValidationFailed { message, issues } => {
+            assert!(issues.len() >= 2);
+            for window in issues.windows(2) {
+                let left = &window[0];
+                let right = &window[1];
+                let ordering = left
+                    .instance_path
+                    .cmp(&right.instance_path)
+                    .then(left.keyword_path.cmp(&right.keyword_path))
+                    .then(left.message.cmp(&right.message));
+                assert!(ordering == Ordering::Less || ordering == Ordering::Equal);
+            }
+
+            let reconstructed = issues
+                .iter()
+                .map(|issue| format!("{}: {}", issue.instance_path, issue.message))
+                .collect::<Vec<_>>()
+                .join("; ");
+            assert_eq!(message, reconstructed);
+            assert!(!message.is_empty());
+        }
+        other => panic!("unexpected error variant: {other}"),
+    }
 }
