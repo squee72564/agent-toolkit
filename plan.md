@@ -160,7 +160,7 @@ Harden every Rust file in a controlled, repeatable cycle: discover risk, apply f
 ### crate: `agent-transport`
 - [x] crates/agent-transport/src/http/mod.rs
 - [x] crates/agent-transport/src/http/tests.rs
-- [ ] crates/agent-transport/src/lib.rs
+- [x] crates/agent-transport/src/lib.rs
 
 ## Refresh Commands
 ```bash
