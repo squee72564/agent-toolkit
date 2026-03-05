@@ -1,4 +1,7 @@
-use serde_json::Value;
+use std::any::Any;
+use std::panic::{AssertUnwindSafe, catch_unwind};
+
+use serde_json::{Value, json};
 
 use crate::anthropic_spec::{AnthropicDecodeEnvelope, AnthropicSpecError};
 use crate::platform::test_fixtures::{
@@ -22,29 +25,24 @@ const SMOKE_ERROR_FIXTURES: [(&str, &str); 4] = [
 ];
 
 #[test]
-fn fixture_smoke_anthropic_basic_chat() {
-    run_success_smoke_scenario("basic_chat", &SMOKE_MODELS_ANTHROPIC);
+fn fixture_smoke_anthropic_basic_chat() -> Result<(), String> {
+    run_success_smoke_scenario("basic_chat", &SMOKE_MODELS_ANTHROPIC)
 }
 
 #[test]
-fn fixture_smoke_anthropic_tool_call() {
-    run_success_smoke_scenario("tool_call", &SMOKE_MODELS_ANTHROPIC);
+fn fixture_smoke_anthropic_tool_call() -> Result<(), String> {
+    run_success_smoke_scenario("tool_call", &SMOKE_MODELS_ANTHROPIC)
 }
 
 #[test]
-fn fixture_smoke_anthropic_tool_call_reasoning() {
-    run_success_smoke_scenario("tool_call_reasoning", &SMOKE_MODELS_ANTHROPIC);
+fn fixture_smoke_anthropic_tool_call_reasoning() -> Result<(), String> {
+    run_success_smoke_scenario("tool_call_reasoning", &SMOKE_MODELS_ANTHROPIC)
 }
 
 #[test]
-fn fixture_smoke_anthropic_errors() {
+fn fixture_smoke_anthropic_errors() -> Result<(), String> {
     for (scenario, preferred_model) in SMOKE_ERROR_FIXTURES {
-        let chosen_model = choose_error_fixture_model_for_upstream(scenario, preferred_model)
-            .unwrap_or_else(|| {
-                panic!(
-                    "no valid upstream error fixture available for provider={PROVIDER} scenario={scenario} preferred={preferred_model}"
-                )
-            });
+        let chosen_model = choose_error_fixture_model_for_upstream(scenario, preferred_model)?;
 
         let body = load_error_fixture_body(PROVIDER, scenario, &chosen_model);
         let payload = AnthropicDecodeEnvelope {
@@ -54,47 +52,60 @@ fn fixture_smoke_anthropic_errors() {
         let error = AnthropicTranslator
             .decode_request(&payload)
             .expect_err("expected upstream decode error for error fixture");
-        assert_anthropic_upstream_error(error, scenario, &chosen_model);
+        assert_anthropic_upstream_error(error, scenario, &chosen_model)?;
     }
+    Ok(())
 }
 
 #[test]
 #[ignore]
-fn fixture_full_anthropic_success_sweep() {
+fn fixture_full_anthropic_success_sweep() -> Result<(), String> {
     for scenario in SUCCESS_SCENARIOS {
         let models = list_fixture_models(PROVIDER, scenario);
-        assert!(
-            !models.is_empty(),
-            "expected at least one fixture model for scenario {scenario}"
-        );
+        if models.is_empty() {
+            return Err(format!(
+                "expected at least one fixture model for scenario {scenario}"
+            ));
+        }
         for model in models {
             let body = load_success_fixture(PROVIDER, scenario, &model);
-            validate_success_fixture_body(&body, scenario, &model).unwrap_or_else(|reason| {
-                panic!("invalid success fixture {scenario}/{model}: {reason}")
-            });
+            validate_success_fixture_body(&body, scenario, &model).map_err(|reason| {
+                format!("invalid success fixture {scenario}/{model}: {reason}")
+            })?;
         }
     }
+    Ok(())
 }
 
 #[test]
 #[ignore]
-fn fixture_full_anthropic_errors_sweep() {
+fn fixture_full_anthropic_errors_sweep() -> Result<(), String> {
     let relpaths = list_error_fixture_relpaths(PROVIDER);
-    assert!(
-        !relpaths.is_empty(),
-        "expected at least one error fixture relpath for provider {PROVIDER}"
-    );
+    if relpaths.is_empty() {
+        return Err(format!(
+            "expected at least one error fixture relpath for provider {PROVIDER}"
+        ));
+    }
     for relpath in relpaths {
-        let (scenario, model) = parse_error_relpath(&relpath);
-        validate_error_fixture_shape(PROVIDER, scenario, model).unwrap_or_else(|reason| {
-            panic!("invalid error fixture wrapper {scenario}/{model}: {reason}")
-        });
+        let (scenario, model) = parse_error_relpath(&relpath)?;
+        validate_error_fixture_shape(PROVIDER, scenario, model).map_err(|reason| {
+            format!("invalid error fixture wrapper {scenario}/{model}: {reason}")
+        })?;
 
-        let body = load_error_fixture_body(PROVIDER, scenario, model);
-        assert!(
-            has_top_level_error_object(&body),
-            "error fixture missing top-level error object: {scenario}/{model}"
-        );
+        let body = catch_unwind(AssertUnwindSafe(|| {
+            load_error_fixture_body(PROVIDER, scenario, model)
+        }))
+        .map_err(|payload| {
+            format!(
+                "failed to load error fixture body {scenario}/{model}: {}",
+                panic_payload_to_string(payload)
+            )
+        })?;
+        if !has_top_level_error_object(&body) {
+            return Err(format!(
+                "error fixture missing top-level error object: {scenario}/{model}"
+            ));
+        }
 
         let payload = AnthropicDecodeEnvelope {
             body,
@@ -103,11 +114,12 @@ fn fixture_full_anthropic_errors_sweep() {
         let error = AnthropicTranslator
             .decode_request(&payload)
             .expect_err("expected upstream decode error for error fixture");
-        assert_anthropic_upstream_error(error, scenario, model);
+        assert_anthropic_upstream_error(error, scenario, model)?;
     }
+    Ok(())
 }
 
-fn run_success_smoke_scenario(scenario: &str, preferred_models: &[&str]) {
+fn run_success_smoke_scenario(scenario: &str, preferred_models: &[&str]) -> Result<(), String> {
     for preferred_model in preferred_models {
         let selected = choose_valid_success_fixture(
             PROVIDER,
@@ -123,41 +135,85 @@ fn run_success_smoke_scenario(scenario: &str, preferred_models: &[&str]) {
                 selected.requested_model, selected.chosen_model
             );
         }
-        validate_success_fixture_body(&selected.body, scenario, &selected.chosen_model)
-            .unwrap_or_else(|reason| {
-                panic!(
+        validate_success_fixture_body(&selected.body, scenario, &selected.chosen_model).map_err(
+            |reason| {
+                format!(
                     "selected fixture failed validation {scenario}/{}: {reason}",
                     selected.chosen_model
                 )
-            });
+            },
+        )?;
     }
+    Ok(())
 }
 
 fn choose_error_fixture_model_for_upstream(
     scenario: &str,
     preferred_model: &str,
-) -> Option<String> {
-    let mut models = list_error_fixture_models(PROVIDER, scenario);
+) -> Result<String, String> {
+    let mut models = catch_unwind(AssertUnwindSafe(|| {
+        list_error_fixture_models(PROVIDER, scenario)
+    }))
+    .map_err(|payload| {
+        format!(
+            "failed to list error fixture models for provider={PROVIDER} scenario={scenario}: {}",
+            panic_payload_to_string(payload)
+        )
+    })?;
     if let Some(pos) = models.iter().position(|model| model == preferred_model) {
         let preferred = models.remove(pos);
         models.insert(0, preferred);
     }
 
+    let mut rejected = Vec::new();
     for model in models {
-        validate_error_fixture_shape(PROVIDER, scenario, &model).unwrap_or_else(|reason| {
-            panic!("invalid error fixture wrapper {scenario}/{model}: {reason}")
-        });
-        let body = load_error_fixture_body(PROVIDER, scenario, &model);
+        let wrapper_shape = catch_unwind(AssertUnwindSafe(|| {
+            validate_error_fixture_shape(PROVIDER, scenario, &model)
+        }));
+        match wrapper_shape {
+            Ok(Ok(())) => {}
+            Ok(Err(reason)) => {
+                rejected.push(format!("{model}: invalid wrapper shape: {reason}"));
+                continue;
+            }
+            Err(payload) => {
+                rejected.push(format!(
+                    "{model}: wrapper shape validation panicked: {}",
+                    panic_payload_to_string(payload)
+                ));
+                continue;
+            }
+        }
+
+        let body = match catch_unwind(AssertUnwindSafe(|| {
+            load_error_fixture_body(PROVIDER, scenario, &model)
+        })) {
+            Ok(body) => body,
+            Err(payload) => {
+                rejected.push(format!(
+                    "{model}: failed to load response.body: {}",
+                    panic_payload_to_string(payload)
+                ));
+                continue;
+            }
+        };
         if has_top_level_error_object(&body) {
             if model != preferred_model {
                 eprintln!(
                     "error fixture swap: provider={PROVIDER} scenario={scenario} requested={preferred_model} chosen={model}"
                 );
             }
-            return Some(model);
+            return Ok(model);
         }
+        rejected.push(format!(
+            "{model}: response.body missing top-level anthropic error object"
+        ));
     }
-    None
+
+    Err(format!(
+        "no valid upstream error fixture available for provider={PROVIDER} scenario={scenario} preferred={preferred_model}; rejected=[{}]",
+        rejected.join("; ")
+    ))
 }
 
 fn validate_success_fixture_body(body: &Value, scenario: &str, _model: &str) -> Result<(), String> {
@@ -228,21 +284,28 @@ fn has_tool_call(response: &Response) -> bool {
         .any(|part| matches!(part, ContentPart::ToolCall { .. }))
 }
 
-fn assert_anthropic_upstream_error(error: AnthropicTranslatorError, scenario: &str, model: &str) {
+fn assert_anthropic_upstream_error(
+    error: AnthropicTranslatorError,
+    scenario: &str,
+    model: &str,
+) -> Result<(), String> {
     match error {
         AnthropicTranslatorError::Decode(AnthropicSpecError::Upstream { message }) => {
-            assert!(
-                !message.trim().is_empty(),
-                "expected non-empty upstream message for {scenario}/{model}"
-            );
-            assert!(
-                message.contains("anthropic error:"),
-                "expected provider context in upstream message for {scenario}/{model}: {message}"
-            );
+            if message.trim().is_empty() {
+                return Err(format!(
+                    "expected non-empty upstream message for {scenario}/{model}"
+                ));
+            }
+            if !message.contains("anthropic error:") {
+                return Err(format!(
+                    "expected provider context in upstream message for {scenario}/{model}: {message}"
+                ));
+            }
+            Ok(())
         }
-        other => {
-            panic!("expected decode upstream error for fixture {scenario}/{model}, got: {other}")
-        }
+        other => Err(format!(
+            "expected decode upstream error for fixture {scenario}/{model}, got: {other}"
+        )),
     }
 }
 
@@ -253,26 +316,100 @@ fn has_top_level_error_object(body: &Value) -> bool {
         && body.get("error").is_some_and(Value::is_object)
 }
 
-fn parse_error_relpath(relpath: &str) -> (&str, &str) {
+fn parse_error_relpath(relpath: &str) -> Result<(&str, &str), String> {
     let mut parts = relpath.split('/');
     let prefix = parts.next();
     let scenario = parts.next();
     let file = parts.next();
     let extra = parts.next();
 
-    assert_eq!(
-        prefix,
-        Some("errors"),
-        "unexpected error relpath prefix: {relpath}"
-    );
-    assert!(extra.is_none(), "unexpected error relpath shape: {relpath}");
+    if prefix != Some("errors") {
+        return Err(format!("unexpected error relpath prefix: {relpath}"));
+    }
+    if extra.is_some() {
+        return Err(format!("unexpected error relpath shape: {relpath}"));
+    }
 
     let scenario =
-        scenario.unwrap_or_else(|| panic!("missing error scenario in relpath: {relpath}"));
-    let file = file.unwrap_or_else(|| panic!("missing error file in relpath: {relpath}"));
+        scenario.ok_or_else(|| format!("missing error scenario in relpath: {relpath}"))?;
+    if scenario.trim().is_empty() {
+        return Err(format!("empty error scenario in relpath: {relpath}"));
+    }
+
+    let file = file.ok_or_else(|| format!("missing error file in relpath: {relpath}"))?;
     let model = file
         .strip_suffix(".json")
-        .unwrap_or_else(|| panic!("error relpath does not end with .json: {relpath}"));
+        .ok_or_else(|| format!("error relpath does not end with .json: {relpath}"))?;
+    if model.trim().is_empty() {
+        return Err(format!("empty error model in relpath: {relpath}"));
+    }
 
-    (scenario, model)
+    Ok((scenario, model))
+}
+
+fn panic_payload_to_string(payload: Box<dyn Any + Send>) -> String {
+    if let Some(message) = payload.downcast_ref::<String>() {
+        return message.clone();
+    }
+    if let Some(message) = payload.downcast_ref::<&'static str>() {
+        return (*message).to_string();
+    }
+    "unknown panic payload".to_string()
+}
+
+#[test]
+fn parse_error_relpath_accepts_valid_relpath() {
+    let parsed = parse_error_relpath("errors/invalid_auth/claude-sonnet-4-5-20250929.json");
+    assert_eq!(parsed, Ok(("invalid_auth", "claude-sonnet-4-5-20250929")));
+}
+
+#[test]
+fn parse_error_relpath_rejects_invalid_prefix() {
+    let error = parse_error_relpath("not-errors/invalid_auth/model.json")
+        .expect_err("expected invalid prefix");
+    assert!(error.contains("unexpected error relpath prefix"));
+}
+
+#[test]
+fn parse_error_relpath_rejects_missing_or_empty_segments() {
+    let missing_scenario =
+        parse_error_relpath("errors//model.json").expect_err("expected missing or empty scenario");
+    assert!(
+        missing_scenario.contains("empty error scenario")
+            || missing_scenario.contains("missing error scenario")
+    );
+
+    let missing_file =
+        parse_error_relpath("errors/invalid_auth").expect_err("expected missing error file");
+    assert!(missing_file.contains("missing error file"));
+
+    let empty_model =
+        parse_error_relpath("errors/invalid_auth/.json").expect_err("expected empty model");
+    assert!(empty_model.contains("empty error model"));
+}
+
+#[test]
+fn parse_error_relpath_rejects_non_json_suffix() {
+    let error = parse_error_relpath("errors/invalid_auth/model.txt")
+        .expect_err("expected non-json suffix rejection");
+    assert!(error.contains("does not end with .json"));
+}
+
+#[test]
+fn has_top_level_error_object_requires_error_type_and_object() {
+    assert!(has_top_level_error_object(&json!({
+        "type": "error",
+        "error": { "message": "bad request" }
+    })));
+    assert!(!has_top_level_error_object(&json!({
+        "error": { "message": "bad request" }
+    })));
+    assert!(!has_top_level_error_object(&json!({
+        "type": "message",
+        "error": { "message": "bad request" }
+    })));
+    assert!(!has_top_level_error_object(&json!({
+        "type": "error",
+        "error": "bad request"
+    })));
 }
