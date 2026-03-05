@@ -10,8 +10,6 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use thiserror::Error;
-//use serde::Serialize;
-//use serde::de::DeserializeOwned;
 
 use agent_core::types::{AdapterContext, AuthCredentials, AuthStyle, PlatformConfig};
 const REQUEST_ID_HEADER_KEY: &str = "transport.request_id_header";
@@ -142,7 +140,7 @@ impl HttpTransport {
             apply_auth(&mut headers, &platform.auth_style, credentials)?;
         }
 
-        // Cusotm metadata headers
+        // Custom metadata headers
         for (key, value) in &ctx.metadata {
             if let Some(raw_name) = key.strip_prefix(CUSTOM_HEADER_PREFIX) {
                 let header_name = parse_header_name(raw_name)?;
@@ -169,6 +167,7 @@ impl HttpTransport {
         TResp: DeserializeOwned,
     {
         let header_config = self.build_header_config(platform, ctx)?;
+        let max_attempts = self.retry_policy.max_attempts.max(1);
         let mut attempt: u8 = 0;
 
         loop {
@@ -189,7 +188,7 @@ impl HttpTransport {
             let response = match request_builder.send().await {
                 Ok(resp) => resp,
                 Err(err) => {
-                    if attempt < self.retry_policy.max_attempts && is_retryable_transport(&err) {
+                    if attempt < max_attempts && is_retryable_transport(&err) {
                         self.sleep_before_retry(attempt).await;
                         continue;
                     }
@@ -204,9 +203,7 @@ impl HttpTransport {
                 return Ok(parsed);
             }
 
-            if attempt < self.retry_policy.max_attempts
-                && self.retry_policy.should_retry_status(status)
-            {
+            if attempt < max_attempts && self.retry_policy.should_retry_status(status) {
                 self.sleep_before_retry(attempt).await;
                 continue;
             }
@@ -261,6 +258,7 @@ impl HttpTransport {
     {
         let payload = serde_json::to_vec(body).map_err(|_| TransportError::Serialization)?;
         let header_config = self.build_header_config(platform, ctx)?;
+        let max_attempts = self.retry_policy.max_attempts.max(1);
         let mut attempt: u8 = 0;
 
         loop {
@@ -277,7 +275,7 @@ impl HttpTransport {
             let response = match request_builder.send().await {
                 Ok(resp) => resp,
                 Err(err) => {
-                    if attempt < self.retry_policy.max_attempts && is_retryable_transport(&err) {
+                    if attempt < max_attempts && is_retryable_transport(&err) {
                         self.sleep_before_retry(attempt).await;
                         continue;
                     }
@@ -288,7 +286,7 @@ impl HttpTransport {
 
             let status = response.status();
             if !status.is_success()
-                && attempt < self.retry_policy.max_attempts
+                && attempt < max_attempts
                 && self.retry_policy.should_retry_status(status)
             {
                 self.sleep_before_retry(attempt).await;
@@ -370,3 +368,6 @@ impl HttpTransportBuilder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
