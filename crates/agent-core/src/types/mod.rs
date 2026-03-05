@@ -255,8 +255,11 @@ pub struct Usage {
 
 impl Usage {
     pub fn derived_total_tokens(&self) -> u64 {
-        self.total_tokens
-            .unwrap_or(self.input_tokens.unwrap_or(0) + self.output_tokens.unwrap_or(0))
+        self.total_tokens.unwrap_or_else(|| {
+            self.input_tokens
+                .unwrap_or(0)
+                .saturating_add(self.output_tokens.unwrap_or(0))
+        })
     }
 }
 
