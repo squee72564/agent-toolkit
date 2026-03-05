@@ -143,13 +143,13 @@ fn run_success_smoke_scenario(scenario: &str, preferred_models: &[&str]) {
             preferred_model,
             |candidate_model, body| validate_success_fixture_body(body, scenario, candidate_model),
         );
-        if selected.swapped {
-            if let Some(reason) = &selected.preferred_rejection_reason {
-                eprintln!(
-                    "fixture swap reason: provider={PROVIDER} scenario={scenario} requested={} chosen={} reason={reason}",
-                    selected.requested_model, selected.chosen_model
-                );
-            }
+        if selected.swapped
+            && let Some(reason) = &selected.preferred_rejection_reason
+        {
+            eprintln!(
+                "fixture swap reason: provider={PROVIDER} scenario={scenario} requested={} chosen={} reason={reason}",
+                selected.requested_model, selected.chosen_model
+            );
         }
         validate_success_fixture_body(&selected.body, scenario, &selected.chosen_model)
             .unwrap_or_else(|reason| {

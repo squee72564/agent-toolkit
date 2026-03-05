@@ -65,25 +65,23 @@ pub(crate) fn resolve_fixture_responses_root_from(
         }
     }
 
-    if include_manifest_fallback {
-        if let Some(manifest_dir) = option_env!("CARGO_MANIFEST_DIR") {
-            for base in ancestry_from(Path::new(manifest_dir)) {
-                let data_relative = base.join("data").join(provider).join("responses");
-                attempted.push(data_relative.clone());
-                if data_relative.is_dir() {
-                    return canonicalize_if_possible(data_relative);
-                }
+    if include_manifest_fallback && let Some(manifest_dir) = option_env!("CARGO_MANIFEST_DIR") {
+        for base in ancestry_from(Path::new(manifest_dir)) {
+            let data_relative = base.join("data").join(provider).join("responses");
+            attempted.push(data_relative.clone());
+            if data_relative.is_dir() {
+                return canonicalize_if_possible(data_relative);
+            }
 
-                let workspace_relative = base
-                    .join("crates")
-                    .join("agent-providers")
-                    .join("data")
-                    .join(provider)
-                    .join("responses");
-                attempted.push(workspace_relative.clone());
-                if workspace_relative.is_dir() {
-                    return canonicalize_if_possible(workspace_relative);
-                }
+            let workspace_relative = base
+                .join("crates")
+                .join("agent-providers")
+                .join("data")
+                .join(provider)
+                .join("responses");
+            attempted.push(workspace_relative.clone());
+            if workspace_relative.is_dir() {
+                return canonicalize_if_possible(workspace_relative);
             }
         }
     }

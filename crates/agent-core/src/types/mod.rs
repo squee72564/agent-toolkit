@@ -16,7 +16,9 @@ pub enum ToolChoice {
     #[default]
     Auto,
     Required,
-    Specific { name: String },
+    Specific {
+        name: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

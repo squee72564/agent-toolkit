@@ -412,12 +412,12 @@ fn decode_openrouter_message_content(
                         let part_type = part_obj.get("type").and_then(Value::as_str).unwrap_or("");
                         match part_type {
                             "text" | "output_text" => {
-                                if let Some(text) = part_obj.get("text").and_then(Value::as_str) {
-                                    if !text.is_empty() {
-                                        content.push(ContentPart::Text {
-                                            text: text.to_string(),
-                                        });
-                                    }
+                                if let Some(text) = part_obj.get("text").and_then(Value::as_str)
+                                    && !text.is_empty()
+                                {
+                                    content.push(ContentPart::Text {
+                                        text: text.to_string(),
+                                    });
                                 }
                             }
                             "refusal" => {
@@ -425,12 +425,11 @@ fn decode_openrouter_message_content(
                                     .get("refusal")
                                     .and_then(Value::as_str)
                                     .or_else(|| part_obj.get("text").and_then(Value::as_str))
+                                    && !text.is_empty()
                                 {
-                                    if !text.is_empty() {
-                                        content.push(ContentPart::Text {
-                                            text: text.to_string(),
-                                        });
-                                    }
+                                    content.push(ContentPart::Text {
+                                        text: text.to_string(),
+                                    });
                                 }
                             }
                             other => {
@@ -461,12 +460,12 @@ fn decode_openrouter_message_content(
 }
 
 fn decode_openrouter_refusal_content(value: Option<&Value>, content: &mut Vec<ContentPart>) {
-    if let Some(text) = value.and_then(Value::as_str) {
-        if !text.is_empty() {
-            content.push(ContentPart::Text {
-                text: text.to_string(),
-            });
-        }
+    if let Some(text) = value.and_then(Value::as_str)
+        && !text.is_empty()
+    {
+        content.push(ContentPart::Text {
+            text: text.to_string(),
+        });
     }
 }
 

@@ -64,10 +64,10 @@ pub(super) fn extract_first_json_object(text: &str) -> Option<String> {
 
         if ch == '}' && depth > 0 {
             depth -= 1;
-            if depth == 0 {
-                if let Some(start_index) = start {
-                    return Some(text[start_index..=index].to_string());
-                }
+            if depth == 0
+                && let Some(start_index) = start
+            {
+                return Some(text[start_index..=index].to_string());
             }
         }
     }

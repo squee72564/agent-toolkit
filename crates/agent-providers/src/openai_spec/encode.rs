@@ -286,10 +286,10 @@ fn flush_message_item(
 }
 
 fn serialize_tool_result_output(tool_result: &ToolResult) -> Result<String, OpenAiSpecError> {
-    if let Some(raw_provider_content) = &tool_result.raw_provider_content {
-        if let Some(raw_text) = raw_provider_content.as_str() {
-            return Ok(raw_text.to_string());
-        }
+    if let Some(raw_provider_content) = &tool_result.raw_provider_content
+        && let Some(raw_text) = raw_provider_content.as_str()
+    {
+        return Ok(raw_text.to_string());
     }
 
     match &tool_result.content {

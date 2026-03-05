@@ -262,16 +262,16 @@ fn decode_output_tool_call(
 }
 
 fn extract_refusal_text(obj: &Map<String, Value>) -> Option<String> {
-    if let Some(text) = obj.get("text").and_then(Value::as_str) {
-        if !text.is_empty() {
-            return Some(text.to_string());
-        }
+    if let Some(text) = obj.get("text").and_then(Value::as_str)
+        && !text.is_empty()
+    {
+        return Some(text.to_string());
     }
 
-    if let Some(text) = obj.get("refusal").and_then(Value::as_str) {
-        if !text.is_empty() {
-            return Some(text.to_string());
-        }
+    if let Some(text) = obj.get("refusal").and_then(Value::as_str)
+        && !text.is_empty()
+    {
+        return Some(text.to_string());
     }
 
     None
