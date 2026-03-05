@@ -219,6 +219,52 @@ fn fallback_policy_rules_only_no_match_does_not_fallback() {
 }
 
 #[test]
+fn fallback_policy_rule_requires_all_match_conditions() {
+    let policy = FallbackPolicy::default()
+        .with_mode(FallbackMode::RulesOnly)
+        .with_rule(FallbackRule {
+            when: FallbackMatch {
+                error_kinds: vec![RuntimeErrorKind::Upstream],
+                status_codes: vec![429],
+                provider_codes: vec!["rate_limit_exceeded".to_string()],
+                providers: vec![ProviderId::OpenAi],
+            },
+            action: FallbackAction::RetryNextTarget,
+        });
+
+    let matching_error = runtime_error(
+        RuntimeErrorKind::Upstream,
+        Some(ProviderId::OpenAi),
+        Some(429),
+        Some("rate_limit_exceeded"),
+    );
+    assert!(policy.should_fallback(&matching_error));
+
+    let wrong_status_error = runtime_error(
+        RuntimeErrorKind::Upstream,
+        Some(ProviderId::OpenAi),
+        Some(503),
+        Some("rate_limit_exceeded"),
+    );
+    assert!(!policy.should_fallback(&wrong_status_error));
+}
+
+#[test]
+fn fallback_policy_provider_code_rule_does_not_match_blank_rule_value() {
+    let policy = FallbackPolicy::default()
+        .with_mode(FallbackMode::RulesOnly)
+        .with_rule(FallbackRule::retry_on_provider_code(" \t "));
+
+    let error = runtime_error(
+        RuntimeErrorKind::Upstream,
+        Some(ProviderId::OpenAi),
+        Some(429),
+        Some("rate_limit_exceeded"),
+    );
+    assert!(!policy.should_fallback(&error));
+}
+
+#[test]
 fn router_requires_explicit_target_without_policy() {
     let toolkit = AgentToolkit {
         clients: HashMap::new(),
@@ -227,6 +273,36 @@ fn router_requires_explicit_target_without_policy() {
     let error = toolkit
         .resolve_targets(&SendOptions::default())
         .expect_err("target resolution should fail");
+    assert_eq!(error.kind, RuntimeErrorKind::TargetResolution);
+}
+
+#[test]
+fn fallback_policy_requires_targets_without_primary_target() {
+    let toolkit = AgentToolkit {
+        clients: HashMap::new(),
+        observer: None,
+    };
+    let options = SendOptions::default().with_fallback_policy(FallbackPolicy::new(vec![]));
+    let error = toolkit
+        .resolve_targets(&options)
+        .expect_err("empty fallback target list should fail without primary target");
+
+    assert_eq!(error.kind, RuntimeErrorKind::TargetResolution);
+}
+
+#[test]
+fn resolve_targets_errors_for_unregistered_provider() {
+    let toolkit = AgentToolkit::builder()
+        .with_openai(ProviderConfig::new("test-key").with_base_url("http://127.0.0.1:1"))
+        .build()
+        .expect("toolkit should build for target resolution test");
+
+    let options =
+        SendOptions::for_target(Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"));
+    let error = toolkit
+        .resolve_targets(&options)
+        .expect_err("unregistered provider should fail target resolution");
+
     assert_eq!(error.kind, RuntimeErrorKind::TargetResolution);
 }
 
@@ -272,6 +348,14 @@ fn message_input_allows_empty_model_for_router_path() {
         .into_request_with_options(None, true)
         .expect("empty model should be allowed for router path");
     assert!(request.model_id.is_empty());
+}
+
+#[test]
+fn message_input_requires_at_least_one_message() {
+    let error = MessageCreateInput::new(Vec::new())
+        .into_request_with_options(Some("default-model"), false)
+        .expect_err("empty messages should fail");
+    assert_eq!(error.kind, RuntimeErrorKind::Configuration);
 }
 
 #[test]
