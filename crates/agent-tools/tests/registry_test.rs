@@ -14,6 +14,11 @@ struct TestTool {
     execute_calls: Arc<AtomicUsize>,
 }
 
+struct FailingTool {
+    name: String,
+    schema: Value,
+}
+
 #[async_trait]
 impl Tool for TestTool {
     fn name(&self) -> &str {
@@ -35,6 +40,25 @@ impl Tool for TestTool {
     }
 }
 
+#[async_trait]
+impl Tool for FailingTool {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn description(&self) -> Option<&str> {
+        Some("failing tool")
+    }
+
+    fn input_schema(&self) -> Value {
+        self.schema.clone()
+    }
+
+    async fn execute(&self, _args: Value) -> Result<ToolOutput, ToolError> {
+        Err(ToolError::Execution("simulated failure".to_string()))
+    }
+}
+
 fn build_tool(
     name: &str,
     schema: Value,
@@ -46,6 +70,13 @@ fn build_tool(
         schema,
         input_schema_calls,
         execute_calls,
+    }
+}
+
+fn build_failing_tool(name: &str, schema: Value) -> FailingTool {
+    FailingTool {
+        name: name.to_string(),
+        schema,
     }
 }
 
@@ -123,6 +154,20 @@ fn validate_call_reports_unknown_tool() {
 }
 
 #[tokio::test]
+async fn execute_validated_reports_unknown_tool() {
+    let registry = ToolRegistry::new();
+    let error = registry
+        .execute_validated("missing", json!({}))
+        .await
+        .expect_err("should fail for unknown tool");
+
+    assert!(matches!(
+        error,
+        ToolRegistryError::UnknownTool { name } if name == "missing"
+    ));
+}
+
+#[tokio::test]
 async fn execute_validated_blocks_execution_when_args_are_invalid() {
     let mut registry = ToolRegistry::new();
     let input_calls = Arc::new(AtomicUsize::new(0));
@@ -149,6 +194,61 @@ async fn execute_validated_blocks_execution_when_args_are_invalid() {
 
     assert!(matches!(error, ToolRegistryError::InvalidArgs { .. }));
     assert_eq!(execute_calls.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn execute_validated_wraps_tool_execution_errors() {
+    let mut registry = ToolRegistry::new();
+    registry
+        .register_validated(build_failing_tool(
+            "search",
+            json!({
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }),
+        ))
+        .expect("schema should compile");
+
+    let error = registry
+        .execute_validated("search", json!({}))
+        .await
+        .expect_err("execution failure should be wrapped");
+
+    match error {
+        ToolRegistryError::Execution { name, source } => {
+            assert_eq!(name, "search");
+            assert_eq!(
+                source.to_string(),
+                "tool execution failed: simulated failure"
+            );
+        }
+        other => panic!("unexpected error variant: {other}"),
+    }
+}
+
+#[test]
+fn validate_call_surfaces_invalid_schema_for_non_validated_registration() {
+    let mut registry = ToolRegistry::new();
+    let tool = build_tool(
+        "search",
+        json!({
+            "type": "object",
+            "properties": 12
+        }),
+        Arc::new(AtomicUsize::new(0)),
+        Arc::new(AtomicUsize::new(0)),
+    );
+    registry.register(tool);
+
+    let error = registry
+        .validate_call("search", &json!({}))
+        .expect_err("invalid schema should fail validation");
+
+    assert!(matches!(
+        error,
+        ToolRegistryError::InvalidSchema { name, .. } if name == "search"
+    ));
 }
 
 #[test]
