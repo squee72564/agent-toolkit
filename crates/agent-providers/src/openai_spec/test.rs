@@ -289,6 +289,201 @@ fn serializes_assistant_tool_call_and_tool_result() {
 }
 
 #[test]
+fn reject_empty_model_id() {
+    let mut request = base_request(vec![Message::user_text("hello")]);
+    request.model_id = "   ".to_string();
+
+    let error = encode_openai_request(&request).expect_err("encoding should fail");
+
+    match error {
+        OpenAiSpecError::Validation { message } => {
+            assert!(message.contains("model_id must not be empty"));
+        }
+        _ => panic!("unexpected error variant"),
+    }
+}
+
+#[test]
+fn reject_json_schema_response_format_with_blank_name() {
+    let mut request = base_request(vec![Message::user_text("hello")]);
+    request.response_format = ResponseFormat::JsonSchema {
+        name: "   ".to_string(),
+        schema: json!({
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+        }),
+    };
+
+    let error = encode_openai_request(&request).expect_err("encoding should fail");
+
+    match error {
+        OpenAiSpecError::Validation { message } => {
+            assert!(message.contains("requires a non-empty name"));
+        }
+        _ => panic!("unexpected error variant"),
+    }
+}
+
+#[test]
+fn reject_json_schema_response_format_with_non_object_schema() {
+    let mut request = base_request(vec![Message::user_text("hello")]);
+    request.response_format = ResponseFormat::JsonSchema {
+        name: "result".to_string(),
+        schema: json!("not-an-object"),
+    };
+
+    let error = encode_openai_request(&request).expect_err("encoding should fail");
+
+    match error {
+        OpenAiSpecError::Validation { message } => {
+            assert!(message.contains("schema to be a JSON object"));
+        }
+        _ => panic!("unexpected error variant"),
+    }
+}
+
+#[test]
+fn reject_duplicate_tool_names() {
+    let mut request = base_request(vec![Message::user_text("hello")]);
+    request.tools = vec![
+        ToolDefinition {
+            name: "lookup_weather".to_string(),
+            description: None,
+            parameters_schema: json!({
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
+            name: "lookup_weather".to_string(),
+            description: Some("duplicate".to_string()),
+            parameters_schema: json!({
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+            }),
+        },
+    ];
+
+    let error = encode_openai_request(&request).expect_err("encoding should fail");
+
+    match error {
+        OpenAiSpecError::Validation { message } => {
+            assert!(message.contains("duplicate tool definition name"));
+        }
+        _ => panic!("unexpected error variant"),
+    }
+}
+
+#[test]
+fn reject_assistant_tool_call_with_blank_id() {
+    let request = base_request(vec![Message {
+        role: MessageRole::Assistant,
+        content: vec![ContentPart::ToolCall {
+            tool_call: ToolCall {
+                id: "   ".to_string(),
+                name: "lookup_weather".to_string(),
+                arguments_json: json!({"city": "SF"}),
+            },
+        }],
+    }]);
+
+    let error = encode_openai_request(&request).expect_err("encoding should fail");
+
+    match error {
+        OpenAiSpecError::Validation { message } => {
+            assert!(message.contains("tool_call id must not be empty"));
+        }
+        _ => panic!("unexpected error variant"),
+    }
+}
+
+#[test]
+fn reject_assistant_tool_call_with_blank_name() {
+    let request = base_request(vec![Message {
+        role: MessageRole::Assistant,
+        content: vec![ContentPart::ToolCall {
+            tool_call: ToolCall {
+                id: "call_weather".to_string(),
+                name: "   ".to_string(),
+                arguments_json: json!({"city": "SF"}),
+            },
+        }],
+    }]);
+
+    let error = encode_openai_request(&request).expect_err("encoding should fail");
+
+    match error {
+        OpenAiSpecError::Validation { message } => {
+            assert!(message.contains("tool_call name must not be empty"));
+        }
+        _ => panic!("unexpected error variant"),
+    }
+}
+
+#[test]
+fn reject_duplicate_assistant_tool_call_ids() {
+    let request = base_request(vec![Message {
+        role: MessageRole::Assistant,
+        content: vec![
+            ContentPart::ToolCall {
+                tool_call: ToolCall {
+                    id: "call_weather".to_string(),
+                    name: "lookup_weather".to_string(),
+                    arguments_json: json!({"city": "SF"}),
+                },
+            },
+            ContentPart::ToolCall {
+                tool_call: ToolCall {
+                    id: "call_weather".to_string(),
+                    name: "lookup_weather".to_string(),
+                    arguments_json: json!({"city": "SF"}),
+                },
+            },
+        ],
+    }]);
+
+    let error = encode_openai_request(&request).expect_err("encoding should fail");
+
+    match error {
+        OpenAiSpecError::ProtocolViolation { message } => {
+            assert!(message.contains("duplicate_tool_call_id"));
+        }
+        _ => panic!("unexpected error variant"),
+    }
+}
+
+#[test]
+fn reject_tool_result_with_blank_tool_call_id() {
+    let request = base_request(vec![Message {
+        role: MessageRole::Tool,
+        content: vec![ContentPart::ToolResult {
+            tool_result: ToolResult {
+                tool_call_id: "   ".to_string(),
+                content: ToolResultContent::Text {
+                    text: "done".to_string(),
+                },
+                raw_provider_content: None,
+            },
+        }],
+    }]);
+
+    let error = encode_openai_request(&request).expect_err("encoding should fail");
+
+    match error {
+        OpenAiSpecError::Validation { message } => {
+            assert!(message.contains("tool_result tool_call_id must not be empty"));
+        }
+        _ => panic!("unexpected error variant"),
+    }
+}
+
+#[test]
 fn decode_top_level_error_maps_to_upstream() {
     let envelope = OpenAiDecodeEnvelope {
         body: json!({
