@@ -197,8 +197,8 @@ fn apply_openrouter_overrides(
     }
 
     insert_optional_bool(body, "parallel_tool_calls", overrides.parallel_tool_calls);
-    insert_optional_f32(body, "frequency_penalty", overrides.frequency_penalty);
-    insert_optional_f32(body, "presence_penalty", overrides.presence_penalty);
+    insert_optional_f32(body, "frequency_penalty", overrides.frequency_penalty)?;
+    insert_optional_f32(body, "presence_penalty", overrides.presence_penalty)?;
     insert_optional_u8(body, "top_logprobs", overrides.top_logprobs);
     insert_optional_i64(body, "seed", overrides.seed);
     insert_optional_u32(body, "max_tokens", overrides.max_tokens);
@@ -262,10 +262,21 @@ fn insert_optional_bool(body: &mut Map<String, Value>, key: &str, value: Option<
     }
 }
 
-fn insert_optional_f32(body: &mut Map<String, Value>, key: &str, value: Option<f32>) {
+fn insert_optional_f32(
+    body: &mut Map<String, Value>,
+    key: &str,
+    value: Option<f32>,
+) -> Result<(), OpenAiSpecError> {
     if let Some(value) = value {
+        if !value.is_finite() {
+            return Err(OpenAiSpecError::Encode {
+                message: format!("openrouter override '{key}' must be finite"),
+                source: None,
+            });
+        }
         body.insert(key.to_string(), Value::from(value));
     }
+    Ok(())
 }
 
 fn insert_optional_u8(body: &mut Map<String, Value>, key: &str, value: Option<u8>) {
@@ -506,7 +517,7 @@ fn decode_openrouter_tool_calls(
             .and_then(Value::as_str)
             .or_else(|| call_obj.get("name").and_then(Value::as_str));
 
-        let Some(name) = name else {
+        let Some(name) = name.map(str::trim).filter(|name| !name.is_empty()) else {
             warnings.push(RuntimeWarning {
                 code: WARN_MISSING_TOOL_CALL_NAME.to_string(),
                 message: format!(

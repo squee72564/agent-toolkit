@@ -209,6 +209,48 @@ fn openrouter_translator_applies_typed_overrides() {
 }
 
 #[test]
+fn openrouter_translator_rejects_non_finite_frequency_penalty_override() {
+    let overrides = OpenRouterOverrides {
+        frequency_penalty: Some(f32::NAN),
+        ..OpenRouterOverrides::default()
+    };
+    let translator = OpenRouterTranslator::new(overrides);
+
+    let error = translator
+        .encode_request(&base_request())
+        .expect_err("encoding should fail for non-finite frequency_penalty");
+
+    match error {
+        OpenRouterTranslatorError::Encode(spec_error) => {
+            assert!(spec_error.message().contains("frequency_penalty"));
+            assert!(spec_error.message().contains("must be finite"));
+        }
+        OpenRouterTranslatorError::Decode(_) => panic!("expected encode error"),
+    }
+}
+
+#[test]
+fn openrouter_translator_rejects_non_finite_presence_penalty_override() {
+    let overrides = OpenRouterOverrides {
+        presence_penalty: Some(f32::INFINITY),
+        ..OpenRouterOverrides::default()
+    };
+    let translator = OpenRouterTranslator::new(overrides);
+
+    let error = translator
+        .encode_request(&base_request())
+        .expect_err("encoding should fail for non-finite presence_penalty");
+
+    match error {
+        OpenRouterTranslatorError::Encode(spec_error) => {
+            assert!(spec_error.message().contains("presence_penalty"));
+            assert!(spec_error.message().contains("must be finite"));
+        }
+        OpenRouterTranslatorError::Decode(_) => panic!("expected encode error"),
+    }
+}
+
+#[test]
 fn openrouter_translator_extra_overrides_take_precedence() {
     let mut extra = Map::new();
     extra.insert("user".to_string(), json!("from-extra"));
@@ -448,6 +490,52 @@ fn openrouter_decode_tool_call_missing_name_is_ignored_with_warning() {
                         "id": "call_1",
                         "type": "function",
                         "function": {
+                            "arguments": "{\"city\":\"SF\"}"
+                        }
+                    }]
+                }
+            }]
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let response = translator
+        .decode_request(&payload)
+        .expect("decode should succeed");
+
+    assert!(
+        !response
+            .output
+            .content
+            .iter()
+            .any(|part| matches!(part, ContentPart::ToolCall { .. }))
+    );
+    assert!(
+        response
+            .warnings
+            .iter()
+            .any(|w| w.code == "openrouter.decode.missing_tool_call_name")
+    );
+}
+
+#[test]
+fn openrouter_decode_tool_call_whitespace_name_is_ignored_with_warning() {
+    let translator = OpenRouterTranslator::default();
+    let payload = OpenAiDecodeEnvelope {
+        body: json!({
+            "id": "chatcmpl-123",
+            "object": "chat.completion",
+            "model": "openai/gpt-4.1-mini",
+            "choices": [{
+                "index": 0,
+                "finish_reason": "tool_calls",
+                "message": {
+                    "role": "assistant",
+                    "tool_calls": [{
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {
+                            "name": "   ",
                             "arguments": "{\"city\":\"SF\"}"
                         }
                     }]
