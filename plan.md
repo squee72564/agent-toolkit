@@ -172,7 +172,7 @@ Harden every Rust file in a controlled, repeatable cycle: discover risk, apply f
 - [x] crates/agent-providers/src/platform/openrouter/mod.rs
 - [x] crates/agent-providers/src/platform/openrouter/test.rs
 - [x] crates/agent-providers/src/platform/openrouter/translator.rs
-- [ ] crates/agent-providers/src/platform/test_fixtures.rs
+- [x] crates/agent-providers/src/platform/test_fixtures.rs
 - [ ] crates/agent-providers/src/platform/test_fixtures_test.rs
 - [ ] crates/agent-providers/src/translator_contract.rs
 
