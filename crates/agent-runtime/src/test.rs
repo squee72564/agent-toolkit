@@ -104,6 +104,37 @@ fn fallback_policy_rules_match_provider_code() {
 }
 
 #[test]
+fn fallback_policy_rules_match_provider_code_with_whitespace_normalization() {
+    let policy = FallbackPolicy::default()
+        .with_mode(FallbackMode::RulesOnly)
+        .with_rule(FallbackRule::retry_on_provider_code(
+            " rate_limit_exceeded ",
+        ));
+
+    let matching_error = runtime_error(
+        RuntimeErrorKind::Upstream,
+        Some(ProviderId::OpenAi),
+        None,
+        Some("  rate_limit_exceeded\t"),
+    );
+    assert!(policy.should_fallback(&matching_error));
+}
+
+#[test]
+fn fallback_rule_for_provider_is_idempotent_for_duplicates() {
+    let rule = FallbackRule::retry_on_status(429)
+        .for_provider(ProviderId::OpenAi)
+        .for_provider(ProviderId::OpenAi)
+        .for_provider(ProviderId::OpenRouter);
+
+    assert_eq!(rule.when.providers.len(), 2);
+    assert_eq!(
+        rule.when.providers,
+        vec![ProviderId::OpenAi, ProviderId::OpenRouter]
+    );
+}
+
+#[test]
 fn fallback_policy_rules_can_scope_to_provider() {
     let policy = FallbackPolicy::default()
         .with_mode(FallbackMode::RulesOnly)
@@ -197,6 +228,34 @@ fn router_requires_explicit_target_without_policy() {
         .resolve_targets(&SendOptions::default())
         .expect_err("target resolution should fail");
     assert_eq!(error.kind, RuntimeErrorKind::TargetResolution);
+}
+
+#[test]
+fn resolve_targets_deduplicates_primary_and_fallback_targets() {
+    let toolkit = AgentToolkit::builder()
+        .with_openai(ProviderConfig::new("test-key").with_base_url("http://127.0.0.1:1"))
+        .with_openrouter(ProviderConfig::new("test-key").with_base_url("http://127.0.0.1:1"))
+        .build()
+        .expect("toolkit should build for target resolution test");
+
+    let options = SendOptions::for_target(Target::new(ProviderId::OpenAi).with_model("gpt-5"))
+        .with_fallback_policy(FallbackPolicy::new(vec![
+            Target::new(ProviderId::OpenAi).with_model("gpt-5"),
+            Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"),
+            Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"),
+        ]));
+
+    let targets = toolkit
+        .resolve_targets(&options)
+        .expect("target resolution should succeed");
+
+    assert_eq!(
+        targets,
+        vec![
+            Target::new(ProviderId::OpenAi).with_model("gpt-5"),
+            Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"),
+        ]
+    );
 }
 
 #[test]
@@ -430,4 +489,17 @@ fn terminal_failure_error_returns_underlying_for_fallback_exhausted() {
     assert_eq!(extracted.kind, RuntimeErrorKind::Upstream);
     assert_eq!(extracted.status_code, Some(503));
     assert_eq!(extracted.request_id.as_deref(), Some("req_terminal"));
+}
+
+#[test]
+fn event_model_trims_and_filters_empty_values() {
+    assert_eq!(
+        event_model(Some("  gpt-5-mini  "), "gpt-5"),
+        Some("gpt-5-mini".to_string())
+    );
+    assert_eq!(
+        event_model(Some("  "), "  gpt-5  "),
+        Some("gpt-5".to_string())
+    );
+    assert_eq!(event_model(None, " "), None);
 }
