@@ -271,6 +271,74 @@ fn encode_rejects_invalid_tool_schema_or_name() {
 }
 
 #[test]
+fn encode_rejects_temperature_out_of_range() {
+    let mut request = base_request(vec![Message {
+        role: MessageRole::User,
+        content: vec![ContentPart::Text {
+            text: "hello".to_string(),
+        }],
+    }]);
+    request.temperature = Some(1.1);
+
+    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert!(
+        error
+            .message()
+            .contains("temperature must be in [0.0, 1.0]")
+    );
+}
+
+#[test]
+fn encode_rejects_top_p_out_of_range() {
+    let mut request = base_request(vec![Message {
+        role: MessageRole::User,
+        content: vec![ContentPart::Text {
+            text: "hello".to_string(),
+        }],
+    }]);
+    request.top_p = Some(-0.1);
+
+    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert!(error.message().contains("top_p must be in [0.0, 1.0]"));
+}
+
+#[test]
+fn encode_rejects_zero_max_output_tokens() {
+    let mut request = base_request(vec![Message {
+        role: MessageRole::User,
+        content: vec![ContentPart::Text {
+            text: "hello".to_string(),
+        }],
+    }]);
+    request.max_output_tokens = Some(0);
+
+    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert!(
+        error
+            .message()
+            .contains("max_output_tokens must be at least 1")
+    );
+}
+
+#[test]
+fn encode_rejects_empty_stop_sequence() {
+    let mut request = base_request(vec![Message {
+        role: MessageRole::User,
+        content: vec![ContentPart::Text {
+            text: "hello".to_string(),
+        }],
+    }]);
+    request.stop = vec!["".to_string()];
+
+    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert!(error.message().contains("must not contain empty strings"));
+}
+
+#[test]
 fn encode_rejects_tool_result_before_tool_call() {
     let request = base_request(vec![
         Message {
@@ -398,6 +466,66 @@ fn encode_rejects_duplicate_tool_call_ids() {
 }
 
 #[test]
+fn encode_rejects_non_object_tool_call_arguments_json() {
+    let request = base_request(vec![Message {
+        role: MessageRole::Assistant,
+        content: vec![ContentPart::ToolCall {
+            tool_call: ToolCall {
+                id: "call_1".to_string(),
+                name: "calculator".to_string(),
+                arguments_json: json!("2+2"),
+            },
+        }],
+    }]);
+
+    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert!(
+        error
+            .message()
+            .contains("arguments_json must be a JSON object")
+    );
+}
+
+#[test]
+fn encode_rejects_non_text_tool_result_parts() {
+    let request = base_request(vec![
+        Message {
+            role: MessageRole::Assistant,
+            content: vec![ContentPart::ToolCall {
+                tool_call: ToolCall {
+                    id: "call_1".to_string(),
+                    name: "calculator".to_string(),
+                    arguments_json: json!({"expression":"2+2"}),
+                },
+            }],
+        },
+        Message {
+            role: MessageRole::Tool,
+            content: vec![ContentPart::ToolResult {
+                tool_result: ToolResult {
+                    tool_call_id: "call_1".to_string(),
+                    content: ToolResultContent::Parts {
+                        parts: vec![ContentPart::ToolCall {
+                            tool_call: ToolCall {
+                                id: "nested".to_string(),
+                                name: "bad".to_string(),
+                                arguments_json: json!({"x":1}),
+                            },
+                        }],
+                    },
+                    raw_provider_content: None,
+                },
+            }],
+        },
+    ]);
+
+    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert!(error.message().contains("must contain only text parts"));
+}
+
+#[test]
 fn encode_rejects_structured_output_with_assistant_prefill() {
     let mut request = base_request(vec![
         Message {
@@ -418,6 +546,42 @@ fn encode_rejects_structured_output_with_assistant_prefill() {
     let error = encode_anthropic_request(&request).expect_err("encode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
     assert!(error.message().contains("assistant-prefill"));
+}
+
+#[test]
+fn encode_maps_json_schema_response_format_to_output_config() {
+    let mut request = base_request(vec![Message {
+        role: MessageRole::User,
+        content: vec![ContentPart::Text {
+            text: "return json".to_string(),
+        }],
+    }]);
+    request.response_format = ResponseFormat::JsonSchema {
+        name: "shape".to_string(),
+        schema: json!({
+            "type": "object",
+            "properties": {
+                "ok": {"type": "boolean"}
+            },
+            "required": ["ok"]
+        }),
+    };
+
+    let encoded = encode_anthropic_request(&request).expect("encode should succeed");
+    assert_eq!(
+        encoded.body.pointer("/output_config/format/type"),
+        Some(&json!("json_schema"))
+    );
+    assert_eq!(
+        encoded.body.pointer("/output_config/format/schema"),
+        Some(&json!({
+            "type": "object",
+            "properties": {
+                "ok": {"type": "boolean"}
+            },
+            "required": ["ok"]
+        }))
+    );
 }
 
 #[test]
@@ -535,13 +699,14 @@ fn decode_tool_use_mapping() {
     let response = decode_anthropic_response(&payload).expect("decode should succeed");
     assert_eq!(response.finish_reason, FinishReason::ToolCalls);
     assert_eq!(response.output.content.len(), 1);
-    match &response.output.content[0] {
-        ContentPart::ToolCall { tool_call } => {
-            assert_eq!(tool_call.id, "call_1");
-            assert_eq!(tool_call.name, "calculator");
-            assert_eq!(tool_call.arguments_json, json!({"expression":"2+2"}));
-        }
-        other => panic!("expected tool call content part, got {other:?}"),
+    assert!(matches!(
+        &response.output.content[0],
+        ContentPart::ToolCall { .. }
+    ));
+    if let ContentPart::ToolCall { tool_call } = &response.output.content[0] {
+        assert_eq!(tool_call.id, "call_1");
+        assert_eq!(tool_call.name, "calculator");
+        assert_eq!(tool_call.arguments_json, json!({"expression":"2+2"}));
     }
 }
 
@@ -642,6 +807,180 @@ fn decode_rejects_non_object_tool_use_input() {
     let error = decode_anthropic_response(&payload).expect_err("decode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Decode);
     assert!(error.message().contains("must be a JSON object"));
+}
+
+#[test]
+fn decode_unknown_content_block_warns_and_maps_to_text() {
+    let payload = AnthropicDecodeEnvelope {
+        body: json!({
+            "role": "assistant",
+            "model": "claude-sonnet-4.6",
+            "stop_reason": "end_turn",
+            "content": [{
+                "type":"future_block",
+                "z": 1,
+                "a": {"k":"v"}
+            }],
+            "usage": {"input_tokens": 1, "output_tokens": 1}
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let response = decode_anthropic_response(&payload).expect("decode should succeed");
+    assert_eq!(response.output.content.len(), 1);
+    assert!(matches!(
+        &response.output.content[0],
+        ContentPart::Text { .. }
+    ));
+    if let ContentPart::Text { text } = &response.output.content[0] {
+        assert_eq!(text, r#"{"a":{"k":"v"},"type":"future_block","z":1}"#);
+    }
+    assert!(
+        response
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "anthropic.decode.unknown_content_block_mapped_to_text")
+    );
+}
+
+#[test]
+fn decode_thinking_block_warns_and_skips_block() {
+    let payload = AnthropicDecodeEnvelope {
+        body: json!({
+            "role": "assistant",
+            "model": "claude-sonnet-4.6",
+            "stop_reason": "end_turn",
+            "content": [{"type":"thinking","text":"hidden"}],
+            "usage": {"input_tokens": 1, "output_tokens": 1}
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let response = decode_anthropic_response(&payload).expect("decode should succeed");
+    assert!(response.output.content.is_empty());
+    assert!(
+        response
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "anthropic.decode.unrepresentable_thinking_skipped")
+    );
+}
+
+#[test]
+fn decode_json_object_extracts_from_combined_text_fallback() {
+    let payload = AnthropicDecodeEnvelope {
+        body: json!({
+            "role": "assistant",
+            "model": "claude-sonnet-4.6",
+            "stop_reason": "end_turn",
+            "content": [
+                {"type":"text","text":"lead-in"},
+                {"type":"text","text":"prefix {\"ok\":true,\"nested\":{\"value\":1}} suffix"}
+            ],
+            "usage": {"input_tokens": 1, "output_tokens": 1}
+        }),
+        requested_response_format: ResponseFormat::JsonObject,
+    };
+
+    let response = decode_anthropic_response(&payload).expect("decode should succeed");
+    assert_eq!(
+        response.output.structured_output,
+        Some(json!({"ok":true,"nested":{"value":1}}))
+    );
+}
+
+#[test]
+fn decode_rejects_non_object_usage() {
+    let payload = AnthropicDecodeEnvelope {
+        body: json!({
+            "role": "assistant",
+            "model": "claude-sonnet-4.6",
+            "stop_reason": "end_turn",
+            "content": [{"type":"text","text":"ok"}],
+            "usage": "invalid"
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let error = decode_anthropic_response(&payload).expect_err("decode should fail");
+    assert_eq!(error.kind(), AnthropicSpecErrorKind::Decode);
+    assert!(error.message().contains("usage must be a JSON object"));
+}
+
+#[test]
+fn decode_rejects_non_numeric_usage_field() {
+    let payload = AnthropicDecodeEnvelope {
+        body: json!({
+            "role": "assistant",
+            "model": "claude-sonnet-4.6",
+            "stop_reason": "end_turn",
+            "content": [{"type":"text","text":"ok"}],
+            "usage": {
+                "input_tokens": "five",
+                "output_tokens": 1
+            }
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let error = decode_anthropic_response(&payload).expect_err("decode should fail");
+    assert_eq!(error.kind(), AnthropicSpecErrorKind::Decode);
+    assert!(error.message().contains("must be numeric"));
+}
+
+#[test]
+fn decode_rejects_signed_usage_field() {
+    let payload = AnthropicDecodeEnvelope {
+        body: json!({
+            "role": "assistant",
+            "model": "claude-sonnet-4.6",
+            "stop_reason": "end_turn",
+            "content": [{"type":"text","text":"ok"}],
+            "usage": {
+                "input_tokens": -1,
+                "output_tokens": 1
+            }
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let error = decode_anthropic_response(&payload).expect_err("decode should fail");
+    assert_eq!(error.kind(), AnthropicSpecErrorKind::Decode);
+    assert!(error.message().contains("must be an unsigned integer"));
+}
+
+#[test]
+fn decode_maps_known_stop_reasons() {
+    let cases = vec![
+        ("stop_sequence", FinishReason::Stop),
+        ("max_tokens", FinishReason::Length),
+        ("refusal", FinishReason::ContentFilter),
+        ("pause_turn", FinishReason::Other),
+    ];
+
+    for (stop_reason, expected) in cases {
+        let payload = AnthropicDecodeEnvelope {
+            body: json!({
+                "role": "assistant",
+                "model": "claude-sonnet-4.6",
+                "stop_reason": stop_reason,
+                "content": [{"type":"text","text":"ok"}],
+                "usage": {"input_tokens": 1, "output_tokens": 1}
+            }),
+            requested_response_format: ResponseFormat::Text,
+        };
+
+        let response = decode_anthropic_response(&payload).expect("decode should succeed");
+        assert_eq!(response.finish_reason, expected);
+        if stop_reason != "pause_turn" {
+            assert!(
+                !response
+                    .warnings
+                    .iter()
+                    .any(|warning| warning.code == "anthropic.decode.unknown_stop_reason")
+            );
+        }
+    }
 }
 
 #[test]
@@ -852,10 +1191,10 @@ fn decode_structured_output_parse_failure_warns() {
 fn encode_and_decode_error_variant_smoke() {
     let request = base_request(vec![]);
     let encode_error = encode_anthropic_request(&request).expect_err("encode should fail");
-    match encode_error {
-        AnthropicSpecError::Validation { .. } | AnthropicSpecError::ProtocolViolation { .. } => {}
-        other => panic!("expected validation/protocol error, got {other:?}"),
-    }
+    assert!(matches!(
+        encode_error,
+        AnthropicSpecError::Validation { .. } | AnthropicSpecError::ProtocolViolation { .. }
+    ));
 
     let payload = AnthropicDecodeEnvelope {
         body: json!({
