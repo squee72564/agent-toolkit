@@ -1,3 +1,4 @@
+use reqwest::Url;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde_json::Value;
 
@@ -237,6 +238,25 @@ fn build_platform_config(
             provider,
             AdapterOperation::BuildHttpRequest,
             format!("base_url is empty for provider {provider:?}"),
+        ));
+    }
+    let parsed_base_url = Url::parse(trimmed_base_url.as_str()).map_err(|error| {
+        AdapterError::new(
+            AdapterErrorKind::Validation,
+            provider,
+            AdapterOperation::BuildHttpRequest,
+            format!("base_url is not a valid URL for provider {provider:?}: {error}"),
+        )
+    })?;
+    if !matches!(parsed_base_url.scheme(), "http" | "https") {
+        return Err(AdapterError::new(
+            AdapterErrorKind::Validation,
+            provider,
+            AdapterOperation::BuildHttpRequest,
+            format!(
+                "base_url must use http or https for provider {provider:?}, got scheme {}",
+                parsed_base_url.scheme()
+            ),
         ));
     }
 

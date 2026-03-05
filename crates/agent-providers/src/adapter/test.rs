@@ -123,6 +123,49 @@ fn platform_config_rejects_empty_base_url() {
 }
 
 #[test]
+fn platform_config_trims_base_url() {
+    let config = adapter_for(ProviderId::OpenAi)
+        .platform_config("  https://api.openai.com  ".to_string())
+        .expect("platform config should succeed");
+    assert_eq!(config.base_url, "https://api.openai.com");
+}
+
+#[test]
+fn platform_config_rejects_malformed_url() {
+    let error = adapter_for(ProviderId::OpenAi)
+        .platform_config("not a valid url".to_string())
+        .expect_err("malformed base url must fail");
+    assert_eq!(error.provider, ProviderId::OpenAi);
+    assert_eq!(error.operation, AdapterOperation::BuildHttpRequest);
+    assert_eq!(error.kind, AdapterErrorKind::Validation);
+}
+
+#[test]
+fn platform_config_rejects_non_http_scheme() {
+    let error = adapter_for(ProviderId::OpenAi)
+        .platform_config("ftp://api.openai.com".to_string())
+        .expect_err("non-http scheme must fail");
+    assert_eq!(error.provider, ProviderId::OpenAi);
+    assert_eq!(error.operation, AdapterOperation::BuildHttpRequest);
+    assert_eq!(error.kind, AdapterErrorKind::Validation);
+}
+
+#[test]
+fn default_base_url_and_endpoint_path_are_expected() {
+    let openai = adapter_for(ProviderId::OpenAi);
+    assert_eq!(openai.default_base_url(), "https://api.openai.com");
+    assert_eq!(openai.endpoint_path(), "/v1/responses");
+
+    let anthropic = adapter_for(ProviderId::Anthropic);
+    assert_eq!(anthropic.default_base_url(), "https://api.anthropic.com");
+    assert_eq!(anthropic.endpoint_path(), "/v1/messages");
+
+    let openrouter = adapter_for(ProviderId::OpenRouter);
+    assert_eq!(openrouter.default_base_url(), "https://openrouter.ai/api");
+    assert_eq!(openrouter.endpoint_path(), "/v1/chat/completions");
+}
+
+#[test]
 fn openai_adapter_encode_decode_matches_translator() {
     let request = base_request();
     let adapter = adapter_for(ProviderId::OpenAi);
