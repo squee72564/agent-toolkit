@@ -11,7 +11,7 @@ use agent_core::types::{
 use super::OpenAiSpecError;
 use super::decode::decode_openai_response;
 use super::encode::encode_openai_request;
-use super::schema_rules::is_strict_compatible_schema;
+use super::schema_rules::{canonicalize_json, is_strict_compatible_schema, stable_json_string};
 use super::{OpenAiDecodeEnvelope, OpenAiSpecErrorKind};
 
 fn base_request(messages: Vec<Message>) -> Request {
@@ -251,6 +251,121 @@ fn strict_schema_requires_no_anyof_and_full_required_list() {
 
     assert!(is_strict_compatible_schema(&valid));
     assert!(!is_strict_compatible_schema(&invalid));
+}
+
+#[test]
+fn strict_schema_rejects_missing_additional_properties_false() {
+    let invalid = json!({
+        "type": "object",
+        "properties": {
+            "city": { "type": "string" }
+        },
+        "required": ["city"]
+    });
+
+    assert!(!is_strict_compatible_schema(&invalid));
+}
+
+#[test]
+fn strict_schema_rejects_required_with_non_string_entries() {
+    let invalid = json!({
+        "type": "object",
+        "properties": {
+            "city": { "type": "string" }
+        },
+        "required": [123],
+        "additionalProperties": false
+    });
+
+    assert!(!is_strict_compatible_schema(&invalid));
+}
+
+#[test]
+fn strict_schema_rejects_duplicate_required_entries() {
+    let invalid = json!({
+        "type": "object",
+        "properties": {
+            "city": { "type": "string" }
+        },
+        "required": ["city", "city"],
+        "additionalProperties": false
+    });
+
+    assert!(!is_strict_compatible_schema(&invalid));
+}
+
+#[test]
+fn strict_schema_rejects_required_entries_not_in_properties() {
+    let invalid = json!({
+        "type": "object",
+        "properties": {
+            "city": { "type": "string" }
+        },
+        "required": ["city", "country"],
+        "additionalProperties": false
+    });
+
+    assert!(!is_strict_compatible_schema(&invalid));
+}
+
+#[test]
+fn strict_schema_requires_all_properties_in_required() {
+    let invalid = json!({
+        "type": "object",
+        "properties": {
+            "city": { "type": "string" },
+            "country": { "type": "string" }
+        },
+        "required": ["city"],
+        "additionalProperties": false
+    });
+
+    assert!(!is_strict_compatible_schema(&invalid));
+}
+
+#[test]
+fn strict_schema_accepts_nested_objects_and_array_items() {
+    let valid = json!({
+        "type": "object",
+        "properties": {
+            "location": {
+                "type": "object",
+                "properties": {
+                    "city": { "type": "string" }
+                },
+                "required": ["city"],
+                "additionalProperties": false
+            },
+            "tags": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "label": { "type": "string" }
+                    },
+                    "required": ["label"],
+                    "additionalProperties": false
+                }
+            }
+        },
+        "required": ["location", "tags"],
+        "additionalProperties": false
+    });
+
+    assert!(is_strict_compatible_schema(&valid));
+}
+
+#[test]
+fn canonicalize_json_sorts_keys_recursively_for_openai_schema_rules() {
+    let input = json!({
+        "z": {"b": 2, "a": 1},
+        "a": [{"d": 4, "c": 3}, 5]
+    });
+
+    let canonical = canonicalize_json(&input);
+    let as_string = stable_json_string(&canonical);
+
+    assert_eq!(as_string, r#"{"a":[{"c":3,"d":4},5],"z":{"a":1,"b":2}}"#);
 }
 
 #[test]
