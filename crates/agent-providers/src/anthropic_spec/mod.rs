@@ -69,6 +69,7 @@ pub enum AnthropicSpecError {
 }
 
 impl AnthropicSpecError {
+    #[must_use]
     #[allow(dead_code)]
     pub(crate) fn validation(message: impl Into<String>) -> Self {
         Self::Validation {
@@ -76,6 +77,7 @@ impl AnthropicSpecError {
         }
     }
 
+    #[must_use]
     #[allow(dead_code)]
     pub(crate) fn encode_with_source<E>(message: impl Into<String>, source: E) -> Self
     where
@@ -87,6 +89,7 @@ impl AnthropicSpecError {
         }
     }
 
+    #[must_use]
     #[allow(dead_code)]
     pub(crate) fn protocol_violation(message: impl Into<String>) -> Self {
         Self::ProtocolViolation {
@@ -94,6 +97,7 @@ impl AnthropicSpecError {
         }
     }
 
+    #[must_use]
     #[allow(dead_code)]
     pub(crate) fn decode(message: impl Into<String>) -> Self {
         Self::Decode {
@@ -102,6 +106,7 @@ impl AnthropicSpecError {
         }
     }
 
+    #[must_use]
     #[allow(dead_code)]
     pub(crate) fn upstream(message: impl Into<String>) -> Self {
         Self::Upstream {
@@ -109,6 +114,7 @@ impl AnthropicSpecError {
         }
     }
 
+    #[must_use]
     #[allow(dead_code)]
     pub(crate) fn unsupported_feature(message: impl Into<String>) -> Self {
         Self::UnsupportedFeature {
@@ -116,6 +122,7 @@ impl AnthropicSpecError {
         }
     }
 
+    #[must_use]
     pub(crate) fn kind(&self) -> AnthropicSpecErrorKind {
         match self {
             Self::Validation { .. } => AnthropicSpecErrorKind::Validation,
@@ -127,6 +134,7 @@ impl AnthropicSpecError {
         }
     }
 
+    #[must_use]
     pub(crate) fn message(&self) -> &str {
         match self {
             Self::Validation { message } => message,

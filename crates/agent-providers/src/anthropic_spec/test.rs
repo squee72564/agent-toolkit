@@ -865,3 +865,56 @@ fn encode_and_decode_error_variant_smoke() {
     let decode_error = decode_anthropic_response(&payload).expect_err("decode should fail");
     assert_eq!(decode_error.kind(), AnthropicSpecErrorKind::Decode);
 }
+
+#[test]
+fn anthropic_spec_error_constructors_set_kind_and_message() {
+    let validation_error = AnthropicSpecError::validation("bad validation");
+    assert_eq!(validation_error.kind(), AnthropicSpecErrorKind::Validation);
+    assert_eq!(validation_error.message(), "bad validation");
+
+    let protocol_error = AnthropicSpecError::protocol_violation("bad protocol");
+    assert_eq!(
+        protocol_error.kind(),
+        AnthropicSpecErrorKind::ProtocolViolation
+    );
+    assert_eq!(protocol_error.message(), "bad protocol");
+
+    let decode_error = AnthropicSpecError::decode("bad decode");
+    assert_eq!(decode_error.kind(), AnthropicSpecErrorKind::Decode);
+    assert_eq!(decode_error.message(), "bad decode");
+
+    let upstream_error = AnthropicSpecError::upstream("bad upstream");
+    assert_eq!(upstream_error.kind(), AnthropicSpecErrorKind::Upstream);
+    assert_eq!(upstream_error.message(), "bad upstream");
+}
+
+#[test]
+fn anthropic_spec_error_encode_with_source_preserves_source_chain() {
+    let encode_error =
+        AnthropicSpecError::encode_with_source("failed to encode", std::io::Error::other("io"));
+    assert_eq!(encode_error.kind(), AnthropicSpecErrorKind::Encode);
+    assert_eq!(encode_error.message(), "failed to encode");
+
+    let source = std::error::Error::source(&encode_error).expect("source should exist");
+    assert!(source.to_string().contains("io"));
+}
+
+#[test]
+fn anthropic_spec_error_decode_variant_with_source_exposes_source() {
+    let decode_error = AnthropicSpecError::Decode {
+        message: "failed to decode".to_string(),
+        source: Some(Box::new(std::io::Error::other("wire"))),
+    };
+    assert_eq!(decode_error.kind(), AnthropicSpecErrorKind::Decode);
+    assert_eq!(decode_error.message(), "failed to decode");
+
+    let source = std::error::Error::source(&decode_error).expect("source should exist");
+    assert!(source.to_string().contains("wire"));
+}
+
+#[test]
+fn anthropic_spec_error_unsupported_feature_kind_and_message() {
+    let error = AnthropicSpecError::unsupported_feature("streaming tools");
+    assert_eq!(error.kind(), AnthropicSpecErrorKind::UnsupportedFeature);
+    assert_eq!(error.message(), "streaming tools");
+}
