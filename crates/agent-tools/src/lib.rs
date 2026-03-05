@@ -116,37 +116,21 @@ impl ToolRegistry {
     }
 
     pub fn validate_call(&self, name: &str, args: &Value) -> Result<(), ToolRegistryError> {
-        let tool = self
-            .tools
-            .get(name)
-            .ok_or_else(|| ToolRegistryError::UnknownTool {
-                name: name.to_string(),
-            })?;
+        let tool = self.lookup_tool(name)?;
 
         if let Some(compiled_schema) = self.compiled_schemas.get(name) {
-            return compiled_schema.validate_args(args).map_err(|source| {
-                ToolRegistryError::InvalidArgs {
-                    name: name.to_string(),
-                    source,
-                }
-            });
+            return compiled_schema
+                .validate_args(args)
+                .map_err(|source| Self::invalid_args(name, source));
         }
 
-        let definition = tool_definition_from_tool(tool.as_ref());
-        let compiled_schema =
-            CompiledToolSchema::from_definition(&definition).map_err(|source| {
-                ToolRegistryError::InvalidSchema {
-                    name: name.to_string(),
-                    source,
-                }
-            })?;
+        let definition = tool_definition_from_tool(tool);
+        let compiled_schema = CompiledToolSchema::from_definition(&definition)
+            .map_err(|source| Self::invalid_schema(name, source))?;
 
         compiled_schema
             .validate_args(args)
-            .map_err(|source| ToolRegistryError::InvalidArgs {
-                name: name.to_string(),
-                source,
-            })
+            .map_err(|source| Self::invalid_args(name, source))
     }
 
     pub async fn execute_validated(
@@ -156,19 +140,45 @@ impl ToolRegistry {
     ) -> Result<ToolOutput, ToolRegistryError> {
         self.validate_call(name, &args)?;
 
-        let tool = self
-            .tools
-            .get(name)
-            .ok_or_else(|| ToolRegistryError::UnknownTool {
-                name: name.to_string(),
-            })?;
+        let tool = self.lookup_tool(name)?;
 
         tool.execute(args)
             .await
-            .map_err(|source| ToolRegistryError::Execution {
-                name: name.to_string(),
-                source,
-            })
+            .map_err(|source| Self::execution(name, source))
+    }
+
+    fn lookup_tool(&self, name: &str) -> Result<&dyn Tool, ToolRegistryError> {
+        self.tools
+            .get(name)
+            .map(|tool| tool.as_ref())
+            .ok_or_else(|| Self::unknown_tool(name))
+    }
+
+    fn unknown_tool(name: &str) -> ToolRegistryError {
+        ToolRegistryError::UnknownTool {
+            name: name.to_string(),
+        }
+    }
+
+    fn invalid_schema(name: &str, source: ToolSchemaError) -> ToolRegistryError {
+        ToolRegistryError::InvalidSchema {
+            name: name.to_string(),
+            source,
+        }
+    }
+
+    fn invalid_args(name: &str, source: ToolArgsValidationError) -> ToolRegistryError {
+        ToolRegistryError::InvalidArgs {
+            name: name.to_string(),
+            source,
+        }
+    }
+
+    fn execution(name: &str, source: ToolError) -> ToolRegistryError {
+        ToolRegistryError::Execution {
+            name: name.to_string(),
+            source,
+        }
     }
 }
 
