@@ -1,4 +1,4 @@
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::openai_spec::{OpenAiDecodeEnvelope, OpenAiSpecError};
 use crate::platform::test_fixtures::{
@@ -42,10 +42,9 @@ fn fixture_smoke_openai_tool_call_reasoning() {
 }
 
 #[test]
-fn fixture_smoke_openai_errors() {
+fn fixture_smoke_openai_errors() -> Result<(), String> {
     for (scenario, preferred_model) in SMOKE_ERROR_FIXTURES {
-        if let Some(chosen_model) =
-            choose_error_fixture_model_for_upstream(scenario, preferred_model)
+        if let Ok(chosen_model) = choose_error_fixture_model_for_upstream(scenario, preferred_model)
         {
             let body = load_error_fixture_body(PROVIDER, scenario, &chosen_model);
             let payload = OpenAiDecodeEnvelope {
@@ -55,17 +54,18 @@ fn fixture_smoke_openai_errors() {
             let error = OpenAiTranslator
                 .decode_request(&payload)
                 .expect_err("expected upstream decode error for error fixture");
-            assert_openai_upstream_error(error, scenario, &chosen_model);
+            assert_openai_upstream_error(error, scenario, &chosen_model)?;
         } else if let Some(reason) = quarantine_error_reason(scenario, preferred_model) {
             eprintln!(
                 "quarantined error fixture used as known anomaly: provider={PROVIDER} scenario={scenario} model={preferred_model} reason={reason}"
             );
         } else {
-            panic!(
+            return Err(format!(
                 "no valid upstream error fixture available for provider={PROVIDER} scenario={scenario} preferred={preferred_model}"
-            );
+            ));
         }
     }
+    Ok(())
 }
 
 #[test]
@@ -88,19 +88,20 @@ fn fixture_full_openai_success_sweep() {
 
 #[test]
 #[ignore]
-fn fixture_full_openai_errors_sweep() {
+fn fixture_full_openai_errors_sweep() -> Result<(), String> {
     let relpaths = list_error_fixture_relpaths(PROVIDER);
-    assert!(
-        !relpaths.is_empty(),
-        "expected at least one error fixture relpath for provider {PROVIDER}"
-    );
+    if relpaths.is_empty() {
+        return Err(format!(
+            "expected at least one error fixture relpath for provider {PROVIDER}"
+        ));
+    }
 
     let mut quarantined_seen = 0usize;
     for relpath in relpaths {
-        let (scenario, model) = parse_error_relpath(&relpath);
-        validate_error_fixture_shape(PROVIDER, scenario, model).unwrap_or_else(|reason| {
-            panic!("invalid error fixture wrapper {scenario}/{model}: {reason}")
-        });
+        let (scenario, model) = parse_error_relpath(&relpath)?;
+        validate_error_fixture_shape(PROVIDER, scenario, model).map_err(|reason| {
+            format!("invalid error fixture wrapper {scenario}/{model}: {reason}")
+        })?;
 
         let body = load_error_fixture_body(PROVIDER, scenario, model);
         if !has_top_level_error_object(&body) {
@@ -111,7 +112,9 @@ fn fixture_full_openai_errors_sweep() {
                 );
                 continue;
             }
-            panic!("error fixture missing top-level error object: {scenario}/{model}");
+            return Err(format!(
+                "error fixture missing top-level error object: {scenario}/{model}"
+            ));
         }
 
         let payload = OpenAiDecodeEnvelope {
@@ -121,14 +124,17 @@ fn fixture_full_openai_errors_sweep() {
         let error = OpenAiTranslator
             .decode_request(&payload)
             .expect_err("expected upstream decode error for error fixture");
-        assert_openai_upstream_error(error, scenario, model);
+        assert_openai_upstream_error(error, scenario, model)?;
     }
 
-    assert_eq!(
-        quarantined_seen,
-        QUARANTINED_ERROR_FIXTURES.len(),
-        "quarantined OpenAI error fixture count changed; review anomaly registry"
-    );
+    if quarantined_seen != QUARANTINED_ERROR_FIXTURES.len() {
+        return Err(format!(
+            "quarantined OpenAI error fixture count changed; expected={}, saw={quarantined_seen}; review anomaly registry",
+            QUARANTINED_ERROR_FIXTURES.len()
+        ));
+    }
+
+    Ok(())
 }
 
 fn run_success_smoke_scenario(scenario: &str, preferred_models: &[&str]) {
@@ -160,17 +166,19 @@ fn run_success_smoke_scenario(scenario: &str, preferred_models: &[&str]) {
 fn choose_error_fixture_model_for_upstream(
     scenario: &str,
     preferred_model: &str,
-) -> Option<String> {
+) -> Result<String, String> {
     let mut models = list_error_fixture_models(PROVIDER, scenario);
     if let Some(pos) = models.iter().position(|model| model == preferred_model) {
         let preferred = models.remove(pos);
         models.insert(0, preferred);
     }
 
+    let mut rejected = Vec::new();
     for model in models {
-        validate_error_fixture_shape(PROVIDER, scenario, &model).unwrap_or_else(|reason| {
-            panic!("invalid error fixture wrapper {scenario}/{model}: {reason}")
-        });
+        if let Err(reason) = validate_error_fixture_shape(PROVIDER, scenario, &model) {
+            rejected.push(format!("{model}: invalid wrapper shape: {reason}"));
+            continue;
+        }
 
         let body = load_error_fixture_body(PROVIDER, scenario, &model);
         if has_top_level_error_object(&body) {
@@ -179,10 +187,17 @@ fn choose_error_fixture_model_for_upstream(
                     "error fixture swap: provider={PROVIDER} scenario={scenario} requested={preferred_model} chosen={model}"
                 );
             }
-            return Some(model);
+            return Ok(model);
         }
+        rejected.push(format!(
+            "{model}: response.body missing top-level openai error object"
+        ));
     }
-    None
+
+    Err(format!(
+        "no valid upstream error fixture available for provider={PROVIDER} scenario={scenario} preferred={preferred_model}; rejected=[{}]",
+        rejected.join("; ")
+    ))
 }
 
 fn validate_success_fixture_body(body: &Value, scenario: &str, _model: &str) -> Result<(), String> {
@@ -253,21 +268,28 @@ fn has_tool_call(response: &Response) -> bool {
         .any(|part| matches!(part, ContentPart::ToolCall { .. }))
 }
 
-fn assert_openai_upstream_error(error: OpenAiTranslatorError, scenario: &str, model: &str) {
+fn assert_openai_upstream_error(
+    error: OpenAiTranslatorError,
+    scenario: &str,
+    model: &str,
+) -> Result<(), String> {
     match error {
         OpenAiTranslatorError::Decode(OpenAiSpecError::Upstream { message }) => {
-            assert!(
-                !message.trim().is_empty(),
-                "expected non-empty upstream message for {scenario}/{model}"
-            );
-            assert!(
-                message.contains("openai error:"),
-                "expected provider context in upstream message for {scenario}/{model}: {message}"
-            );
+            if message.trim().is_empty() {
+                return Err(format!(
+                    "expected non-empty upstream message for {scenario}/{model}"
+                ));
+            }
+            if !message.contains("openai error:") {
+                return Err(format!(
+                    "expected provider context in upstream message for {scenario}/{model}: {message}"
+                ));
+            }
+            Ok(())
         }
-        other => {
-            panic!("expected decode upstream error for fixture {scenario}/{model}, got: {other}")
-        }
+        other => Err(format!(
+            "expected decode upstream error for fixture {scenario}/{model}, got: {other}"
+        )),
     }
 }
 
@@ -282,26 +304,84 @@ fn quarantine_error_reason(scenario: &str, model: &str) -> Option<&'static str> 
         .map(|(_, _, reason)| *reason)
 }
 
-fn parse_error_relpath(relpath: &str) -> (&str, &str) {
+fn parse_error_relpath(relpath: &str) -> Result<(&str, &str), String> {
     let mut parts = relpath.split('/');
     let prefix = parts.next();
     let scenario = parts.next();
     let file = parts.next();
     let extra = parts.next();
 
-    assert_eq!(
-        prefix,
-        Some("errors"),
-        "unexpected error relpath prefix: {relpath}"
-    );
-    assert!(extra.is_none(), "unexpected error relpath shape: {relpath}");
+    if prefix != Some("errors") {
+        return Err(format!("unexpected error relpath prefix: {relpath}"));
+    }
+    if extra.is_some() {
+        return Err(format!("unexpected error relpath shape: {relpath}"));
+    }
 
     let scenario =
-        scenario.unwrap_or_else(|| panic!("missing error scenario in relpath: {relpath}"));
-    let file = file.unwrap_or_else(|| panic!("missing error file in relpath: {relpath}"));
+        scenario.ok_or_else(|| format!("missing error scenario in relpath: {relpath}"))?;
+    if scenario.trim().is_empty() {
+        return Err(format!("empty error scenario in relpath: {relpath}"));
+    }
+
+    let file = file.ok_or_else(|| format!("missing error file in relpath: {relpath}"))?;
     let model = file
         .strip_suffix(".json")
-        .unwrap_or_else(|| panic!("error relpath does not end with .json: {relpath}"));
+        .ok_or_else(|| format!("error relpath does not end with .json: {relpath}"))?;
+    if model.trim().is_empty() {
+        return Err(format!("empty error model in relpath: {relpath}"));
+    }
 
-    (scenario, model)
+    Ok((scenario, model))
+}
+
+#[test]
+fn parse_error_relpath_accepts_valid_relpath() {
+    let parsed = parse_error_relpath("errors/invalid_auth/gpt-5-mini.json");
+    assert_eq!(parsed, Ok(("invalid_auth", "gpt-5-mini")));
+}
+
+#[test]
+fn parse_error_relpath_rejects_invalid_prefix() {
+    let error = parse_error_relpath("not-errors/invalid_auth/model.json")
+        .expect_err("expected invalid prefix");
+    assert!(error.contains("unexpected error relpath prefix"));
+}
+
+#[test]
+fn parse_error_relpath_rejects_missing_or_empty_segments() {
+    let missing_scenario =
+        parse_error_relpath("errors//model.json").expect_err("expected missing or empty scenario");
+    assert!(
+        missing_scenario.contains("empty error scenario")
+            || missing_scenario.contains("missing error scenario")
+    );
+
+    let missing_file =
+        parse_error_relpath("errors/invalid_auth").expect_err("expected missing error file");
+    assert!(missing_file.contains("missing error file"));
+
+    let empty_model =
+        parse_error_relpath("errors/invalid_auth/.json").expect_err("expected empty model");
+    assert!(empty_model.contains("empty error model"));
+}
+
+#[test]
+fn parse_error_relpath_rejects_non_json_suffix() {
+    let error = parse_error_relpath("errors/invalid_auth/model.txt")
+        .expect_err("expected non-json suffix rejection");
+    assert!(error.contains("does not end with .json"));
+}
+
+#[test]
+fn has_top_level_error_object_requires_error_object() {
+    assert!(has_top_level_error_object(&json!({
+        "error": { "message": "bad request" }
+    })));
+    assert!(!has_top_level_error_object(&json!({
+        "error": "bad request"
+    })));
+    assert!(!has_top_level_error_object(&json!({
+        "message": "bad request"
+    })));
 }
