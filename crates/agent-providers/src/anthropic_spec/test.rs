@@ -296,6 +296,105 @@ fn encode_rejects_tool_result_before_tool_call() {
 }
 
 #[test]
+fn encode_rejects_empty_tool_call_id() {
+    let request = base_request(vec![Message {
+        role: MessageRole::Assistant,
+        content: vec![ContentPart::ToolCall {
+            tool_call: ToolCall {
+                id: "   ".to_string(),
+                name: "calculator".to_string(),
+                arguments_json: json!({"expression":"2+2"}),
+            },
+        }],
+    }]);
+
+    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert!(error.message().contains("non-empty tool_call id"));
+}
+
+#[test]
+fn encode_rejects_empty_tool_call_name() {
+    let request = base_request(vec![Message {
+        role: MessageRole::Assistant,
+        content: vec![ContentPart::ToolCall {
+            tool_call: ToolCall {
+                id: "call_1".to_string(),
+                name: "  ".to_string(),
+                arguments_json: json!({"expression":"2+2"}),
+            },
+        }],
+    }]);
+
+    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert!(error.message().contains("non-empty tool_call name"));
+}
+
+#[test]
+fn encode_rejects_empty_tool_result_tool_call_id() {
+    let request = base_request(vec![
+        Message {
+            role: MessageRole::Assistant,
+            content: vec![ContentPart::ToolCall {
+                tool_call: ToolCall {
+                    id: "call_1".to_string(),
+                    name: "calculator".to_string(),
+                    arguments_json: json!({"expression":"2+2"}),
+                },
+            }],
+        },
+        Message {
+            role: MessageRole::Tool,
+            content: vec![ContentPart::ToolResult {
+                tool_result: ToolResult {
+                    tool_call_id: "  ".to_string(),
+                    content: ToolResultContent::Text {
+                        text: "4".to_string(),
+                    },
+                    raw_provider_content: None,
+                },
+            }],
+        },
+    ]);
+
+    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert!(error.message().contains("non-empty tool_call_id"));
+}
+
+#[test]
+fn encode_rejects_duplicate_tool_call_ids() {
+    let request = base_request(vec![Message {
+        role: MessageRole::Assistant,
+        content: vec![
+            ContentPart::ToolCall {
+                tool_call: ToolCall {
+                    id: "call_1".to_string(),
+                    name: "calculator".to_string(),
+                    arguments_json: json!({"expression":"2+2"}),
+                },
+            },
+            ContentPart::ToolCall {
+                tool_call: ToolCall {
+                    id: "call_1".to_string(),
+                    name: "calculator_v2".to_string(),
+                    arguments_json: json!({"expression":"5+5"}),
+                },
+            },
+        ],
+    }]);
+
+    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    assert_eq!(error.kind(), AnthropicSpecErrorKind::ProtocolViolation);
+    assert!(
+        error
+            .message()
+            .contains("duplicate assistant tool_call id 'call_1'")
+    );
+}
+
+#[test]
 fn encode_rejects_structured_output_with_assistant_prefill() {
     let mut request = base_request(vec![
         Message {
@@ -605,6 +704,63 @@ fn decode_missing_and_partial_usage_warns() {
             .warnings
             .iter()
             .any(|warning| warning.code == "anthropic.decode.usage_partial")
+    );
+}
+
+#[test]
+fn decode_usage_billed_input_overflow_warns_and_drops_aggregate() {
+    let payload = AnthropicDecodeEnvelope {
+        body: json!({
+            "role": "assistant",
+            "model": "claude-sonnet-4.6",
+            "stop_reason": "end_turn",
+            "content": [{"type":"text","text":"ok"}],
+            "usage": {
+                "input_tokens": u64::MAX,
+                "cache_creation_input_tokens": 1,
+                "output_tokens": 1
+            }
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let response = decode_anthropic_response(&payload).expect("decode should succeed");
+    assert_eq!(response.usage.input_tokens, None);
+    assert_eq!(response.usage.output_tokens, Some(1));
+    assert_eq!(response.usage.total_tokens, None);
+    assert!(
+        response
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "anthropic.decode.usage_overflow")
+    );
+}
+
+#[test]
+fn decode_usage_total_tokens_overflow_warns_and_drops_total() {
+    let payload = AnthropicDecodeEnvelope {
+        body: json!({
+            "role": "assistant",
+            "model": "claude-sonnet-4.6",
+            "stop_reason": "end_turn",
+            "content": [{"type":"text","text":"ok"}],
+            "usage": {
+                "input_tokens": 5,
+                "output_tokens": u64::MAX
+            }
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let response = decode_anthropic_response(&payload).expect("decode should succeed");
+    assert_eq!(response.usage.input_tokens, Some(5));
+    assert_eq!(response.usage.output_tokens, Some(u64::MAX));
+    assert_eq!(response.usage.total_tokens, None);
+    assert!(
+        response
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "anthropic.decode.usage_overflow")
     );
 }
 
