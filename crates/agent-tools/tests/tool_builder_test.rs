@@ -5,7 +5,7 @@ use std::sync::{
 
 use agent_core::types::ToolDefinition;
 use agent_tools::{
-    Tool, ToolBuilder, ToolBuilderError, ToolOutput, ToolRegistry, ToolRegistryError,
+    Tool, ToolBuilder, ToolBuilderError, ToolError, ToolOutput, ToolRegistry, ToolRegistryError,
 };
 use serde_json::json;
 
@@ -59,11 +59,10 @@ fn builder_reports_schema_compile_failure() {
         .handler(|args| async move { Ok(ToolOutput { content: args }) })
         .build();
 
-    match result {
-        Err(ToolBuilderError::InvalidSchema { .. }) => {}
-        Err(other) => panic!("unexpected builder error: {other}"),
-        Ok(_) => panic!("invalid schema should fail at build"),
-    }
+    assert!(matches!(
+        result,
+        Err(ToolBuilderError::InvalidSchema { .. })
+    ));
 }
 
 #[test]
@@ -198,4 +197,91 @@ fn from_definition_with_blank_name_fails_at_build() {
         .build();
 
     assert!(matches!(result, Err(ToolBuilderError::MissingName)));
+}
+
+#[test]
+fn from_definition_with_invalid_schema_fails_at_build() {
+    let definition = ToolDefinition {
+        name: "lookup".to_string(),
+        description: Some("Lookup data".to_string()),
+        parameters_schema: json!({
+            "type": "object",
+            "properties": 12
+        }),
+    };
+
+    let result = ToolBuilder::from_definition(definition)
+        .handler(|args| async move { Ok(ToolOutput { content: args }) })
+        .build();
+
+    assert!(matches!(
+        result,
+        Err(ToolBuilderError::InvalidSchema { .. })
+    ));
+}
+
+#[tokio::test]
+async fn non_object_args_block_execution() {
+    let execute_calls = Arc::new(AtomicUsize::new(0));
+    let calls = execute_calls.clone();
+
+    let tool = ToolBuilder::new()
+        .name("search")
+        .schema(strict_schema())
+        .handler(move |args| {
+            let calls = calls.clone();
+            async move {
+                calls.fetch_add(1, Ordering::SeqCst);
+                Ok(ToolOutput { content: args })
+            }
+        })
+        .build()
+        .expect("builder should produce a tool");
+
+    let mut registry = ToolRegistry::new();
+    registry
+        .register_validated(tool)
+        .expect("schema should compile");
+
+    let error = registry
+        .execute_validated("search", json!("not-an-object"))
+        .await
+        .expect_err("non-object args should fail");
+
+    match error {
+        ToolRegistryError::InvalidArgs { name, source } => {
+            assert_eq!(name, "search");
+            assert_eq!(source.to_string(), "tool arguments must be a JSON object");
+        }
+        other => panic!("expected InvalidArgs error, got {other}"),
+    }
+    assert_eq!(execute_calls.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn execution_failure_surfaces_tool_name_and_source() {
+    let tool = ToolBuilder::new()
+        .name("search")
+        .schema(strict_schema())
+        .handler(|_| async move { Err(ToolError::Execution("boom".to_string())) })
+        .build()
+        .expect("builder should produce a tool");
+
+    let mut registry = ToolRegistry::new();
+    registry
+        .register_validated(tool)
+        .expect("schema should compile");
+
+    let error = registry
+        .execute_validated("search", json!({ "query": "rust" }))
+        .await
+        .expect_err("execution failure should surface as registry error");
+
+    match error {
+        ToolRegistryError::Execution { name, source } => {
+            assert_eq!(name, "search");
+            assert_eq!(source.to_string(), "tool execution failed: boom");
+        }
+        other => panic!("expected Execution error, got {other}"),
+    }
 }
