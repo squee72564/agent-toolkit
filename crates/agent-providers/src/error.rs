@@ -37,24 +37,17 @@ pub struct AdapterError {
 }
 
 impl AdapterError {
+    #[must_use]
     pub fn new(
         kind: AdapterErrorKind,
         provider: ProviderId,
         operation: AdapterOperation,
         message: impl Into<String>,
     ) -> Self {
-        Self {
-            kind,
-            provider,
-            operation,
-            message: message.into(),
-            source: None,
-            status_code: None,
-            request_id: None,
-            provider_code: None,
-        }
+        Self::build(kind, provider, operation, message, None)
     }
 
+    #[must_use]
     pub fn with_source<E>(
         kind: AdapterErrorKind,
         provider: ProviderId,
@@ -65,19 +58,56 @@ impl AdapterError {
     where
         E: StdError + Send + Sync + 'static,
     {
+        Self::build(kind, provider, operation, message, Some(Box::new(source)))
+    }
+
+    #[must_use]
+    pub fn with_status_code(mut self, status_code: u16) -> Self {
+        self.status_code = Some(status_code);
+        self
+    }
+
+    #[must_use]
+    pub fn with_request_id(mut self, request_id: impl Into<String>) -> Self {
+        self.request_id = normalize_metadata(request_id.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_provider_code(mut self, provider_code: impl Into<String>) -> Self {
+        self.provider_code = normalize_metadata(provider_code.into());
+        self
+    }
+
+    #[must_use]
+    pub fn source_ref(&self) -> Option<&(dyn StdError + Send + Sync + 'static)> {
+        self.source.as_deref()
+    }
+
+    fn build(
+        kind: AdapterErrorKind,
+        provider: ProviderId,
+        operation: AdapterOperation,
+        message: impl Into<String>,
+        source: Option<Box<dyn StdError + Send + Sync>>,
+    ) -> Self {
         Self {
             kind,
             provider,
             operation,
             message: message.into(),
-            source: Some(Box::new(source)),
+            source,
             status_code: None,
             request_id: None,
             provider_code: None,
         }
     }
+}
 
-    pub fn source_ref(&self) -> Option<&(dyn StdError + Send + Sync + 'static)> {
-        self.source.as_deref()
+fn normalize_metadata(value: String) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
     }
+    Some(trimmed.to_string())
 }

@@ -24,7 +24,6 @@ pub struct AnthropicDecodeEnvelope {
     pub requested_response_format: ResponseFormat,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AnthropicErrorEnvelope {
     pub message: String,
@@ -43,7 +42,6 @@ pub enum AnthropicSpecErrorKind {
 }
 
 #[derive(Debug, Error)]
-#[allow(dead_code)]
 pub enum AnthropicSpecError {
     #[error("validation error: {message}")]
     Validation { message: String },
@@ -69,13 +67,14 @@ pub enum AnthropicSpecError {
 }
 
 impl AnthropicSpecError {
-    #[allow(dead_code)]
+    #[must_use]
     pub(crate) fn validation(message: impl Into<String>) -> Self {
         Self::Validation {
             message: message.into(),
         }
     }
 
+    #[must_use]
     #[allow(dead_code)]
     pub(crate) fn encode_with_source<E>(message: impl Into<String>, source: E) -> Self
     where
@@ -87,14 +86,14 @@ impl AnthropicSpecError {
         }
     }
 
-    #[allow(dead_code)]
+    #[must_use]
     pub(crate) fn protocol_violation(message: impl Into<String>) -> Self {
         Self::ProtocolViolation {
             message: message.into(),
         }
     }
 
-    #[allow(dead_code)]
+    #[must_use]
     pub(crate) fn decode(message: impl Into<String>) -> Self {
         Self::Decode {
             message: message.into(),
@@ -102,13 +101,14 @@ impl AnthropicSpecError {
         }
     }
 
-    #[allow(dead_code)]
+    #[must_use]
     pub(crate) fn upstream(message: impl Into<String>) -> Self {
         Self::Upstream {
             message: message.into(),
         }
     }
 
+    #[must_use]
     #[allow(dead_code)]
     pub(crate) fn unsupported_feature(message: impl Into<String>) -> Self {
         Self::UnsupportedFeature {
@@ -116,6 +116,7 @@ impl AnthropicSpecError {
         }
     }
 
+    #[must_use]
     pub(crate) fn kind(&self) -> AnthropicSpecErrorKind {
         match self {
             Self::Validation { .. } => AnthropicSpecErrorKind::Validation,
@@ -127,6 +128,7 @@ impl AnthropicSpecError {
         }
     }
 
+    #[must_use]
     pub(crate) fn message(&self) -> &str {
         match self {
             Self::Validation { message } => message,

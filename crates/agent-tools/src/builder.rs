@@ -102,6 +102,9 @@ impl ToolBuilder {
 
     pub fn build(self) -> Result<BuiltTool, ToolBuilderError> {
         let name = self.name.ok_or(ToolBuilderError::MissingName)?;
+        if name.trim().is_empty() {
+            return Err(ToolBuilderError::MissingName);
+        }
         let schema = self.schema.ok_or(ToolBuilderError::MissingSchema)?;
         let handler = self.handler.ok_or(ToolBuilderError::MissingHandler)?;
 

@@ -262,6 +262,16 @@ fn map_non_system_messages(messages: &[&Message]) -> Result<Vec<WireMessage>, An
                             "tool_call content is only valid in assistant messages",
                         ));
                     }
+                    if tool_call.id.trim().is_empty() {
+                        return Err(AnthropicSpecError::validation(
+                            "tool_call content requires a non-empty tool_call id",
+                        ));
+                    }
+                    if tool_call.name.trim().is_empty() {
+                        return Err(AnthropicSpecError::validation(
+                            "tool_call content requires a non-empty tool_call name",
+                        ));
+                    }
                     if !tool_call.arguments_json.is_object() {
                         return Err(AnthropicSpecError::validation(format!(
                             "tool_call '{}' arguments_json must be a JSON object",
@@ -269,7 +279,12 @@ fn map_non_system_messages(messages: &[&Message]) -> Result<Vec<WireMessage>, An
                         )));
                     }
 
-                    seen_tool_call_ids.insert(tool_call.id.clone());
+                    if !seen_tool_call_ids.insert(tool_call.id.clone()) {
+                        return Err(AnthropicSpecError::protocol_violation(format!(
+                            "duplicate assistant tool_call id '{}'",
+                            tool_call.id
+                        )));
+                    }
                     blocks.push(json!({
                         "type": "tool_use",
                         "id": tool_call.id,
@@ -281,6 +296,11 @@ fn map_non_system_messages(messages: &[&Message]) -> Result<Vec<WireMessage>, An
                     if message.role != MessageRole::Tool {
                         return Err(AnthropicSpecError::validation(
                             "tool_result content is only valid in tool messages",
+                        ));
+                    }
+                    if tool_result.tool_call_id.trim().is_empty() {
+                        return Err(AnthropicSpecError::validation(
+                            "tool_result content requires a non-empty tool_call_id",
                         ));
                     }
                     if !seen_tool_call_ids.contains(&tool_result.tool_call_id) {

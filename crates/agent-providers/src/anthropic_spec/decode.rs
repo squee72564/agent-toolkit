@@ -14,6 +14,7 @@ const WARN_EMPTY_OUTPUT: &str = "anthropic.decode.empty_output";
 const WARN_UNKNOWN_STOP_REASON: &str = "anthropic.decode.unknown_stop_reason";
 const WARN_USAGE_MISSING: &str = "anthropic.decode.usage_missing";
 const WARN_USAGE_PARTIAL: &str = "anthropic.decode.usage_partial";
+const WARN_USAGE_OVERFLOW: &str = "anthropic.decode.usage_overflow";
 const WARN_STRUCTURED_OUTPUT_PARSE_FAILED: &str = "anthropic.decode.structured_output_parse_failed";
 
 pub(crate) fn decode_anthropic_response(
@@ -325,11 +326,28 @@ fn decode_usage(
         );
     }
 
-    let billed_input = input_tokens.map(|base| {
-        base + cache_creation_input_tokens.unwrap_or(0) + cache_read_input_tokens.unwrap_or(0)
-    });
+    let billed_input = if let Some(base) = input_tokens {
+        let with_creation = checked_add_with_warning(
+            base,
+            cache_creation_input_tokens.unwrap_or(0),
+            "input_tokens + cache_creation_input_tokens",
+            warnings,
+        );
+        with_creation.and_then(|sum| {
+            checked_add_with_warning(
+                sum,
+                cache_read_input_tokens.unwrap_or(0),
+                "input_tokens + cache_creation_input_tokens + cache_read_input_tokens",
+                warnings,
+            )
+        })
+    } else {
+        None
+    };
     let total_tokens = match (billed_input, output_tokens) {
-        (Some(input), Some(output)) => Some(input + output),
+        (Some(input), Some(output)) => {
+            checked_add_with_warning(input, output, "billed_input + output_tokens", warnings)
+        }
         _ => None,
     };
 
@@ -375,6 +393,25 @@ fn map_finish_reason(stop_reason: &str, warnings: &mut Vec<RuntimeWarning>) -> F
                 format!("unknown anthropic stop_reason '{other}' mapped to Other"),
             );
             FinishReason::Other
+        }
+    }
+}
+
+fn checked_add_with_warning(
+    lhs: u64,
+    rhs: u64,
+    expression: &str,
+    warnings: &mut Vec<RuntimeWarning>,
+) -> Option<u64> {
+    match lhs.checked_add(rhs) {
+        Some(sum) => Some(sum),
+        None => {
+            push_warning(
+                warnings,
+                WARN_USAGE_OVERFLOW,
+                format!("anthropic usage overflow while computing {expression}"),
+            );
+            None
         }
     }
 }

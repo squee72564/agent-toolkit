@@ -1,10 +1,27 @@
-use super::*;
+use std::time::Duration;
+
+use super::{
+    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, HttpJsonResponse, ProviderId,
+    RequestEndEvent, RequestStartEvent, RetryPolicy, RuntimeObserver, core, protocols, runtime,
+    tools, transport,
+};
 
 #[test]
 fn provider_id_reexport_matches_agent_core_type() {
-    let provider_from_agent: ProviderId = ProviderId::OpenAi;
-    let provider_from_core: agent_core::types::ProviderId = provider_from_agent;
-    assert_eq!(provider_from_core, agent_core::types::ProviderId::OpenAi);
+    for provider_from_agent in [
+        ProviderId::OpenAi,
+        ProviderId::Anthropic,
+        ProviderId::OpenRouter,
+    ] {
+        let provider_from_core: agent_core::types::ProviderId = provider_from_agent;
+        let expected = match provider_from_agent {
+            ProviderId::OpenAi => agent_core::types::ProviderId::OpenAi,
+            ProviderId::Anthropic => agent_core::types::ProviderId::Anthropic,
+            ProviderId::OpenRouter => agent_core::types::ProviderId::OpenRouter,
+        };
+
+        assert_eq!(provider_from_core, expected);
+    }
 }
 
 #[test]
@@ -18,7 +35,7 @@ fn observability_reexports_are_accessible() {
         model: None,
         target_index: None,
         attempt_index: None,
-        elapsed: std::time::Duration::from_millis(0),
+        elapsed: Duration::ZERO,
         first_target: None,
         resolved_target_count: 0,
     };
@@ -28,7 +45,7 @@ fn observability_reexports_are_accessible() {
         model: None,
         target_index: None,
         attempt_index: None,
-        elapsed: std::time::Duration::from_millis(0),
+        elapsed: Duration::ZERO,
     };
     let _ = AttemptSuccessEvent {
         request_id: None,
@@ -36,7 +53,7 @@ fn observability_reexports_are_accessible() {
         model: None,
         target_index: None,
         attempt_index: None,
-        elapsed: std::time::Duration::from_millis(0),
+        elapsed: Duration::ZERO,
         status_code: None,
     };
     let _ = AttemptFailureEvent {
@@ -45,7 +62,7 @@ fn observability_reexports_are_accessible() {
         model: None,
         target_index: None,
         attempt_index: None,
-        elapsed: std::time::Duration::from_millis(0),
+        elapsed: Duration::ZERO,
         error_kind: None,
         error_message: None,
     };
@@ -55,11 +72,44 @@ fn observability_reexports_are_accessible() {
         model: None,
         target_index: None,
         attempt_index: None,
-        elapsed: std::time::Duration::from_millis(0),
+        elapsed: Duration::ZERO,
         status_code: None,
         error_kind: None,
         error_message: None,
     };
+}
+
+#[test]
+fn module_reexports_are_accessible() {
+    let provider_from_core_mod: core::types::ProviderId = core::types::ProviderId::Anthropic;
+    assert_eq!(
+        provider_from_core_mod,
+        agent_core::types::ProviderId::Anthropic
+    );
+
+    let adapter_error_kind: protocols::error::AdapterErrorKind =
+        protocols::error::AdapterErrorKind::Validation;
+    assert_eq!(
+        adapter_error_kind,
+        agent_providers::error::AdapterErrorKind::Validation
+    );
+
+    let _default_retry_from_transport_mod = transport::RetryPolicy::default();
+    let _runtime_error_kind = runtime::RuntimeErrorKind::Validation;
+    let _tool_registry = tools::ToolRegistry::new();
+}
+
+#[test]
+fn top_level_transport_reexports_are_constructible() {
+    fn assert_debug_clone<T: std::fmt::Debug + Clone>() {}
+
+    assert_debug_clone::<HttpJsonResponse>();
+    assert_debug_clone::<RetryPolicy>();
+
+    let retry = RetryPolicy::default();
+    assert_eq!(retry.max_attempts, 3);
+    assert_eq!(retry.initial_backoff, Duration::from_millis(100));
+    assert_eq!(retry.max_backoff, Duration::from_millis(2_000));
 }
 
 #[derive(Debug)]

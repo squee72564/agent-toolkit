@@ -14,6 +14,11 @@ struct TestTool {
     execute_calls: Arc<AtomicUsize>,
 }
 
+struct FailingTool {
+    name: String,
+    schema: Value,
+}
+
 #[async_trait]
 impl Tool for TestTool {
     fn name(&self) -> &str {
@@ -35,6 +40,25 @@ impl Tool for TestTool {
     }
 }
 
+#[async_trait]
+impl Tool for FailingTool {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn description(&self) -> Option<&str> {
+        Some("failing tool")
+    }
+
+    fn input_schema(&self) -> Value {
+        self.schema.clone()
+    }
+
+    async fn execute(&self, _args: Value) -> Result<ToolOutput, ToolError> {
+        Err(ToolError::Execution("simulated failure".to_string()))
+    }
+}
+
 fn build_tool(
     name: &str,
     schema: Value,
@@ -46,6 +70,13 @@ fn build_tool(
         schema,
         input_schema_calls,
         execute_calls,
+    }
+}
+
+fn build_failing_tool(name: &str, schema: Value) -> FailingTool {
+    FailingTool {
+        name: name.to_string(),
+        schema,
     }
 }
 
@@ -123,6 +154,20 @@ fn validate_call_reports_unknown_tool() {
 }
 
 #[tokio::test]
+async fn execute_validated_reports_unknown_tool() {
+    let registry = ToolRegistry::new();
+    let error = registry
+        .execute_validated("missing", json!({}))
+        .await
+        .expect_err("should fail for unknown tool");
+
+    assert!(matches!(
+        error,
+        ToolRegistryError::UnknownTool { name } if name == "missing"
+    ));
+}
+
+#[tokio::test]
 async fn execute_validated_blocks_execution_when_args_are_invalid() {
     let mut registry = ToolRegistry::new();
     let input_calls = Arc::new(AtomicUsize::new(0));
@@ -149,6 +194,139 @@ async fn execute_validated_blocks_execution_when_args_are_invalid() {
 
     assert!(matches!(error, ToolRegistryError::InvalidArgs { .. }));
     assert_eq!(execute_calls.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn execute_validated_executes_tool_for_valid_args() {
+    let mut registry = ToolRegistry::new();
+    let input_calls = Arc::new(AtomicUsize::new(0));
+    let execute_calls = Arc::new(AtomicUsize::new(0));
+    let tool = build_tool(
+        "search",
+        json!({
+            "type": "object",
+            "properties": {
+                "query": { "type": "string" }
+            },
+            "required": ["query"],
+            "additionalProperties": false
+        }),
+        input_calls,
+        execute_calls.clone(),
+    );
+
+    registry.register_validated(tool).expect("valid schema");
+    let output = registry
+        .execute_validated("search", json!({ "query": "rust" }))
+        .await
+        .expect("valid args should execute tool");
+
+    assert_eq!(output.content, json!({ "query": "rust" }));
+    assert_eq!(execute_calls.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn execute_validated_wraps_tool_execution_errors() {
+    let mut registry = ToolRegistry::new();
+    registry
+        .register_validated(build_failing_tool(
+            "search",
+            json!({
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }),
+        ))
+        .expect("schema should compile");
+
+    let error = registry
+        .execute_validated("search", json!({}))
+        .await
+        .expect_err("execution failure should be wrapped");
+
+    assert!(matches!(
+        error,
+        ToolRegistryError::Execution { ref name, ref source }
+            if name == "search"
+                && source.to_string() == "tool execution failed: simulated failure"
+    ));
+}
+
+#[test]
+fn register_validated_rejects_invalid_schema_without_registering_tool() {
+    let mut registry = ToolRegistry::new();
+    let input_calls = Arc::new(AtomicUsize::new(0));
+    let execute_calls = Arc::new(AtomicUsize::new(0));
+    let invalid_tool = build_tool(
+        "search",
+        json!({
+            "type": "object",
+            "properties": 12
+        }),
+        input_calls,
+        execute_calls,
+    );
+
+    let error = registry
+        .register_validated(invalid_tool)
+        .expect_err("invalid schema should fail registration");
+
+    assert!(matches!(
+        error,
+        ToolRegistryError::InvalidSchema { name, .. } if name == "search"
+    ));
+    assert!(registry.is_empty());
+    assert!(registry.get("search").is_none());
+    assert!(matches!(
+        registry.validate_call("search", &json!({})),
+        Err(ToolRegistryError::UnknownTool { name }) if name == "search"
+    ));
+}
+
+#[test]
+fn validate_call_surfaces_invalid_schema_for_non_validated_registration() {
+    let mut registry = ToolRegistry::new();
+    let tool = build_tool(
+        "search",
+        json!({
+            "type": "object",
+            "properties": 12
+        }),
+        Arc::new(AtomicUsize::new(0)),
+        Arc::new(AtomicUsize::new(0)),
+    );
+    registry.register(tool);
+
+    let error = registry
+        .validate_call("search", &json!({}))
+        .expect_err("invalid schema should fail validation");
+
+    assert!(matches!(
+        error,
+        ToolRegistryError::InvalidSchema { name, .. } if name == "search"
+    ));
+}
+
+#[test]
+fn non_validated_registration_recompiles_schema_on_each_validation_call() {
+    let mut registry = ToolRegistry::new();
+    let input_calls = Arc::new(AtomicUsize::new(0));
+    let execute_calls = Arc::new(AtomicUsize::new(0));
+    registry.register(build_tool(
+        "search",
+        strict_schema("query"),
+        input_calls.clone(),
+        execute_calls,
+    ));
+
+    registry
+        .validate_call("search", &json!({ "query": 1 }))
+        .expect("first call should compile schema and pass validation");
+    registry
+        .validate_call("search", &json!({ "query": 2 }))
+        .expect("second call should compile schema and pass validation");
+
+    assert_eq!(input_calls.load(Ordering::SeqCst), 2);
 }
 
 #[test]

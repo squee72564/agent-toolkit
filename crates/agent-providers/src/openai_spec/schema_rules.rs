@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use serde_json::{Map, Value};
 
 pub(super) fn is_strict_compatible_schema(schema: &Value) -> bool {
@@ -23,31 +25,20 @@ pub(super) fn is_strict_compatible_schema(schema: &Value) -> bool {
         _ => return false,
     }
 
+    let empty_properties = Map::new();
     let properties = obj
         .get("properties")
         .and_then(Value::as_object)
-        .cloned()
-        .unwrap_or_default();
+        .unwrap_or(&empty_properties);
 
+    let empty_required = Vec::new();
     let required = obj
         .get("required")
         .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
+        .unwrap_or(&empty_required);
 
-    if properties.len() != required.len() {
+    if !required_keys_match_properties(required, properties) {
         return false;
-    }
-
-    for key in properties.keys() {
-        let present = required
-            .iter()
-            .filter_map(Value::as_str)
-            .any(|required_key| required_key == key);
-
-        if !present {
-            return false;
-        }
     }
 
     properties.values().all(is_strict_compatible_schema)
@@ -56,9 +47,31 @@ pub(super) fn is_strict_compatible_schema(schema: &Value) -> bool {
 fn is_object_type(type_value: Option<&Value>) -> bool {
     match type_value {
         Some(Value::String(value)) => value == "object",
-        Some(Value::Array(values)) => values.iter().any(|entry| entry == "object"),
+        Some(Value::Array(values)) => values
+            .iter()
+            .any(|entry| matches!(entry, Value::String(value) if value == "object")),
         _ => false,
     }
+}
+
+fn required_keys_match_properties(required: &[Value], properties: &Map<String, Value>) -> bool {
+    if properties.len() != required.len() {
+        return false;
+    }
+
+    let mut required_keys = HashSet::with_capacity(required.len());
+    for entry in required {
+        let Some(key) = entry.as_str() else {
+            return false;
+        };
+        if !required_keys.insert(key) {
+            return false;
+        }
+    }
+
+    properties
+        .keys()
+        .all(|property_key| required_keys.contains(property_key.as_str()))
 }
 
 pub(super) fn canonicalize_json(value: &Value) -> Value {

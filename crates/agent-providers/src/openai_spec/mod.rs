@@ -68,12 +68,14 @@ pub enum OpenAiSpecError {
 }
 
 impl OpenAiSpecError {
+    #[must_use]
     pub(crate) fn validation(message: impl Into<String>) -> Self {
         Self::Validation {
             message: message.into(),
         }
     }
 
+    #[must_use]
     pub(crate) fn encode_with_source<E>(message: impl Into<String>, source: E) -> Self
     where
         E: StdError + Send + Sync + 'static,
@@ -84,12 +86,14 @@ impl OpenAiSpecError {
         }
     }
 
+    #[must_use]
     pub(crate) fn protocol_violation(message: impl Into<String>) -> Self {
         Self::ProtocolViolation {
             message: message.into(),
         }
     }
 
+    #[must_use]
     pub(crate) fn decode(message: impl Into<String>) -> Self {
         Self::Decode {
             message: message.into(),
@@ -97,6 +101,7 @@ impl OpenAiSpecError {
         }
     }
 
+    #[must_use]
     pub(crate) fn upstream(message: impl Into<String>) -> Self {
         Self::Upstream {
             message: message.into(),
@@ -104,12 +109,14 @@ impl OpenAiSpecError {
     }
 
     #[allow(dead_code)]
+    #[must_use]
     pub(crate) fn unsupported_feature(message: impl Into<String>) -> Self {
         Self::UnsupportedFeature {
             message: message.into(),
         }
     }
 
+    #[must_use]
     pub(crate) fn kind(&self) -> OpenAiSpecErrorKind {
         match self {
             Self::Validation { .. } => OpenAiSpecErrorKind::Validation,
@@ -121,6 +128,7 @@ impl OpenAiSpecError {
         }
     }
 
+    #[must_use]
     pub(crate) fn message(&self) -> &str {
         match self {
             Self::Validation { message } => message,

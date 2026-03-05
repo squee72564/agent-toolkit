@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use serde_json::{Map, Value, json};
 
 use agent_core::types::{
@@ -11,6 +13,10 @@ use super::{OpenAiEncodedRequest, OpenAiSpecError};
 pub(crate) fn encode_openai_request(
     req: &Request,
 ) -> Result<OpenAiEncodedRequest, OpenAiSpecError> {
+    if req.model_id.trim().is_empty() {
+        return Err(OpenAiSpecError::validation("model_id must not be empty"));
+    }
+
     let mut warnings = Vec::new();
     let text_format = map_response_format(req)?;
     let tool_choice = map_tool_choice(req)?;
@@ -71,12 +77,26 @@ fn map_response_format(req: &Request) -> Result<Value, OpenAiSpecError> {
     match &req.response_format {
         ResponseFormat::Text => Ok(json!({ "type": "text" })),
         ResponseFormat::JsonObject => Ok(json!({ "type": "json_object" })),
-        ResponseFormat::JsonSchema { name, schema } => Ok(json!({
-            "type": "json_schema",
-            "name": name,
-            "schema": schema,
-            "strict": true,
-        })),
+        ResponseFormat::JsonSchema { name, schema } => {
+            if name.trim().is_empty() {
+                return Err(OpenAiSpecError::validation(
+                    "json_schema response format requires a non-empty name",
+                ));
+            }
+
+            if !schema.is_object() {
+                return Err(OpenAiSpecError::validation(
+                    "json_schema response format requires schema to be a JSON object",
+                ));
+            }
+
+            Ok(json!({
+                "type": "json_schema",
+                "name": name,
+                "schema": schema,
+                "strict": true,
+            }))
+        }
     }
 }
 
@@ -122,9 +142,16 @@ fn map_tools(
     req: &Request,
     warnings: &mut Vec<RuntimeWarning>,
 ) -> Result<Vec<Value>, OpenAiSpecError> {
+    let mut seen_tool_names = HashSet::new();
     let mut tools = Vec::new();
 
     for tool in &req.tools {
+        if !seen_tool_names.insert(tool.name.as_str()) {
+            return Err(OpenAiSpecError::validation(format!(
+                "duplicate tool definition name: {}",
+                tool.name
+            )));
+        }
         tools.push(map_tool_definition(tool, warnings)?);
     }
 
@@ -179,7 +206,7 @@ fn map_tool_definition(
 
 fn map_messages(req: &Request) -> Result<Vec<Value>, OpenAiSpecError> {
     let mut input_items = Vec::new();
-    let mut seen_tool_call_ids: Vec<String> = Vec::new();
+    let mut seen_tool_call_ids: HashSet<String> = HashSet::new();
 
     for message in &req.messages {
         let mut message_parts = Vec::new();
@@ -207,6 +234,22 @@ fn map_messages(req: &Request) -> Result<Vec<Value>, OpenAiSpecError> {
                             "tool_call content is only valid for assistant role messages",
                         ));
                     }
+                    if tool_call.id.trim().is_empty() {
+                        return Err(OpenAiSpecError::validation(
+                            "assistant tool_call id must not be empty",
+                        ));
+                    }
+                    if tool_call.name.trim().is_empty() {
+                        return Err(OpenAiSpecError::validation(
+                            "assistant tool_call name must not be empty",
+                        ));
+                    }
+                    if !seen_tool_call_ids.insert(tool_call.id.clone()) {
+                        return Err(OpenAiSpecError::protocol_violation(format!(
+                            "duplicate_tool_call_id: {}",
+                            tool_call.id
+                        )));
+                    }
 
                     flush_message_item(&mut input_items, &message.role, &mut message_parts);
 
@@ -221,7 +264,6 @@ fn map_messages(req: &Request) -> Result<Vec<Value>, OpenAiSpecError> {
                             )
                         })?;
 
-                    seen_tool_call_ids.push(tool_call.id.clone());
                     input_items.push(json!({
                         "type": "function_call",
                         "call_id": tool_call.id,
@@ -233,6 +275,11 @@ fn map_messages(req: &Request) -> Result<Vec<Value>, OpenAiSpecError> {
                     if message.role != MessageRole::Tool {
                         return Err(OpenAiSpecError::validation(
                             "tool_result content is only valid for tool role messages",
+                        ));
+                    }
+                    if tool_result.tool_call_id.trim().is_empty() {
+                        return Err(OpenAiSpecError::validation(
+                            "tool_result tool_call_id must not be empty",
                         ));
                     }
 

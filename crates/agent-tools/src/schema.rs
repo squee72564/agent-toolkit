@@ -61,13 +61,7 @@ impl CompiledToolSchema {
 
         let mut issues: Vec<ValidationIssue> = match self.validator.validate(args) {
             Ok(()) => return Ok(()),
-            Err(errors) => errors
-                .map(|error| ValidationIssue {
-                    instance_path: normalize_json_pointer(error.instance_path.to_string()),
-                    keyword_path: normalize_json_pointer(error.schema_path.to_string()),
-                    message: error.to_string(),
-                })
-                .collect(),
+            Err(errors) => errors.map(to_validation_issue).collect(),
         };
 
         issues.sort_by(|left, right| {
@@ -77,30 +71,52 @@ impl CompiledToolSchema {
                 .then(left.message.cmp(&right.message))
         });
 
-        let message = issues
-            .iter()
-            .map(|issue| format!("{}: {}", issue.instance_path, issue.message))
-            .collect::<Vec<_>>()
-            .join("; ");
+        let message = build_validation_failed_message(&issues);
 
         Err(ToolArgsValidationError::ValidationFailed { message, issues })
     }
 }
 
 fn declares_object_type(schema_object: &Map<String, Value>) -> bool {
-    match schema_object.get("type") {
-        Some(Value::String(value)) => value == "object",
-        Some(Value::Array(values)) => values
+    schema_object
+        .get("type")
+        .is_some_and(declares_object_type_value)
+}
+
+fn declares_object_type_value(type_value: &Value) -> bool {
+    match type_value {
+        Value::String(value) => value == "object",
+        Value::Array(values) => values
             .iter()
             .any(|value| matches!(value, Value::String(item) if item == "object")),
         _ => false,
     }
 }
 
-fn normalize_json_pointer(path: String) -> String {
+fn to_validation_issue(error: jsonschema::ValidationError<'_>) -> ValidationIssue {
+    ValidationIssue {
+        instance_path: normalize_json_pointer(&error.instance_path.to_string()),
+        keyword_path: normalize_json_pointer(&error.schema_path.to_string()),
+        message: error.to_string(),
+    }
+}
+
+fn build_validation_failed_message(issues: &[ValidationIssue]) -> String {
+    if issues.is_empty() {
+        return "tool arguments failed schema validation".to_string();
+    }
+
+    issues
+        .iter()
+        .map(|issue| format!("{}: {}", issue.instance_path, issue.message))
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
+fn normalize_json_pointer(path: &str) -> String {
     if path.is_empty() {
         "$".to_string()
     } else {
-        path
+        path.to_string()
     }
 }

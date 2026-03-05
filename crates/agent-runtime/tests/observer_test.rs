@@ -1,6 +1,8 @@
 use std::collections::VecDeque;
+use std::future::Future;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use agent_core::types::ProviderId;
 use agent_runtime::{
@@ -14,6 +16,7 @@ use tokio::net::TcpListener;
 const OPENAI_SUCCESS_BODY: &str = include_str!(
     "../../agent-providers/data/openai/responses/2026-02-27T03:25:13.281Z/basic_chat/gpt-5-mini.json"
 );
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum RecordedEvent {
@@ -185,6 +188,43 @@ fn event_names(events: &[RecordedEvent]) -> Vec<&'static str> {
     events.iter().map(RecordedEvent::name).collect()
 }
 
+fn event_at(events: &[RecordedEvent], index: usize) -> &RecordedEvent {
+    events.get(index).unwrap_or_else(|| {
+        panic!(
+            "expected event at index {index}, got {} events ({:?})",
+            events.len(),
+            event_names(events)
+        )
+    })
+}
+
+fn as_attempt_start(event: &RecordedEvent) -> &AttemptStartEvent {
+    match event {
+        RecordedEvent::AttemptStart(inner) => inner,
+        other => panic!("expected attempt_start event, got {}", other.name()),
+    }
+}
+
+fn as_attempt_success(event: &RecordedEvent) -> &AttemptSuccessEvent {
+    match event {
+        RecordedEvent::AttemptSuccess(inner) => inner,
+        other => panic!("expected attempt_success event, got {}", other.name()),
+    }
+}
+
+fn as_request_end(event: &RecordedEvent) -> &RequestEndEvent {
+    match event {
+        RecordedEvent::RequestEnd(inner) => inner,
+        other => panic!("expected request_end event, got {}", other.name()),
+    }
+}
+
+async fn with_timeout<T>(future: impl Future<Output = T>) -> T {
+    tokio::time::timeout(REQUEST_TIMEOUT, future)
+        .await
+        .expect("request timed out in test")
+}
+
 #[tokio::test]
 async fn observer_callbacks_direct_lifecycle_success() {
     let base_url = spawn_openai_stub(vec![StubHttpResponse::success("req_success")]).await;
@@ -198,11 +238,13 @@ async fn observer_callbacks_direct_lifecycle_success() {
         .build()
         .expect("build direct client");
 
-    let (_response, meta) = client
-        .messages()
-        .create_with_meta(MessageCreateInput::user("hello"))
-        .await
-        .expect("direct request should succeed");
+    let (_response, meta) = with_timeout(
+        client
+            .messages()
+            .create_with_meta(MessageCreateInput::user("hello")),
+    )
+    .await
+    .expect("direct request should succeed");
 
     assert_eq!(meta.attempts.len(), 1);
 
@@ -217,14 +259,8 @@ async fn observer_callbacks_direct_lifecycle_success() {
         ]
     );
 
-    let attempt_elapsed = match &events[2] {
-        RecordedEvent::AttemptSuccess(event) => event.elapsed,
-        _ => panic!("expected attempt success event"),
-    };
-    let request_end = match &events[3] {
-        RecordedEvent::RequestEnd(event) => event,
-        _ => panic!("expected request end event"),
-    };
+    let attempt_elapsed = as_attempt_success(event_at(&events, 2)).elapsed;
+    let request_end = as_request_end(event_at(&events, 3));
 
     assert!(request_end.error_kind.is_none());
     assert!(request_end.request_id.is_some());
@@ -243,11 +279,13 @@ async fn observer_callbacks_direct_lifecycle_failure() {
         .build()
         .expect("build direct client");
 
-    let error = client
-        .messages()
-        .create_with_meta(MessageCreateInput::user("hello"))
-        .await
-        .expect_err("direct request should fail");
+    let error = with_timeout(
+        client
+            .messages()
+            .create_with_meta(MessageCreateInput::user("hello")),
+    )
+    .await
+    .expect_err("direct request should fail");
 
     assert_eq!(error.kind, RuntimeErrorKind::Transport);
 
@@ -261,13 +299,9 @@ async fn observer_callbacks_direct_lifecycle_failure() {
             "request_end"
         ]
     );
-    match &events[3] {
-        RecordedEvent::RequestEnd(event) => {
-            assert!(event.error_kind.is_some());
-            assert!(event.error_message.is_some());
-        }
-        _ => panic!("expected request end event"),
-    }
+    let request_end = as_request_end(event_at(&events, 3));
+    assert!(request_end.error_kind.is_some());
+    assert!(request_end.error_message.is_some());
 }
 
 #[tokio::test]
@@ -287,15 +321,15 @@ async fn router_fallback_ordered_attempts_with_indices() {
     .with_mode(FallbackMode::RulesOnly)
     .with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Configuration));
 
-    let (_response, meta) = toolkit
-        .messages()
-        .create_with_meta(
+    let (_response, meta) = with_timeout(
+        toolkit.messages().create_with_meta(
             MessageCreateInput::user("hello"),
             SendOptions::for_target(Target::new(ProviderId::OpenAi).with_model(" "))
                 .with_fallback_policy(fallback_policy),
-        )
-        .await
-        .expect("router request should succeed on second attempt");
+        ),
+    )
+    .await
+    .expect("router request should succeed on second attempt");
 
     assert_eq!(meta.attempts.len(), 2);
 
@@ -312,20 +346,12 @@ async fn router_fallback_ordered_attempts_with_indices() {
         ]
     );
 
-    match &events[1] {
-        RecordedEvent::AttemptStart(event) => {
-            assert_eq!(event.target_index, Some(0));
-            assert_eq!(event.attempt_index, Some(0));
-        }
-        _ => panic!("expected first attempt_start"),
-    }
-    match &events[3] {
-        RecordedEvent::AttemptStart(event) => {
-            assert_eq!(event.target_index, Some(1));
-            assert_eq!(event.attempt_index, Some(1));
-        }
-        _ => panic!("expected second attempt_start"),
-    }
+    let first_attempt = as_attempt_start(event_at(&events, 1));
+    assert_eq!(first_attempt.target_index, Some(0));
+    assert_eq!(first_attempt.attempt_index, Some(0));
+    let second_attempt = as_attempt_start(event_at(&events, 3));
+    assert_eq!(second_attempt.target_index, Some(1));
+    assert_eq!(second_attempt.attempt_index, Some(1));
 }
 
 #[tokio::test]
@@ -339,15 +365,15 @@ async fn toolkit_observer_and_send_override_precedence() {
         .build()
         .expect("build toolkit");
 
-    let _ = toolkit
-        .messages()
-        .create_with_meta(
+    let _ = with_timeout(
+        toolkit.messages().create_with_meta(
             MessageCreateInput::user("hello"),
             SendOptions::for_target(Target::new(ProviderId::OpenAi))
                 .with_observer(send_observer.clone()),
-        )
-        .await
-        .expect_err("request should fail and still emit observer events");
+        ),
+    )
+    .await
+    .expect_err("request should fail and still emit observer events");
 
     assert!(toolkit_observer.snapshot().is_empty());
     assert_eq!(
@@ -376,15 +402,15 @@ async fn fallback_exhausted_request_end_uses_terminal_failure_context() {
             .with_mode(FallbackMode::RulesOnly)
             .with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Configuration));
 
-    let error = toolkit
-        .messages()
-        .create_with_meta(
+    let error = with_timeout(
+        toolkit.messages().create_with_meta(
             MessageCreateInput::user("hello"),
             SendOptions::for_target(Target::new(ProviderId::OpenAi).with_model(" "))
                 .with_fallback_policy(fallback_policy),
-        )
-        .await
-        .expect_err("request should exhaust fallback");
+        ),
+    )
+    .await
+    .expect_err("request should exhaust fallback");
 
     assert_eq!(error.kind, RuntimeErrorKind::FallbackExhausted);
 
@@ -401,13 +427,15 @@ async fn fallback_exhausted_request_end_uses_terminal_failure_context() {
         ]
     );
 
-    match &events[5] {
-        RecordedEvent::RequestEnd(event) => {
-            assert_eq!(event.error_kind, Some(RuntimeErrorKind::Configuration));
-            assert_ne!(event.error_kind, Some(RuntimeErrorKind::FallbackExhausted));
-        }
-        _ => panic!("expected request_end"),
-    }
+    let request_end = as_request_end(event_at(&events, 5));
+    assert_eq!(
+        request_end.error_kind,
+        Some(RuntimeErrorKind::Configuration)
+    );
+    assert_ne!(
+        request_end.error_kind,
+        Some(RuntimeErrorKind::FallbackExhausted)
+    );
 }
 
 #[tokio::test]
@@ -423,21 +451,22 @@ async fn observer_panic_does_not_break_request_and_subsequent_callbacks() {
         .build()
         .expect("build direct client");
 
-    let _ = client
-        .messages()
-        .create_with_meta(MessageCreateInput::user("hello"))
-        .await
-        .expect("request should still succeed despite observer panic");
+    let _ = with_timeout(
+        client
+            .messages()
+            .create_with_meta(MessageCreateInput::user("hello")),
+    )
+    .await
+    .expect("request should still succeed despite observer panic");
 
     let events = observer.snapshot();
-    assert!(
-        events
-            .iter()
-            .any(|event| matches!(event, RecordedEvent::AttemptSuccess(_)))
-    );
-    assert!(
-        events
-            .iter()
-            .any(|event| matches!(event, RecordedEvent::RequestEnd(_)))
+    assert_eq!(
+        event_names(&events),
+        vec![
+            "request_start",
+            "attempt_start",
+            "attempt_success",
+            "request_end"
+        ]
     );
 }

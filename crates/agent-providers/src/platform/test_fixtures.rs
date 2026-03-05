@@ -16,6 +16,25 @@ fn fixture_responses_root(provider: &str) -> PathBuf {
     resolve_fixture_responses_root(provider)
 }
 
+fn assert_valid_fixture_segment(label: &str, value: &str) {
+    assert!(
+        !value.is_empty(),
+        "invalid fixture {label} segment: empty value"
+    );
+    assert!(
+        value != "." && value != "..",
+        "invalid fixture {label} segment '{value}': relative path markers are not allowed"
+    );
+    assert!(
+        !value.contains('/') && !value.contains('\\'),
+        "invalid fixture {label} segment '{value}': path separators are not allowed"
+    );
+}
+
+fn assert_valid_provider(provider: &str) {
+    assert_valid_fixture_segment("provider", provider);
+}
+
 pub(crate) fn resolve_fixture_responses_root(provider: &str) -> PathBuf {
     let cwd = std::env::current_dir().unwrap_or_else(|err| {
         panic!("failed to determine current working directory for fixture discovery: {err}")
@@ -30,6 +49,8 @@ pub(crate) fn resolve_fixture_responses_root_from(
     env_override: Option<&Path>,
     include_manifest_fallback: bool,
 ) -> PathBuf {
+    assert_valid_provider(provider);
+
     let mut attempted = Vec::new();
 
     if let Some(root) = env_override {
@@ -129,6 +150,10 @@ fn read_json(path: &Path) -> Value {
 }
 
 fn error_fixture_path(provider: &str, scenario: &str, model: &str) -> PathBuf {
+    assert_valid_provider(provider);
+    assert_valid_fixture_segment("scenario", scenario);
+    assert_valid_fixture_segment("model", model);
+
     latest_capture_dir(provider)
         .join("errors")
         .join(scenario)
@@ -136,6 +161,8 @@ fn error_fixture_path(provider: &str, scenario: &str, model: &str) -> PathBuf {
 }
 
 pub(crate) fn latest_capture_dir(provider: &str) -> PathBuf {
+    assert_valid_provider(provider);
+
     let responses_root = fixture_responses_root(provider);
     assert!(
         responses_root.is_dir(),
@@ -172,6 +199,10 @@ pub(crate) fn latest_capture_dir(provider: &str) -> PathBuf {
 }
 
 pub(crate) fn load_success_fixture(provider: &str, scenario: &str, model: &str) -> Value {
+    assert_valid_provider(provider);
+    assert_valid_fixture_segment("scenario", scenario);
+    assert_valid_fixture_segment("model", model);
+
     let path = latest_capture_dir(provider)
         .join(scenario)
         .join(format!("{model}.json"));
@@ -179,6 +210,10 @@ pub(crate) fn load_success_fixture(provider: &str, scenario: &str, model: &str) 
 }
 
 pub(crate) fn load_error_fixture_body(provider: &str, scenario: &str, model: &str) -> Value {
+    assert_valid_provider(provider);
+    assert_valid_fixture_segment("scenario", scenario);
+    assert_valid_fixture_segment("model", model);
+
     let path = error_fixture_path(provider, scenario, model);
     let fixture = read_json(&path);
     fixture
@@ -194,6 +229,9 @@ pub(crate) fn load_error_fixture_body(provider: &str, scenario: &str, model: &st
 }
 
 pub(crate) fn list_fixture_models(provider: &str, scenario: &str) -> Vec<String> {
+    assert_valid_provider(provider);
+    assert_valid_fixture_segment("scenario", scenario);
+
     let scenario_dir = latest_capture_dir(provider).join(scenario);
     assert!(
         scenario_dir.is_dir(),
@@ -231,6 +269,9 @@ pub(crate) fn load_success_fixture_candidates(
     provider: &str,
     scenario: &str,
 ) -> Vec<(String, Value)> {
+    assert_valid_provider(provider);
+    assert_valid_fixture_segment("scenario", scenario);
+
     let models = list_fixture_models(provider, scenario);
     models
         .into_iter()
@@ -250,6 +291,10 @@ pub(crate) fn choose_valid_success_fixture<F>(
 where
     F: FnMut(&str, &Value) -> Result<(), String>,
 {
+    assert_valid_provider(provider);
+    assert_valid_fixture_segment("scenario", scenario);
+    assert_valid_fixture_segment("preferred model", preferred_model);
+
     let candidates = load_success_fixture_candidates(provider, scenario);
     assert!(
         !candidates.is_empty(),
@@ -306,6 +351,9 @@ where
 }
 
 pub(crate) fn list_error_fixture_models(provider: &str, scenario: &str) -> Vec<String> {
+    assert_valid_provider(provider);
+    assert_valid_fixture_segment("scenario", scenario);
+
     let scenario_dir = latest_capture_dir(provider).join("errors").join(scenario);
     assert!(
         scenario_dir.is_dir(),
@@ -340,6 +388,8 @@ pub(crate) fn list_error_fixture_models(provider: &str, scenario: &str) -> Vec<S
 }
 
 pub(crate) fn list_error_fixture_relpaths(provider: &str) -> Vec<String> {
+    assert_valid_provider(provider);
+
     let errors_dir = latest_capture_dir(provider).join("errors");
     assert!(
         errors_dir.is_dir(),
@@ -403,8 +453,19 @@ pub(crate) fn validate_error_fixture_shape(
     scenario: &str,
     model: &str,
 ) -> Result<(), String> {
+    assert_valid_provider(provider);
+    assert_valid_fixture_segment("scenario", scenario);
+    assert_valid_fixture_segment("model", model);
+
     let path = error_fixture_path(provider, scenario, model);
     let fixture = read_json(&path);
+    validate_error_fixture_wrapper_shape(&fixture, &path)
+}
+
+pub(crate) fn validate_error_fixture_wrapper_shape(
+    fixture: &Value,
+    path: &Path,
+) -> Result<(), String> {
     let root = fixture
         .as_object()
         .ok_or_else(|| format!("fixture wrapper is not an object: {}", path.display()))?;

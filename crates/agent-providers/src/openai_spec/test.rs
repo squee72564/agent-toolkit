@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::io;
 
 use serde_json::json;
 
@@ -10,7 +11,7 @@ use agent_core::types::{
 use super::OpenAiSpecError;
 use super::decode::decode_openai_response;
 use super::encode::encode_openai_request;
-use super::schema_rules::is_strict_compatible_schema;
+use super::schema_rules::{canonicalize_json, is_strict_compatible_schema, stable_json_string};
 use super::{OpenAiDecodeEnvelope, OpenAiSpecErrorKind};
 
 fn base_request(messages: Vec<Message>) -> Request {
@@ -193,12 +194,14 @@ fn reject_specific_tool_choice_when_tool_missing() {
 
     let error = encode_openai_request(&request).expect_err("encoding should fail");
 
-    match error {
-        OpenAiSpecError::Validation { message } => {
-            assert!(message.contains("requires at least one tool definition"));
-        }
-        _ => panic!("unexpected error variant"),
-    }
+    assert!(
+        matches!(
+            &error,
+            OpenAiSpecError::Validation { message }
+                if message.contains("requires at least one tool definition")
+        ),
+        "expected validation error for missing tool definitions, got: {error:?}"
+    );
 }
 
 #[test]
@@ -218,12 +221,14 @@ fn reject_tool_result_without_prior_tool_call() {
 
     let error = encode_openai_request(&request).expect_err("encoding should fail");
 
-    match error {
-        OpenAiSpecError::ProtocolViolation { message } => {
-            assert!(message.contains("tool_result_without_matching_tool_call"));
-        }
-        _ => panic!("unexpected error variant"),
-    }
+    assert!(
+        matches!(
+            &error,
+            OpenAiSpecError::ProtocolViolation { message }
+                if message.contains("tool_result_without_matching_tool_call")
+        ),
+        "expected protocol violation for unmatched tool result, got: {error:?}"
+    );
 }
 
 #[test]
@@ -250,6 +255,121 @@ fn strict_schema_requires_no_anyof_and_full_required_list() {
 
     assert!(is_strict_compatible_schema(&valid));
     assert!(!is_strict_compatible_schema(&invalid));
+}
+
+#[test]
+fn strict_schema_rejects_missing_additional_properties_false() {
+    let invalid = json!({
+        "type": "object",
+        "properties": {
+            "city": { "type": "string" }
+        },
+        "required": ["city"]
+    });
+
+    assert!(!is_strict_compatible_schema(&invalid));
+}
+
+#[test]
+fn strict_schema_rejects_required_with_non_string_entries() {
+    let invalid = json!({
+        "type": "object",
+        "properties": {
+            "city": { "type": "string" }
+        },
+        "required": [123],
+        "additionalProperties": false
+    });
+
+    assert!(!is_strict_compatible_schema(&invalid));
+}
+
+#[test]
+fn strict_schema_rejects_duplicate_required_entries() {
+    let invalid = json!({
+        "type": "object",
+        "properties": {
+            "city": { "type": "string" }
+        },
+        "required": ["city", "city"],
+        "additionalProperties": false
+    });
+
+    assert!(!is_strict_compatible_schema(&invalid));
+}
+
+#[test]
+fn strict_schema_rejects_required_entries_not_in_properties() {
+    let invalid = json!({
+        "type": "object",
+        "properties": {
+            "city": { "type": "string" }
+        },
+        "required": ["city", "country"],
+        "additionalProperties": false
+    });
+
+    assert!(!is_strict_compatible_schema(&invalid));
+}
+
+#[test]
+fn strict_schema_requires_all_properties_in_required() {
+    let invalid = json!({
+        "type": "object",
+        "properties": {
+            "city": { "type": "string" },
+            "country": { "type": "string" }
+        },
+        "required": ["city"],
+        "additionalProperties": false
+    });
+
+    assert!(!is_strict_compatible_schema(&invalid));
+}
+
+#[test]
+fn strict_schema_accepts_nested_objects_and_array_items() {
+    let valid = json!({
+        "type": "object",
+        "properties": {
+            "location": {
+                "type": "object",
+                "properties": {
+                    "city": { "type": "string" }
+                },
+                "required": ["city"],
+                "additionalProperties": false
+            },
+            "tags": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "label": { "type": "string" }
+                    },
+                    "required": ["label"],
+                    "additionalProperties": false
+                }
+            }
+        },
+        "required": ["location", "tags"],
+        "additionalProperties": false
+    });
+
+    assert!(is_strict_compatible_schema(&valid));
+}
+
+#[test]
+fn canonicalize_json_sorts_keys_recursively_for_openai_schema_rules() {
+    let input = json!({
+        "z": {"b": 2, "a": 1},
+        "a": [{"d": 4, "c": 3}, 5]
+    });
+
+    let canonical = canonicalize_json(&input);
+    let as_string = stable_json_string(&canonical);
+
+    assert_eq!(as_string, r#"{"a":[{"c":3,"d":4},5],"z":{"a":1,"b":2}}"#);
 }
 
 #[test]
@@ -286,6 +406,201 @@ fn serializes_assistant_tool_call_and_tool_result() {
 
     assert_eq!(input[0]["type"], json!("function_call"));
     assert_eq!(input[1]["type"], json!("function_call_output"));
+}
+
+#[test]
+fn reject_empty_model_id() {
+    let mut request = base_request(vec![Message::user_text("hello")]);
+    request.model_id = "   ".to_string();
+
+    let error = encode_openai_request(&request).expect_err("encoding should fail");
+
+    match error {
+        OpenAiSpecError::Validation { message } => {
+            assert!(message.contains("model_id must not be empty"));
+        }
+        _ => panic!("unexpected error variant"),
+    }
+}
+
+#[test]
+fn reject_json_schema_response_format_with_blank_name() {
+    let mut request = base_request(vec![Message::user_text("hello")]);
+    request.response_format = ResponseFormat::JsonSchema {
+        name: "   ".to_string(),
+        schema: json!({
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+        }),
+    };
+
+    let error = encode_openai_request(&request).expect_err("encoding should fail");
+
+    match error {
+        OpenAiSpecError::Validation { message } => {
+            assert!(message.contains("requires a non-empty name"));
+        }
+        _ => panic!("unexpected error variant"),
+    }
+}
+
+#[test]
+fn reject_json_schema_response_format_with_non_object_schema() {
+    let mut request = base_request(vec![Message::user_text("hello")]);
+    request.response_format = ResponseFormat::JsonSchema {
+        name: "result".to_string(),
+        schema: json!("not-an-object"),
+    };
+
+    let error = encode_openai_request(&request).expect_err("encoding should fail");
+
+    match error {
+        OpenAiSpecError::Validation { message } => {
+            assert!(message.contains("schema to be a JSON object"));
+        }
+        _ => panic!("unexpected error variant"),
+    }
+}
+
+#[test]
+fn reject_duplicate_tool_names() {
+    let mut request = base_request(vec![Message::user_text("hello")]);
+    request.tools = vec![
+        ToolDefinition {
+            name: "lookup_weather".to_string(),
+            description: None,
+            parameters_schema: json!({
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
+            name: "lookup_weather".to_string(),
+            description: Some("duplicate".to_string()),
+            parameters_schema: json!({
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+            }),
+        },
+    ];
+
+    let error = encode_openai_request(&request).expect_err("encoding should fail");
+
+    match error {
+        OpenAiSpecError::Validation { message } => {
+            assert!(message.contains("duplicate tool definition name"));
+        }
+        _ => panic!("unexpected error variant"),
+    }
+}
+
+#[test]
+fn reject_assistant_tool_call_with_blank_id() {
+    let request = base_request(vec![Message {
+        role: MessageRole::Assistant,
+        content: vec![ContentPart::ToolCall {
+            tool_call: ToolCall {
+                id: "   ".to_string(),
+                name: "lookup_weather".to_string(),
+                arguments_json: json!({"city": "SF"}),
+            },
+        }],
+    }]);
+
+    let error = encode_openai_request(&request).expect_err("encoding should fail");
+
+    match error {
+        OpenAiSpecError::Validation { message } => {
+            assert!(message.contains("tool_call id must not be empty"));
+        }
+        _ => panic!("unexpected error variant"),
+    }
+}
+
+#[test]
+fn reject_assistant_tool_call_with_blank_name() {
+    let request = base_request(vec![Message {
+        role: MessageRole::Assistant,
+        content: vec![ContentPart::ToolCall {
+            tool_call: ToolCall {
+                id: "call_weather".to_string(),
+                name: "   ".to_string(),
+                arguments_json: json!({"city": "SF"}),
+            },
+        }],
+    }]);
+
+    let error = encode_openai_request(&request).expect_err("encoding should fail");
+
+    match error {
+        OpenAiSpecError::Validation { message } => {
+            assert!(message.contains("tool_call name must not be empty"));
+        }
+        _ => panic!("unexpected error variant"),
+    }
+}
+
+#[test]
+fn reject_duplicate_assistant_tool_call_ids() {
+    let request = base_request(vec![Message {
+        role: MessageRole::Assistant,
+        content: vec![
+            ContentPart::ToolCall {
+                tool_call: ToolCall {
+                    id: "call_weather".to_string(),
+                    name: "lookup_weather".to_string(),
+                    arguments_json: json!({"city": "SF"}),
+                },
+            },
+            ContentPart::ToolCall {
+                tool_call: ToolCall {
+                    id: "call_weather".to_string(),
+                    name: "lookup_weather".to_string(),
+                    arguments_json: json!({"city": "SF"}),
+                },
+            },
+        ],
+    }]);
+
+    let error = encode_openai_request(&request).expect_err("encoding should fail");
+
+    match error {
+        OpenAiSpecError::ProtocolViolation { message } => {
+            assert!(message.contains("duplicate_tool_call_id"));
+        }
+        _ => panic!("unexpected error variant"),
+    }
+}
+
+#[test]
+fn reject_tool_result_with_blank_tool_call_id() {
+    let request = base_request(vec![Message {
+        role: MessageRole::Tool,
+        content: vec![ContentPart::ToolResult {
+            tool_result: ToolResult {
+                tool_call_id: "   ".to_string(),
+                content: ToolResultContent::Text {
+                    text: "done".to_string(),
+                },
+                raw_provider_content: None,
+            },
+        }],
+    }]);
+
+    let error = encode_openai_request(&request).expect_err("encoding should fail");
+
+    match error {
+        OpenAiSpecError::Validation { message } => {
+            assert!(message.contains("tool_result tool_call_id must not be empty"));
+        }
+        _ => panic!("unexpected error variant"),
+    }
 }
 
 #[test]
@@ -432,4 +747,204 @@ fn decode_invalid_tool_call_arguments_falls_back_to_string_with_warning() {
         }
         _ => panic!("expected first output content part to be a tool call"),
     }
+}
+
+#[test]
+fn decode_function_call_rejects_blank_call_id() {
+    let envelope = OpenAiDecodeEnvelope {
+        body: json!({
+            "status": "completed",
+            "model": "gpt-4.1-mini",
+            "output": [
+                {
+                    "type": "function_call",
+                    "call_id": "   ",
+                    "name": "lookup_weather",
+                    "arguments": "{\"city\":\"SF\"}"
+                }
+            ]
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let error = decode_openai_response(&envelope).expect_err("decode should fail");
+    match error {
+        OpenAiSpecError::Decode { message, .. } => {
+            assert!(message.contains("call_id must not be empty"));
+        }
+        _ => panic!("expected decode error variant"),
+    }
+}
+
+#[test]
+fn decode_function_call_rejects_blank_name() {
+    let envelope = OpenAiDecodeEnvelope {
+        body: json!({
+            "status": "completed",
+            "model": "gpt-4.1-mini",
+            "output": [
+                {
+                    "type": "function_call",
+                    "call_id": "call_1",
+                    "name": " ",
+                    "arguments": "{\"city\":\"SF\"}"
+                }
+            ]
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let error = decode_openai_response(&envelope).expect_err("decode should fail");
+    match error {
+        OpenAiSpecError::Decode { message, .. } => {
+            assert!(message.contains("name must not be empty"));
+        }
+        _ => panic!("expected decode error variant"),
+    }
+}
+
+#[test]
+fn decode_function_call_rejects_blank_arguments() {
+    let envelope = OpenAiDecodeEnvelope {
+        body: json!({
+            "status": "completed",
+            "model": "gpt-4.1-mini",
+            "output": [
+                {
+                    "type": "function_call",
+                    "call_id": "call_1",
+                    "name": "lookup_weather",
+                    "arguments": "  "
+                }
+            ]
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let error = decode_openai_response(&envelope).expect_err("decode should fail");
+    match error {
+        OpenAiSpecError::Decode { message, .. } => {
+            assert!(message.contains("arguments must not be empty"));
+        }
+        _ => panic!("expected decode error variant"),
+    }
+}
+
+#[test]
+fn decode_refusal_whitespace_only_is_ignored() {
+    let envelope = OpenAiDecodeEnvelope {
+        body: json!({
+            "status": "completed",
+            "model": "gpt-4.1-mini",
+            "output": [
+                {
+                    "type": "refusal",
+                    "text": "   "
+                }
+            ]
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let response = decode_openai_response(&envelope).expect("decode should succeed");
+    assert!(response.output.content.is_empty());
+    assert!(
+        response
+            .warnings
+            .iter()
+            .any(|w| w.code == "openai.decode.empty_content")
+    );
+}
+
+#[test]
+fn decode_refusal_text_is_trimmed_and_emitted() {
+    let envelope = OpenAiDecodeEnvelope {
+        body: json!({
+            "status": "completed",
+            "model": "gpt-4.1-mini",
+            "output": [
+                {
+                    "type": "refusal",
+                    "refusal": "  cannot comply  "
+                }
+            ]
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let response = decode_openai_response(&envelope).expect("decode should succeed");
+    assert_eq!(response.output.content.len(), 1);
+    match &response.output.content[0] {
+        ContentPart::Text { text } => assert_eq!(text, "cannot comply"),
+        _ => panic!("expected text content part"),
+    }
+}
+
+#[test]
+fn error_kind_maps_for_all_variants() {
+    let validation = OpenAiSpecError::validation("invalid input");
+    assert_eq!(validation.kind(), OpenAiSpecErrorKind::Validation);
+
+    let encode = OpenAiSpecError::encode_with_source("encode failed", io::Error::other("boom"));
+    assert_eq!(encode.kind(), OpenAiSpecErrorKind::Encode);
+
+    let decode = OpenAiSpecError::decode("decode failed");
+    assert_eq!(decode.kind(), OpenAiSpecErrorKind::Decode);
+
+    let upstream = OpenAiSpecError::upstream("upstream failed");
+    assert_eq!(upstream.kind(), OpenAiSpecErrorKind::Upstream);
+
+    let protocol = OpenAiSpecError::protocol_violation("protocol failed");
+    assert_eq!(protocol.kind(), OpenAiSpecErrorKind::ProtocolViolation);
+
+    let unsupported = OpenAiSpecError::unsupported_feature("unsupported feature");
+    assert_eq!(unsupported.kind(), OpenAiSpecErrorKind::UnsupportedFeature);
+}
+
+#[test]
+fn error_message_returns_original_message_for_all_variants() {
+    assert_eq!(
+        OpenAiSpecError::validation("invalid input").message(),
+        "invalid input"
+    );
+    assert_eq!(
+        OpenAiSpecError::encode_with_source("encode failed", io::Error::other("boom")).message(),
+        "encode failed"
+    );
+    assert_eq!(
+        OpenAiSpecError::decode("decode failed").message(),
+        "decode failed"
+    );
+    assert_eq!(
+        OpenAiSpecError::upstream("upstream failed").message(),
+        "upstream failed"
+    );
+    assert_eq!(
+        OpenAiSpecError::protocol_violation("protocol failed").message(),
+        "protocol failed"
+    );
+    assert_eq!(
+        OpenAiSpecError::unsupported_feature("unsupported feature").message(),
+        "unsupported feature"
+    );
+}
+
+#[test]
+fn encode_with_source_preserves_error_chain() {
+    let error = OpenAiSpecError::encode_with_source("encode failed", io::Error::other("boom"));
+
+    let source = std::error::Error::source(&error).expect("source should be present");
+    assert!(
+        source.to_string().contains("boom"),
+        "source message should include original io error message"
+    );
+}
+
+#[test]
+fn decode_constructor_has_no_source() {
+    let error = OpenAiSpecError::decode("decode failed");
+    assert!(
+        std::error::Error::source(&error).is_none(),
+        "decode constructor should not attach a source"
+    );
 }

@@ -37,6 +37,18 @@ fn base_request() -> Request {
     }
 }
 
+fn assert_adapter_error(
+    error: AdapterError,
+    provider: ProviderId,
+    operation: AdapterOperation,
+    kind: AdapterErrorKind,
+) {
+    assert_eq!(error.provider, provider);
+    assert_eq!(error.operation, operation);
+    assert_eq!(error.kind, kind);
+    assert!(error.source_ref().is_some());
+}
+
 #[test]
 fn adapter_lookup_returns_expected_ids() {
     assert_eq!(adapter_for(ProviderId::OpenAi).id(), ProviderId::OpenAi);
@@ -120,6 +132,49 @@ fn platform_config_rejects_empty_base_url() {
     assert_eq!(error.provider, ProviderId::OpenAi);
     assert_eq!(error.operation, AdapterOperation::BuildHttpRequest);
     assert_eq!(error.kind, AdapterErrorKind::Validation);
+}
+
+#[test]
+fn platform_config_trims_base_url() {
+    let config = adapter_for(ProviderId::OpenAi)
+        .platform_config("  https://api.openai.com  ".to_string())
+        .expect("platform config should succeed");
+    assert_eq!(config.base_url, "https://api.openai.com");
+}
+
+#[test]
+fn platform_config_rejects_malformed_url() {
+    let error = adapter_for(ProviderId::OpenAi)
+        .platform_config("not a valid url".to_string())
+        .expect_err("malformed base url must fail");
+    assert_eq!(error.provider, ProviderId::OpenAi);
+    assert_eq!(error.operation, AdapterOperation::BuildHttpRequest);
+    assert_eq!(error.kind, AdapterErrorKind::Validation);
+}
+
+#[test]
+fn platform_config_rejects_non_http_scheme() {
+    let error = adapter_for(ProviderId::OpenAi)
+        .platform_config("ftp://api.openai.com".to_string())
+        .expect_err("non-http scheme must fail");
+    assert_eq!(error.provider, ProviderId::OpenAi);
+    assert_eq!(error.operation, AdapterOperation::BuildHttpRequest);
+    assert_eq!(error.kind, AdapterErrorKind::Validation);
+}
+
+#[test]
+fn default_base_url_and_endpoint_path_are_expected() {
+    let openai = adapter_for(ProviderId::OpenAi);
+    assert_eq!(openai.default_base_url(), "https://api.openai.com");
+    assert_eq!(openai.endpoint_path(), "/v1/responses");
+
+    let anthropic = adapter_for(ProviderId::Anthropic);
+    assert_eq!(anthropic.default_base_url(), "https://api.anthropic.com");
+    assert_eq!(anthropic.endpoint_path(), "/v1/messages");
+
+    let openrouter = adapter_for(ProviderId::OpenRouter);
+    assert_eq!(openrouter.default_base_url(), "https://openrouter.ai/api");
+    assert_eq!(openrouter.endpoint_path(), "/v1/chat/completions");
 }
 
 #[test]
@@ -236,4 +291,107 @@ fn openrouter_adapter_preserves_fallback_decode_warning() {
         })
         .expect("translator decode should succeed");
     assert_eq!(response, translator_response);
+}
+
+#[test]
+fn openai_adapter_decode_error_maps_provider_operation_and_kind() {
+    let adapter = adapter_for(ProviderId::OpenAi);
+    let error = adapter
+        .decode_response(&json!("invalid"), &ResponseFormat::Text)
+        .expect_err("decode should fail for non-object payload");
+
+    assert_adapter_error(
+        error,
+        ProviderId::OpenAi,
+        AdapterOperation::DecodeResponse,
+        AdapterErrorKind::Decode,
+    );
+}
+
+#[test]
+fn anthropic_adapter_decode_error_maps_provider_operation_and_kind() {
+    let adapter = adapter_for(ProviderId::Anthropic);
+    let error = adapter
+        .decode_response(
+            &json!({ "model": "claude-sonnet-4-6" }),
+            &ResponseFormat::Text,
+        )
+        .expect_err("decode should fail for malformed anthropic payload");
+
+    assert_adapter_error(
+        error,
+        ProviderId::Anthropic,
+        AdapterOperation::DecodeResponse,
+        AdapterErrorKind::Decode,
+    );
+}
+
+#[test]
+fn openrouter_adapter_decode_error_maps_provider_operation_and_kind() {
+    let adapter = adapter_for(ProviderId::OpenRouter);
+    let error = adapter
+        .decode_response(&json!("invalid"), &ResponseFormat::Text)
+        .expect_err("decode should fail when both OpenAI and fallback decoding fail");
+
+    assert_adapter_error(
+        error,
+        ProviderId::OpenRouter,
+        AdapterOperation::DecodeResponse,
+        AdapterErrorKind::Decode,
+    );
+}
+
+#[test]
+fn openai_adapter_encode_validation_error_maps_provider_operation_and_kind() {
+    let adapter = adapter_for(ProviderId::OpenAi);
+    let mut request = base_request();
+    request.messages.clear();
+
+    let error = adapter
+        .encode_request(&request)
+        .expect_err("encode should fail for empty messages");
+
+    assert_adapter_error(
+        error,
+        ProviderId::OpenAi,
+        AdapterOperation::EncodeRequest,
+        AdapterErrorKind::Validation,
+    );
+}
+
+#[test]
+fn anthropic_adapter_encode_validation_error_maps_provider_operation_and_kind() {
+    let adapter = adapter_for(ProviderId::Anthropic);
+    let mut request = base_request();
+    request.model_id = "claude-sonnet-4-6".to_string();
+    request.temperature = Some(1.5);
+
+    let error = adapter
+        .encode_request(&request)
+        .expect_err("encode should fail for out-of-range temperature");
+
+    assert_adapter_error(
+        error,
+        ProviderId::Anthropic,
+        AdapterOperation::EncodeRequest,
+        AdapterErrorKind::Validation,
+    );
+}
+
+#[test]
+fn openrouter_adapter_encode_validation_error_maps_provider_operation_and_kind() {
+    let adapter = adapter_for(ProviderId::OpenRouter);
+    let mut request = base_request();
+    request.messages.clear();
+
+    let error = adapter
+        .encode_request(&request)
+        .expect_err("encode should fail for empty messages");
+
+    assert_adapter_error(
+        error,
+        ProviderId::OpenRouter,
+        AdapterOperation::EncodeRequest,
+        AdapterErrorKind::Validation,
+    );
 }

@@ -81,10 +81,16 @@ impl FallbackMatch {
         }
 
         if !self.provider_codes.is_empty() {
-            let Some(provider_code) = error.provider_code.as_deref() else {
+            let Some(provider_code) = error.provider_code.as_deref().and_then(trimmed_non_empty)
+            else {
                 return false;
             };
-            if !self.provider_codes.iter().any(|code| code == provider_code) {
+            if !self
+                .provider_codes
+                .iter()
+                .filter_map(|code| trimmed_non_empty(code))
+                .any(|code| code == provider_code)
+            {
                 return false;
             }
         }
@@ -150,7 +156,9 @@ impl FallbackRule {
     }
 
     pub fn for_provider(mut self, provider: ProviderId) -> Self {
-        self.when.providers.push(provider);
+        if !self.when.providers.contains(&provider) {
+            self.when.providers.push(provider);
+        }
         self
     }
 }
@@ -1163,14 +1171,7 @@ impl AgentToolkit {
             provider: targets.first().map(|target| target.provider),
             model: targets
                 .first()
-                .and_then(|target| target.model.clone())
-                .or_else(|| {
-                    if request.model_id.is_empty() {
-                        None
-                    } else {
-                        Some(request.model_id.clone())
-                    }
-                }),
+                .and_then(|target| event_model(target.model.as_deref(), &request.model_id)),
             target_index: None,
             attempt_index: None,
             elapsed: request_started_at.elapsed(),
@@ -1194,13 +1195,7 @@ impl AgentToolkit {
                 let request_end_event = RequestEndEvent {
                     request_id: error.request_id.clone(),
                     provider: Some(target.provider),
-                    model: target.model.clone().or_else(|| {
-                        if request.model_id.is_empty() {
-                            None
-                        } else {
-                            Some(request.model_id.clone())
-                        }
-                    }),
+                    model: event_model(target.model.as_deref(), &request.model_id),
                     target_index: Some(index),
                     attempt_index: Some(index),
                     elapsed: request_started_at.elapsed(),
@@ -1222,13 +1217,7 @@ impl AgentToolkit {
             let attempt_start_event = AttemptStartEvent {
                 request_id: None,
                 provider: Some(target.provider),
-                model: target.model.clone().or_else(|| {
-                    if request.model_id.is_empty() {
-                        None
-                    } else {
-                        Some(request.model_id.clone())
-                    }
-                }),
+                model: event_model(target.model.as_deref(), &request.model_id),
                 target_index: Some(index),
                 attempt_index: Some(index),
                 elapsed: attempt_started_at.elapsed(),
@@ -1360,12 +1349,10 @@ impl AgentToolkit {
         let mut targets = Vec::new();
 
         if let Some(primary_target) = &options.target {
-            targets.push(primary_target.clone());
+            push_unique_target(&mut targets, primary_target.clone());
             if let Some(fallback_policy) = &options.fallback_policy {
                 for target in &fallback_policy.targets {
-                    if *target != *primary_target {
-                        targets.push(target.clone());
-                    }
+                    push_unique_target(&mut targets, target.clone());
                 }
             }
         } else if let Some(fallback_policy) = &options.fallback_policy {
@@ -1374,7 +1361,9 @@ impl AgentToolkit {
                     "fallback policy requires at least one target",
                 ));
             }
-            targets.extend(fallback_policy.targets.clone());
+            for target in &fallback_policy.targets {
+                push_unique_target(&mut targets, target.clone());
+            }
         } else {
             return Err(RuntimeError::target_resolution(
                 "explicit target is required unless a fallback policy is provided",
@@ -1946,6 +1935,19 @@ fn trimmed_non_empty(value: &str) -> Option<&str> {
         None
     } else {
         Some(trimmed)
+    }
+}
+
+fn event_model(target_model: Option<&str>, request_model: &str) -> Option<String> {
+    target_model
+        .and_then(trimmed_non_empty)
+        .or_else(|| trimmed_non_empty(request_model))
+        .map(ToString::to_string)
+}
+
+fn push_unique_target(targets: &mut Vec<Target>, target: Target) {
+    if !targets.contains(&target) {
+        targets.push(target);
     }
 }
 
