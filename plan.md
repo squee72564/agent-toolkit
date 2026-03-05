@@ -161,7 +161,7 @@ Harden every Rust file in a controlled, repeatable cycle: discover risk, apply f
 - [x] crates/agent-providers/src/openai_spec/test.rs
 - [x] crates/agent-providers/src/platform/anthropic/fixtures_test.rs
 - [x] crates/agent-providers/src/platform/anthropic/mod.rs
-- [ ] crates/agent-providers/src/platform/anthropic/test.rs
+- [x] crates/agent-providers/src/platform/anthropic/test.rs
 - [ ] crates/agent-providers/src/platform/anthropic/translator.rs
 - [ ] crates/agent-providers/src/platform/mod.rs
 - [ ] crates/agent-providers/src/platform/openai/fixtures_test.rs
