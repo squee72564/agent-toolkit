@@ -211,8 +211,12 @@ impl HttpTransport {
                 continue;
             }
 
-            let error = response.error_for_status().unwrap_err();
-            return Err(TransportError::Request(error));
+            if let Err(error) = response.error_for_status_ref() {
+                return Err(TransportError::Request(error));
+            }
+
+            let parsed = response.json::<TResp>().await?;
+            return Ok(parsed);
         }
     }
 

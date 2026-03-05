@@ -8,8 +8,9 @@ pub(super) fn canonicalize_json(value: &Value) -> Value {
 
             let mut out = Map::new();
             for key in keys {
-                let next = map.get(&key).expect("key collected from object must exist");
-                out.insert(key, canonicalize_json(next));
+                if let Some(next) = map.get(&key) {
+                    out.insert(key, canonicalize_json(next));
+                }
             }
 
             Value::Object(out)
