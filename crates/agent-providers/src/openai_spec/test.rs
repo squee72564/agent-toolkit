@@ -433,3 +433,134 @@ fn decode_invalid_tool_call_arguments_falls_back_to_string_with_warning() {
         _ => panic!("expected first output content part to be a tool call"),
     }
 }
+
+#[test]
+fn decode_function_call_rejects_blank_call_id() {
+    let envelope = OpenAiDecodeEnvelope {
+        body: json!({
+            "status": "completed",
+            "model": "gpt-4.1-mini",
+            "output": [
+                {
+                    "type": "function_call",
+                    "call_id": "   ",
+                    "name": "lookup_weather",
+                    "arguments": "{\"city\":\"SF\"}"
+                }
+            ]
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let error = decode_openai_response(&envelope).expect_err("decode should fail");
+    match error {
+        OpenAiSpecError::Decode { message, .. } => {
+            assert!(message.contains("call_id must not be empty"));
+        }
+        _ => panic!("expected decode error variant"),
+    }
+}
+
+#[test]
+fn decode_function_call_rejects_blank_name() {
+    let envelope = OpenAiDecodeEnvelope {
+        body: json!({
+            "status": "completed",
+            "model": "gpt-4.1-mini",
+            "output": [
+                {
+                    "type": "function_call",
+                    "call_id": "call_1",
+                    "name": " ",
+                    "arguments": "{\"city\":\"SF\"}"
+                }
+            ]
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let error = decode_openai_response(&envelope).expect_err("decode should fail");
+    match error {
+        OpenAiSpecError::Decode { message, .. } => {
+            assert!(message.contains("name must not be empty"));
+        }
+        _ => panic!("expected decode error variant"),
+    }
+}
+
+#[test]
+fn decode_function_call_rejects_blank_arguments() {
+    let envelope = OpenAiDecodeEnvelope {
+        body: json!({
+            "status": "completed",
+            "model": "gpt-4.1-mini",
+            "output": [
+                {
+                    "type": "function_call",
+                    "call_id": "call_1",
+                    "name": "lookup_weather",
+                    "arguments": "  "
+                }
+            ]
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let error = decode_openai_response(&envelope).expect_err("decode should fail");
+    match error {
+        OpenAiSpecError::Decode { message, .. } => {
+            assert!(message.contains("arguments must not be empty"));
+        }
+        _ => panic!("expected decode error variant"),
+    }
+}
+
+#[test]
+fn decode_refusal_whitespace_only_is_ignored() {
+    let envelope = OpenAiDecodeEnvelope {
+        body: json!({
+            "status": "completed",
+            "model": "gpt-4.1-mini",
+            "output": [
+                {
+                    "type": "refusal",
+                    "text": "   "
+                }
+            ]
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let response = decode_openai_response(&envelope).expect("decode should succeed");
+    assert!(response.output.content.is_empty());
+    assert!(
+        response
+            .warnings
+            .iter()
+            .any(|w| w.code == "openai.decode.empty_content")
+    );
+}
+
+#[test]
+fn decode_refusal_text_is_trimmed_and_emitted() {
+    let envelope = OpenAiDecodeEnvelope {
+        body: json!({
+            "status": "completed",
+            "model": "gpt-4.1-mini",
+            "output": [
+                {
+                    "type": "refusal",
+                    "refusal": "  cannot comply  "
+                }
+            ]
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let response = decode_openai_response(&envelope).expect("decode should succeed");
+    assert_eq!(response.output.content.len(), 1);
+    match &response.output.content[0] {
+        ContentPart::Text { text } => assert_eq!(text, "cannot comply"),
+        _ => panic!("expected text content part"),
+    }
+}

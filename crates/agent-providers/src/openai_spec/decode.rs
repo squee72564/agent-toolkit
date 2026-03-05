@@ -6,6 +6,13 @@ use agent_core::types::{
 
 use super::{OpenAiDecodeEnvelope, OpenAiErrorEnvelope, OpenAiSpecError};
 
+const WARN_EMPTY_CONTENT: &str = "openai.decode.empty_content";
+const WARN_UNKNOWN_OUTPUT_ITEM: &str = "openai.decode.unknown_output_item";
+const WARN_UNKNOWN_MESSAGE_PART: &str = "openai.decode.unknown_message_part";
+const WARN_INVALID_TOOL_CALL_ARGUMENTS: &str = "openai.decode.invalid_tool_call_arguments";
+const WARN_STRUCTURED_OUTPUT_NOT_OBJECT: &str = "openai.decode.structured_output_not_object";
+const WARN_STRUCTURED_OUTPUT_PARSE_FAILED: &str = "openai.decode.structured_output_parse_failed";
+
 pub(crate) fn decode_openai_response(
     payload: &OpenAiDecodeEnvelope,
 ) -> Result<Response, OpenAiSpecError> {
@@ -34,20 +41,16 @@ pub(crate) fn decode_openai_response(
     let mut content = Vec::new();
     let mut warnings = Vec::new();
 
-    let output_items = root
-        .get("output")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-
-    for item in output_items {
-        decode_output_item(&item, &mut content, &mut warnings)?;
+    if let Some(output_items) = root.get("output").and_then(Value::as_array) {
+        for item in output_items {
+            decode_output_item(item, &mut content, &mut warnings)?;
+        }
     }
 
     if content.is_empty() {
         push_warning(
             &mut warnings,
-            "openai.decode.empty_content",
+            WARN_EMPTY_CONTENT,
             "openai response produced no decodable content parts",
         );
     }
@@ -157,7 +160,7 @@ fn decode_output_item(
         other => {
             push_warning(
                 warnings,
-                "openai.decode.unknown_output_item",
+                WARN_UNKNOWN_OUTPUT_ITEM,
                 format!("ignored unknown output item type: {other}"),
             );
             Ok(())
@@ -170,49 +173,45 @@ fn decode_output_message(
     content: &mut Vec<ContentPart>,
     warnings: &mut Vec<RuntimeWarning>,
 ) -> Result<(), OpenAiSpecError> {
-    let parts = item_obj
-        .get("content")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
+    if let Some(parts) = item_obj.get("content").and_then(Value::as_array) {
+        for part in parts {
+            let Some(part_obj) = part.as_object() else {
+                return Err(OpenAiSpecError::decode(
+                    "output message content part must be an object",
+                ));
+            };
 
-    for part in parts {
-        let Some(part_obj) = part.as_object() else {
-            return Err(OpenAiSpecError::decode(
-                "output message content part must be an object",
-            ));
-        };
+            let Some(part_type) = part_obj.get("type").and_then(Value::as_str) else {
+                return Err(OpenAiSpecError::decode(
+                    "output message content part missing type",
+                ));
+            };
 
-        let Some(part_type) = part_obj.get("type").and_then(Value::as_str) else {
-            return Err(OpenAiSpecError::decode(
-                "output message content part missing type",
-            ));
-        };
-
-        match part_type {
-            "output_text" => {
-                let text = part_obj
-                    .get("text")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default();
-                if !text.is_empty() {
-                    content.push(ContentPart::Text {
-                        text: text.to_string(),
-                    });
+            match part_type {
+                "output_text" => {
+                    let text = part_obj
+                        .get("text")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default();
+                    if !text.is_empty() {
+                        content.push(ContentPart::Text {
+                            text: text.to_string(),
+                        });
+                    }
                 }
-            }
-            "reasoning" => {}
-            "refusal" => {
-                if let Some(text) = extract_refusal_text(part_obj) {
-                    content.push(ContentPart::Text { text });
+                "reasoning" => {}
+                "refusal" => {
+                    if let Some(text) = extract_refusal_text(part_obj) {
+                        content.push(ContentPart::Text { text });
+                    }
                 }
-            }
-            other => {
-                push_warning(
-                    warnings,
-                    "openai.decode.unknown_message_part",
-                    format!("ignored unknown output message content part type: {other}"),
-                );
+                other => {
+                    push_warning(
+                        warnings,
+                        WARN_UNKNOWN_MESSAGE_PART,
+                        format!("ignored unknown output message content part type: {other}"),
+                    );
+                }
             }
         }
     }
@@ -220,30 +219,54 @@ fn decode_output_message(
     Ok(())
 }
 
+fn decode_required_non_empty_str<'a>(
+    item_obj: &'a Map<String, Value>,
+    key: &str,
+    missing_message: &str,
+    blank_message: &str,
+) -> Result<&'a str, OpenAiSpecError> {
+    let value = item_obj
+        .get(key)
+        .and_then(Value::as_str)
+        .ok_or_else(|| OpenAiSpecError::decode(missing_message))?;
+
+    if value.trim().is_empty() {
+        return Err(OpenAiSpecError::decode(blank_message));
+    }
+
+    Ok(value)
+}
+
 fn decode_output_tool_call(
     item_obj: &Map<String, Value>,
     content: &mut Vec<ContentPart>,
     warnings: &mut Vec<RuntimeWarning>,
 ) -> Result<(), OpenAiSpecError> {
-    let call_id = item_obj
-        .get("call_id")
-        .and_then(Value::as_str)
-        .ok_or_else(|| OpenAiSpecError::decode("function_call output item missing call_id"))?;
-    let name = item_obj
-        .get("name")
-        .and_then(Value::as_str)
-        .ok_or_else(|| OpenAiSpecError::decode("function_call output item missing name"))?;
-    let arguments = item_obj
-        .get("arguments")
-        .and_then(Value::as_str)
-        .ok_or_else(|| OpenAiSpecError::decode("function_call output item missing arguments"))?;
+    let call_id = decode_required_non_empty_str(
+        item_obj,
+        "call_id",
+        "function_call output item missing call_id",
+        "function_call output item call_id must not be empty",
+    )?;
+    let name = decode_required_non_empty_str(
+        item_obj,
+        "name",
+        "function_call output item missing name",
+        "function_call output item name must not be empty",
+    )?;
+    let arguments = decode_required_non_empty_str(
+        item_obj,
+        "arguments",
+        "function_call output item missing arguments",
+        "function_call output item arguments must not be empty",
+    )?;
 
     let arguments_json = match serde_json::from_str::<Value>(arguments) {
         Ok(value) => value,
         Err(_) => {
             push_warning(
                 warnings,
-                "openai.decode.invalid_tool_call_arguments",
+                WARN_INVALID_TOOL_CALL_ARGUMENTS,
                 format!(
                     "tool call arguments for '{name}' are not valid JSON; preserving raw string"
                 ),
@@ -262,16 +285,18 @@ fn decode_output_tool_call(
 }
 
 fn extract_refusal_text(obj: &Map<String, Value>) -> Option<String> {
-    if let Some(text) = obj.get("text").and_then(Value::as_str)
-        && !text.is_empty()
-    {
-        return Some(text.to_string());
+    if let Some(text) = obj.get("text").and_then(Value::as_str) {
+        let trimmed = text.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
     }
 
-    if let Some(text) = obj.get("refusal").and_then(Value::as_str)
-        && !text.is_empty()
-    {
-        return Some(text.to_string());
+    if let Some(text) = obj.get("refusal").and_then(Value::as_str) {
+        let trimmed = text.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
     }
 
     None
@@ -307,7 +332,7 @@ fn decode_structured_output(
                 } else {
                     push_warning(
                         warnings,
-                        "openai.decode.structured_output_not_object",
+                        WARN_STRUCTURED_OUTPUT_NOT_OBJECT,
                         "structured output is valid JSON but not a JSON object",
                     );
                     None
@@ -319,7 +344,7 @@ fn decode_structured_output(
         Err(_) => {
             push_warning(
                 warnings,
-                "openai.decode.structured_output_parse_failed",
+                WARN_STRUCTURED_OUTPUT_PARSE_FAILED,
                 "unable to parse structured output JSON from decoded text",
             );
             None
