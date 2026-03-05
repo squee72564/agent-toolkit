@@ -9,19 +9,14 @@ pub enum ProviderId {
     OpenRouter,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ToolChoice {
     None,
+    #[default]
     Auto,
     Required,
     Specific { name: String },
-}
-
-impl Default for ToolChoice {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -223,21 +218,16 @@ impl Message {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ResponseFormat {
+    #[default]
     Text,
     JsonObject,
     JsonSchema {
         name: String,
         schema: serde_json::Value,
     },
-}
-
-impl Default for ResponseFormat {
-    fn default() -> Self {
-        Self::Text
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
