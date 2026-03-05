@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::error::Error;
 use std::io;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -14,7 +15,9 @@ use tokio::task::JoinHandle;
 
 use super::{HttpTransport, RetryPolicy, TransportError};
 
-#[derive(Debug)]
+type TestResult<T = ()> = Result<T, Box<dyn Error + Send + Sync>>;
+
+#[derive(Debug, Clone)]
 struct CapturedRequest {
     method: String,
     path: String,
@@ -27,11 +30,6 @@ struct ScriptedResponse {
     status: StatusCode,
     headers: Vec<(String, String)>,
     body: String,
-}
-
-fn header_name(raw: &str) -> HeaderName {
-    HeaderName::from_bytes(raw.as_bytes())
-        .unwrap_or_else(|error| panic!("invalid header name {raw}: {error}"))
 }
 
 fn default_platform(auth_style: AuthStyle) -> PlatformConfig {
@@ -84,6 +82,9 @@ fn parse_request_head(head: &str) -> io::Result<(String, String, HashMap<String,
         .next()
         .ok_or_else(|| invalid_data_error("missing request path"))?
         .to_string();
+    let _http_version = request_parts
+        .next()
+        .ok_or_else(|| invalid_data_error("missing request HTTP version"))?;
 
     let mut headers = HashMap::new();
     for line in lines {
@@ -137,7 +138,7 @@ async fn read_request(stream: &mut TcpStream) -> io::Result<CapturedRequest> {
     };
 
     while body.len() < content_length {
-        let mut chunk = vec![0_u8; content_length - body.len()];
+        let mut chunk = [0_u8; 1024];
         let bytes_read = stream.read(&mut chunk).await?;
         if bytes_read == 0 {
             return Err(io::Error::new(
@@ -145,7 +146,9 @@ async fn read_request(stream: &mut TcpStream) -> io::Result<CapturedRequest> {
                 "connection closed before reading full body",
             ));
         }
-        body.extend_from_slice(&chunk[..bytes_read]);
+        let remaining = content_length - body.len();
+        let take = bytes_read.min(remaining);
+        body.extend_from_slice(&chunk[..take]);
     }
 
     Ok(CapturedRequest {
@@ -216,6 +219,21 @@ async fn spawn_scripted_server(
     Ok((format!("http://{address}"), recorded, handle))
 }
 
+fn captured_requests(
+    recorded: &Arc<Mutex<Vec<CapturedRequest>>>,
+) -> io::Result<Vec<CapturedRequest>> {
+    let guard = recorded
+        .lock()
+        .map_err(|_| io::Error::other("failed to read captured requests"))?;
+    Ok(guard.clone())
+}
+
+async fn await_server(handle: JoinHandle<io::Result<()>>) -> io::Result<()> {
+    handle
+        .await
+        .map_err(|error| io::Error::other(format!("server join failed: {error}")))?
+}
+
 #[test]
 fn retry_policy_backoff_caps_at_max() {
     let policy = RetryPolicy {
@@ -244,11 +262,12 @@ fn retry_policy_backoff_caps_at_max() {
 }
 
 #[test]
-fn build_header_config_applies_default_auth_and_metadata_headers() {
+fn build_header_config_applies_default_auth_and_metadata_headers() -> TestResult {
     let mut platform = default_platform(AuthStyle::Bearer);
-    platform
-        .default_headers
-        .insert(header_name("x-default"), HeaderValue::from_static("base"));
+    platform.default_headers.insert(
+        HeaderName::from_static("x-default"),
+        HeaderValue::from_static("base"),
+    );
 
     let mut metadata = BTreeMap::new();
     metadata.insert(
@@ -263,11 +282,12 @@ fn build_header_config_applies_default_auth_and_metadata_headers() {
     };
 
     let transport = default_transport(RetryPolicy::default());
-    let config = transport
-        .build_header_config(&platform, &ctx)
-        .unwrap_or_else(|error| panic!("expected valid header config: {error}"));
+    let config = transport.build_header_config(&platform, &ctx)?;
 
-    assert_eq!(config.request_id_header, header_name("x-trace-id"));
+    assert_eq!(
+        config.request_id_header,
+        HeaderName::from_static("x-trace-id")
+    );
     assert_eq!(
         config.headers.get("x-default"),
         Some(&HeaderValue::from_static("base"))
@@ -280,10 +300,12 @@ fn build_header_config_applies_default_auth_and_metadata_headers() {
         config.headers.get(AUTHORIZATION),
         Some(&HeaderValue::from_static("Bearer secret-token"))
     );
+
+    Ok(())
 }
 
 #[test]
-fn build_header_config_rejects_invalid_custom_header_name() {
+fn build_header_config_rejects_invalid_custom_header_name() -> TestResult {
     let platform = default_platform(AuthStyle::None);
     let mut metadata = BTreeMap::new();
     metadata.insert(
@@ -297,16 +319,17 @@ fn build_header_config_rejects_invalid_custom_header_name() {
     };
 
     let transport = default_transport(RetryPolicy::default());
-    let error = transport
-        .build_header_config(&platform, &ctx)
-        .err()
-        .unwrap_or_else(|| panic!("expected invalid header name error"));
+    let error = match transport.build_header_config(&platform, &ctx) {
+        Ok(_) => return Err(io::Error::other("expected invalid header name error").into()),
+        Err(error) => error,
+    };
 
     assert!(matches!(error, TransportError::InvalidHeaderName));
+    Ok(())
 }
 
 #[test]
-fn build_header_config_rejects_invalid_custom_header_value() {
+fn build_header_config_rejects_invalid_custom_header_value() -> TestResult {
     let platform = default_platform(AuthStyle::None);
     let mut metadata = BTreeMap::new();
     metadata.insert(
@@ -320,12 +343,13 @@ fn build_header_config_rejects_invalid_custom_header_value() {
     };
 
     let transport = default_transport(RetryPolicy::default());
-    let error = transport
-        .build_header_config(&platform, &ctx)
-        .err()
-        .unwrap_or_else(|| panic!("expected invalid header value error"));
+    let error = match transport.build_header_config(&platform, &ctx) {
+        Ok(_) => return Err(io::Error::other("expected invalid header value error").into()),
+        Err(error) => error,
+    };
 
     assert!(matches!(error, TransportError::InvalidHeaderValue));
+    Ok(())
 }
 
 #[derive(Serialize)]
@@ -334,15 +358,13 @@ struct ExampleBody<'a> {
 }
 
 #[tokio::test]
-async fn post_json_value_preserves_non_success_status_and_extracts_request_id() {
+async fn post_json_value_preserves_non_success_status_and_extracts_request_id() -> TestResult {
     let responses = vec![ScriptedResponse {
         status: StatusCode::BAD_REQUEST,
         headers: vec![("x-trace-id".to_string(), "trace-42".to_string())],
         body: json!({"error": "bad request"}).to_string(),
     }];
-    let (base_url, recorded, handle) = spawn_scripted_server(responses)
-        .await
-        .unwrap_or_else(|error| panic!("failed to start test server: {error}"));
+    let (base_url, recorded, handle) = spawn_scripted_server(responses).await?;
 
     let mut platform = default_platform(AuthStyle::None);
     platform.base_url = base_url.clone();
@@ -369,23 +391,15 @@ async fn post_json_value_preserves_non_success_status_and_extracts_request_id() 
             &ExampleBody { msg: "hello" },
             &ctx,
         )
-        .await
-        .unwrap_or_else(|error| panic!("post_json_value failed: {error}"));
+        .await?;
 
     assert_eq!(response.status, StatusCode::BAD_REQUEST);
     assert_eq!(response.request_id.as_deref(), Some("trace-42"));
     assert_eq!(response.body, json!({"error": "bad request"}));
 
-    let server_result = handle
-        .await
-        .unwrap_or_else(|error| panic!("server join failed: {error}"));
-    if let Err(error) = server_result {
-        panic!("server failed: {error}");
-    }
+    await_server(handle).await?;
 
-    let captured = recorded
-        .lock()
-        .unwrap_or_else(|_| panic!("failed to read captured requests"));
+    let captured = captured_requests(&recorded)?;
     assert_eq!(captured.len(), 1);
     assert_eq!(captured[0].method, "POST");
     assert_eq!(captured[0].path, "/v1/test");
@@ -398,13 +412,13 @@ async fn post_json_value_preserves_non_success_status_and_extracts_request_id() 
         Some("custom")
     );
 
-    let body: Value = serde_json::from_slice(&captured[0].body)
-        .unwrap_or_else(|error| panic!("captured request body was not valid json: {error}"));
+    let body: Value = serde_json::from_slice(&captured[0].body)?;
     assert_eq!(body, json!({"msg": "hello"}));
+    Ok(())
 }
 
 #[tokio::test]
-async fn get_json_retries_retryable_status_then_succeeds() {
+async fn get_json_retries_retryable_status_then_succeeds() -> TestResult {
     let responses = vec![
         ScriptedResponse {
             status: StatusCode::SERVICE_UNAVAILABLE,
@@ -417,9 +431,7 @@ async fn get_json_retries_retryable_status_then_succeeds() {
             body: json!({"ok": true}).to_string(),
         },
     ];
-    let (base_url, recorded, handle) = spawn_scripted_server(responses)
-        .await
-        .unwrap_or_else(|error| panic!("failed to start test server: {error}"));
+    let (base_url, recorded, handle) = spawn_scripted_server(responses).await?;
 
     let policy = RetryPolicy {
         max_attempts: 2,
@@ -435,22 +447,15 @@ async fn get_json_retries_retryable_status_then_succeeds() {
             &format!("{base_url}/retry"),
             &empty_context(),
         )
-        .await
-        .unwrap_or_else(|error| panic!("get_json failed: {error}"));
+        .await?;
 
     assert_eq!(result, json!({"ok": true}));
 
-    let server_result = handle
-        .await
-        .unwrap_or_else(|error| panic!("server join failed: {error}"));
-    if let Err(error) = server_result {
-        panic!("server failed: {error}");
-    }
+    await_server(handle).await?;
 
-    let captured = recorded
-        .lock()
-        .unwrap_or_else(|_| panic!("failed to read captured requests"));
+    let captured = captured_requests(&recorded)?;
     assert_eq!(captured.len(), 2);
     assert_eq!(captured[0].path, "/retry");
     assert_eq!(captured[1].path, "/retry");
+    Ok(())
 }
