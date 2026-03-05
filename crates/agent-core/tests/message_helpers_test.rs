@@ -73,33 +73,25 @@ fn content_part_tool_result_json_and_text_default_raw_none() {
     let json_part = ContentPart::tool_result_json("call_1", json!({ "ok": true }));
     let text_part = ContentPart::tool_result_text("call_2", "done");
 
-    match json_part {
-        ContentPart::ToolResult { tool_result } => {
-            assert_eq!(tool_result.tool_call_id, "call_1");
-            assert_eq!(
-                tool_result.content,
-                ToolResultContent::Json {
+    assert!(matches!(
+        json_part,
+        ContentPart::ToolResult { ref tool_result }
+            if tool_result.tool_call_id == "call_1"
+                && tool_result.content == ToolResultContent::Json {
                     value: json!({ "ok": true })
                 }
-            );
-            assert_eq!(tool_result.raw_provider_content, None);
-        }
-        _ => panic!("expected tool result json content part"),
-    }
+                && tool_result.raw_provider_content.is_none()
+    ));
 
-    match text_part {
-        ContentPart::ToolResult { tool_result } => {
-            assert_eq!(tool_result.tool_call_id, "call_2");
-            assert_eq!(
-                tool_result.content,
-                ToolResultContent::Text {
+    assert!(matches!(
+        text_part,
+        ContentPart::ToolResult { ref tool_result }
+            if tool_result.tool_call_id == "call_2"
+                && tool_result.content == ToolResultContent::Text {
                     text: "done".to_string()
                 }
-            );
-            assert_eq!(tool_result.raw_provider_content, None);
-        }
-        _ => panic!("expected tool result text content part"),
-    }
+                && tool_result.raw_provider_content.is_none()
+    ));
 }
 
 #[test]
@@ -109,19 +101,16 @@ fn tool_result_with_raw_variants_populate_raw_provider_content() {
         ContentPart::tool_result_json_with_raw("call_1", json!({ "ok": true }), raw.clone());
     let text_part = ContentPart::tool_result_text_with_raw("call_2", "done", raw.clone());
 
-    match json_part {
-        ContentPart::ToolResult { tool_result } => {
-            assert_eq!(tool_result.raw_provider_content, Some(raw.clone()));
-        }
-        _ => panic!("expected tool result json content part"),
-    }
-
-    match text_part {
-        ContentPart::ToolResult { tool_result } => {
-            assert_eq!(tool_result.raw_provider_content, Some(raw));
-        }
-        _ => panic!("expected tool result text content part"),
-    }
+    assert!(matches!(
+        json_part,
+        ContentPart::ToolResult { ref tool_result }
+            if tool_result.raw_provider_content == Some(raw.clone())
+    ));
+    assert!(matches!(
+        text_part,
+        ContentPart::ToolResult { ref tool_result }
+            if tool_result.raw_provider_content == Some(raw)
+    ));
 }
 
 #[test]
@@ -133,6 +122,37 @@ fn message_tool_result_helpers_create_tool_role_messages() {
     assert_eq!(text_message.role, MessageRole::Tool);
     assert_eq!(json_message.content.len(), 1);
     assert_eq!(text_message.content.len(), 1);
+}
+
+#[test]
+fn message_tool_result_helpers_with_raw_create_tool_role_messages_and_preserve_raw() {
+    let raw = json!({ "provider": "openai", "payload": { "x": 1 } });
+    let json_message =
+        Message::tool_result_json_with_raw("call_1", json!({ "temp_f": 72 }), raw.clone());
+    let text_message = Message::tool_result_text_with_raw("call_2", "sunny", raw.clone());
+
+    assert_eq!(json_message.role, MessageRole::Tool);
+    assert_eq!(text_message.role, MessageRole::Tool);
+    assert_eq!(json_message.content.len(), 1);
+    assert_eq!(text_message.content.len(), 1);
+    assert!(matches!(
+        json_message.content[0],
+        ContentPart::ToolResult { ref tool_result }
+            if tool_result.tool_call_id == "call_1"
+                && tool_result.content == ToolResultContent::Json {
+                    value: json!({ "temp_f": 72 })
+                }
+                && tool_result.raw_provider_content == Some(raw.clone())
+    ));
+    assert!(matches!(
+        text_message.content[0],
+        ContentPart::ToolResult { ref tool_result }
+            if tool_result.tool_call_id == "call_2"
+                && tool_result.content == ToolResultContent::Text {
+                    text: "sunny".to_string()
+                }
+                && tool_result.raw_provider_content == Some(raw)
+    ));
 }
 
 #[test]
@@ -163,4 +183,52 @@ fn serde_roundtrip_of_helper_built_messages_matches_existing_contract() {
     let decoded: Message = serde_json::from_str(&serialized).expect("deserialize message");
 
     assert_eq!(decoded, message);
+}
+
+#[test]
+fn serde_helper_message_omits_raw_provider_content_when_none() {
+    let message = Message::tool_result_text("call_2", "done");
+    let serialized = serde_json::to_value(&message).expect("serialize message");
+
+    assert_eq!(serialized["role"]["type"], json!("tool"));
+    assert_eq!(serialized["content"][0]["type"], json!("tool_result"));
+    assert_eq!(
+        serialized["content"][0]["tool_result"]["tool_call_id"],
+        json!("call_2")
+    );
+    assert_eq!(
+        serialized["content"][0]["tool_result"]["content"]["type"],
+        json!("text")
+    );
+    assert_eq!(
+        serialized["content"][0]["tool_result"]["content"]["text"],
+        json!("done")
+    );
+    assert!(serialized["content"][0]["tool_result"]["raw_provider_content"].is_null());
+}
+
+#[test]
+fn serde_helper_message_includes_raw_provider_content_when_present() {
+    let raw = json!({ "provider": "openai", "payload": { "x": 1 } });
+    let message = Message::tool_result_json_with_raw("call_1", json!({ "ok": true }), raw.clone());
+    let serialized = serde_json::to_value(&message).expect("serialize message");
+
+    assert_eq!(serialized["role"]["type"], json!("tool"));
+    assert_eq!(serialized["content"][0]["type"], json!("tool_result"));
+    assert_eq!(
+        serialized["content"][0]["tool_result"]["tool_call_id"],
+        json!("call_1")
+    );
+    assert_eq!(
+        serialized["content"][0]["tool_result"]["content"]["type"],
+        json!("json")
+    );
+    assert_eq!(
+        serialized["content"][0]["tool_result"]["content"]["value"],
+        json!({ "ok": true })
+    );
+    assert_eq!(
+        serialized["content"][0]["tool_result"]["raw_provider_content"],
+        raw
+    );
 }
