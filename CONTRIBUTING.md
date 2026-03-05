@@ -2,7 +2,7 @@
 
 ## Toolchain and compatibility policy
 
-- The workspace toolchain is pinned in `rust-toolchain.toml` (`stable` channel with `rustfmt` and `clippy`).
+- The workspace toolchain is pinned in `rust-toolchain.toml` (`1.93.0` with `rustfmt` and `clippy`).
 - The workspace compatibility floor is `rust-version = "1.88"` in root `Cargo.toml`.
 
 ## Required local checks before push
@@ -13,7 +13,7 @@ Run the same deterministic checks as CI:
 cargo check --workspace --all-targets --locked
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo clippy --workspace --lib --all-features -- -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic
+cargo clippy --workspace --lib --bins --all-features -- -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic
 cargo test --workspace --all-targets --all-features
 RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --document-private-items
 ```

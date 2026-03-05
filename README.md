@@ -355,7 +355,7 @@ If credentials are missing, the `live_tests` job exits with a clear deterministi
 
 ## Toolchain and compatibility policy
 
-- Toolchain source of truth: `rust-toolchain.toml` (`stable`, with `rustfmt` + `clippy`).
+- Toolchain source of truth: `rust-toolchain.toml` (`1.93.0`, with `rustfmt` + `clippy`).
 - Workspace compatibility floor: `rust-version = "1.88"`.
 - Workspace lint policy is centralized in root `Cargo.toml` and inherited in all crates via `[lints] workspace = true`.
 
