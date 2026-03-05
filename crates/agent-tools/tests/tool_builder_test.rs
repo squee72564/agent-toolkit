@@ -66,6 +66,47 @@ fn builder_reports_schema_compile_failure() {
     }
 }
 
+#[test]
+fn build_fails_when_name_is_missing() {
+    let result = ToolBuilder::new()
+        .schema(strict_schema())
+        .handler(|args| async move { Ok(ToolOutput { content: args }) })
+        .build();
+
+    assert!(matches!(result, Err(ToolBuilderError::MissingName)));
+}
+
+#[test]
+fn build_fails_when_name_is_blank() {
+    let result = ToolBuilder::new()
+        .name("   ")
+        .schema(strict_schema())
+        .handler(|args| async move { Ok(ToolOutput { content: args }) })
+        .build();
+
+    assert!(matches!(result, Err(ToolBuilderError::MissingName)));
+}
+
+#[test]
+fn build_fails_when_schema_is_missing() {
+    let result = ToolBuilder::new()
+        .name("search")
+        .handler(|args| async move { Ok(ToolOutput { content: args }) })
+        .build();
+
+    assert!(matches!(result, Err(ToolBuilderError::MissingSchema)));
+}
+
+#[test]
+fn build_fails_when_handler_is_missing() {
+    let result = ToolBuilder::new()
+        .name("search")
+        .schema(strict_schema())
+        .build();
+
+    assert!(matches!(result, Err(ToolBuilderError::MissingHandler)));
+}
+
 #[tokio::test]
 async fn args_validation_failure_blocks_execution() {
     let execute_calls = Arc::new(AtomicUsize::new(0));
@@ -142,4 +183,19 @@ fn from_definition_pipeline_builds_tool() {
     assert_eq!(tool.name(), "lookup");
     assert_eq!(tool.description(), Some("Lookup data"));
     assert_eq!(tool.input_schema(), strict_schema());
+}
+
+#[test]
+fn from_definition_with_blank_name_fails_at_build() {
+    let definition = ToolDefinition {
+        name: " \t\n".to_string(),
+        description: Some("Lookup data".to_string()),
+        parameters_schema: strict_schema(),
+    };
+
+    let result = ToolBuilder::from_definition(definition)
+        .handler(|args| async move { Ok(ToolOutput { content: args }) })
+        .build();
+
+    assert!(matches!(result, Err(ToolBuilderError::MissingName)));
 }
