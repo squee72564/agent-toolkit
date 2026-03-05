@@ -1,8 +1,33 @@
+use std::collections::BTreeMap;
+
 use crate::error::{AdapterErrorKind, AdapterOperation};
-use crate::openai_spec::OpenAiSpecError;
+use crate::openai_spec::{OpenAiDecodeEnvelope, OpenAiSpecError};
+use crate::translator_contract::ProtocolTranslator;
 use agent_core::types::ProviderId;
+use agent_core::types::{ContentPart, Message, MessageRole, Request, ResponseFormat, ToolChoice};
+use serde_json::json;
 
 use super::translator::{OpenAiTranslator, OpenAiTranslatorError};
+
+fn base_request() -> Request {
+    Request {
+        model_id: "gpt-4.1-mini".to_string(),
+        messages: vec![Message {
+            role: MessageRole::User,
+            content: vec![ContentPart::Text {
+                text: "hello".to_string(),
+            }],
+        }],
+        tools: Vec::new(),
+        tool_choice: ToolChoice::Auto,
+        response_format: ResponseFormat::Text,
+        temperature: None,
+        top_p: None,
+        max_output_tokens: None,
+        stop: Vec::new(),
+        metadata: BTreeMap::new(),
+    }
+}
 
 #[test]
 fn maps_openai_encode_error_into_adapter_error() {
@@ -122,4 +147,54 @@ fn maps_openai_unsupported_feature_error_into_adapter_error() {
 #[test]
 fn openai_translator_is_constructible() {
     let _ = OpenAiTranslator;
+}
+
+#[test]
+fn openai_translator_encode_passes_through_openai_encoder() {
+    let translator = OpenAiTranslator;
+    let encoded = translator
+        .encode_request(&base_request())
+        .expect("encoding should succeed");
+
+    assert_eq!(encoded.body["model"], "gpt-4.1-mini");
+    assert!(encoded.body["input"].is_array());
+}
+
+#[test]
+fn openai_translator_decode_passes_through_openai_decoder() {
+    let translator = OpenAiTranslator;
+    let payload = OpenAiDecodeEnvelope {
+        body: json!({
+            "status": "completed",
+            "model": "gpt-4.1-mini",
+            "output": [{
+                "type": "message",
+                "content": [{
+                    "type": "output_text",
+                    "text": "hello from openai format"
+                }]
+            }],
+            "usage": {
+                "input_tokens": 3,
+                "output_tokens": 4,
+                "total_tokens": 7
+            }
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let response = translator
+        .decode_request(&payload)
+        .expect("decode should succeed");
+
+    assert_eq!(response.model, "gpt-4.1-mini");
+    assert_eq!(
+        response.output.content,
+        vec![ContentPart::Text {
+            text: "hello from openai format".to_string()
+        }]
+    );
+    assert_eq!(response.usage.input_tokens, Some(3));
+    assert_eq!(response.usage.output_tokens, Some(4));
+    assert_eq!(response.usage.total_tokens, Some(7));
 }
