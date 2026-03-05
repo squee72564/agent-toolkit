@@ -154,11 +154,12 @@ Harden every Rust file in a controlled, repeatable cycle: discover risk, apply f
 - [x] crates/agent-tools/src/lib.rs
 - [x] crates/agent-tools/src/schema.rs
 - [x] crates/agent-tools/tests/registry_test.rs
-- [ ] crates/agent-tools/tests/schema_test.rs
+- [x] crates/agent-tools/tests/schema_test.rs
 - [ ] crates/agent-tools/tests/tool_builder_test.rs
 
 ### crate: `agent-transport`
 - [ ] crates/agent-transport/src/http/mod.rs
+- [ ] crates/agent-transport/src/http/tests.rs ( NON-EXISTENT CREATE PLEASE)
 - [ ] crates/agent-transport/src/lib.rs
 
 ## Refresh Commands
