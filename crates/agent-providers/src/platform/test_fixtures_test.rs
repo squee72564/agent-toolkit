@@ -1,5 +1,6 @@
 use std::panic;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::json;
@@ -10,14 +11,18 @@ use crate::platform::test_fixtures::{
     validate_error_fixture_shape, validate_error_fixture_wrapper_shape,
 };
 
+static UNIQUE_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+
 fn unique_temp_dir(label: &str) -> PathBuf {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("time went backwards")
         .as_nanos();
+    let counter = UNIQUE_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let pid = std::process::id();
     let path = std::env::temp_dir()
         .join("agent-providers-test-fixtures")
-        .join(format!("{label}-{now}"));
+        .join(format!("{label}-{pid}-{now}-{counter}"));
     std::fs::create_dir_all(&path).expect("failed to create temp directory");
     path
 }
@@ -253,6 +258,24 @@ fn choose_valid_success_fixture_swaps_to_fallback_when_preferred_rejected() {
 }
 
 #[test]
+fn choose_valid_success_fixture_reports_missing_preferred_model() {
+    let chosen = choose_valid_success_fixture(
+        "openai",
+        "basic_chat",
+        "definitely-missing-model",
+        |_model, _| Ok(()),
+    );
+
+    assert_eq!(chosen.requested_model, "definitely-missing-model");
+    assert_ne!(chosen.chosen_model, chosen.requested_model);
+    assert!(chosen.swapped);
+    let reason = chosen
+        .preferred_rejection_reason
+        .expect("expected missing preferred model reason");
+    assert!(reason.contains("not present in scenario fixtures"));
+}
+
+#[test]
 fn choose_valid_success_fixture_panics_when_all_candidates_rejected() {
     assert_panics_with_message(
         || {
@@ -311,4 +334,28 @@ fn validate_error_fixture_wrapper_shape_rejects_malformed_body() {
         .expect_err("expected malformed wrapper to fail validation");
     assert!(err.contains("response.body"));
     assert!(err.contains("must be an object"));
+}
+
+#[test]
+fn validate_error_fixture_wrapper_shape_rejects_missing_response_object() {
+    let malformed = json!({
+        "status": 400
+    });
+    let path = Path::new("errors/invalid_model/missing_response.json");
+    let err = validate_error_fixture_wrapper_shape(&malformed, path)
+        .expect_err("expected missing response object to fail validation");
+    assert!(err.contains("missing object field 'response'"));
+}
+
+#[test]
+fn validate_error_fixture_wrapper_shape_rejects_missing_response_body() {
+    let malformed = json!({
+        "response": {
+            "status": 400
+        }
+    });
+    let path = Path::new("errors/invalid_model/missing_body.json");
+    let err = validate_error_fixture_wrapper_shape(&malformed, path)
+        .expect_err("expected missing response.body to fail validation");
+    assert!(err.contains("missing field 'response.body'"));
 }
