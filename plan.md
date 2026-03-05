@@ -146,7 +146,7 @@ Harden every Rust file in a controlled, repeatable cycle: discover risk, apply f
 
 ### crate: `agent-runtime`
 - [x] crates/agent-runtime/src/lib.rs
-- [ ] crates/agent-runtime/src/test.rs
+- [x] crates/agent-runtime/src/test.rs
 - [ ] crates/agent-runtime/tests/observer_test.rs
 
 ### crate: `agent-tools`
