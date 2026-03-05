@@ -142,7 +142,7 @@ Harden every Rust file in a controlled, repeatable cycle: discover risk, apply f
 ### crate: `agent-core`
 - [x] crates/agent-core/src/lib.rs
 - [x] crates/agent-core/src/types/mod.rs
-- [ ] crates/agent-core/tests/message_helpers_test.rs
+- [x] crates/agent-core/tests/message_helpers_test.rs
 
 ### crate: `agent-providers`
 - [ ] crates/agent-providers/src/adapter.rs
