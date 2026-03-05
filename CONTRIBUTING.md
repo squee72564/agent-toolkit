@@ -3,7 +3,7 @@
 ## Toolchain and compatibility policy
 
 - The workspace toolchain is pinned in `rust-toolchain.toml` (`stable` channel with `rustfmt` and `clippy`).
-- The workspace compatibility floor is `rust-version = "1.85"` in root `Cargo.toml`.
+- The workspace compatibility floor is `rust-version = "1.88"` in root `Cargo.toml`.
 
 ## Required local checks before push
 
