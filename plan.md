@@ -136,48 +136,16 @@ Harden every Rust file in a controlled, repeatable cycle: discover risk, apply f
 
 ## Per-File Checklist
 ### crate: `agent`
-- [x] crates/agent/src/lib.rs
-- [x] crates/agent/src/test.rs
+- COMPLETED
 
 ### crate: `agent-core`
-- [x] crates/agent-core/src/lib.rs
-- [x] crates/agent-core/src/types/mod.rs
-- [x] crates/agent-core/tests/message_helpers_test.rs
+- COMPLETED
 
 ### crate: `agent-providers`
-- [x] crates/agent-providers/src/adapter.rs
-- [x] crates/agent-providers/src/adapter/test.rs
-- [x] crates/agent-providers/src/anthropic_spec/decode.rs
-- [x] crates/agent-providers/src/anthropic_spec/encode.rs
-- [x] crates/agent-providers/src/anthropic_spec/mod.rs
-- [x] crates/agent-providers/src/anthropic_spec/schema_rules.rs
-- [x] crates/agent-providers/src/anthropic_spec/test.rs
-- [x] crates/agent-providers/src/error.rs
-- [x] crates/agent-providers/src/lib.rs
-- [x] crates/agent-providers/src/openai_spec/decode.rs
-- [x] crates/agent-providers/src/openai_spec/encode.rs
-- [x] crates/agent-providers/src/openai_spec/mod.rs
-- [x] crates/agent-providers/src/openai_spec/schema_rules.rs
-- [x] crates/agent-providers/src/openai_spec/test.rs
-- [x] crates/agent-providers/src/platform/anthropic/fixtures_test.rs
-- [x] crates/agent-providers/src/platform/anthropic/mod.rs
-- [x] crates/agent-providers/src/platform/anthropic/test.rs
-- [x] crates/agent-providers/src/platform/anthropic/translator.rs
-- [x] crates/agent-providers/src/platform/mod.rs
-- [x] crates/agent-providers/src/platform/openai/fixtures_test.rs
-- [x] crates/agent-providers/src/platform/openai/mod.rs
-- [x] crates/agent-providers/src/platform/openai/test.rs
-- [x] crates/agent-providers/src/platform/openai/translator.rs
-- [x] crates/agent-providers/src/platform/openrouter/fixtures_test.rs
-- [x] crates/agent-providers/src/platform/openrouter/mod.rs
-- [x] crates/agent-providers/src/platform/openrouter/test.rs
-- [x] crates/agent-providers/src/platform/openrouter/translator.rs
-- [x] crates/agent-providers/src/platform/test_fixtures.rs
-- [x] crates/agent-providers/src/platform/test_fixtures_test.rs
-- [x] crates/agent-providers/src/translator_contract.rs
+- COMPLETED
 
 ### crate: `agent-runtime`
-- [ ] crates/agent-runtime/src/lib.rs
+- [x] crates/agent-runtime/src/lib.rs
 - [ ] crates/agent-runtime/src/test.rs
 - [ ] crates/agent-runtime/tests/observer_test.rs
 
