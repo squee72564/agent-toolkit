@@ -194,12 +194,14 @@ fn reject_specific_tool_choice_when_tool_missing() {
 
     let error = encode_openai_request(&request).expect_err("encoding should fail");
 
-    match error {
-        OpenAiSpecError::Validation { message } => {
-            assert!(message.contains("requires at least one tool definition"));
-        }
-        _ => panic!("unexpected error variant"),
-    }
+    assert!(
+        matches!(
+            &error,
+            OpenAiSpecError::Validation { message }
+                if message.contains("requires at least one tool definition")
+        ),
+        "expected validation error for missing tool definitions, got: {error:?}"
+    );
 }
 
 #[test]
@@ -219,12 +221,14 @@ fn reject_tool_result_without_prior_tool_call() {
 
     let error = encode_openai_request(&request).expect_err("encoding should fail");
 
-    match error {
-        OpenAiSpecError::ProtocolViolation { message } => {
-            assert!(message.contains("tool_result_without_matching_tool_call"));
-        }
-        _ => panic!("unexpected error variant"),
-    }
+    assert!(
+        matches!(
+            &error,
+            OpenAiSpecError::ProtocolViolation { message }
+                if message.contains("tool_result_without_matching_tool_call")
+        ),
+        "expected protocol violation for unmatched tool result, got: {error:?}"
+    );
 }
 
 #[test]
