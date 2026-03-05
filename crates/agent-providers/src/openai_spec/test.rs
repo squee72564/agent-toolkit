@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::io;
 
 use serde_json::json;
 
@@ -758,4 +759,73 @@ fn decode_refusal_text_is_trimmed_and_emitted() {
         ContentPart::Text { text } => assert_eq!(text, "cannot comply"),
         _ => panic!("expected text content part"),
     }
+}
+
+#[test]
+fn error_kind_maps_for_all_variants() {
+    let validation = OpenAiSpecError::validation("invalid input");
+    assert_eq!(validation.kind(), OpenAiSpecErrorKind::Validation);
+
+    let encode = OpenAiSpecError::encode_with_source("encode failed", io::Error::other("boom"));
+    assert_eq!(encode.kind(), OpenAiSpecErrorKind::Encode);
+
+    let decode = OpenAiSpecError::decode("decode failed");
+    assert_eq!(decode.kind(), OpenAiSpecErrorKind::Decode);
+
+    let upstream = OpenAiSpecError::upstream("upstream failed");
+    assert_eq!(upstream.kind(), OpenAiSpecErrorKind::Upstream);
+
+    let protocol = OpenAiSpecError::protocol_violation("protocol failed");
+    assert_eq!(protocol.kind(), OpenAiSpecErrorKind::ProtocolViolation);
+
+    let unsupported = OpenAiSpecError::unsupported_feature("unsupported feature");
+    assert_eq!(unsupported.kind(), OpenAiSpecErrorKind::UnsupportedFeature);
+}
+
+#[test]
+fn error_message_returns_original_message_for_all_variants() {
+    assert_eq!(
+        OpenAiSpecError::validation("invalid input").message(),
+        "invalid input"
+    );
+    assert_eq!(
+        OpenAiSpecError::encode_with_source("encode failed", io::Error::other("boom")).message(),
+        "encode failed"
+    );
+    assert_eq!(
+        OpenAiSpecError::decode("decode failed").message(),
+        "decode failed"
+    );
+    assert_eq!(
+        OpenAiSpecError::upstream("upstream failed").message(),
+        "upstream failed"
+    );
+    assert_eq!(
+        OpenAiSpecError::protocol_violation("protocol failed").message(),
+        "protocol failed"
+    );
+    assert_eq!(
+        OpenAiSpecError::unsupported_feature("unsupported feature").message(),
+        "unsupported feature"
+    );
+}
+
+#[test]
+fn encode_with_source_preserves_error_chain() {
+    let error = OpenAiSpecError::encode_with_source("encode failed", io::Error::other("boom"));
+
+    let source = std::error::Error::source(&error).expect("source should be present");
+    assert!(
+        source.to_string().contains("boom"),
+        "source message should include original io error message"
+    );
+}
+
+#[test]
+fn decode_constructor_has_no_source() {
+    let error = OpenAiSpecError::decode("decode failed");
+    assert!(
+        std::error::Error::source(&error).is_none(),
+        "decode constructor should not attach a source"
+    );
 }
