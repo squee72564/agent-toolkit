@@ -668,7 +668,7 @@ fn decode_basic_text_usage_and_stop_reason() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_anthropic_response(payload.clone()).expect("decode should succeed");
+    let response = decode_anthropic_response(&payload).expect("decode should succeed");
     assert_eq!(response.model, "claude-sonnet-4.6");
     assert_eq!(response.finish_reason, FinishReason::Stop);
     assert_eq!(response.usage.input_tokens, Some(15));
@@ -698,7 +698,7 @@ fn decode_tool_use_mapping() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_anthropic_response(payload.clone()).expect("decode should succeed");
+    let response = decode_anthropic_response(&payload).expect("decode should succeed");
     assert_eq!(response.finish_reason, FinishReason::ToolCalls);
     assert_eq!(response.output.content.len(), 1);
     assert!(matches!(
@@ -729,7 +729,7 @@ fn decode_structured_output_for_json_object_and_json_schema() {
     };
 
     let json_object_response =
-        decode_anthropic_response(json_object_payload.clone()).expect("decode should succeed");
+        decode_anthropic_response(&json_object_payload).expect("decode should succeed");
     assert_eq!(
         json_object_response.output.structured_output,
         Some(json!({"ok":true}))
@@ -753,7 +753,7 @@ fn decode_structured_output_for_json_object_and_json_schema() {
     };
 
     let json_schema_response =
-        decode_anthropic_response(json_schema_payload.clone()).expect("decode should succeed");
+        decode_anthropic_response(&json_schema_payload).expect("decode should succeed");
     assert_eq!(
         json_schema_response.output.structured_output,
         Some(json!({"value":123}))
@@ -767,7 +767,7 @@ fn decode_rejects_malformed_payload() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_anthropic_response(payload.clone()).expect_err("decode should fail");
+    let error = decode_anthropic_response(&payload).expect_err("decode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Decode);
     assert!(error.message().contains("JSON object"));
 }
@@ -783,7 +783,7 @@ fn decode_rejects_missing_required_fields() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_anthropic_response(payload.clone()).expect_err("decode should fail");
+    let error = decode_anthropic_response(&payload).expect_err("decode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Decode);
     assert!(error.message().contains("missing stop_reason"));
 }
@@ -806,7 +806,7 @@ fn decode_rejects_non_object_tool_use_input() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_anthropic_response(payload.clone()).expect_err("decode should fail");
+    let error = decode_anthropic_response(&payload).expect_err("decode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Decode);
     assert!(error.message().contains("must be a JSON object"));
 }
@@ -828,7 +828,7 @@ fn decode_unknown_content_block_warns_and_maps_to_text() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_anthropic_response(payload.clone()).expect("decode should succeed");
+    let response = decode_anthropic_response(&payload).expect("decode should succeed");
     assert_eq!(response.output.content.len(), 1);
     assert!(matches!(
         &response.output.content[0],
@@ -858,7 +858,7 @@ fn decode_thinking_block_warns_and_skips_block() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_anthropic_response(payload.clone()).expect("decode should succeed");
+    let response = decode_anthropic_response(&payload).expect("decode should succeed");
     assert!(response.output.content.is_empty());
     assert!(
         response
@@ -884,7 +884,7 @@ fn decode_json_object_extracts_from_combined_text_fallback() {
         requested_response_format: ResponseFormat::JsonObject,
     };
 
-    let response = decode_anthropic_response(payload.clone()).expect("decode should succeed");
+    let response = decode_anthropic_response(&payload).expect("decode should succeed");
     assert_eq!(
         response.output.structured_output,
         Some(json!({"ok":true,"nested":{"value":1}}))
@@ -904,7 +904,7 @@ fn decode_rejects_non_object_usage() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_anthropic_response(payload.clone()).expect_err("decode should fail");
+    let error = decode_anthropic_response(&payload).expect_err("decode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Decode);
     assert!(error.message().contains("usage must be a JSON object"));
 }
@@ -925,7 +925,7 @@ fn decode_rejects_non_numeric_usage_field() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_anthropic_response(payload.clone()).expect_err("decode should fail");
+    let error = decode_anthropic_response(&payload).expect_err("decode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Decode);
     assert!(error.message().contains("must be numeric"));
 }
@@ -946,7 +946,7 @@ fn decode_rejects_signed_usage_field() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_anthropic_response(payload.clone()).expect_err("decode should fail");
+    let error = decode_anthropic_response(&payload).expect_err("decode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Decode);
     assert!(error.message().contains("must be an unsigned integer"));
 }
@@ -972,7 +972,7 @@ fn decode_maps_known_stop_reasons() {
             requested_response_format: ResponseFormat::Text,
         };
 
-        let response = decode_anthropic_response(payload.clone()).expect("decode should succeed");
+        let response = decode_anthropic_response(&payload).expect("decode should succeed");
         assert_eq!(response.finish_reason, expected);
         if stop_reason != "pause_turn" {
             assert!(
@@ -998,7 +998,7 @@ fn decode_unknown_stop_reason_warns_and_maps_to_other() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_anthropic_response(payload.clone()).expect("decode should succeed");
+    let response = decode_anthropic_response(&payload).expect("decode should succeed");
     assert_eq!(response.finish_reason, FinishReason::Other);
     assert!(
         response
@@ -1020,7 +1020,7 @@ fn decode_missing_and_partial_usage_warns() {
         requested_response_format: ResponseFormat::Text,
     };
     let missing_usage =
-        decode_anthropic_response(missing_usage_payload.clone()).expect("decode should succeed");
+        decode_anthropic_response(&missing_usage_payload).expect("decode should succeed");
     assert_eq!(missing_usage.usage, agent_core::types::Usage::default());
     assert!(
         missing_usage
@@ -1040,7 +1040,7 @@ fn decode_missing_and_partial_usage_warns() {
         requested_response_format: ResponseFormat::Text,
     };
     let partial_usage =
-        decode_anthropic_response(partial_usage_payload.clone()).expect("decode should succeed");
+        decode_anthropic_response(&partial_usage_payload).expect("decode should succeed");
     assert_eq!(partial_usage.usage.input_tokens, Some(4));
     assert_eq!(partial_usage.usage.output_tokens, None);
     assert!(
@@ -1068,7 +1068,7 @@ fn decode_usage_billed_input_overflow_warns_and_drops_aggregate() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_anthropic_response(payload.clone()).expect("decode should succeed");
+    let response = decode_anthropic_response(&payload).expect("decode should succeed");
     assert_eq!(response.usage.input_tokens, None);
     assert_eq!(response.usage.output_tokens, Some(1));
     assert_eq!(response.usage.total_tokens, None);
@@ -1096,7 +1096,7 @@ fn decode_usage_total_tokens_overflow_warns_and_drops_total() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_anthropic_response(payload.clone()).expect("decode should succeed");
+    let response = decode_anthropic_response(&payload).expect("decode should succeed");
     assert_eq!(response.usage.input_tokens, Some(5));
     assert_eq!(response.usage.output_tokens, Some(u64::MAX));
     assert_eq!(response.usage.total_tokens, None);
@@ -1122,7 +1122,7 @@ fn decode_top_level_upstream_error_parsing_and_formatting() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_anthropic_response(payload.clone()).expect_err("decode should fail");
+    let error = decode_anthropic_response(&payload).expect_err("decode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Upstream);
     assert!(error.message().contains("anthropic error:"));
     assert!(error.message().contains("type=invalid_request_error"));
@@ -1153,7 +1153,7 @@ fn decode_empty_output_warns() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_anthropic_response(payload.clone()).expect("decode should succeed");
+    let response = decode_anthropic_response(&payload).expect("decode should succeed");
     assert!(response.output.content.is_empty());
     assert!(
         response
@@ -1179,7 +1179,7 @@ fn decode_structured_output_parse_failure_warns() {
         },
     };
 
-    let response = decode_anthropic_response(payload.clone()).expect("decode should succeed");
+    let response = decode_anthropic_response(&payload).expect("decode should succeed");
     assert_eq!(response.output.structured_output, None);
     assert!(
         response
@@ -1206,7 +1206,7 @@ fn encode_and_decode_error_variant_smoke() {
         }),
         requested_response_format: ResponseFormat::Text,
     };
-    let decode_error = decode_anthropic_response(payload.clone()).expect_err("decode should fail");
+    let decode_error = decode_anthropic_response(&payload).expect_err("decode should fail");
     assert_eq!(decode_error.kind(), AnthropicSpecErrorKind::Decode);
 }
 

@@ -29,7 +29,7 @@ impl ProtocolTranslator for OpenAiTranslator {
     }
 
     fn decode_request(&self, payload: Self::ResponsePayload) -> Result<Response, Self::Error> {
-        decode_openai_response(payload).map_err(OpenAiTranslatorError::Decode)
+        decode_openai_response(&payload).map_err(OpenAiTranslatorError::Decode)
     }
 }
 

@@ -29,7 +29,7 @@ impl ProtocolTranslator for AnthropicTranslator {
     }
 
     fn decode_request(&self, payload: Self::ResponsePayload) -> Result<Response, Self::Error> {
-        decode_anthropic_response(payload).map_err(AnthropicTranslatorError::Decode)
+        decode_anthropic_response(&payload).map_err(AnthropicTranslatorError::Decode)
     }
 }
 

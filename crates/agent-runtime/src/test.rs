@@ -496,6 +496,30 @@ fn conversation_from_into_vec_roundtrip() {
 }
 
 #[test]
+fn conversation_into_vec_reuses_allocation_when_unique() {
+    let mut conversation = Conversation::with_user_text("u1");
+    conversation.push_assistant_text("a1");
+
+    let original_ptr = conversation.messages.as_ptr();
+    let messages: Vec<Message> = conversation.into();
+
+    assert_eq!(messages.as_ptr(), original_ptr);
+}
+
+#[test]
+fn conversation_into_vec_clones_when_messages_are_shared() {
+    let mut conversation = Conversation::with_user_text("u1");
+    conversation.push_assistant_text("a1");
+    let shared = conversation.clone();
+
+    let original_ptr = shared.messages.as_ptr();
+    let messages: Vec<Message> = conversation.into();
+
+    assert_ne!(messages.as_ptr(), original_ptr);
+    assert_eq!(messages.as_slice(), shared.messages());
+}
+
+#[test]
 fn message_create_input_from_conversation_ref_and_owned() {
     let mut conversation = Conversation::with_user_text("u1");
     conversation.push_assistant_text("a1");

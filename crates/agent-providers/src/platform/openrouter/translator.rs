@@ -95,7 +95,7 @@ impl ProtocolTranslator for OpenRouterTranslator {
     }
 
     fn decode_request(&self, payload: Self::ResponsePayload) -> Result<Response, Self::Error> {
-        match decode_openai_response(payload.clone()) {
+        match decode_openai_response(&payload) {
             Ok(response) => Ok(response),
             Err(openai_decode_error) => {
                 if !should_attempt_openrouter_fallback(&openai_decode_error) {

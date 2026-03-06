@@ -14,7 +14,7 @@ const WARN_STRUCTURED_OUTPUT_NOT_OBJECT: &str = "openai.decode.structured_output
 const WARN_STRUCTURED_OUTPUT_PARSE_FAILED: &str = "openai.decode.structured_output_parse_failed";
 
 pub(crate) fn decode_openai_response(
-    payload: OpenAiDecodeEnvelope,
+    payload: &OpenAiDecodeEnvelope,
 ) -> Result<Response, OpenAiSpecError> {
     let root = payload
         .body

@@ -616,7 +616,7 @@ fn decode_top_level_error_maps_to_upstream() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_openai_response(envelope.clone()).expect_err("decode should fail");
+    let error = decode_openai_response(&envelope).expect_err("decode should fail");
     assert_eq!(error.kind(), OpenAiSpecErrorKind::Upstream);
     assert!(error.message().contains("openai error:"));
     assert!(error.message().contains("invalid_api_key"));
@@ -633,7 +633,7 @@ fn decode_in_progress_status_uses_interpolated_message() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_openai_response(envelope.clone()).expect_err("decode should fail");
+    let error = decode_openai_response(&envelope).expect_err("decode should fail");
 
     match error {
         OpenAiSpecError::Decode { message, .. } => {
@@ -666,7 +666,7 @@ fn decode_unknown_output_item_is_ignored_with_warning() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_openai_response(envelope.clone()).expect("decode should succeed");
+    let response = decode_openai_response(&envelope).expect("decode should succeed");
     assert_eq!(response.output.content.len(), 1);
     assert!(
         response
@@ -695,7 +695,7 @@ fn decode_unknown_message_part_is_ignored_with_warning() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_openai_response(envelope.clone()).expect("decode should succeed");
+    let response = decode_openai_response(&envelope).expect("decode should succeed");
     assert_eq!(response.output.content.len(), 1);
     assert!(
         response
@@ -723,7 +723,7 @@ fn decode_invalid_tool_call_arguments_falls_back_to_string_with_warning() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_openai_response(envelope.clone()).expect("decode should succeed");
+    let response = decode_openai_response(&envelope).expect("decode should succeed");
     assert_eq!(
         response.finish_reason,
         agent_core::types::FinishReason::ToolCalls
@@ -767,7 +767,7 @@ fn decode_function_call_rejects_blank_call_id() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_openai_response(envelope.clone()).expect_err("decode should fail");
+    let error = decode_openai_response(&envelope).expect_err("decode should fail");
     match error {
         OpenAiSpecError::Decode { message, .. } => {
             assert!(message.contains("call_id must not be empty"));
@@ -794,7 +794,7 @@ fn decode_function_call_rejects_blank_name() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_openai_response(envelope.clone()).expect_err("decode should fail");
+    let error = decode_openai_response(&envelope).expect_err("decode should fail");
     match error {
         OpenAiSpecError::Decode { message, .. } => {
             assert!(message.contains("name must not be empty"));
@@ -821,7 +821,7 @@ fn decode_function_call_rejects_blank_arguments() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_openai_response(envelope.clone()).expect_err("decode should fail");
+    let error = decode_openai_response(&envelope).expect_err("decode should fail");
     match error {
         OpenAiSpecError::Decode { message, .. } => {
             assert!(message.contains("arguments must not be empty"));
@@ -846,7 +846,7 @@ fn decode_refusal_whitespace_only_is_ignored() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_openai_response(envelope.clone()).expect("decode should succeed");
+    let response = decode_openai_response(&envelope).expect("decode should succeed");
     assert!(response.output.content.is_empty());
     assert!(
         response
@@ -872,7 +872,7 @@ fn decode_refusal_text_is_trimmed_and_emitted() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_openai_response(envelope.clone()).expect("decode should succeed");
+    let response = decode_openai_response(&envelope).expect("decode should succeed");
     assert_eq!(response.output.content.len(), 1);
     match &response.output.content[0] {
         ContentPart::Text { text } => assert_eq!(text, "cannot comply"),

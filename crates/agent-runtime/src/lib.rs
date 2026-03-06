@@ -885,7 +885,10 @@ impl From<Vec<Message>> for Conversation {
 
 impl From<Conversation> for Vec<Message> {
     fn from(conversation: Conversation) -> Self {
-        conversation.clone_messages()
+        match Arc::try_unwrap(conversation.messages) {
+            Ok(messages) => messages,
+            Err(messages) => messages.as_ref().clone(),
+        }
     }
 }
 
