@@ -123,6 +123,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+Typed tool authoring (auto-schema from Rust types) is also supported:
+
+```rust
+use agent_toolkit::tools::{ToolBuilder, ToolError};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct WeatherArgs {
+    city: String,
+}
+
+#[derive(Debug, Serialize)]
+struct WeatherOut {
+    city: String,
+    temp_f: i32,
+    conditions: String,
+}
+
+let tool = ToolBuilder::new()
+    .name("get_weather_typed")
+    .description("Get current weather by city")
+    .typed_handler(|args: WeatherArgs| async move {
+        Ok::<WeatherOut, ToolError>(WeatherOut {
+            city: args.city,
+            temp_f: 67,
+            conditions: "sunny".to_string(),
+        })
+    })
+    .build()?;
+```
+
+Schema precedence for `ToolBuilder`:
+- Default for `.typed_handler(...)`: input schema is derived from the `TArgs` type.
+- Override: if `.schema(...)` is called after `.typed_handler(...)`, the manual schema is used.
+
+Use raw `.handler(|serde_json::Value| ...)` when you need dynamic payload handling or the lowest-overhead local hot path.
+
 ### Rule-based routing fallback
 
 ```rust
