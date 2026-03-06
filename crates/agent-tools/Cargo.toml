@@ -16,6 +16,8 @@ description = "Tool registration, schema validation, and execution utilities."
 agent-core = { path = "../agent-core" }
 async-trait.workspace = true
 jsonschema = "0.18"
+schemars.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 
