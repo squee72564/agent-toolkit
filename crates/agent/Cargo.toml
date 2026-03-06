@@ -23,5 +23,11 @@ agent-runtime = { path = "../agent-runtime" }
 agent-tools = { path = "../agent-tools" }
 agent-transport = { path = "../agent-transport" }
 
+[dev-dependencies]
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
 [lints]
 workspace = true

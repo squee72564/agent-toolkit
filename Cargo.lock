@@ -74,6 +74,10 @@ dependencies = [
  "agent-runtime",
  "agent-tools",
  "agent-transport",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
