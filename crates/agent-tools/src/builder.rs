@@ -4,7 +4,10 @@ use std::sync::Arc;
 
 use agent_core::types::ToolDefinition;
 use async_trait::async_trait;
-use serde_json::Value;
+use schemars::JsonSchema;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+use serde_json::{Value, json};
 use thiserror::Error;
 
 use crate::{CompiledToolSchema, Tool, ToolError, ToolOutput, ToolSchemaError};
@@ -100,6 +103,53 @@ impl ToolBuilder {
         self
     }
 
+    /// Registers a strongly typed handler and derives an input JSON schema from `TArgs`.
+    ///
+    /// Behavior:
+    /// - Decodes runtime JSON arguments into `TArgs`.
+    /// - Executes `handler(TArgs)`.
+    /// - Encodes `TOut` into `ToolOutput.content`.
+    ///
+    /// Conversion failures are mapped to:
+    /// - `ToolError::InvalidInputDecode` when decoding `TArgs` fails.
+    /// - `ToolError::InvalidOutputEncode` when encoding `TOut` fails.
+    ///
+    /// Schema precedence:
+    /// - Calling `typed_handler` sets the schema from `TArgs` by default.
+    /// - Calling `.schema(...)` after `typed_handler` overrides the derived schema.
+    pub fn typed_handler<TArgs, TOut, F, Fut>(mut self, handler: F) -> Self
+    where
+        TArgs: DeserializeOwned + JsonSchema + Send + 'static,
+        TOut: Serialize + Send + 'static,
+        F: Fn(TArgs) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<TOut, ToolError>> + Send + 'static,
+    {
+        self.schema = Some(derived_schema::<TArgs>());
+        let handler = Arc::new(handler);
+
+        let wrapped = move |args: Value| -> BoxToolFuture {
+            let handler = Arc::clone(&handler);
+            let typed_args = match serde_json::from_value::<TArgs>(args) {
+                Ok(typed_args) => typed_args,
+                Err(error) => {
+                    return Box::pin(async move {
+                        Err(ToolError::InvalidInputDecode(error.to_string()))
+                    });
+                }
+            };
+
+            Box::pin(async move {
+                let output = handler(typed_args).await?;
+                let content = serde_json::to_value(output)
+                    .map_err(|error| ToolError::InvalidOutputEncode(error.to_string()))?;
+                Ok(ToolOutput { content })
+            })
+        };
+
+        self.handler = Some(Arc::new(wrapped));
+        self
+    }
+
     pub fn build(self) -> Result<BuiltTool, ToolBuilderError> {
         let name = self.name.ok_or(ToolBuilderError::MissingName)?;
         if name.trim().is_empty() {
@@ -122,5 +172,18 @@ impl ToolBuilder {
             schema,
             handler,
         })
+    }
+}
+
+fn derived_schema<TArgs>() -> Value
+where
+    TArgs: JsonSchema,
+{
+    match serde_json::to_value(schemars::schema_for!(TArgs)) {
+        Ok(schema) => schema,
+        Err(error) => json!({
+            "type": "object",
+            "x-schema-encode-error": error.to_string()
+        }),
     }
 }

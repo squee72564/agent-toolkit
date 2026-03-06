@@ -20,6 +20,10 @@ pub struct ToolOutput {
 pub enum ToolError {
     #[error("tool execution failed: {0}")]
     Execution(String),
+    #[error("tool input decode failed: {0}")]
+    InvalidInputDecode(String),
+    #[error("tool output encode failed: {0}")]
+    InvalidOutputEncode(String),
 }
 
 #[derive(Debug, Error)]
@@ -142,9 +146,13 @@ impl ToolRegistry {
 
         let tool = self.lookup_tool(name)?;
 
-        tool.execute(args)
-            .await
-            .map_err(|source| Self::execution(name, source))
+        match tool.execute(args).await {
+            Ok(output) => Ok(output),
+            Err(ToolError::InvalidInputDecode(message)) => {
+                Err(Self::invalid_input_decode(name, message))
+            }
+            Err(source) => Err(Self::execution(name, source)),
+        }
     }
 
     fn lookup_tool(&self, name: &str) -> Result<&dyn Tool, ToolRegistryError> {
@@ -178,6 +186,16 @@ impl ToolRegistry {
         ToolRegistryError::Execution {
             name: name.to_string(),
             source,
+        }
+    }
+
+    fn invalid_input_decode(name: &str, source: String) -> ToolRegistryError {
+        ToolRegistryError::InvalidArgs {
+            name: name.to_string(),
+            source: ToolArgsValidationError::ValidationFailed {
+                message: format!("tool '{name}' input decode failed: {source}"),
+                issues: Vec::new(),
+            },
         }
     }
 }

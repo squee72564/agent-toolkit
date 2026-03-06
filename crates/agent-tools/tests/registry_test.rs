@@ -5,6 +5,8 @@ use std::sync::{
 
 use agent_tools::{Tool, ToolError, ToolOutput, ToolRegistry, ToolRegistryError};
 use async_trait::async_trait;
+use schemars::JsonSchema;
+use serde::{Deserialize, Deserializer};
 use serde_json::{Value, json};
 
 struct TestTool {
@@ -426,4 +428,115 @@ fn tool_definitions_returns_sorted_provider_ready_definitions() {
     assert_eq!(definitions[1].parameters_schema, json!({"type": "object"}));
     assert_eq!(first_input_calls.load(Ordering::SeqCst), 1);
     assert_eq!(second_input_calls.load(Ordering::SeqCst), 1);
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct DecodeStrictArgs {
+    #[serde(deserialize_with = "deserialize_non_empty")]
+    query: String,
+}
+
+#[derive(serde::Serialize)]
+struct DecodeStrictOut {
+    query: String,
+}
+
+#[tokio::test]
+async fn execute_validated_maps_typed_input_decode_failures_to_invalid_args() {
+    let tool = agent_tools::ToolBuilder::new()
+        .name("search")
+        .typed_handler(
+            |args: DecodeStrictArgs| async move { Ok(DecodeStrictOut { query: args.query }) },
+        )
+        .build()
+        .expect("typed tool should build");
+
+    let mut registry = ToolRegistry::new();
+    registry
+        .register_validated(tool)
+        .expect("typed schema should compile");
+
+    let error = registry
+        .execute_validated("search", json!({"query": ""}))
+        .await
+        .expect_err("decode should fail for empty query");
+
+    match error {
+        ToolRegistryError::InvalidArgs { name, source } => {
+            assert_eq!(name, "search");
+            assert!(
+                source
+                    .to_string()
+                    .starts_with("tool 'search' input decode failed:")
+            );
+        }
+        other => panic!("expected invalid args error, got {other}"),
+    }
+}
+
+fn deserialize_non_empty<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    if value.is_empty() {
+        return Err(serde::de::Error::custom("query must not be empty"));
+    }
+    Ok(value)
+}
+
+#[tokio::test]
+async fn typed_and_raw_tools_can_mix_in_one_registry() {
+    let raw_tool = agent_tools::ToolBuilder::new()
+        .name("raw_echo")
+        .schema(json!({
+            "type": "object",
+            "properties": { "value": { "type": "string" } },
+            "required": ["value"],
+            "additionalProperties": false
+        }))
+        .handler(|args| async move { Ok(agent_tools::ToolOutput { content: args }) })
+        .build()
+        .expect("raw tool should build");
+
+    #[derive(Deserialize, JsonSchema)]
+    struct TypedArgs {
+        value: String,
+    }
+
+    #[derive(serde::Serialize)]
+    struct TypedOut {
+        wrapped: String,
+    }
+
+    let typed_tool = agent_tools::ToolBuilder::new()
+        .name("typed_echo")
+        .typed_handler(|args: TypedArgs| async move {
+            Ok(TypedOut {
+                wrapped: format!("typed:{}", args.value),
+            })
+        })
+        .build()
+        .expect("typed tool should build");
+
+    let mut registry = ToolRegistry::new();
+    registry
+        .register_validated(raw_tool)
+        .expect("raw schema should compile");
+    registry
+        .register_validated(typed_tool)
+        .expect("typed schema should compile");
+
+    let raw_output = registry
+        .execute_validated("raw_echo", json!({"value":"hi"}))
+        .await
+        .expect("raw tool should execute");
+    assert_eq!(raw_output.content, json!({"value":"hi"}));
+
+    let typed_output = registry
+        .execute_validated("typed_echo", json!({"value":"hi"}))
+        .await
+        .expect("typed tool should execute");
+    assert_eq!(typed_output.content, json!({"wrapped":"typed:hi"}));
 }
