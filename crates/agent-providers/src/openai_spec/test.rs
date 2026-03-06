@@ -38,7 +38,7 @@ fn encode_simple_user_text_message() {
         }],
     }]);
 
-    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+    let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
 
     assert_eq!(encoded.body["model"], json!("gpt-4.1-mini"));
     assert_eq!(encoded.body["text"]["format"]["type"], json!("text"));
@@ -54,7 +54,7 @@ fn encode_warnings_empty_for_basic_request() {
         }],
     }]);
 
-    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+    let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
 
     assert!(encoded.warnings.is_empty());
 }
@@ -69,7 +69,7 @@ fn encode_warns_when_top_p_ignored() {
     }]);
     request.top_p = Some(0.8);
 
-    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+    let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
 
     assert!(
         encoded
@@ -89,7 +89,7 @@ fn encode_warns_when_stop_ignored() {
     }]);
     request.stop = vec!["END".to_string()];
 
-    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+    let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
 
     assert!(
         encoded
@@ -122,7 +122,7 @@ fn encode_warns_when_tool_schema_not_strict_compatible() {
         }),
     }];
 
-    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+    let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
 
     assert_eq!(encoded.body["tools"][0]["strict"], json!(false));
     assert!(
@@ -130,6 +130,85 @@ fn encode_warns_when_tool_schema_not_strict_compatible() {
             .warnings
             .iter()
             .any(|w| w.code == "openai.encode.non_strict_tool_schema")
+    );
+}
+
+#[test]
+fn encode_maps_tool_definition_with_description_and_object_schema() {
+    let mut request = base_request(vec![Message::user_text("hello")]);
+    request.tools = vec![ToolDefinition {
+        name: "lookup_weather".to_string(),
+        description: Some("Look up forecast details".to_string()),
+        parameters_schema: json!({
+            "type": "object",
+            "properties": {
+                "city": { "type": "string" }
+            },
+            "required": ["city"],
+            "additionalProperties": false
+        }),
+    }];
+
+    let encoded = encode_openai_request(request).expect("encoding should succeed");
+
+    assert_eq!(
+        encoded.body.pointer("/tools/0/type"),
+        Some(&json!("function"))
+    );
+    assert_eq!(
+        encoded.body.pointer("/tools/0/name"),
+        Some(&json!("lookup_weather"))
+    );
+    assert_eq!(
+        encoded.body.pointer("/tools/0/description"),
+        Some(&json!("Look up forecast details"))
+    );
+    assert_eq!(
+        encoded.body.pointer("/tools/0/parameters/type"),
+        Some(&json!("object"))
+    );
+    assert_eq!(encoded.body.pointer("/tools/0/strict"), Some(&json!(true)));
+}
+
+#[test]
+fn encode_maps_json_schema_response_format() {
+    let mut request = base_request(vec![Message::user_text("return json")]);
+    request.response_format = ResponseFormat::JsonSchema {
+        name: "result".to_string(),
+        schema: json!({
+            "type": "object",
+            "properties": {
+                "ok": { "type": "boolean" }
+            },
+            "required": ["ok"],
+            "additionalProperties": false
+        }),
+    };
+
+    let encoded = encode_openai_request(request).expect("encoding should succeed");
+
+    assert_eq!(
+        encoded.body.pointer("/text/format/type"),
+        Some(&json!("json_schema"))
+    );
+    assert_eq!(
+        encoded.body.pointer("/text/format/name"),
+        Some(&json!("result"))
+    );
+    assert_eq!(
+        encoded.body.pointer("/text/format/schema"),
+        Some(&json!({
+            "type": "object",
+            "properties": {
+                "ok": { "type": "boolean" }
+            },
+            "required": ["ok"],
+            "additionalProperties": false
+        }))
+    );
+    assert_eq!(
+        encoded.body.pointer("/text/format/strict"),
+        Some(&json!(true))
     );
 }
 
@@ -158,7 +237,7 @@ fn encode_emits_multiple_warnings_together() {
         }),
     }];
 
-    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+    let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
 
     assert!(
         encoded
@@ -192,7 +271,7 @@ fn reject_specific_tool_choice_when_tool_missing() {
         name: "lookup_weather".to_string(),
     };
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     assert!(
         matches!(
@@ -219,7 +298,7 @@ fn reject_tool_result_without_prior_tool_call() {
         }],
     }]);
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     assert!(
         matches!(
@@ -399,7 +478,7 @@ fn serializes_assistant_tool_call_and_tool_result() {
         },
     ]);
 
-    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+    let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
     let input = encoded.body["input"]
         .as_array()
         .expect("input must be array");
@@ -413,7 +492,7 @@ fn reject_empty_model_id() {
     let mut request = base_request(vec![Message::user_text("hello")]);
     request.model_id = "   ".to_string();
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
         OpenAiSpecError::Validation { message } => {
@@ -436,7 +515,7 @@ fn reject_json_schema_response_format_with_blank_name() {
         }),
     };
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
         OpenAiSpecError::Validation { message } => {
@@ -454,7 +533,7 @@ fn reject_json_schema_response_format_with_non_object_schema() {
         schema: json!("not-an-object"),
     };
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
         OpenAiSpecError::Validation { message } => {
@@ -490,7 +569,7 @@ fn reject_duplicate_tool_names() {
         },
     ];
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
         OpenAiSpecError::Validation { message } => {
@@ -513,7 +592,7 @@ fn reject_assistant_tool_call_with_blank_id() {
         }],
     }]);
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
         OpenAiSpecError::Validation { message } => {
@@ -536,7 +615,7 @@ fn reject_assistant_tool_call_with_blank_name() {
         }],
     }]);
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
         OpenAiSpecError::Validation { message } => {
@@ -568,7 +647,7 @@ fn reject_duplicate_assistant_tool_call_ids() {
         ],
     }]);
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
         OpenAiSpecError::ProtocolViolation { message } => {
@@ -593,7 +672,7 @@ fn reject_tool_result_with_blank_tool_call_id() {
         }],
     }]);
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
         OpenAiSpecError::Validation { message } => {

@@ -153,7 +153,7 @@ fn openai_translator_is_constructible() {
 fn openai_translator_encode_passes_through_openai_encoder() {
     let translator = OpenAiTranslator;
     let encoded = translator
-        .encode_request(&base_request())
+        .encode_request(base_request())
         .expect("encoding should succeed");
 
     assert_eq!(encoded.body["model"], "gpt-4.1-mini");
@@ -184,7 +184,7 @@ fn openai_translator_decode_passes_through_openai_decoder() {
     };
 
     let response = translator
-        .decode_request(&payload)
+        .decode_request(payload.clone())
         .expect("decode should succeed");
 
     assert_eq!(response.model, "gpt-4.1-mini");

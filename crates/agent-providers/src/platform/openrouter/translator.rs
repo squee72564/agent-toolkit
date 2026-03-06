@@ -2,7 +2,7 @@ use serde_json::{Map, Value};
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
 use crate::openai_spec::decode::decode_openai_response;
-use crate::openai_spec::encode::encode_openai_request;
+use crate::openai_spec::encode::{OpenAiEncodeInput, encode_openai_request_parts};
 use crate::openai_spec::{
     OpenAiDecodeEnvelope, OpenAiEncodedRequest, OpenAiSpecError, OpenAiSpecErrorKind,
 };
@@ -77,10 +77,37 @@ impl ProtocolTranslator for OpenRouterTranslator {
     type ResponsePayload = OpenAiDecodeEnvelope;
     type Error = OpenRouterTranslatorError;
 
-    fn encode_request(&self, req: &Request) -> Result<Self::RequestPayload, Self::Error> {
-        let mut encoded = encode_openai_request(req).map_err(OpenRouterTranslatorError::Encode)?;
+    fn encode_request(&self, req: Request) -> Result<Self::RequestPayload, Self::Error> {
+        let Request {
+            model_id,
+            messages,
+            tools,
+            tool_choice,
+            response_format,
+            temperature,
+            top_p,
+            max_output_tokens,
+            stop,
+            metadata,
+        } = req;
+
+        let mut encoded = encode_openai_request_parts(OpenAiEncodeInput {
+            model_id: &model_id,
+            messages,
+            tools,
+            tool_choice,
+            response_format,
+            temperature,
+            top_p,
+            max_output_tokens,
+            stop: &stop,
+            metadata,
+        })
+        .map_err(OpenRouterTranslatorError::Encode)?;
         apply_openrouter_overrides(
-            req,
+            &model_id,
+            top_p,
+            &stop,
             &self.overrides,
             &mut encoded.body,
             &mut encoded.warnings,
@@ -89,15 +116,15 @@ impl ProtocolTranslator for OpenRouterTranslator {
         Ok(encoded)
     }
 
-    fn decode_request(&self, payload: &Self::ResponsePayload) -> Result<Response, Self::Error> {
-        match decode_openai_response(payload) {
+    fn decode_request(&self, payload: Self::ResponsePayload) -> Result<Response, Self::Error> {
+        match decode_openai_response(&payload) {
             Ok(response) => Ok(response),
             Err(openai_decode_error) => {
                 if !should_attempt_openrouter_fallback(&openai_decode_error) {
                     return Err(OpenRouterTranslatorError::Decode(openai_decode_error));
                 }
 
-                match decode_openrouter_chat_completions_response(payload) {
+                match decode_openrouter_chat_completions_response(&payload) {
                     Ok(response) => Ok(response),
                     Err(fallback_error) => Err(OpenRouterTranslatorError::Decode(
                         OpenAiSpecError::decode(format!(
@@ -145,7 +172,9 @@ fn map_spec_error_kind(kind: OpenAiSpecErrorKind) -> AdapterErrorKind {
 }
 
 fn apply_openrouter_overrides(
-    req: &Request,
+    model_id: &str,
+    top_p: Option<f32>,
+    stop: &[String],
     overrides: &OpenRouterOverrides,
     request_body: &mut Value,
     warnings: &mut Vec<RuntimeWarning>,
@@ -155,16 +184,16 @@ fn apply_openrouter_overrides(
     })?;
 
     let mut mapped_top_p = false;
-    if let Some(top_p) = req.top_p {
+    if let Some(top_p) = top_p {
         body.insert("top_p".to_string(), Value::from(top_p));
         mapped_top_p = true;
     }
 
     let mut mapped_stop = false;
-    if !req.stop.is_empty() {
+    if !stop.is_empty() {
         body.insert(
             "stop".to_string(),
-            Value::Array(req.stop.iter().cloned().map(Value::String).collect()),
+            Value::Array(stop.iter().cloned().map(Value::String).collect()),
         );
         mapped_stop = true;
     }
@@ -182,7 +211,7 @@ fn apply_openrouter_overrides(
     }
 
     if !overrides.fallback_models.is_empty() {
-        let mut models = vec![Value::String(req.model_id.clone())];
+        let mut models = vec![Value::String(model_id.to_string())];
         for fallback in &overrides.fallback_models {
             if fallback.trim().is_empty() {
                 continue;

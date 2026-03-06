@@ -1,10 +1,10 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Map, Value, json};
 
 use agent_core::types::{
     ContentPart, Message, MessageRole, Request, ResponseFormat, RuntimeWarning, ToolChoice,
-    ToolDefinition, ToolResult, ToolResultContent,
+    ToolDefinition, ToolResultContent,
 };
 
 use super::schema_rules::{canonicalize_json, permissive_json_object_schema, stable_json_string};
@@ -33,9 +33,9 @@ impl WireMessage {
 }
 
 pub(crate) fn encode_anthropic_request(
-    req: &Request,
+    req: Request,
 ) -> Result<AnthropicEncodedRequest, AnthropicSpecError> {
-    validate_request(req)?;
+    validate_request(&req)?;
 
     let mut warnings = Vec::new();
     if req.temperature.is_some() && req.top_p.is_some() {
@@ -46,8 +46,21 @@ pub(crate) fn encode_anthropic_request(
         );
     }
 
-    let (system, non_system_messages) = map_system_prefix(req)?;
-    let mapped_messages = map_non_system_messages(&non_system_messages)?;
+    let Request {
+        model_id,
+        messages,
+        tools,
+        tool_choice,
+        response_format,
+        metadata,
+        temperature,
+        top_p,
+        max_output_tokens,
+        stop,
+    } = req;
+
+    let (system, non_system_messages) = map_system_prefix(messages)?;
+    let mapped_messages = map_non_system_messages(non_system_messages)?;
     let merged_messages = merge_consecutive_messages(mapped_messages);
     validate_tool_ordering(&merged_messages)?;
 
@@ -55,16 +68,17 @@ pub(crate) fn encode_anthropic_request(
         return Err(AnthropicSpecError::validation("empty messages"));
     }
 
-    let tools = map_tools(req)?;
-    let tool_choice = map_tool_choice(req)?;
-    let output_config = map_response_format(req, &merged_messages)?;
-    let metadata = map_metadata(req, &mut warnings);
+    // Validate tool_choice against the original tool definitions before consuming them.
+    let tool_choice = map_tool_choice(&tools, &tool_choice)?;
+    let tools = map_tools(tools)?;
+    let output_config = map_response_format(response_format, &merged_messages)?;
+    let metadata = map_metadata(metadata, &mut warnings);
 
     let mut body = Map::new();
-    body.insert("model".to_string(), Value::String(req.model_id.clone()));
+    body.insert("model".to_string(), Value::String(model_id));
     body.insert(
         "max_tokens".to_string(),
-        Value::from(req.max_output_tokens.unwrap_or_else(|| {
+        Value::from(max_output_tokens.unwrap_or_else(|| {
             push_warning(
                 &mut warnings,
                 WARN_DEFAULT_MAX_TOKENS_APPLIED,
@@ -96,13 +110,13 @@ pub(crate) fn encode_anthropic_request(
     if let Some(output_config) = output_config {
         body.insert("output_config".to_string(), output_config);
     }
-    if !req.stop.is_empty() {
-        body.insert("stop_sequences".to_string(), json!(req.stop));
+    if !stop.is_empty() {
+        body.insert("stop_sequences".to_string(), json!(stop));
     }
-    if let Some(temperature) = req.temperature {
+    if let Some(temperature) = temperature {
         body.insert("temperature".to_string(), json!(temperature));
     }
-    if let Some(top_p) = req.top_p {
+    if let Some(top_p) = top_p {
         body.insert("top_p".to_string(), json!(top_p));
     }
     if let Some(metadata) = metadata {
@@ -187,37 +201,39 @@ fn validate_tool_choice(req: &Request) -> Result<(), AnthropicSpecError> {
 }
 
 fn map_system_prefix(
-    req: &Request,
-) -> Result<(Option<Vec<Value>>, Vec<&Message>), AnthropicSpecError> {
-    let mut index = 0;
-    while index < req.messages.len() && req.messages[index].role == MessageRole::System {
-        index += 1;
-    }
-
-    if req.messages[index..]
-        .iter()
-        .any(|message| message.role == MessageRole::System)
-    {
-        return Err(AnthropicSpecError::validation(
-            "system messages must form a contiguous prefix for Anthropic",
-        ));
-    }
-
+    messages: Vec<Message>,
+) -> Result<(Option<Vec<Value>>, Vec<Message>), AnthropicSpecError> {
     let mut system_blocks = Vec::new();
-    for message in &req.messages[..index] {
-        for part in &message.content {
-            match part {
-                ContentPart::Text { text } => system_blocks.push(json!({
-                    "type": "text",
-                    "text": text,
-                })),
-                _ => {
-                    return Err(AnthropicSpecError::validation(
-                        "system messages only support text content",
-                    ));
+    let mut remaining_messages = Vec::new();
+    let mut non_system_started = false;
+
+    for message in messages {
+        let Message { role, content } = message;
+        if role == MessageRole::System && non_system_started {
+            return Err(AnthropicSpecError::validation(
+                "system messages must form a contiguous prefix for Anthropic",
+            ));
+        }
+
+        if role == MessageRole::System {
+            for part in content {
+                match part {
+                    ContentPart::Text { text } => system_blocks.push(json!({
+                        "type": "text",
+                        "text": text,
+                    })),
+                    _ => {
+                        return Err(AnthropicSpecError::validation(
+                            "system messages only support text content",
+                        ));
+                    }
                 }
             }
+            continue;
         }
+
+        non_system_started = true;
+        remaining_messages.push(Message { role, content });
     }
 
     let system = if system_blocks.is_empty() {
@@ -226,15 +242,16 @@ fn map_system_prefix(
         Some(system_blocks)
     };
 
-    Ok((system, req.messages[index..].iter().collect()))
+    Ok((system, remaining_messages))
 }
 
-fn map_non_system_messages(messages: &[&Message]) -> Result<Vec<WireMessage>, AnthropicSpecError> {
+fn map_non_system_messages(messages: Vec<Message>) -> Result<Vec<WireMessage>, AnthropicSpecError> {
     let mut mapped = Vec::new();
     let mut seen_tool_call_ids = BTreeSet::new();
 
     for message in messages {
-        let role = match message.role {
+        let Message { role, content } = message;
+        let wire_role = match role {
             MessageRole::User => "user",
             MessageRole::Assistant => "assistant",
             MessageRole::Tool => "user",
@@ -242,10 +259,10 @@ fn map_non_system_messages(messages: &[&Message]) -> Result<Vec<WireMessage>, An
         };
 
         let mut blocks = Vec::new();
-        for part in &message.content {
+        for part in content {
             match part {
                 ContentPart::Text { text } => {
-                    if message.role == MessageRole::Tool {
+                    if role == MessageRole::Tool {
                         return Err(AnthropicSpecError::validation(
                             "tool messages must contain tool_result content only",
                         ));
@@ -257,17 +274,19 @@ fn map_non_system_messages(messages: &[&Message]) -> Result<Vec<WireMessage>, An
                     }));
                 }
                 ContentPart::ToolCall { tool_call } => {
-                    if message.role != MessageRole::Assistant {
+                    if role != MessageRole::Assistant {
                         return Err(AnthropicSpecError::validation(
                             "tool_call content is only valid in assistant messages",
                         ));
                     }
-                    if tool_call.id.trim().is_empty() {
+                    let tool_call_id = tool_call.id;
+                    if tool_call_id.trim().is_empty() {
                         return Err(AnthropicSpecError::validation(
                             "tool_call content requires a non-empty tool_call id",
                         ));
                     }
-                    if tool_call.name.trim().is_empty() {
+                    let tool_call_name = tool_call.name;
+                    if tool_call_name.trim().is_empty() {
                         return Err(AnthropicSpecError::validation(
                             "tool_call content requires a non-empty tool_call name",
                         ));
@@ -275,45 +294,46 @@ fn map_non_system_messages(messages: &[&Message]) -> Result<Vec<WireMessage>, An
                     if !tool_call.arguments_json.is_object() {
                         return Err(AnthropicSpecError::validation(format!(
                             "tool_call '{}' arguments_json must be a JSON object",
-                            tool_call.name
+                            tool_call_name
                         )));
                     }
 
-                    if !seen_tool_call_ids.insert(tool_call.id.clone()) {
+                    if !seen_tool_call_ids.insert(tool_call_id.clone()) {
                         return Err(AnthropicSpecError::protocol_violation(format!(
                             "duplicate assistant tool_call id '{}'",
-                            tool_call.id
+                            tool_call_id
                         )));
                     }
                     blocks.push(json!({
                         "type": "tool_use",
-                        "id": tool_call.id,
-                        "name": tool_call.name,
+                        "id": tool_call_id,
+                        "name": tool_call_name,
                         "input": tool_call.arguments_json,
                     }));
                 }
                 ContentPart::ToolResult { tool_result } => {
-                    if message.role != MessageRole::Tool {
+                    if role != MessageRole::Tool {
                         return Err(AnthropicSpecError::validation(
                             "tool_result content is only valid in tool messages",
                         ));
                     }
-                    if tool_result.tool_call_id.trim().is_empty() {
+                    let tool_call_id = tool_result.tool_call_id;
+                    if tool_call_id.trim().is_empty() {
                         return Err(AnthropicSpecError::validation(
                             "tool_result content requires a non-empty tool_call_id",
                         ));
                     }
-                    if !seen_tool_call_ids.contains(&tool_result.tool_call_id) {
+                    if !seen_tool_call_ids.contains(&tool_call_id) {
                         return Err(AnthropicSpecError::protocol_violation(format!(
                             "tool_result references unknown tool_call_id: {}",
-                            tool_result.tool_call_id
+                            tool_call_id
                         )));
                     }
 
-                    let content = tool_result_content_as_text_blocks(tool_result)?;
+                    let content = tool_result_content_as_text_blocks(tool_result.content)?;
                     blocks.push(json!({
                         "type": "tool_result",
-                        "tool_use_id": tool_result.tool_call_id,
+                        "tool_use_id": tool_call_id,
                         "content": content,
                     }));
                 }
@@ -327,7 +347,7 @@ fn map_non_system_messages(messages: &[&Message]) -> Result<Vec<WireMessage>, An
         }
 
         mapped.push(WireMessage {
-            role,
+            role: wire_role,
             content: blocks,
         });
     }
@@ -336,16 +356,16 @@ fn map_non_system_messages(messages: &[&Message]) -> Result<Vec<WireMessage>, An
 }
 
 fn tool_result_content_as_text_blocks(
-    tool_result: &ToolResult,
+    content: ToolResultContent,
 ) -> Result<Vec<Value>, AnthropicSpecError> {
-    match &tool_result.content {
+    match content {
         ToolResultContent::Text { text } => Ok(vec![json!({
             "type": "text",
             "text": text,
         })]),
         ToolResultContent::Json { value } => Ok(vec![json!({
             "type": "text",
-            "text": stable_json_string(&canonicalize_json(value)),
+            "text": stable_json_string(&canonicalize_json(&value)),
         })]),
         ToolResultContent::Parts { parts } => {
             let mut blocks = Vec::new();
@@ -488,47 +508,53 @@ fn validate_tool_ordering(messages: &[WireMessage]) -> Result<(), AnthropicSpecE
     Ok(())
 }
 
-fn map_tools(req: &Request) -> Result<Vec<Value>, AnthropicSpecError> {
-    req.tools
-        .iter()
+fn map_tools(tools: Vec<ToolDefinition>) -> Result<Vec<Value>, AnthropicSpecError> {
+    tools
+        .into_iter()
         .map(map_tool_definition)
         .collect::<Result<Vec<_>, _>>()
 }
 
-fn map_tool_definition(tool: &ToolDefinition) -> Result<Value, AnthropicSpecError> {
-    if tool.name.trim().is_empty() {
+fn map_tool_definition(tool: ToolDefinition) -> Result<Value, AnthropicSpecError> {
+    let ToolDefinition {
+        name,
+        description,
+        parameters_schema,
+    } = tool;
+
+    if name.trim().is_empty() {
         return Err(AnthropicSpecError::validation(
             "tool definitions require non-empty names",
         ));
     }
-    if tool.name.chars().count() > 128 {
+    if name.chars().count() > 128 {
         return Err(AnthropicSpecError::validation(format!(
             "tool '{}' name exceeds 128 characters",
-            tool.name
+            name
         )));
     }
-    if !tool.parameters_schema.is_object() {
+    if !parameters_schema.is_object() {
         return Err(AnthropicSpecError::validation(format!(
             "tool '{}' parameters_schema must be a JSON object",
-            tool.name
+            name
         )));
     }
 
     let mut mapped = Map::new();
-    mapped.insert("name".to_string(), Value::String(tool.name.clone()));
-    if let Some(description) = &tool.description {
-        mapped.insert(
-            "description".to_string(),
-            Value::String(description.clone()),
-        );
+    mapped.insert("name".to_string(), Value::String(name));
+    if let Some(description) = description {
+        mapped.insert("description".to_string(), Value::String(description));
     }
-    mapped.insert("input_schema".to_string(), tool.parameters_schema.clone());
+    mapped.insert("input_schema".to_string(), parameters_schema);
 
     Ok(Value::Object(mapped))
 }
 
-fn map_tool_choice(req: &Request) -> Result<Value, AnthropicSpecError> {
-    match &req.tool_choice {
+fn map_tool_choice(
+    tools: &[ToolDefinition],
+    tool_choice: &ToolChoice,
+) -> Result<Value, AnthropicSpecError> {
+    match tool_choice {
         ToolChoice::None => Ok(json!({ "type": "none" })),
         ToolChoice::Auto => Ok(json!({ "type": "auto" })),
         ToolChoice::Required => Ok(json!({ "type": "any" })),
@@ -538,7 +564,7 @@ fn map_tool_choice(req: &Request) -> Result<Value, AnthropicSpecError> {
                     "tool_choice specific requires a non-empty tool name",
                 ));
             }
-            if !req.tools.iter().any(|tool| tool.name == *name) {
+            if !tools.iter().any(|tool| tool.name == *name) {
                 return Err(AnthropicSpecError::validation(format!(
                     "tool_choice specific references unknown tool: {name}",
                 )));
@@ -553,10 +579,10 @@ fn map_tool_choice(req: &Request) -> Result<Value, AnthropicSpecError> {
 }
 
 fn map_response_format(
-    req: &Request,
+    response_format: ResponseFormat,
     messages: &[WireMessage],
 ) -> Result<Option<Value>, AnthropicSpecError> {
-    match &req.response_format {
+    match response_format {
         ResponseFormat::Text => Ok(None),
         ResponseFormat::JsonObject => {
             validate_no_assistant_prefill(messages)?;
@@ -591,13 +617,16 @@ fn validate_no_assistant_prefill(messages: &[WireMessage]) -> Result<(), Anthrop
     Ok(())
 }
 
-fn map_metadata(req: &Request, warnings: &mut Vec<RuntimeWarning>) -> Option<Value> {
-    let mut metadata = Map::new();
-    if let Some(user_id) = req.metadata.get("user_id") {
-        metadata.insert("user_id".to_string(), Value::String(user_id.clone()));
+fn map_metadata(
+    metadata: BTreeMap<String, String>,
+    warnings: &mut Vec<RuntimeWarning>,
+) -> Option<Value> {
+    let mut mapped_metadata = Map::new();
+    if let Some(user_id) = metadata.get("user_id") {
+        mapped_metadata.insert("user_id".to_string(), Value::String(user_id.clone()));
     }
 
-    if req.metadata.keys().any(|key| key != "user_id") {
+    if metadata.keys().any(|key| key != "user_id") {
         push_warning(
             warnings,
             WARN_DROPPED_UNSUPPORTED_METADATA_KEYS,
@@ -605,10 +634,10 @@ fn map_metadata(req: &Request, warnings: &mut Vec<RuntimeWarning>) -> Option<Val
         );
     }
 
-    if metadata.is_empty() {
+    if mapped_metadata.is_empty() {
         None
     } else {
-        Some(Value::Object(metadata))
+        Some(Value::Object(mapped_metadata))
     }
 }
 

@@ -150,7 +150,7 @@ fn maps_openrouter_error_preserves_source_chain() {
 fn openrouter_translator_reuses_openai_spec_encoder() {
     let translator = OpenRouterTranslator::default();
     let encoded = translator
-        .encode_request(&base_request())
+        .encode_request(base_request())
         .expect("encoding should succeed");
 
     assert_eq!(encoded.body["model"], "openai/gpt-4.1-mini");
@@ -165,7 +165,7 @@ fn openrouter_translator_preserves_openai_encode_warnings() {
     request.stop = vec!["DONE".to_string()];
 
     let encoded = translator
-        .encode_request(&request)
+        .encode_request(request.clone())
         .expect("encoding should succeed");
 
     let top_p = encoded.body["top_p"]
@@ -188,6 +188,32 @@ fn openrouter_translator_preserves_openai_encode_warnings() {
 }
 
 #[test]
+fn openrouter_translator_reintroduces_top_p_and_stop_with_fallback_models() {
+    let overrides = OpenRouterOverrides {
+        fallback_models: vec!["openai/gpt-4.1".to_string()],
+        ..OpenRouterOverrides::default()
+    };
+    let translator = OpenRouterTranslator::new(overrides);
+    let mut request = base_request();
+    request.top_p = Some(0.9);
+    request.stop = vec!["DONE".to_string()];
+
+    let encoded = translator
+        .encode_request(request)
+        .expect("encoding should succeed");
+
+    assert_eq!(
+        encoded.body["models"],
+        json!(["openai/gpt-4.1-mini", "openai/gpt-4.1"])
+    );
+    let top_p = encoded.body["top_p"]
+        .as_f64()
+        .expect("top_p should be numeric");
+    assert!((top_p - 0.9).abs() < 1e-6);
+    assert_eq!(encoded.body["stop"], json!(["DONE"]));
+}
+
+#[test]
 fn openrouter_translator_applies_typed_overrides() {
     let overrides = OpenRouterOverrides {
         max_tokens: Some(384),
@@ -199,7 +225,7 @@ fn openrouter_translator_applies_typed_overrides() {
     let translator = OpenRouterTranslator::new(overrides);
 
     let encoded = translator
-        .encode_request(&base_request())
+        .encode_request(base_request())
         .expect("encoding should succeed");
 
     assert_eq!(encoded.body["max_tokens"], 384);
@@ -217,7 +243,7 @@ fn openrouter_translator_rejects_non_finite_frequency_penalty_override() {
     let translator = OpenRouterTranslator::new(overrides);
 
     let error = translator
-        .encode_request(&base_request())
+        .encode_request(base_request())
         .expect_err("encoding should fail for non-finite frequency_penalty");
 
     match error {
@@ -238,7 +264,7 @@ fn openrouter_translator_rejects_non_finite_presence_penalty_override() {
     let translator = OpenRouterTranslator::new(overrides);
 
     let error = translator
-        .encode_request(&base_request())
+        .encode_request(base_request())
         .expect_err("encoding should fail for non-finite presence_penalty");
 
     match error {
@@ -265,7 +291,7 @@ fn openrouter_translator_extra_overrides_take_precedence() {
     let translator = OpenRouterTranslator::new(overrides);
 
     let encoded = translator
-        .encode_request(&base_request())
+        .encode_request(base_request())
         .expect("encoding should succeed");
 
     assert_eq!(encoded.body["user"], "from-extra");
@@ -296,7 +322,7 @@ fn openrouter_decode_uses_openai_path_when_payload_is_openai_compatible() {
     };
 
     let response = translator
-        .decode_request(&payload)
+        .decode_request(payload.clone())
         .expect("decode should succeed");
 
     assert_eq!(response.model, "openai/gpt-4.1-mini");
@@ -335,7 +361,7 @@ fn openrouter_decode_falls_back_to_chat_completions_shape() {
     };
 
     let response = translator
-        .decode_request(&payload)
+        .decode_request(payload.clone())
         .expect("decode should succeed");
 
     assert_eq!(response.model, "openai/gpt-4.1-mini");
@@ -367,7 +393,7 @@ fn openrouter_decode_returns_combined_error_when_both_paths_fail() {
     };
 
     let error = translator
-        .decode_request(&payload)
+        .decode_request(payload.clone())
         .expect_err("decode should fail");
 
     match error {
@@ -401,7 +427,7 @@ fn openrouter_decode_does_not_fallback_on_upstream_error() {
     };
 
     let error = translator
-        .decode_request(&payload)
+        .decode_request(payload.clone())
         .expect_err("decode should fail");
 
     match error {
@@ -449,7 +475,7 @@ fn openrouter_decode_tool_call_missing_id_generates_warning_and_synthetic_id() {
     };
 
     let response = translator
-        .decode_request(&payload)
+        .decode_request(payload.clone())
         .expect("decode should succeed");
 
     assert_eq!(response.finish_reason, FinishReason::ToolCalls);
@@ -500,7 +526,7 @@ fn openrouter_decode_tool_call_missing_name_is_ignored_with_warning() {
     };
 
     let response = translator
-        .decode_request(&payload)
+        .decode_request(payload.clone())
         .expect("decode should succeed");
 
     assert!(
@@ -546,7 +572,7 @@ fn openrouter_decode_tool_call_whitespace_name_is_ignored_with_warning() {
     };
 
     let response = translator
-        .decode_request(&payload)
+        .decode_request(payload.clone())
         .expect("decode should succeed");
 
     assert!(
@@ -592,7 +618,7 @@ fn openrouter_decode_invalid_tool_call_arguments_preserve_raw_string_with_warnin
     };
 
     let response = translator
-        .decode_request(&payload)
+        .decode_request(payload.clone())
         .expect("decode should succeed");
 
     assert!(response.warnings.iter().any(|w| {
@@ -628,7 +654,7 @@ fn openrouter_decode_unknown_finish_reason_emits_warning_and_maps_to_other() {
     };
 
     let response = translator
-        .decode_request(&payload)
+        .decode_request(payload.clone())
         .expect("decode should succeed");
 
     assert_eq!(response.finish_reason, FinishReason::Other);
@@ -661,7 +687,7 @@ fn openrouter_decode_structured_output_parse_failure_emits_warning() {
     };
 
     let response = translator
-        .decode_request(&payload)
+        .decode_request(payload.clone())
         .expect("decode should succeed");
 
     assert!(response.output.structured_output.is_none());

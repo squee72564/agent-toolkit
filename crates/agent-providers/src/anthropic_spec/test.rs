@@ -40,7 +40,7 @@ fn encode_basic_text_message() {
         }],
     }]);
 
-    let encoded = encode_anthropic_request(&request).expect("encode should succeed");
+    let encoded = encode_anthropic_request(request.clone()).expect("encode should succeed");
 
     assert_eq!(encoded.body["model"], json!("claude-sonnet-4.6"));
     assert_eq!(encoded.body["max_tokens"], json!(1024));
@@ -74,7 +74,7 @@ fn encode_system_prefix_mapping() {
         },
     ]);
 
-    let encoded = encode_anthropic_request(&request).expect("encode should succeed");
+    let encoded = encode_anthropic_request(request.clone()).expect("encode should succeed");
     assert_eq!(encoded.body["system"][0]["text"], json!("sys-a"));
     assert_eq!(encoded.body["system"][1]["text"], json!("sys-b"));
     assert_eq!(encoded.body["messages"][0]["role"], json!("user"));
@@ -102,7 +102,7 @@ fn encode_tools_and_tool_choice_mappings() {
 
     request.tool_choice = ToolChoice::None;
     assert_eq!(
-        encode_anthropic_request(&request)
+        encode_anthropic_request(request.clone())
             .expect("encode none")
             .body
             .pointer("/tool_choice/type"),
@@ -111,7 +111,7 @@ fn encode_tools_and_tool_choice_mappings() {
 
     request.tool_choice = ToolChoice::Auto;
     assert_eq!(
-        encode_anthropic_request(&request)
+        encode_anthropic_request(request.clone())
             .expect("encode auto")
             .body
             .pointer("/tool_choice/type"),
@@ -120,7 +120,7 @@ fn encode_tools_and_tool_choice_mappings() {
 
     request.tool_choice = ToolChoice::Required;
     assert_eq!(
-        encode_anthropic_request(&request)
+        encode_anthropic_request(request.clone())
             .expect("encode required")
             .body
             .pointer("/tool_choice/type"),
@@ -130,7 +130,7 @@ fn encode_tools_and_tool_choice_mappings() {
     request.tool_choice = ToolChoice::Specific {
         name: "calculator".to_string(),
     };
-    let encoded = encode_anthropic_request(&request).expect("encode specific");
+    let encoded = encode_anthropic_request(request.clone()).expect("encode specific");
     assert_eq!(
         encoded.body.pointer("/tool_choice/type"),
         Some(&json!("tool"))
@@ -144,6 +144,41 @@ fn encode_tools_and_tool_choice_mappings() {
     assert_eq!(
         encoded.body.pointer("/tools/0/name"),
         Some(&json!("calculator"))
+    );
+    assert_eq!(
+        encoded.body.pointer("/tools/0/input_schema/type"),
+        Some(&json!("object"))
+    );
+    assert_eq!(
+        encoded.body.pointer("/tools/0/description"),
+        Some(&json!("compute expression"))
+    );
+}
+
+#[test]
+fn encode_maps_tool_definition_with_description_and_object_schema() {
+    let mut request = base_request(vec![Message::user_text("hello")]);
+    request.tools = vec![ToolDefinition {
+        name: "lookup_weather".to_string(),
+        description: Some("Look up forecast details".to_string()),
+        parameters_schema: json!({
+            "type": "object",
+            "properties": {
+                "city": { "type": "string" }
+            },
+            "required": ["city"]
+        }),
+    }];
+
+    let encoded = encode_anthropic_request(request).expect("encode should succeed");
+
+    assert_eq!(
+        encoded.body.pointer("/tools/0/name"),
+        Some(&json!("lookup_weather"))
+    );
+    assert_eq!(
+        encoded.body.pointer("/tools/0/description"),
+        Some(&json!("Look up forecast details"))
     );
     assert_eq!(
         encoded.body.pointer("/tools/0/input_schema/type"),
@@ -190,7 +225,7 @@ fn encode_tool_call_and_tool_result_sequencing_success() {
         },
     ]);
 
-    let encoded = encode_anthropic_request(&request).expect("encode should succeed");
+    let encoded = encode_anthropic_request(request.clone()).expect("encode should succeed");
     let messages = encoded.body["messages"]
         .as_array()
         .expect("messages should be an array");
@@ -217,7 +252,7 @@ fn encode_rejects_non_prefix_system_message() {
         },
     ]);
 
-    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
     assert!(error.message().contains("contiguous prefix"));
 }
@@ -234,7 +269,7 @@ fn encode_rejects_bad_tool_choice() {
         name: "missing".to_string(),
     };
 
-    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
     assert!(
         error
@@ -256,7 +291,8 @@ fn encode_rejects_invalid_tool_schema_or_name() {
         description: None,
         parameters_schema: json!({"type":"object"}),
     }];
-    let empty_name_error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let empty_name_error =
+        encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert_eq!(empty_name_error.kind(), AnthropicSpecErrorKind::Validation);
     assert!(empty_name_error.message().contains("non-empty names"));
 
@@ -265,7 +301,8 @@ fn encode_rejects_invalid_tool_schema_or_name() {
         description: None,
         parameters_schema: json!("not-object"),
     }];
-    let bad_schema_error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let bad_schema_error =
+        encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert_eq!(bad_schema_error.kind(), AnthropicSpecErrorKind::Validation);
     assert!(bad_schema_error.message().contains("must be a JSON object"));
 }
@@ -280,7 +317,7 @@ fn encode_rejects_temperature_out_of_range() {
     }]);
     request.temperature = Some(1.1);
 
-    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
     assert!(
         error
@@ -299,7 +336,7 @@ fn encode_rejects_top_p_out_of_range() {
     }]);
     request.top_p = Some(-0.1);
 
-    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
     assert!(error.message().contains("top_p must be in [0.0, 1.0]"));
 }
@@ -314,7 +351,7 @@ fn encode_rejects_zero_max_output_tokens() {
     }]);
     request.max_output_tokens = Some(0);
 
-    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
     assert!(
         error
@@ -333,7 +370,7 @@ fn encode_rejects_empty_stop_sequence() {
     }]);
     request.stop = vec!["".to_string()];
 
-    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
     assert!(error.message().contains("must not contain empty strings"));
 }
@@ -361,7 +398,7 @@ fn encode_rejects_tool_result_before_tool_call() {
         },
     ]);
 
-    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::ProtocolViolation);
     assert!(error.message().contains("unknown tool_call_id"));
 }
@@ -379,7 +416,7 @@ fn encode_rejects_empty_tool_call_id() {
         }],
     }]);
 
-    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
     assert!(error.message().contains("non-empty tool_call id"));
 }
@@ -397,7 +434,7 @@ fn encode_rejects_empty_tool_call_name() {
         }],
     }]);
 
-    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
     assert!(error.message().contains("non-empty tool_call name"));
 }
@@ -429,7 +466,7 @@ fn encode_rejects_empty_tool_result_tool_call_id() {
         },
     ]);
 
-    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
     assert!(error.message().contains("non-empty tool_call_id"));
 }
@@ -456,7 +493,7 @@ fn encode_rejects_duplicate_tool_call_ids() {
         ],
     }]);
 
-    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::ProtocolViolation);
     assert!(
         error
@@ -478,7 +515,7 @@ fn encode_rejects_non_object_tool_call_arguments_json() {
         }],
     }]);
 
-    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
     assert!(
         error
@@ -520,7 +557,7 @@ fn encode_rejects_non_text_tool_result_parts() {
         },
     ]);
 
-    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
     assert!(error.message().contains("must contain only text parts"));
 }
@@ -543,7 +580,7 @@ fn encode_rejects_structured_output_with_assistant_prefill() {
     ]);
     request.response_format = ResponseFormat::JsonObject;
 
-    let error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
     assert!(error.message().contains("assistant-prefill"));
 }
@@ -567,7 +604,7 @@ fn encode_maps_json_schema_response_format_to_output_config() {
         }),
     };
 
-    let encoded = encode_anthropic_request(&request).expect("encode should succeed");
+    let encoded = encode_anthropic_request(request.clone()).expect("encode should succeed");
     assert_eq!(
         encoded.body.pointer("/output_config/format/type"),
         Some(&json!("json_schema"))
@@ -595,7 +632,7 @@ fn encode_emits_warning_when_temperature_and_top_p_set() {
     request.temperature = Some(0.3);
     request.top_p = Some(0.9);
 
-    let encoded = encode_anthropic_request(&request).expect("encode should succeed");
+    let encoded = encode_anthropic_request(request.clone()).expect("encode should succeed");
     assert!(
         encoded
             .warnings
@@ -612,7 +649,7 @@ fn encode_emits_warning_when_default_max_tokens_applied() {
             text: "hello".to_string(),
         }],
     }]);
-    let encoded = encode_anthropic_request(&request).expect("encode should succeed");
+    let encoded = encode_anthropic_request(request.clone()).expect("encode should succeed");
 
     assert_eq!(encoded.body["max_tokens"], json!(1024));
     assert!(
@@ -638,7 +675,7 @@ fn encode_emits_warning_when_dropping_unsupported_metadata_keys() {
         .metadata
         .insert("trace_id".to_string(), "trace-123".to_string());
 
-    let encoded = encode_anthropic_request(&request).expect("encode should succeed");
+    let encoded = encode_anthropic_request(request.clone()).expect("encode should succeed");
     assert_eq!(encoded.body["metadata"], json!({"user_id":"user-1"}));
     assert!(
         encoded
@@ -1190,7 +1227,7 @@ fn decode_structured_output_parse_failure_warns() {
 #[test]
 fn encode_and_decode_error_variant_smoke() {
     let request = base_request(vec![]);
-    let encode_error = encode_anthropic_request(&request).expect_err("encode should fail");
+    let encode_error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert!(matches!(
         encode_error,
         AnthropicSpecError::Validation { .. } | AnthropicSpecError::ProtocolViolation { .. }

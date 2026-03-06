@@ -24,12 +24,12 @@ impl ProtocolTranslator for AnthropicTranslator {
     type ResponsePayload = AnthropicDecodeEnvelope;
     type Error = AnthropicTranslatorError;
 
-    fn encode_request(&self, req: &Request) -> Result<Self::RequestPayload, Self::Error> {
+    fn encode_request(&self, req: Request) -> Result<Self::RequestPayload, Self::Error> {
         encode_anthropic_request(req).map_err(AnthropicTranslatorError::Encode)
     }
 
-    fn decode_request(&self, payload: &Self::ResponsePayload) -> Result<Response, Self::Error> {
-        decode_anthropic_response(payload).map_err(AnthropicTranslatorError::Decode)
+    fn decode_request(&self, payload: Self::ResponsePayload) -> Result<Response, Self::Error> {
+        decode_anthropic_response(&payload).map_err(AnthropicTranslatorError::Decode)
     }
 }
 

@@ -24,12 +24,12 @@ impl ProtocolTranslator for OpenAiTranslator {
     type ResponsePayload = OpenAiDecodeEnvelope;
     type Error = OpenAiTranslatorError;
 
-    fn encode_request(&self, req: &Request) -> Result<Self::RequestPayload, Self::Error> {
+    fn encode_request(&self, req: Request) -> Result<Self::RequestPayload, Self::Error> {
         encode_openai_request(req).map_err(OpenAiTranslatorError::Encode)
     }
 
-    fn decode_request(&self, payload: &Self::ResponsePayload) -> Result<Response, Self::Error> {
-        decode_openai_response(payload).map_err(OpenAiTranslatorError::Decode)
+    fn decode_request(&self, payload: Self::ResponsePayload) -> Result<Response, Self::Error> {
+        decode_openai_response(&payload).map_err(OpenAiTranslatorError::Decode)
     }
 }
 

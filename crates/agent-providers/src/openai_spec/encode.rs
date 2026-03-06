@@ -1,34 +1,89 @@
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use serde_json::{Map, Value, json};
 
 use agent_core::types::{
-    ContentPart, MessageRole, Request, ResponseFormat, RuntimeWarning, ToolChoice, ToolDefinition,
-    ToolResult, ToolResultContent,
+    ContentPart, Message, MessageRole, Request, ResponseFormat, RuntimeWarning, ToolChoice,
+    ToolDefinition, ToolResult, ToolResultContent,
 };
 
 use super::schema_rules::{canonicalize_json, is_strict_compatible_schema, stable_json_string};
 use super::{OpenAiEncodedRequest, OpenAiSpecError};
 
-pub(crate) fn encode_openai_request(
-    req: &Request,
+pub(crate) struct OpenAiEncodeInput<'a> {
+    pub(crate) model_id: &'a str,
+    pub(crate) messages: Vec<Message>,
+    pub(crate) tools: Vec<ToolDefinition>,
+    pub(crate) tool_choice: ToolChoice,
+    pub(crate) response_format: ResponseFormat,
+    pub(crate) temperature: Option<f32>,
+    pub(crate) top_p: Option<f32>,
+    pub(crate) max_output_tokens: Option<u32>,
+    pub(crate) stop: &'a [String],
+    pub(crate) metadata: BTreeMap<String, String>,
+}
+
+pub(crate) fn encode_openai_request(req: Request) -> Result<OpenAiEncodedRequest, OpenAiSpecError> {
+    let Request {
+        model_id,
+        messages,
+        tools,
+        tool_choice,
+        response_format,
+        metadata,
+        temperature,
+        top_p,
+        max_output_tokens,
+        stop,
+    } = req;
+
+    encode_openai_request_parts(OpenAiEncodeInput {
+        model_id: &model_id,
+        messages,
+        tools,
+        tool_choice,
+        response_format,
+        temperature,
+        top_p,
+        max_output_tokens,
+        stop: &stop,
+        metadata,
+    })
+}
+
+pub(crate) fn encode_openai_request_parts(
+    input: OpenAiEncodeInput<'_>,
 ) -> Result<OpenAiEncodedRequest, OpenAiSpecError> {
-    if req.model_id.trim().is_empty() {
+    let OpenAiEncodeInput {
+        model_id,
+        messages,
+        tools,
+        tool_choice,
+        response_format,
+        temperature,
+        top_p,
+        max_output_tokens,
+        stop,
+        metadata,
+    } = input;
+
+    if model_id.trim().is_empty() {
         return Err(OpenAiSpecError::validation("model_id must not be empty"));
     }
 
     let mut warnings = Vec::new();
-    let text_format = map_response_format(req)?;
-    let tool_choice = map_tool_choice(req)?;
-    let tools = map_tools(req, &mut warnings)?;
-    let input = map_messages(req)?;
+    let text_format = map_response_format(response_format)?;
+    // Validate tool_choice against the original tool definitions before consuming them.
+    let tool_choice = map_tool_choice(&tools, &tool_choice)?;
+    let tools = map_tools(tools, &mut warnings)?;
+    let input = map_messages(messages)?;
 
     if input.is_empty() {
         return Err(OpenAiSpecError::validation("empty input"));
     }
 
     let mut body = Map::new();
-    body.insert("model".to_string(), Value::String(req.model_id.clone()));
+    body.insert("model".to_string(), Value::String(model_id.to_string()));
     body.insert("store".to_string(), Value::Bool(false));
     body.insert("input".to_string(), Value::Array(input));
     body.insert("text".to_string(), json!({ "format": text_format }));
@@ -39,19 +94,19 @@ pub(crate) fn encode_openai_request(
 
     body.insert("tool_choice".to_string(), tool_choice);
 
-    if let Some(temperature) = req.temperature {
+    if let Some(temperature) = temperature {
         body.insert("temperature".to_string(), json!(temperature));
     }
 
-    if let Some(max_output_tokens) = req.max_output_tokens {
+    if let Some(max_output_tokens) = max_output_tokens {
         body.insert("max_output_tokens".to_string(), json!(max_output_tokens));
     }
 
-    if !req.metadata.is_empty() {
-        body.insert("metadata".to_string(), json!(req.metadata));
+    if !metadata.is_empty() {
+        body.insert("metadata".to_string(), json!(metadata));
     }
 
-    if req.top_p.is_some() {
+    if top_p.is_some() {
         push_warning(
             &mut warnings,
             "openai.encode.ignored_top_p",
@@ -59,7 +114,7 @@ pub(crate) fn encode_openai_request(
         );
     }
 
-    if !req.stop.is_empty() {
+    if !stop.is_empty() {
         push_warning(
             &mut warnings,
             "openai.encode.ignored_stop",
@@ -73,8 +128,8 @@ pub(crate) fn encode_openai_request(
     })
 }
 
-fn map_response_format(req: &Request) -> Result<Value, OpenAiSpecError> {
-    match &req.response_format {
+fn map_response_format(response_format: ResponseFormat) -> Result<Value, OpenAiSpecError> {
+    match response_format {
         ResponseFormat::Text => Ok(json!({ "type": "text" })),
         ResponseFormat::JsonObject => Ok(json!({ "type": "json_object" })),
         ResponseFormat::JsonSchema { name, schema } => {
@@ -100,22 +155,25 @@ fn map_response_format(req: &Request) -> Result<Value, OpenAiSpecError> {
     }
 }
 
-fn map_tool_choice(req: &Request) -> Result<Value, OpenAiSpecError> {
-    if req.tools.is_empty() {
-        if matches!(req.tool_choice, ToolChoice::Required) {
+fn map_tool_choice(
+    tools: &[ToolDefinition],
+    tool_choice: &ToolChoice,
+) -> Result<Value, OpenAiSpecError> {
+    if tools.is_empty() {
+        if matches!(tool_choice, ToolChoice::Required) {
             return Err(OpenAiSpecError::validation(
                 "tool_choice 'required' requires at least one tool definition",
             ));
         }
 
-        if let ToolChoice::Specific { .. } = &req.tool_choice {
+        if let ToolChoice::Specific { .. } = tool_choice {
             return Err(OpenAiSpecError::validation(
                 "tool_choice 'specific' requires at least one tool definition",
             ));
         }
     }
 
-    match &req.tool_choice {
+    match tool_choice {
         ToolChoice::None => Ok(Value::String("none".to_string())),
         ToolChoice::Auto => Ok(Value::String("auto".to_string())),
         ToolChoice::Required => Ok(Value::String("required".to_string())),
@@ -126,7 +184,7 @@ fn map_tool_choice(req: &Request) -> Result<Value, OpenAiSpecError> {
                 ));
             }
 
-            let found = req.tools.iter().any(|tool| tool.name == *name);
+            let found = tools.iter().any(|tool| tool.name == *name);
             if !found {
                 return Err(OpenAiSpecError::validation(format!(
                     "tool_choice specific references unknown tool: {name}"
@@ -139,88 +197,92 @@ fn map_tool_choice(req: &Request) -> Result<Value, OpenAiSpecError> {
 }
 
 fn map_tools(
-    req: &Request,
+    tools: Vec<ToolDefinition>,
     warnings: &mut Vec<RuntimeWarning>,
 ) -> Result<Vec<Value>, OpenAiSpecError> {
     let mut seen_tool_names = HashSet::new();
-    let mut tools = Vec::new();
+    let mut mapped_tools = Vec::new();
 
-    for tool in &req.tools {
-        if !seen_tool_names.insert(tool.name.as_str()) {
+    for tool in tools {
+        if !seen_tool_names.insert(tool.name.clone()) {
             return Err(OpenAiSpecError::validation(format!(
                 "duplicate tool definition name: {}",
                 tool.name
             )));
         }
-        tools.push(map_tool_definition(tool, warnings)?);
+        mapped_tools.push(map_tool_definition(tool, warnings)?);
     }
 
-    Ok(tools)
+    Ok(mapped_tools)
 }
 
 fn map_tool_definition(
-    tool: &ToolDefinition,
+    tool: ToolDefinition,
     warnings: &mut Vec<RuntimeWarning>,
 ) -> Result<Value, OpenAiSpecError> {
-    if tool.name.trim().is_empty() {
+    let ToolDefinition {
+        name,
+        description,
+        parameters_schema,
+    } = tool;
+
+    if name.trim().is_empty() {
         return Err(OpenAiSpecError::validation(
             "tool definition requires non-empty name",
         ));
     }
 
-    if !tool.parameters_schema.is_object() {
+    if !parameters_schema.is_object() {
         return Err(OpenAiSpecError::validation(format!(
             "tool '{}' parameters_schema must be a JSON object",
-            tool.name
+            name
         )));
     }
 
-    let strict = is_strict_compatible_schema(&tool.parameters_schema);
+    let strict = is_strict_compatible_schema(&parameters_schema);
     if !strict {
         push_warning(
             warnings,
             "openai.encode.non_strict_tool_schema",
             format!(
                 "tool '{}' schema is not strict-compatible; emitted strict=false",
-                tool.name
+                name
             ),
         );
     }
 
     let mut payload = Map::new();
     payload.insert("type".to_string(), Value::String("function".to_string()));
-    payload.insert("name".to_string(), Value::String(tool.name.clone()));
+    payload.insert("name".to_string(), Value::String(name));
 
-    if let Some(description) = &tool.description {
-        payload.insert(
-            "description".to_string(),
-            Value::String(description.clone()),
-        );
+    if let Some(description) = description {
+        payload.insert("description".to_string(), Value::String(description));
     }
 
-    payload.insert("parameters".to_string(), tool.parameters_schema.clone());
+    payload.insert("parameters".to_string(), parameters_schema);
     payload.insert("strict".to_string(), Value::Bool(strict));
 
     Ok(Value::Object(payload))
 }
 
-fn map_messages(req: &Request) -> Result<Vec<Value>, OpenAiSpecError> {
+fn map_messages(messages: Vec<Message>) -> Result<Vec<Value>, OpenAiSpecError> {
     let mut input_items = Vec::new();
     let mut seen_tool_call_ids: HashSet<String> = HashSet::new();
 
-    for message in &req.messages {
+    for message in messages {
+        let Message { role, content } = message;
         let mut message_parts = Vec::new();
 
-        for part in &message.content {
+        for part in content {
             match part {
                 ContentPart::Text { text } => {
-                    if message.role == MessageRole::Tool {
+                    if role == MessageRole::Tool {
                         return Err(OpenAiSpecError::validation(
                             "tool role messages cannot contain plain text content",
                         ));
                     }
 
-                    let part_type = if message.role == MessageRole::Assistant {
+                    let part_type = if role == MessageRole::Assistant {
                         "output_text"
                     } else {
                         "input_text"
@@ -229,36 +291,38 @@ fn map_messages(req: &Request) -> Result<Vec<Value>, OpenAiSpecError> {
                     message_parts.push(json!({ "type": part_type, "text": text }));
                 }
                 ContentPart::ToolCall { tool_call } => {
-                    if message.role != MessageRole::Assistant {
+                    if role != MessageRole::Assistant {
                         return Err(OpenAiSpecError::validation(
                             "tool_call content is only valid for assistant role messages",
                         ));
                     }
-                    if tool_call.id.trim().is_empty() {
+                    let tool_id = tool_call.id;
+                    if tool_id.trim().is_empty() {
                         return Err(OpenAiSpecError::validation(
                             "assistant tool_call id must not be empty",
                         ));
                     }
-                    if tool_call.name.trim().is_empty() {
+                    let tool_name = tool_call.name;
+                    if tool_name.trim().is_empty() {
                         return Err(OpenAiSpecError::validation(
                             "assistant tool_call name must not be empty",
                         ));
                     }
-                    if !seen_tool_call_ids.insert(tool_call.id.clone()) {
+                    if !seen_tool_call_ids.insert(tool_id.clone()) {
                         return Err(OpenAiSpecError::protocol_violation(format!(
                             "duplicate_tool_call_id: {}",
-                            tool_call.id
+                            tool_id
                         )));
                     }
 
-                    flush_message_item(&mut input_items, &message.role, &mut message_parts);
+                    flush_message_item(&mut input_items, &role, &mut message_parts);
 
                     let arguments =
                         serde_json::to_string(&tool_call.arguments_json).map_err(|e| {
                             OpenAiSpecError::encode_with_source(
                                 format!(
                                     "failed to serialize tool_call arguments for '{}'",
-                                    tool_call.name
+                                    tool_name
                                 ),
                                 e,
                             )
@@ -266,43 +330,49 @@ fn map_messages(req: &Request) -> Result<Vec<Value>, OpenAiSpecError> {
 
                     input_items.push(json!({
                         "type": "function_call",
-                        "call_id": tool_call.id,
-                        "name": tool_call.name,
+                        "call_id": tool_id,
+                        "name": tool_name,
                         "arguments": arguments
                     }));
                 }
                 ContentPart::ToolResult { tool_result } => {
-                    if message.role != MessageRole::Tool {
+                    if role != MessageRole::Tool {
                         return Err(OpenAiSpecError::validation(
                             "tool_result content is only valid for tool role messages",
                         ));
                     }
-                    if tool_result.tool_call_id.trim().is_empty() {
+                    let ToolResult {
+                        tool_call_id,
+                        content,
+                        raw_provider_content,
+                    } = tool_result;
+                    if tool_call_id.trim().is_empty() {
                         return Err(OpenAiSpecError::validation(
                             "tool_result tool_call_id must not be empty",
                         ));
                     }
 
-                    flush_message_item(&mut input_items, &message.role, &mut message_parts);
+                    flush_message_item(&mut input_items, &role, &mut message_parts);
 
-                    if !seen_tool_call_ids.contains(&tool_result.tool_call_id) {
+                    if !seen_tool_call_ids.contains(&tool_call_id) {
                         return Err(OpenAiSpecError::protocol_violation(format!(
                             "tool_result_without_matching_tool_call: {}",
-                            tool_result.tool_call_id
+                            tool_call_id
                         )));
                     }
 
-                    let output = serialize_tool_result_output(tool_result)?;
+                    let output =
+                        serialize_tool_result_output(content, raw_provider_content.as_ref())?;
                     input_items.push(json!({
                         "type": "function_call_output",
-                        "call_id": tool_result.tool_call_id,
+                        "call_id": tool_call_id,
                         "output": output
                     }));
                 }
             }
         }
 
-        flush_message_item(&mut input_items, &message.role, &mut message_parts);
+        flush_message_item(&mut input_items, &role, &mut message_parts);
     }
 
     Ok(input_items)
@@ -332,22 +402,25 @@ fn flush_message_item(
     }));
 }
 
-fn serialize_tool_result_output(tool_result: &ToolResult) -> Result<String, OpenAiSpecError> {
-    if let Some(raw_provider_content) = &tool_result.raw_provider_content
+fn serialize_tool_result_output(
+    content: ToolResultContent,
+    raw_provider_content: Option<&Value>,
+) -> Result<String, OpenAiSpecError> {
+    if let Some(raw_provider_content) = raw_provider_content
         && let Some(raw_text) = raw_provider_content.as_str()
     {
         return Ok(raw_text.to_string());
     }
 
-    match &tool_result.content {
-        ToolResultContent::Text { text } => Ok(text.clone()),
-        ToolResultContent::Json { value } => Ok(stable_json_string(&canonicalize_json(value))),
+    match content {
+        ToolResultContent::Text { text } => Ok(text),
+        ToolResultContent::Json { value } => Ok(stable_json_string(&canonicalize_json(&value))),
         ToolResultContent::Parts { parts } => {
             let mut lines = Vec::new();
 
             for part in parts {
                 match part {
-                    ContentPart::Text { text } => lines.push(text.clone()),
+                    ContentPart::Text { text } => lines.push(text),
                     _ => {
                         return Err(OpenAiSpecError::validation(
                             "tool_result parts content for OpenAI must contain only text parts",
