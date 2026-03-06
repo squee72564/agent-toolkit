@@ -2,7 +2,7 @@ use serde_json::{Map, Value};
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
 use crate::openai_spec::decode::decode_openai_response;
-use crate::openai_spec::encode::encode_openai_request;
+use crate::openai_spec::encode::{OpenAiEncodeInput, encode_openai_request_parts};
 use crate::openai_spec::{
     OpenAiDecodeEnvelope, OpenAiEncodedRequest, OpenAiSpecError, OpenAiSpecErrorKind,
 };
@@ -78,10 +78,32 @@ impl ProtocolTranslator for OpenRouterTranslator {
     type Error = OpenRouterTranslatorError;
 
     fn encode_request(&self, req: Request) -> Result<Self::RequestPayload, Self::Error> {
-        let model_id = req.model_id.clone();
-        let top_p = req.top_p;
-        let stop = req.stop.clone();
-        let mut encoded = encode_openai_request(req).map_err(OpenRouterTranslatorError::Encode)?;
+        let Request {
+            model_id,
+            messages,
+            tools,
+            tool_choice,
+            response_format,
+            temperature,
+            top_p,
+            max_output_tokens,
+            stop,
+            metadata,
+        } = req;
+
+        let mut encoded = encode_openai_request_parts(OpenAiEncodeInput {
+            model_id: &model_id,
+            messages,
+            tools,
+            tool_choice,
+            response_format,
+            temperature,
+            top_p,
+            max_output_tokens,
+            stop: &stop,
+            metadata,
+        })
+        .map_err(OpenRouterTranslatorError::Encode)?;
         apply_openrouter_overrides(
             &model_id,
             top_p,
