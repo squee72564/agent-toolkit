@@ -393,8 +393,19 @@ fn conversation_new_is_empty() {
 }
 
 #[test]
+fn conversation_with_system_text_starts_with_system_text() {
+    let conversation = Conversation::with_system_text("You are a helpful assistant");
+    assert_eq!(conversation.len(), 1);
+    assert_eq!(
+        conversation.messages()[0],
+        Message::system_text("You are a helpful assistant")
+    );
+}
+
+#[test]
 fn conversation_with_user_text_starts_with_user_message() {
-    let conversation = Conversation::with_user_text("hello");
+    let mut conversation = Conversation::new();
+    conversation.push_user_text("hello");
     assert_eq!(conversation.len(), 1);
     assert_eq!(conversation.messages()[0], Message::user_text("hello"));
 }
@@ -459,7 +470,8 @@ fn conversation_generic_push_and_extend_work() {
 
 #[test]
 fn conversation_to_input_and_into_input_preserve_messages() {
-    let mut conversation = Conversation::with_user_text("u1");
+    let mut conversation = Conversation::new();
+    conversation.push_user_text("u1");
     conversation.push_assistant_text("a1");
 
     let to_input = conversation.to_input();
@@ -497,7 +509,8 @@ fn conversation_from_into_vec_roundtrip() {
 
 #[test]
 fn conversation_into_vec_reuses_allocation_when_unique() {
-    let mut conversation = Conversation::with_user_text("u1");
+    let mut conversation = Conversation::new();
+    conversation.push_user_text("u1");
     conversation.push_assistant_text("a1");
 
     let original_ptr = conversation.messages.as_ptr();
@@ -508,7 +521,8 @@ fn conversation_into_vec_reuses_allocation_when_unique() {
 
 #[test]
 fn conversation_into_vec_clones_when_messages_are_shared() {
-    let mut conversation = Conversation::with_user_text("u1");
+    let mut conversation = Conversation::new();
+    conversation.push_user_text("u1");
     conversation.push_assistant_text("a1");
     let shared = conversation.clone();
 
@@ -521,7 +535,8 @@ fn conversation_into_vec_clones_when_messages_are_shared() {
 
 #[test]
 fn message_create_input_from_conversation_ref_and_owned() {
-    let mut conversation = Conversation::with_user_text("u1");
+    let mut conversation = Conversation::new();
+    conversation.push_user_text("u1");
     conversation.push_assistant_text("a1");
 
     let from_ref: MessageCreateInput = (&conversation).into();
@@ -532,7 +547,8 @@ fn message_create_input_from_conversation_ref_and_owned() {
 
 #[test]
 fn conversation_to_input_uses_copy_on_write_for_later_mutation() {
-    let mut conversation = Conversation::with_user_text("u1");
+    let mut conversation = Conversation::new();
+    conversation.push_user_text("u1");
     let first_input = conversation.to_input();
 
     conversation.push_assistant_text("a1");

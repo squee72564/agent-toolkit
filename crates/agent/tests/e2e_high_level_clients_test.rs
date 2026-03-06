@@ -88,7 +88,8 @@ async fn anthropic_conversation_flow_preserves_history_between_turns() {
         .build()
         .expect("build anthropic client");
 
-    let mut conversation = Conversation::with_user_text("hello anthropic");
+    let mut conversation = Conversation::new();
+    conversation.push_user_text("hello anthropic");
 
     let _ = with_test_timeout(client.messages().create(conversation.to_input()))
         .await
@@ -156,7 +157,8 @@ async fn openrouter_tool_enabled_flow_handles_tool_orchestration_and_meta() {
 
     let registry = build_registry_with_raw_and_typed_tools();
 
-    let mut conversation = Conversation::with_user_text("use a tool");
+    let mut conversation = Conversation::new();
+    conversation.push_user_text("use a tool");
 
     let (first_response, first_meta) = with_test_timeout(client.messages().create_with_meta(
         tool_enabled_input(conversation.to_input(), &registry).with_tool_choice(ToolChoice::Auto),

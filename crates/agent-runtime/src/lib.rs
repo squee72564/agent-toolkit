@@ -754,18 +754,8 @@ impl Conversation {
         }
     }
 
-    /// Creates a conversation initialized with one user text message.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use agent_runtime::Conversation;
-    ///
-    /// let conversation = Conversation::with_user_text("Hello");
-    /// assert_eq!(conversation.len(), 1);
-    /// ```
-    pub fn with_user_text(text: impl Into<String>) -> Self {
-        Self::from_messages(vec![Message::user_text(text)])
+    pub fn with_system_text(text: impl Into<String>) -> Self {
+        Self::from_messages(vec![Message::system_text(text)])
     }
 
     pub fn len(&self) -> usize {
@@ -836,39 +826,10 @@ impl Conversation {
         Arc::make_mut(&mut self.messages).clear();
     }
 
-    /// Creates a `MessageCreateInput` that preserves this conversation's messages.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use agent_runtime::Conversation;
-    ///
-    /// let mut conversation = Conversation::with_user_text("What's 2 + 2?");
-    /// conversation.push_assistant_text("4");
-    ///
-    /// let input = conversation.to_input();
-    /// assert_eq!(input.messages().len(), 2);
-    /// assert!(input.model.is_none());
-    /// ```
     pub fn to_input(&self) -> MessageCreateInput {
         MessageCreateInput::new_shared(Arc::clone(&self.messages))
     }
 
-    /// Consumes this conversation and converts it into a `MessageCreateInput`.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use agent_runtime::Conversation;
-    /// use serde_json::json;
-    ///
-    /// let mut conversation = Conversation::with_user_text("Search for Rust traits");
-    /// conversation.push_assistant_tool_call("call_1", "search", json!({ "q": "rust traits" }));
-    /// conversation.push_tool_result_text("call_1", "Found official Rust book chapter.");
-    ///
-    /// let input = conversation.into_input();
-    /// assert_eq!(input.messages().len(), 3);
-    /// ```
     pub fn into_input(self) -> MessageCreateInput {
         match Arc::try_unwrap(self.messages) {
             Ok(messages) => MessageCreateInput::new_owned(messages),

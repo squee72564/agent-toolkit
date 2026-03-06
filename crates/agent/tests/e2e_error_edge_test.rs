@@ -165,7 +165,8 @@ async fn orchestration_loop_reports_invalid_tool_args_predictably() {
     };
 
     let registry = build_raw_echo_only_registry();
-    let mut conversation = Conversation::with_user_text("run a tool");
+    let mut conversation = Conversation::new();
+    conversation.push_user_text("Run a tool.");
 
     let error = orchestrate_tool_calls(&response, &mut conversation, &registry)
         .await
