@@ -90,9 +90,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     registry.register_validated(weather_tool)?;
 
     let mut convo = Conversation::with_user_text("What is weather in SF?");
-    let mut input = convo.to_input();
-    input.tools = registry.tool_definitions();
-    input.tool_choice = ToolChoice::Auto;
+    let input = convo
+        .to_input()
+        .with_tools(registry.tool_definitions())
+        .with_tool_choice(ToolChoice::Auto);
 
     let response = client.messages().create(input).await?;
 
