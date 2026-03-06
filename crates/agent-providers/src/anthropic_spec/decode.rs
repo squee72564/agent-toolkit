@@ -18,7 +18,7 @@ const WARN_USAGE_OVERFLOW: &str = "anthropic.decode.usage_overflow";
 const WARN_STRUCTURED_OUTPUT_PARSE_FAILED: &str = "anthropic.decode.structured_output_parse_failed";
 
 pub(crate) fn decode_anthropic_response(
-    payload: &AnthropicDecodeEnvelope,
+    payload: AnthropicDecodeEnvelope,
 ) -> Result<Response, AnthropicSpecError> {
     let root = payload
         .body

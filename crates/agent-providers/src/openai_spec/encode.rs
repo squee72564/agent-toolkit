@@ -10,25 +10,33 @@ use agent_core::types::{
 use super::schema_rules::{canonicalize_json, is_strict_compatible_schema, stable_json_string};
 use super::{OpenAiEncodedRequest, OpenAiSpecError};
 
-pub(crate) fn encode_openai_request(
-    req: &Request,
-) -> Result<OpenAiEncodedRequest, OpenAiSpecError> {
+pub(crate) fn encode_openai_request(req: Request) -> Result<OpenAiEncodedRequest, OpenAiSpecError> {
     if req.model_id.trim().is_empty() {
         return Err(OpenAiSpecError::validation("model_id must not be empty"));
     }
 
     let mut warnings = Vec::new();
-    let text_format = map_response_format(req)?;
-    let tool_choice = map_tool_choice(req)?;
-    let tools = map_tools(req, &mut warnings)?;
-    let input = map_messages(req)?;
+    let text_format = map_response_format(&req)?;
+    let tool_choice = map_tool_choice(&req)?;
+    let tools = map_tools(&req, &mut warnings)?;
+    let input = map_messages(&req)?;
 
     if input.is_empty() {
         return Err(OpenAiSpecError::validation("empty input"));
     }
 
+    let Request {
+        model_id,
+        metadata,
+        temperature,
+        max_output_tokens,
+        top_p,
+        stop,
+        ..
+    } = req;
+
     let mut body = Map::new();
-    body.insert("model".to_string(), Value::String(req.model_id.clone()));
+    body.insert("model".to_string(), Value::String(model_id));
     body.insert("store".to_string(), Value::Bool(false));
     body.insert("input".to_string(), Value::Array(input));
     body.insert("text".to_string(), json!({ "format": text_format }));
@@ -39,19 +47,19 @@ pub(crate) fn encode_openai_request(
 
     body.insert("tool_choice".to_string(), tool_choice);
 
-    if let Some(temperature) = req.temperature {
+    if let Some(temperature) = temperature {
         body.insert("temperature".to_string(), json!(temperature));
     }
 
-    if let Some(max_output_tokens) = req.max_output_tokens {
+    if let Some(max_output_tokens) = max_output_tokens {
         body.insert("max_output_tokens".to_string(), json!(max_output_tokens));
     }
 
-    if !req.metadata.is_empty() {
-        body.insert("metadata".to_string(), json!(req.metadata));
+    if !metadata.is_empty() {
+        body.insert("metadata".to_string(), json!(metadata));
     }
 
-    if req.top_p.is_some() {
+    if top_p.is_some() {
         push_warning(
             &mut warnings,
             "openai.encode.ignored_top_p",
@@ -59,7 +67,7 @@ pub(crate) fn encode_openai_request(
         );
     }
 
-    if !req.stop.is_empty() {
+    if !stop.is_empty() {
         push_warning(
             &mut warnings,
             "openai.encode.ignored_stop",

@@ -15,6 +15,7 @@ description = "HTTP transport and retry primitives for agent-toolkit."
 [dependencies]
 agent-core = { path = "../agent-core" }
 base64.workspace = true
+bytes = "1"
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

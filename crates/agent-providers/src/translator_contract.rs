@@ -19,10 +19,10 @@ pub trait ProtocolTranslator {
     type Error: std::error::Error + Send + Sync + 'static;
 
     /// Encodes a core [`Request`] into a provider-specific request payload.
-    fn encode_request(&self, req: &Request) -> Result<Self::RequestPayload, Self::Error>;
+    fn encode_request(&self, req: Request) -> Result<Self::RequestPayload, Self::Error>;
 
     /// Decodes a provider response payload into a core [`Response`].
     ///
     /// The method name is retained for API compatibility.
-    fn decode_request(&self, payload: &Self::ResponsePayload) -> Result<Response, Self::Error>;
+    fn decode_request(&self, payload: Self::ResponsePayload) -> Result<Response, Self::Error>;
 }

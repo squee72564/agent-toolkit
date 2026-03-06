@@ -22,11 +22,33 @@ fn runtime_error(
     }
 }
 
+fn test_provider_client(provider: ProviderId) -> ProviderClient {
+    let adapter = adapter_for(provider);
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .expect("test client should build");
+    let transport = HttpTransport::builder(client).build();
+    let platform = adapter
+        .platform_config("http://127.0.0.1:1".to_string())
+        .expect("test platform should build");
+
+    ProviderClient::new(ProviderRuntime {
+        provider,
+        adapter,
+        platform,
+        auth_token: "test-key".to_string(),
+        default_model: None,
+        transport,
+        observer: None,
+    })
+}
+
 #[test]
 fn message_input_from_str_creates_user_message() {
     let input = MessageCreateInput::from("hello");
-    assert_eq!(input.messages.len(), 1);
-    assert_eq!(input.messages[0].role, MessageRole::User);
+    assert_eq!(input.messages().len(), 1);
+    assert_eq!(input.messages()[0].role, MessageRole::User);
 }
 
 #[test]
@@ -292,10 +314,10 @@ fn fallback_policy_requires_targets_without_primary_target() {
 
 #[test]
 fn resolve_targets_errors_for_unregistered_provider() {
-    let toolkit = AgentToolkit::builder()
-        .with_openai(ProviderConfig::new("test-key").with_base_url("http://127.0.0.1:1"))
-        .build()
-        .expect("toolkit should build for target resolution test");
+    let toolkit = AgentToolkit {
+        clients: HashMap::from([(ProviderId::OpenAi, test_provider_client(ProviderId::OpenAi))]),
+        observer: None,
+    };
 
     let options =
         SendOptions::for_target(Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"));
@@ -308,11 +330,16 @@ fn resolve_targets_errors_for_unregistered_provider() {
 
 #[test]
 fn resolve_targets_deduplicates_primary_and_fallback_targets() {
-    let toolkit = AgentToolkit::builder()
-        .with_openai(ProviderConfig::new("test-key").with_base_url("http://127.0.0.1:1"))
-        .with_openrouter(ProviderConfig::new("test-key").with_base_url("http://127.0.0.1:1"))
-        .build()
-        .expect("toolkit should build for target resolution test");
+    let toolkit = AgentToolkit {
+        clients: HashMap::from([
+            (ProviderId::OpenAi, test_provider_client(ProviderId::OpenAi)),
+            (
+                ProviderId::OpenRouter,
+                test_provider_client(ProviderId::OpenRouter),
+            ),
+        ]),
+        observer: None,
+    };
 
     let options = SendOptions::for_target(Target::new(ProviderId::OpenAi).with_model("gpt-5"))
         .with_fallback_policy(FallbackPolicy::new(vec![
@@ -436,7 +463,7 @@ fn conversation_to_input_and_into_input_preserve_messages() {
     conversation.push_assistant_text("a1");
 
     let to_input = conversation.to_input();
-    assert_eq!(to_input.messages, conversation.clone_messages());
+    assert_eq!(to_input.messages(), conversation.messages());
     assert!(to_input.model.is_none());
     assert!(to_input.tools.is_empty());
     assert_eq!(to_input.tool_choice, ToolChoice::default());
@@ -448,7 +475,7 @@ fn conversation_to_input_and_into_input_preserve_messages() {
     assert!(to_input.metadata.is_empty());
 
     let into_input = conversation.clone().into_input();
-    assert_eq!(into_input.messages, conversation.clone_messages());
+    assert_eq!(into_input.messages(), conversation.messages());
     assert!(into_input.model.is_none());
     assert!(into_input.tools.is_empty());
     assert_eq!(into_input.tool_choice, ToolChoice::default());
@@ -477,6 +504,21 @@ fn message_create_input_from_conversation_ref_and_owned() {
     let from_owned: MessageCreateInput = conversation.clone().into();
 
     assert_eq!(from_ref, from_owned);
+}
+
+#[test]
+fn conversation_to_input_uses_copy_on_write_for_later_mutation() {
+    let mut conversation = Conversation::with_user_text("u1");
+    let first_input = conversation.to_input();
+
+    conversation.push_assistant_text("a1");
+    let second_input = conversation.to_input();
+
+    assert_eq!(first_input.messages(), &[Message::user_text("u1")]);
+    assert_eq!(
+        second_input.messages(),
+        &[Message::user_text("u1"), Message::assistant_text("a1")]
+    );
 }
 
 #[test]

@@ -50,7 +50,7 @@ fn fixture_smoke_anthropic_errors() -> Result<(), String> {
             requested_response_format: ResponseFormat::Text,
         };
         let error = AnthropicTranslator
-            .decode_request(&payload)
+            .decode_request(payload.clone())
             .expect_err("expected upstream decode error for error fixture");
         assert_anthropic_upstream_error(error, scenario, &chosen_model)?;
     }
@@ -112,7 +112,7 @@ fn fixture_full_anthropic_errors_sweep() -> Result<(), String> {
             requested_response_format: ResponseFormat::Text,
         };
         let error = AnthropicTranslator
-            .decode_request(&payload)
+            .decode_request(payload.clone())
             .expect_err("expected upstream decode error for error fixture");
         assert_anthropic_upstream_error(error, scenario, model)?;
     }
@@ -222,7 +222,7 @@ fn validate_success_fixture_body(body: &Value, scenario: &str, _model: &str) -> 
         requested_response_format: ResponseFormat::Text,
     };
     let response = AnthropicTranslator
-        .decode_request(&payload)
+        .decode_request(payload.clone())
         .map_err(|err| format!("decode failed: {err}"))?;
     assert_success_invariants(&response, scenario)
 }

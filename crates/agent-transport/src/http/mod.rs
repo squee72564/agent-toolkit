@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use base64::Engine;
+use bytes::Bytes;
 use reqwest::header::{
     AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue, InvalidHeaderName,
     InvalidHeaderValue,
@@ -160,7 +161,7 @@ impl HttpTransport {
         platform: &PlatformConfig,
         method: Method,
         url: &str,
-        body: Option<Vec<u8>>,
+        body: Option<Bytes>,
         ctx: &AdapterContext,
     ) -> Result<TResp, TransportError>
     where
@@ -242,7 +243,7 @@ impl HttpTransport {
         TResp: DeserializeOwned,
     {
         let payload = serde_json::to_vec(body).map_err(|_| TransportError::Serialization)?;
-        self.execute_json_request(platform, Method::POST, url, Some(payload), ctx)
+        self.execute_json_request(platform, Method::POST, url, Some(payload.into()), ctx)
             .await
     }
 
@@ -256,7 +257,9 @@ impl HttpTransport {
     where
         TReq: Serialize + ?Sized,
     {
-        let payload = serde_json::to_vec(body).map_err(|_| TransportError::Serialization)?;
+        let payload: Bytes = serde_json::to_vec(body)
+            .map_err(|_| TransportError::Serialization)?
+            .into();
         let header_config = self.build_header_config(platform, ctx)?;
         let max_attempts = self.retry_policy.max_attempts.max(1);
         let mut attempt: u8 = 0;

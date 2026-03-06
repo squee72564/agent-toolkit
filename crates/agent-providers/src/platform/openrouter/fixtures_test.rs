@@ -57,7 +57,7 @@ fn fixture_smoke_openrouter_errors() -> Result<(), String> {
             requested_response_format: ResponseFormat::Text,
         };
         let error = OpenRouterTranslator::default()
-            .decode_request(&payload)
+            .decode_request(payload.clone())
             .expect_err("expected upstream decode error for error fixture");
         assert_openrouter_upstream_error(error, scenario, &chosen_model)?;
     }
@@ -127,7 +127,7 @@ fn fixture_full_openrouter_errors_sweep() -> Result<(), String> {
             requested_response_format: ResponseFormat::Text,
         };
         let error = OpenRouterTranslator::default()
-            .decode_request(&payload)
+            .decode_request(payload.clone())
             .expect_err("expected upstream decode error for error fixture");
         assert_openrouter_upstream_error(error, scenario, model)?;
     }
@@ -202,7 +202,7 @@ fn validate_success_fixture_body(body: &Value, scenario: &str, _model: &str) -> 
         requested_response_format: ResponseFormat::Text,
     };
     let response = OpenRouterTranslator::default()
-        .decode_request(&payload)
+        .decode_request(payload.clone())
         .map_err(|err| format!("decode failed: {err}"))?;
     assert_success_invariants(&response, scenario)?;
     assert_fallback_warning_for_non_openai_shape(body, &response)

@@ -20,10 +20,10 @@ pub trait ProviderAdapter: Sync + std::fmt::Debug {
     fn default_base_url(&self) -> &'static str;
     fn endpoint_path(&self) -> &'static str;
     fn platform_config(&self, base_url: String) -> Result<PlatformConfig, AdapterError>;
-    fn encode_request(&self, req: &Request) -> Result<EncodedRequest, AdapterError>;
+    fn encode_request(&self, req: Request) -> Result<EncodedRequest, AdapterError>;
     fn decode_response(
         &self,
-        body: &Value,
+        body: Value,
         requested_format: &ResponseFormat,
     ) -> Result<Response, AdapterError>;
 }
@@ -94,7 +94,7 @@ impl ProviderAdapter for OpenAiAdapter {
         )
     }
 
-    fn encode_request(&self, req: &Request) -> Result<EncodedRequest, AdapterError> {
+    fn encode_request(&self, req: Request) -> Result<EncodedRequest, AdapterError> {
         let translator = OpenAiTranslator;
         let encoded = translator.encode_request(req).map_err(AdapterError::from)?;
         Ok(EncodedRequest {
@@ -105,16 +105,16 @@ impl ProviderAdapter for OpenAiAdapter {
 
     fn decode_response(
         &self,
-        body: &Value,
+        body: Value,
         requested_format: &ResponseFormat,
     ) -> Result<Response, AdapterError> {
         let translator = OpenAiTranslator;
         let envelope = OpenAiDecodeEnvelope {
-            body: body.clone(),
+            body,
             requested_response_format: requested_format.clone(),
         };
         translator
-            .decode_request(&envelope)
+            .decode_request(envelope)
             .map_err(AdapterError::from)
     }
 }
@@ -149,7 +149,7 @@ impl ProviderAdapter for AnthropicAdapter {
         )
     }
 
-    fn encode_request(&self, req: &Request) -> Result<EncodedRequest, AdapterError> {
+    fn encode_request(&self, req: Request) -> Result<EncodedRequest, AdapterError> {
         let translator = AnthropicTranslator;
         let encoded = translator.encode_request(req).map_err(AdapterError::from)?;
         Ok(EncodedRequest {
@@ -160,16 +160,16 @@ impl ProviderAdapter for AnthropicAdapter {
 
     fn decode_response(
         &self,
-        body: &Value,
+        body: Value,
         requested_format: &ResponseFormat,
     ) -> Result<Response, AdapterError> {
         let translator = AnthropicTranslator;
         let envelope = AnthropicDecodeEnvelope {
-            body: body.clone(),
+            body,
             requested_response_format: requested_format.clone(),
         };
         translator
-            .decode_request(&envelope)
+            .decode_request(envelope)
             .map_err(AdapterError::from)
     }
 }
@@ -198,7 +198,7 @@ impl ProviderAdapter for OpenRouterAdapter {
         )
     }
 
-    fn encode_request(&self, req: &Request) -> Result<EncodedRequest, AdapterError> {
+    fn encode_request(&self, req: Request) -> Result<EncodedRequest, AdapterError> {
         let translator = OpenRouterTranslator::default();
         let encoded = translator.encode_request(req).map_err(AdapterError::from)?;
         Ok(EncodedRequest {
@@ -209,16 +209,16 @@ impl ProviderAdapter for OpenRouterAdapter {
 
     fn decode_response(
         &self,
-        body: &Value,
+        body: Value,
         requested_format: &ResponseFormat,
     ) -> Result<Response, AdapterError> {
         let translator = OpenRouterTranslator::default();
         let envelope = OpenAiDecodeEnvelope {
-            body: body.clone(),
+            body,
             requested_response_format: requested_format.clone(),
         };
         translator
-            .decode_request(&envelope)
+            .decode_request(envelope)
             .map_err(AdapterError::from)
     }
 }

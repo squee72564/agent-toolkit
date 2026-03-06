@@ -503,9 +503,49 @@ pub struct ResponseMeta {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+enum MessagesPayload {
+    Owned(Vec<Message>),
+    Shared(Arc<Vec<Message>>),
+}
+
+impl Default for MessagesPayload {
+    fn default() -> Self {
+        Self::Owned(Vec::new())
+    }
+}
+
+impl MessagesPayload {
+    fn as_slice(&self) -> &[Message] {
+        match self {
+            Self::Owned(messages) => messages.as_slice(),
+            Self::Shared(messages) => messages.as_slice(),
+        }
+    }
+
+    fn into_vec(self) -> Vec<Message> {
+        match self {
+            Self::Owned(messages) => messages,
+            Self::Shared(messages) => messages.as_ref().clone(),
+        }
+    }
+
+    fn to_mut(&mut self) -> &mut Vec<Message> {
+        if let Self::Shared(messages) = self {
+            let cloned = messages.as_ref().clone();
+            *self = Self::Owned(cloned);
+        }
+
+        match self {
+            Self::Owned(messages) => messages,
+            Self::Shared(_) => unreachable!("shared payload should materialize before mutation"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct MessageCreateInput {
     pub model: Option<String>,
-    pub messages: Vec<Message>,
+    messages: MessagesPayload,
     pub tools: Vec<ToolDefinition>,
     pub tool_choice: ToolChoice,
     pub response_format: ResponseFormat,
@@ -518,9 +558,28 @@ pub struct MessageCreateInput {
 
 impl MessageCreateInput {
     pub fn new(messages: Vec<Message>) -> Self {
+        Self::new_owned(messages)
+    }
+
+    fn new_owned(messages: Vec<Message>) -> Self {
         Self {
             model: None,
-            messages,
+            messages: MessagesPayload::Owned(messages),
+            tools: Vec::new(),
+            tool_choice: ToolChoice::default(),
+            response_format: ResponseFormat::default(),
+            temperature: None,
+            top_p: None,
+            max_output_tokens: None,
+            stop: Vec::new(),
+            metadata: BTreeMap::new(),
+        }
+    }
+
+    fn new_shared(messages: Arc<Vec<Message>>) -> Self {
+        Self {
+            model: None,
+            messages: MessagesPayload::Shared(messages),
             tools: Vec::new(),
             tool_choice: ToolChoice::default(),
             response_format: ResponseFormat::default(),
@@ -536,8 +595,64 @@ impl MessageCreateInput {
         Self::from(text.into())
     }
 
+    pub fn messages(&self) -> &[Message] {
+        self.messages.as_slice()
+    }
+
+    pub fn messages_mut(&mut self) -> &mut Vec<Message> {
+        self.messages.to_mut()
+    }
+
+    pub fn into_messages(self) -> Vec<Message> {
+        self.messages.into_vec()
+    }
+
     pub fn with_model(mut self, model: impl Into<String>) -> Self {
         self.model = Some(model.into());
+        self
+    }
+
+    pub fn with_tools(mut self, tools: Vec<ToolDefinition>) -> Self {
+        self.tools = tools;
+        self
+    }
+
+    pub fn with_tool_choice(mut self, tool_choice: ToolChoice) -> Self {
+        self.tool_choice = tool_choice;
+        self
+    }
+
+    pub fn with_response_format(mut self, response_format: ResponseFormat) -> Self {
+        self.response_format = response_format;
+        self
+    }
+
+    pub fn with_temperature(mut self, temperature: f32) -> Self {
+        self.temperature = Some(temperature);
+        self
+    }
+
+    pub fn with_top_p(mut self, top_p: f32) -> Self {
+        self.top_p = Some(top_p);
+        self
+    }
+
+    pub fn with_max_output_tokens(mut self, max_output_tokens: u32) -> Self {
+        self.max_output_tokens = Some(max_output_tokens);
+        self
+    }
+
+    pub fn with_stop<I, S>(mut self, stop: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.stop = stop.into_iter().map(Into::into).collect();
+        self
+    }
+
+    pub fn with_metadata(mut self, metadata: BTreeMap<String, String>) -> Self {
+        self.metadata = metadata;
         self
     }
 
@@ -546,13 +661,27 @@ impl MessageCreateInput {
         default_model: Option<&str>,
         allow_empty_model: bool,
     ) -> Result<Request, RuntimeError> {
-        if self.messages.is_empty() {
+        let MessageCreateInput {
+            model,
+            messages,
+            tools,
+            tool_choice,
+            response_format,
+            temperature,
+            top_p,
+            max_output_tokens,
+            stop,
+            metadata,
+        } = self;
+
+        let messages = messages.into_vec();
+        if messages.is_empty() {
             return Err(RuntimeError::configuration(
                 "messages().create(...) requires at least one message",
             ));
         }
 
-        let model_id = match (self.model, default_model) {
+        let model_id = match (model, default_model) {
             (Some(model_id), _) if !model_id.trim().is_empty() => model_id,
             (_, Some(default_model)) if !default_model.trim().is_empty() => {
                 default_model.to_string()
@@ -567,15 +696,15 @@ impl MessageCreateInput {
 
         Ok(Request {
             model_id,
-            messages: self.messages,
-            tools: self.tools,
-            tool_choice: self.tool_choice,
-            response_format: self.response_format,
-            temperature: self.temperature,
-            top_p: self.top_p,
-            max_output_tokens: self.max_output_tokens,
-            stop: self.stop,
-            metadata: self.metadata,
+            messages,
+            tools,
+            tool_choice,
+            response_format,
+            temperature,
+            top_p,
+            max_output_tokens,
+            stop,
+            metadata,
         })
     }
 }
@@ -600,7 +729,7 @@ impl From<Vec<Message>> for MessageCreateInput {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Conversation {
-    messages: Vec<Message>,
+    messages: Arc<Vec<Message>>,
 }
 
 impl Conversation {
@@ -620,7 +749,9 @@ impl Conversation {
 
     /// Creates a conversation from an existing message history.
     pub fn from_messages(messages: Vec<Message>) -> Self {
-        Self { messages }
+        Self {
+            messages: Arc::new(messages),
+        }
     }
 
     /// Creates a conversation initialized with one user text message.
@@ -638,30 +769,30 @@ impl Conversation {
     }
 
     pub fn len(&self) -> usize {
-        self.messages.len()
+        self.messages.as_ref().len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.messages.is_empty()
+        self.messages.as_ref().is_empty()
     }
 
     pub fn messages(&self) -> &[Message] {
-        &self.messages
+        self.messages.as_slice()
     }
 
     pub fn clone_messages(&self) -> Vec<Message> {
-        self.messages.clone()
+        self.messages.as_ref().clone()
     }
 
     pub fn push_message(&mut self, message: Message) {
-        self.messages.push(message);
+        Arc::make_mut(&mut self.messages).push(message);
     }
 
     pub fn extend_messages<I>(&mut self, messages: I)
     where
         I: IntoIterator<Item = Message>,
     {
-        self.messages.extend(messages);
+        Arc::make_mut(&mut self.messages).extend(messages);
     }
 
     pub fn push_user_text(&mut self, text: impl Into<String>) {
@@ -702,7 +833,7 @@ impl Conversation {
     }
 
     pub fn clear(&mut self) {
-        self.messages.clear();
+        Arc::make_mut(&mut self.messages).clear();
     }
 
     /// Creates a `MessageCreateInput` that preserves this conversation's messages.
@@ -716,11 +847,11 @@ impl Conversation {
     /// conversation.push_assistant_text("4");
     ///
     /// let input = conversation.to_input();
-    /// assert_eq!(input.messages.len(), 2);
+    /// assert_eq!(input.messages().len(), 2);
     /// assert!(input.model.is_none());
     /// ```
     pub fn to_input(&self) -> MessageCreateInput {
-        MessageCreateInput::new(self.clone_messages())
+        MessageCreateInput::new_shared(Arc::clone(&self.messages))
     }
 
     /// Consumes this conversation and converts it into a `MessageCreateInput`.
@@ -736,10 +867,13 @@ impl Conversation {
     /// conversation.push_tool_result_text("call_1", "Found official Rust book chapter.");
     ///
     /// let input = conversation.into_input();
-    /// assert_eq!(input.messages.len(), 3);
+    /// assert_eq!(input.messages().len(), 3);
     /// ```
     pub fn into_input(self) -> MessageCreateInput {
-        MessageCreateInput::new(self.messages)
+        match Arc::try_unwrap(self.messages) {
+            Ok(messages) => MessageCreateInput::new_owned(messages),
+            Err(messages) => MessageCreateInput::new_shared(messages),
+        }
     }
 }
 
@@ -751,7 +885,7 @@ impl From<Vec<Message>> for Conversation {
 
 impl From<Conversation> for Vec<Message> {
     fn from(conversation: Conversation) -> Self {
-        conversation.messages
+        conversation.clone_messages()
     }
 }
 
@@ -1186,6 +1320,9 @@ impl AgentToolkit {
         let mut attempts = Vec::new();
         let mut last_error: Option<RuntimeError> = None;
 
+        let request_model_id = request.model_id.clone();
+        let mut request = Some(request);
+
         for (index, target) in targets.iter().enumerate() {
             let Some(client) = self.clients.get(&target.provider) else {
                 let error = RuntimeError::target_resolution(format!(
@@ -1195,7 +1332,7 @@ impl AgentToolkit {
                 let request_end_event = RequestEndEvent {
                     request_id: error.request_id.clone(),
                     provider: Some(target.provider),
-                    model: event_model(target.model.as_deref(), &request.model_id),
+                    model: event_model(target.model.as_deref(), &request_model_id),
                     target_index: Some(index),
                     attempt_index: Some(index),
                     elapsed: request_started_at.elapsed(),
@@ -1217,7 +1354,7 @@ impl AgentToolkit {
             let attempt_start_event = AttemptStartEvent {
                 request_id: None,
                 provider: Some(target.provider),
-                model: event_model(target.model.as_deref(), &request.model_id),
+                model: event_model(target.model.as_deref(), &request_model_id),
                 target_index: Some(index),
                 attempt_index: Some(index),
                 elapsed: attempt_started_at.elapsed(),
@@ -1226,10 +1363,36 @@ impl AgentToolkit {
                 runtime_observer.on_attempt_start(&attempt_start_event);
             });
 
+            let is_last = index + 1 >= targets.len();
+            let Some(attempt_request) = (if is_last {
+                request.take()
+            } else {
+                request.as_ref().cloned()
+            }) else {
+                let error = RuntimeError::target_resolution(
+                    "request state was exhausted before completing fallback attempts",
+                );
+                let request_end_event = RequestEndEvent {
+                    request_id: error.request_id.clone(),
+                    provider: Some(target.provider),
+                    model: event_model(target.model.as_deref(), &request_model_id),
+                    target_index: Some(index),
+                    attempt_index: Some(index),
+                    elapsed: request_started_at.elapsed(),
+                    status_code: error.status_code,
+                    error_kind: Some(error.kind),
+                    error_message: Some(error.message.clone()),
+                };
+                safe_call_observer(request_observer, |runtime_observer| {
+                    runtime_observer.on_request_end(&request_end_event);
+                });
+                return Err(error);
+            };
+
             let attempt = client
                 .runtime
                 .execute_attempt(
-                    request.clone(),
+                    attempt_request,
                     target.model.as_deref(),
                     options.metadata.clone(),
                 )
@@ -1802,7 +1965,7 @@ impl ProviderRuntime {
         let url = join_url(&self.platform.base_url, self.adapter.endpoint_path());
 
         let provider_response = self
-            .execute_adapter_attempt(&request, &url, &adapter_context)
+            .execute_adapter_attempt(request, &url, &adapter_context)
             .await;
 
         match provider_response {
@@ -1859,23 +2022,31 @@ impl ProviderRuntime {
 
     async fn execute_adapter_attempt(
         &self,
-        request: &Request,
+        request: Request,
         url: &str,
         adapter_context: &AdapterContext,
     ) -> Result<(Response, HttpJsonResponse), RuntimeError> {
+        let response_format = request.response_format.clone();
         let encoded = self
             .adapter
             .encode_request(request)
             .map_err(RuntimeError::from_adapter)?;
-        let provider_response = self
+        let mut provider_response = self
             .transport
             .post_json_value(&self.platform, url, &encoded.body, adapter_context)
             .await
             .map_err(|error| RuntimeError::from_transport(self.provider, error))?;
+        let provider_code = extract_provider_code(&provider_response.body);
+        let response_body = std::mem::replace(&mut provider_response.body, serde_json::Value::Null);
         let mut response = self
             .adapter
-            .decode_response(&provider_response.body, &request.response_format)
-            .map_err(|error| self.runtime_error_from_adapter(error, Some(&provider_response)))?;
+            .decode_response(response_body, &response_format)
+            .map_err(|mut error| {
+                if error.provider_code.is_none() {
+                    error.provider_code = provider_code;
+                }
+                self.runtime_error_from_adapter(error, Some(&provider_response))
+            })?;
         prepend_encode_warnings(&mut response, encoded.warnings);
         Ok((response, provider_response))
     }

@@ -33,9 +33,9 @@ impl WireMessage {
 }
 
 pub(crate) fn encode_anthropic_request(
-    req: &Request,
+    req: Request,
 ) -> Result<AnthropicEncodedRequest, AnthropicSpecError> {
-    validate_request(req)?;
+    validate_request(&req)?;
 
     let mut warnings = Vec::new();
     if req.temperature.is_some() && req.top_p.is_some() {
@@ -46,7 +46,7 @@ pub(crate) fn encode_anthropic_request(
         );
     }
 
-    let (system, non_system_messages) = map_system_prefix(req)?;
+    let (system, non_system_messages) = map_system_prefix(&req)?;
     let mapped_messages = map_non_system_messages(&non_system_messages)?;
     let merged_messages = merge_consecutive_messages(mapped_messages);
     validate_tool_ordering(&merged_messages)?;
@@ -55,16 +55,24 @@ pub(crate) fn encode_anthropic_request(
         return Err(AnthropicSpecError::validation("empty messages"));
     }
 
-    let tools = map_tools(req)?;
-    let tool_choice = map_tool_choice(req)?;
-    let output_config = map_response_format(req, &merged_messages)?;
-    let metadata = map_metadata(req, &mut warnings);
+    let tools = map_tools(&req)?;
+    let tool_choice = map_tool_choice(&req)?;
+    let output_config = map_response_format(&req, &merged_messages)?;
+    let metadata = map_metadata(&req, &mut warnings);
+    let Request {
+        model_id,
+        max_output_tokens,
+        stop,
+        temperature,
+        top_p,
+        ..
+    } = req;
 
     let mut body = Map::new();
-    body.insert("model".to_string(), Value::String(req.model_id.clone()));
+    body.insert("model".to_string(), Value::String(model_id));
     body.insert(
         "max_tokens".to_string(),
-        Value::from(req.max_output_tokens.unwrap_or_else(|| {
+        Value::from(max_output_tokens.unwrap_or_else(|| {
             push_warning(
                 &mut warnings,
                 WARN_DEFAULT_MAX_TOKENS_APPLIED,
@@ -96,13 +104,13 @@ pub(crate) fn encode_anthropic_request(
     if let Some(output_config) = output_config {
         body.insert("output_config".to_string(), output_config);
     }
-    if !req.stop.is_empty() {
-        body.insert("stop_sequences".to_string(), json!(req.stop));
+    if !stop.is_empty() {
+        body.insert("stop_sequences".to_string(), json!(stop));
     }
-    if let Some(temperature) = req.temperature {
+    if let Some(temperature) = temperature {
         body.insert("temperature".to_string(), json!(temperature));
     }
-    if let Some(top_p) = req.top_p {
+    if let Some(top_p) = top_p {
         body.insert("top_p".to_string(), json!(top_p));
     }
     if let Some(metadata) = metadata {

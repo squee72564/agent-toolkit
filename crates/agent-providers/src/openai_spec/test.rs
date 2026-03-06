@@ -38,7 +38,7 @@ fn encode_simple_user_text_message() {
         }],
     }]);
 
-    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+    let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
 
     assert_eq!(encoded.body["model"], json!("gpt-4.1-mini"));
     assert_eq!(encoded.body["text"]["format"]["type"], json!("text"));
@@ -54,7 +54,7 @@ fn encode_warnings_empty_for_basic_request() {
         }],
     }]);
 
-    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+    let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
 
     assert!(encoded.warnings.is_empty());
 }
@@ -69,7 +69,7 @@ fn encode_warns_when_top_p_ignored() {
     }]);
     request.top_p = Some(0.8);
 
-    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+    let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
 
     assert!(
         encoded
@@ -89,7 +89,7 @@ fn encode_warns_when_stop_ignored() {
     }]);
     request.stop = vec!["END".to_string()];
 
-    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+    let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
 
     assert!(
         encoded
@@ -122,7 +122,7 @@ fn encode_warns_when_tool_schema_not_strict_compatible() {
         }),
     }];
 
-    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+    let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
 
     assert_eq!(encoded.body["tools"][0]["strict"], json!(false));
     assert!(
@@ -158,7 +158,7 @@ fn encode_emits_multiple_warnings_together() {
         }),
     }];
 
-    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+    let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
 
     assert!(
         encoded
@@ -192,7 +192,7 @@ fn reject_specific_tool_choice_when_tool_missing() {
         name: "lookup_weather".to_string(),
     };
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     assert!(
         matches!(
@@ -219,7 +219,7 @@ fn reject_tool_result_without_prior_tool_call() {
         }],
     }]);
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     assert!(
         matches!(
@@ -399,7 +399,7 @@ fn serializes_assistant_tool_call_and_tool_result() {
         },
     ]);
 
-    let encoded = encode_openai_request(&request).expect("encoding should succeed");
+    let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
     let input = encoded.body["input"]
         .as_array()
         .expect("input must be array");
@@ -413,7 +413,7 @@ fn reject_empty_model_id() {
     let mut request = base_request(vec![Message::user_text("hello")]);
     request.model_id = "   ".to_string();
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
         OpenAiSpecError::Validation { message } => {
@@ -436,7 +436,7 @@ fn reject_json_schema_response_format_with_blank_name() {
         }),
     };
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
         OpenAiSpecError::Validation { message } => {
@@ -454,7 +454,7 @@ fn reject_json_schema_response_format_with_non_object_schema() {
         schema: json!("not-an-object"),
     };
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
         OpenAiSpecError::Validation { message } => {
@@ -490,7 +490,7 @@ fn reject_duplicate_tool_names() {
         },
     ];
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
         OpenAiSpecError::Validation { message } => {
@@ -513,7 +513,7 @@ fn reject_assistant_tool_call_with_blank_id() {
         }],
     }]);
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
         OpenAiSpecError::Validation { message } => {
@@ -536,7 +536,7 @@ fn reject_assistant_tool_call_with_blank_name() {
         }],
     }]);
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
         OpenAiSpecError::Validation { message } => {
@@ -568,7 +568,7 @@ fn reject_duplicate_assistant_tool_call_ids() {
         ],
     }]);
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
         OpenAiSpecError::ProtocolViolation { message } => {
@@ -593,7 +593,7 @@ fn reject_tool_result_with_blank_tool_call_id() {
         }],
     }]);
 
-    let error = encode_openai_request(&request).expect_err("encoding should fail");
+    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
         OpenAiSpecError::Validation { message } => {
@@ -616,7 +616,7 @@ fn decode_top_level_error_maps_to_upstream() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_openai_response(&envelope).expect_err("decode should fail");
+    let error = decode_openai_response(envelope.clone()).expect_err("decode should fail");
     assert_eq!(error.kind(), OpenAiSpecErrorKind::Upstream);
     assert!(error.message().contains("openai error:"));
     assert!(error.message().contains("invalid_api_key"));
@@ -633,7 +633,7 @@ fn decode_in_progress_status_uses_interpolated_message() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_openai_response(&envelope).expect_err("decode should fail");
+    let error = decode_openai_response(envelope.clone()).expect_err("decode should fail");
 
     match error {
         OpenAiSpecError::Decode { message, .. } => {
@@ -666,7 +666,7 @@ fn decode_unknown_output_item_is_ignored_with_warning() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_openai_response(&envelope).expect("decode should succeed");
+    let response = decode_openai_response(envelope.clone()).expect("decode should succeed");
     assert_eq!(response.output.content.len(), 1);
     assert!(
         response
@@ -695,7 +695,7 @@ fn decode_unknown_message_part_is_ignored_with_warning() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_openai_response(&envelope).expect("decode should succeed");
+    let response = decode_openai_response(envelope.clone()).expect("decode should succeed");
     assert_eq!(response.output.content.len(), 1);
     assert!(
         response
@@ -723,7 +723,7 @@ fn decode_invalid_tool_call_arguments_falls_back_to_string_with_warning() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_openai_response(&envelope).expect("decode should succeed");
+    let response = decode_openai_response(envelope.clone()).expect("decode should succeed");
     assert_eq!(
         response.finish_reason,
         agent_core::types::FinishReason::ToolCalls
@@ -767,7 +767,7 @@ fn decode_function_call_rejects_blank_call_id() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_openai_response(&envelope).expect_err("decode should fail");
+    let error = decode_openai_response(envelope.clone()).expect_err("decode should fail");
     match error {
         OpenAiSpecError::Decode { message, .. } => {
             assert!(message.contains("call_id must not be empty"));
@@ -794,7 +794,7 @@ fn decode_function_call_rejects_blank_name() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_openai_response(&envelope).expect_err("decode should fail");
+    let error = decode_openai_response(envelope.clone()).expect_err("decode should fail");
     match error {
         OpenAiSpecError::Decode { message, .. } => {
             assert!(message.contains("name must not be empty"));
@@ -821,7 +821,7 @@ fn decode_function_call_rejects_blank_arguments() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let error = decode_openai_response(&envelope).expect_err("decode should fail");
+    let error = decode_openai_response(envelope.clone()).expect_err("decode should fail");
     match error {
         OpenAiSpecError::Decode { message, .. } => {
             assert!(message.contains("arguments must not be empty"));
@@ -846,7 +846,7 @@ fn decode_refusal_whitespace_only_is_ignored() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_openai_response(&envelope).expect("decode should succeed");
+    let response = decode_openai_response(envelope.clone()).expect("decode should succeed");
     assert!(response.output.content.is_empty());
     assert!(
         response
@@ -872,7 +872,7 @@ fn decode_refusal_text_is_trimmed_and_emitted() {
         requested_response_format: ResponseFormat::Text,
     };
 
-    let response = decode_openai_response(&envelope).expect("decode should succeed");
+    let response = decode_openai_response(envelope.clone()).expect("decode should succeed");
     assert_eq!(response.output.content.len(), 1);
     match &response.output.content[0] {
         ContentPart::Text { text } => assert_eq!(text, "cannot comply"),

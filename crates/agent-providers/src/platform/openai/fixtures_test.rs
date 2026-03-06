@@ -52,7 +52,7 @@ fn fixture_smoke_openai_errors() -> Result<(), String> {
                 requested_response_format: ResponseFormat::Text,
             };
             let error = OpenAiTranslator
-                .decode_request(&payload)
+                .decode_request(payload.clone())
                 .expect_err("expected upstream decode error for error fixture");
             assert_openai_upstream_error(error, scenario, &chosen_model)?;
         } else if let Some(reason) = quarantine_error_reason(scenario, preferred_model) {
@@ -122,7 +122,7 @@ fn fixture_full_openai_errors_sweep() -> Result<(), String> {
             requested_response_format: ResponseFormat::Text,
         };
         let error = OpenAiTranslator
-            .decode_request(&payload)
+            .decode_request(payload.clone())
             .expect_err("expected upstream decode error for error fixture");
         assert_openai_upstream_error(error, scenario, model)?;
     }
@@ -206,7 +206,7 @@ fn validate_success_fixture_body(body: &Value, scenario: &str, _model: &str) -> 
         requested_response_format: ResponseFormat::Text,
     };
     let response = OpenAiTranslator
-        .decode_request(&payload)
+        .decode_request(payload.clone())
         .map_err(|err| format!("decode failed: {err}"))?;
     assert_success_invariants(&response, scenario)
 }
