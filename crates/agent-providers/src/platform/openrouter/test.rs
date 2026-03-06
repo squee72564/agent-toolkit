@@ -188,6 +188,32 @@ fn openrouter_translator_preserves_openai_encode_warnings() {
 }
 
 #[test]
+fn openrouter_translator_reintroduces_top_p_and_stop_with_fallback_models() {
+    let overrides = OpenRouterOverrides {
+        fallback_models: vec!["openai/gpt-4.1".to_string()],
+        ..OpenRouterOverrides::default()
+    };
+    let translator = OpenRouterTranslator::new(overrides);
+    let mut request = base_request();
+    request.top_p = Some(0.9);
+    request.stop = vec!["DONE".to_string()];
+
+    let encoded = translator
+        .encode_request(request)
+        .expect("encoding should succeed");
+
+    assert_eq!(
+        encoded.body["models"],
+        json!(["openai/gpt-4.1-mini", "openai/gpt-4.1"])
+    );
+    let top_p = encoded.body["top_p"]
+        .as_f64()
+        .expect("top_p should be numeric");
+    assert!((top_p - 0.9).abs() < 1e-6);
+    assert_eq!(encoded.body["stop"], json!(["DONE"]));
+}
+
+#[test]
 fn openrouter_translator_applies_typed_overrides() {
     let overrides = OpenRouterOverrides {
         max_tokens: Some(384),

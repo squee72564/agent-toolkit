@@ -134,6 +134,85 @@ fn encode_warns_when_tool_schema_not_strict_compatible() {
 }
 
 #[test]
+fn encode_maps_tool_definition_with_description_and_object_schema() {
+    let mut request = base_request(vec![Message::user_text("hello")]);
+    request.tools = vec![ToolDefinition {
+        name: "lookup_weather".to_string(),
+        description: Some("Look up forecast details".to_string()),
+        parameters_schema: json!({
+            "type": "object",
+            "properties": {
+                "city": { "type": "string" }
+            },
+            "required": ["city"],
+            "additionalProperties": false
+        }),
+    }];
+
+    let encoded = encode_openai_request(request).expect("encoding should succeed");
+
+    assert_eq!(
+        encoded.body.pointer("/tools/0/type"),
+        Some(&json!("function"))
+    );
+    assert_eq!(
+        encoded.body.pointer("/tools/0/name"),
+        Some(&json!("lookup_weather"))
+    );
+    assert_eq!(
+        encoded.body.pointer("/tools/0/description"),
+        Some(&json!("Look up forecast details"))
+    );
+    assert_eq!(
+        encoded.body.pointer("/tools/0/parameters/type"),
+        Some(&json!("object"))
+    );
+    assert_eq!(encoded.body.pointer("/tools/0/strict"), Some(&json!(true)));
+}
+
+#[test]
+fn encode_maps_json_schema_response_format() {
+    let mut request = base_request(vec![Message::user_text("return json")]);
+    request.response_format = ResponseFormat::JsonSchema {
+        name: "result".to_string(),
+        schema: json!({
+            "type": "object",
+            "properties": {
+                "ok": { "type": "boolean" }
+            },
+            "required": ["ok"],
+            "additionalProperties": false
+        }),
+    };
+
+    let encoded = encode_openai_request(request).expect("encoding should succeed");
+
+    assert_eq!(
+        encoded.body.pointer("/text/format/type"),
+        Some(&json!("json_schema"))
+    );
+    assert_eq!(
+        encoded.body.pointer("/text/format/name"),
+        Some(&json!("result"))
+    );
+    assert_eq!(
+        encoded.body.pointer("/text/format/schema"),
+        Some(&json!({
+            "type": "object",
+            "properties": {
+                "ok": { "type": "boolean" }
+            },
+            "required": ["ok"],
+            "additionalProperties": false
+        }))
+    );
+    assert_eq!(
+        encoded.body.pointer("/text/format/strict"),
+        Some(&json!(true))
+    );
+}
+
+#[test]
 fn encode_emits_multiple_warnings_together() {
     let mut request = base_request(vec![Message {
         role: MessageRole::User,

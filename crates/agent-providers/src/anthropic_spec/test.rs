@@ -149,6 +149,41 @@ fn encode_tools_and_tool_choice_mappings() {
         encoded.body.pointer("/tools/0/input_schema/type"),
         Some(&json!("object"))
     );
+    assert_eq!(
+        encoded.body.pointer("/tools/0/description"),
+        Some(&json!("compute expression"))
+    );
+}
+
+#[test]
+fn encode_maps_tool_definition_with_description_and_object_schema() {
+    let mut request = base_request(vec![Message::user_text("hello")]);
+    request.tools = vec![ToolDefinition {
+        name: "lookup_weather".to_string(),
+        description: Some("Look up forecast details".to_string()),
+        parameters_schema: json!({
+            "type": "object",
+            "properties": {
+                "city": { "type": "string" }
+            },
+            "required": ["city"]
+        }),
+    }];
+
+    let encoded = encode_anthropic_request(request).expect("encode should succeed");
+
+    assert_eq!(
+        encoded.body.pointer("/tools/0/name"),
+        Some(&json!("lookup_weather"))
+    );
+    assert_eq!(
+        encoded.body.pointer("/tools/0/description"),
+        Some(&json!("Look up forecast details"))
+    );
+    assert_eq!(
+        encoded.body.pointer("/tools/0/input_schema/type"),
+        Some(&json!("object"))
+    );
 }
 
 #[test]
