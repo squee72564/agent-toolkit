@@ -2,7 +2,7 @@ mod e2e;
 
 use std::time::Duration;
 
-use agent_toolkit::tools::ToolRegistryError;
+use agent_toolkit::tools::ToolRuntimeError;
 use agent_toolkit::{
     AssistantOutput, ContentPart, Conversation, FinishReason, MessageCreateInput, RuntimeErrorKind,
     ToolCall, Usage, anthropic, openai, openrouter,
@@ -173,10 +173,10 @@ async fn orchestration_loop_reports_invalid_tool_args_predictably() {
         .expect_err("invalid args should bubble as tool loop error");
 
     match error {
-        ToolLoopError::Registry(registry_error) => {
+        ToolLoopError::Runtime(registry_error) => {
             assert!(matches!(
                 registry_error,
-                ToolRegistryError::InvalidArgs { .. }
+                ToolRuntimeError::InvalidArgs { .. }
             ));
         }
     }
