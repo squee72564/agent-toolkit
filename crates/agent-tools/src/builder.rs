@@ -1,45 +1,14 @@
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 
 use agent_core::types::ToolDefinition;
-use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use thiserror::Error;
 
-use crate::{CompiledToolSchema, Tool, ToolError, ToolOutput, ToolSchemaError};
-
-type BoxToolFuture = Pin<Box<dyn Future<Output = Result<ToolOutput, ToolError>> + Send>>;
-type ToolHandler = dyn Fn(Value) -> BoxToolFuture + Send + Sync;
-
-pub struct BuiltTool {
-    name: String,
-    description: Option<String>,
-    schema: Value,
-    handler: Arc<ToolHandler>,
-}
-
-#[async_trait]
-impl Tool for BuiltTool {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn description(&self) -> Option<&str> {
-        self.description.as_deref()
-    }
-
-    fn input_schema(&self) -> Value {
-        self.schema.clone()
-    }
-
-    async fn execute(&self, args: Value) -> Result<ToolOutput, ToolError> {
-        (self.handler)(args).await
-    }
-}
+use crate::schema::{CompiledToolSchema, ToolSchemaError};
+use crate::tool::{BoxToolFuture, BuiltTool, ToolError, ToolHandler, ToolOutput};
 
 #[derive(Debug, Error)]
 pub enum ToolBuilderError {
@@ -166,12 +135,7 @@ impl ToolBuilder {
         CompiledToolSchema::from_definition(&definition)
             .map_err(|source| ToolBuilderError::InvalidSchema { source })?;
 
-        Ok(BuiltTool {
-            name,
-            description: self.description,
-            schema,
-            handler,
-        })
+        Ok(BuiltTool::new(name, self.description, schema, handler))
     }
 }
 
