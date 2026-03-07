@@ -1,12 +1,5 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicUsize, Ordering},
-};
-
 use agent_core::types::ToolDefinition;
-use agent_tools::{
-    Tool, ToolBuilder, ToolBuilderError, ToolError, ToolOutput, ToolRegistry, ToolRegistryError,
-};
+use agent_tools::{Tool, ToolBuilder, ToolBuilderError, ToolError, ToolOutput};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::json;
@@ -32,8 +25,8 @@ struct EchoOut {
     echo: String,
 }
 
-#[tokio::test]
-async fn builder_construction_and_tool_definitions_work() {
+#[test]
+fn builder_construction_exposes_expected_tool_metadata() {
     let tool = ToolBuilder::new()
         .name("search")
         .description("Search for documents")
@@ -45,19 +38,6 @@ async fn builder_construction_and_tool_definitions_work() {
     assert_eq!(tool.name(), "search");
     assert_eq!(tool.description(), Some("Search for documents"));
     assert_eq!(tool.input_schema(), strict_schema());
-
-    let mut registry = ToolRegistry::new();
-    registry
-        .register_validated(tool)
-        .expect("schema should compile");
-    let definitions = registry.tool_definitions();
-    assert_eq!(definitions.len(), 1);
-    assert_eq!(definitions[0].name, "search");
-    assert_eq!(
-        definitions[0].description.as_deref(),
-        Some("Search for documents")
-    );
-    assert_eq!(definitions[0].parameters_schema, strict_schema());
 }
 
 #[test]
@@ -118,66 +98,6 @@ fn build_fails_when_handler_is_missing() {
     assert!(matches!(result, Err(ToolBuilderError::MissingHandler)));
 }
 
-#[tokio::test]
-async fn args_validation_failure_blocks_execution() {
-    let execute_calls = Arc::new(AtomicUsize::new(0));
-    let calls = execute_calls.clone();
-
-    let tool = ToolBuilder::new()
-        .name("search")
-        .schema(strict_schema())
-        .handler(move |args| {
-            let calls = calls.clone();
-            async move {
-                calls.fetch_add(1, Ordering::SeqCst);
-                Ok(ToolOutput { content: args })
-            }
-        })
-        .build()
-        .expect("builder should produce a tool");
-
-    let mut registry = ToolRegistry::new();
-    registry
-        .register_validated(tool)
-        .expect("schema should compile");
-
-    let error = registry
-        .execute_validated("search", json!({}))
-        .await
-        .expect_err("missing required field should fail");
-
-    assert!(matches!(error, ToolRegistryError::InvalidArgs { .. }));
-    assert_eq!(execute_calls.load(Ordering::SeqCst), 0);
-}
-
-#[tokio::test]
-async fn execution_success_with_valid_args() {
-    let tool = ToolBuilder::new()
-        .name("search")
-        .schema(strict_schema())
-        .handler(|args| async move {
-            Ok(ToolOutput {
-                content: json!({
-                    "echo": args["query"]
-                }),
-            })
-        })
-        .build()
-        .expect("builder should produce a tool");
-
-    let mut registry = ToolRegistry::new();
-    registry
-        .register_validated(tool)
-        .expect("schema should compile");
-
-    let output = registry
-        .execute_validated("search", json!({ "query": "rust" }))
-        .await
-        .expect("valid args should execute");
-
-    assert_eq!(output.content, json!({ "echo": "rust" }));
-}
-
 #[test]
 fn from_definition_pipeline_builds_tool() {
     let definition = ToolDefinition {
@@ -233,72 +153,6 @@ fn from_definition_with_invalid_schema_fails_at_build() {
 }
 
 #[tokio::test]
-async fn non_object_args_block_execution() {
-    let execute_calls = Arc::new(AtomicUsize::new(0));
-    let calls = execute_calls.clone();
-
-    let tool = ToolBuilder::new()
-        .name("search")
-        .schema(strict_schema())
-        .handler(move |args| {
-            let calls = calls.clone();
-            async move {
-                calls.fetch_add(1, Ordering::SeqCst);
-                Ok(ToolOutput { content: args })
-            }
-        })
-        .build()
-        .expect("builder should produce a tool");
-
-    let mut registry = ToolRegistry::new();
-    registry
-        .register_validated(tool)
-        .expect("schema should compile");
-
-    let error = registry
-        .execute_validated("search", json!("not-an-object"))
-        .await
-        .expect_err("non-object args should fail");
-
-    match error {
-        ToolRegistryError::InvalidArgs { name, source } => {
-            assert_eq!(name, "search");
-            assert_eq!(source.to_string(), "tool arguments must be a JSON object");
-        }
-        other => panic!("expected InvalidArgs error, got {other}"),
-    }
-    assert_eq!(execute_calls.load(Ordering::SeqCst), 0);
-}
-
-#[tokio::test]
-async fn execution_failure_surfaces_tool_name_and_source() {
-    let tool = ToolBuilder::new()
-        .name("search")
-        .schema(strict_schema())
-        .handler(|_| async move { Err(ToolError::Execution("boom".to_string())) })
-        .build()
-        .expect("builder should produce a tool");
-
-    let mut registry = ToolRegistry::new();
-    registry
-        .register_validated(tool)
-        .expect("schema should compile");
-
-    let error = registry
-        .execute_validated("search", json!({ "query": "rust" }))
-        .await
-        .expect_err("execution failure should surface as registry error");
-
-    match error {
-        ToolRegistryError::Execution { name, source } => {
-            assert_eq!(name, "search");
-            assert_eq!(source.to_string(), "tool execution failed: boom");
-        }
-        other => panic!("expected Execution error, got {other}"),
-    }
-}
-
-#[tokio::test]
 async fn typed_handler_round_trip_succeeds() {
     let tool = ToolBuilder::new()
         .name("echo")
@@ -310,13 +164,8 @@ async fn typed_handler_round_trip_succeeds() {
         .build()
         .expect("builder should produce a typed tool");
 
-    let mut registry = ToolRegistry::new();
-    registry
-        .register_validated(tool)
-        .expect("schema should compile");
-
-    let output = registry
-        .execute_validated("echo", json!({ "query": "rust" }))
+    let output = tool
+        .execute(json!({ "query": "rust" }))
         .await
         .expect("typed execution should succeed");
 
@@ -340,37 +189,6 @@ fn typed_handler_derives_object_schema_with_required_fields() {
     assert_eq!(schema.get("required"), Some(&json!(["query"])));
 }
 
-#[tokio::test]
-async fn typed_handler_invalid_payload_blocks_handler_and_surfaces_invalid_args() {
-    let execute_calls = Arc::new(AtomicUsize::new(0));
-    let calls = execute_calls.clone();
-
-    let tool = ToolBuilder::new()
-        .name("echo")
-        .typed_handler(move |args: EchoArgs| {
-            let calls = calls.clone();
-            async move {
-                calls.fetch_add(1, Ordering::SeqCst);
-                Ok(EchoOut { echo: args.query })
-            }
-        })
-        .build()
-        .expect("builder should produce a typed tool");
-
-    let mut registry = ToolRegistry::new();
-    registry
-        .register_validated(tool)
-        .expect("schema should compile");
-
-    let error = registry
-        .execute_validated("echo", json!({ "query": 42 }))
-        .await
-        .expect_err("schema validation should fail for wrong field type");
-
-    assert!(matches!(error, ToolRegistryError::InvalidArgs { .. }));
-    assert_eq!(execute_calls.load(Ordering::SeqCst), 0);
-}
-
 struct BrokenOutput;
 
 impl Serialize for BrokenOutput {
@@ -386,30 +204,19 @@ impl Serialize for BrokenOutput {
 }
 
 #[tokio::test]
-async fn typed_handler_output_encode_failure_surfaces_as_execution() {
+async fn typed_handler_output_encode_failure_surfaces_as_tool_error() {
     let tool = ToolBuilder::new()
         .name("echo")
         .typed_handler(|_args: EchoArgs| async move { Ok(BrokenOutput) })
         .build()
         .expect("builder should produce a typed tool");
 
-    let mut registry = ToolRegistry::new();
-    registry
-        .register_validated(tool)
-        .expect("schema should compile");
-
-    let error = registry
-        .execute_validated("echo", json!({ "query": "rust" }))
+    let error = tool
+        .execute(json!({ "query": "rust" }))
         .await
         .expect_err("output encode should fail");
 
-    match error {
-        ToolRegistryError::Execution { name, source } => {
-            assert_eq!(name, "echo");
-            assert!(matches!(source, ToolError::InvalidOutputEncode(_)));
-        }
-        other => panic!("expected execution error, got {other}"),
-    }
+    assert!(matches!(error, ToolError::InvalidOutputEncode(_)));
 }
 
 #[test]
