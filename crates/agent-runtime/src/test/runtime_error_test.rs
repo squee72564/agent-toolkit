@@ -1,4 +1,5 @@
 use super::*;
+use agent_transport::{TimeoutStage, TransportError};
 
 #[test]
 fn terminal_failure_error_returns_underlying_for_fallback_exhausted() {
@@ -18,4 +19,24 @@ fn terminal_failure_error_returns_underlying_for_fallback_exhausted() {
     assert_eq!(extracted.kind, RuntimeErrorKind::Upstream);
     assert_eq!(extracted.status_code, Some(503));
     assert_eq!(extracted.request_id.as_deref(), Some("req_terminal"));
+}
+
+#[test]
+fn transport_timeout_messages_preserve_stream_stage() {
+    let first_byte = RuntimeError::from_transport(
+        ProviderId::OpenAi,
+        TransportError::Timeout {
+            stage: TimeoutStage::FirstByte,
+        },
+    );
+    assert_eq!(first_byte.kind, RuntimeErrorKind::Transport);
+    assert_eq!(first_byte.message, "stream first byte timed out");
+
+    let stream_idle = RuntimeError::from_transport(
+        ProviderId::OpenAi,
+        TransportError::Timeout {
+            stage: TimeoutStage::StreamIdle,
+        },
+    );
+    assert_eq!(stream_idle.message, "stream idle timed out");
 }

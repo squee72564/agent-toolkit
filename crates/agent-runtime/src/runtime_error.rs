@@ -96,6 +96,8 @@ impl RuntimeError {
                 match stage {
                     TimeoutStage::Request => "request timed out".to_string(),
                     TimeoutStage::StreamSetup => "stream setup timed out".to_string(),
+                    TimeoutStage::FirstByte => "stream first byte timed out".to_string(),
+                    TimeoutStage::StreamIdle => "stream idle timed out".to_string(),
                 },
                 None,
                 None,
@@ -117,8 +119,12 @@ impl RuntimeError {
                 Some(head.status.as_u16()),
                 head.request_id.clone(),
             ),
-            TransportError::StreamTerminated { message, head } => (
-                format!("stream terminated unexpectedly: {message}"),
+            TransportError::StreamTerminated {
+                reason,
+                message,
+                head,
+            } => (
+                format!("stream terminated unexpectedly ({reason}): {message}"),
                 Some(head.status.as_u16()),
                 head.request_id.clone(),
             ),

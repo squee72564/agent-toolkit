@@ -359,7 +359,7 @@ Observer precedence is `SendOptions::with_observer(...)` > `AgentToolkit::builde
 - `agent-core`: provider-agnostic domain types and traits shared across crates, including canonical `ProviderId`.
 - `agent-providers`: provider-specific encode/decode/spec logic, static `ProviderAdapter` lookup boundary, and fixture datasets for validation tests.
 - `agent-runtime`: high-level clients (`openai()`, `anthropic()`, `openrouter()`), toolkit routing/fallback orchestration, and unified adapter-driven execution flow.
-- `agent-transport`: HTTP transport implementation with retry support, auth/header handling, and JSON request/response helpers.
+- `agent-transport`: HTTP transport implementation with retry support, auth/header handling, generic request bodies, and JSON/SSE/bytes response helpers.
 - `agent-tools`: lightweight tool trait and registry primitives for tool integration.
 
 ## TODO 
