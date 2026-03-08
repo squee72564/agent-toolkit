@@ -218,3 +218,83 @@ async fn send_bytes_preserves_raw_payload_and_explicit_content_type() -> TestRes
     assert_eq!(captured[0].body, vec![0, 1, 2]);
     Ok(())
 }
+
+#[tokio::test]
+async fn send_json_response_supports_non_post_methods_and_preserves_status() -> TestResult {
+    let responses = vec![ScriptedResponse {
+        status: StatusCode::ACCEPTED,
+        headers: vec![],
+        delay_before_headers: None,
+        body: ScriptedBody::Fixed(json!({"accepted": true}).to_string()),
+    }];
+    let (base_url, recorded, handle) = spawn_scripted_server(responses).await?;
+
+    let transport = default_transport(RetryPolicy::default());
+    let platform = default_platform(AuthStyle::None);
+    let ctx = empty_context();
+
+    let response = transport
+        .send_json_response(
+            &platform,
+            reqwest::Method::PUT,
+            &format!("{base_url}/v1/update"),
+            &ExampleBody { msg: "hello" },
+            &ctx,
+        )
+        .await?;
+
+    assert_eq!(response.head.status, StatusCode::ACCEPTED);
+    assert_eq!(response.body, json!({"accepted": true}));
+
+    await_server(handle).await?;
+
+    let captured = captured_requests(&recorded)?;
+    assert_eq!(captured.len(), 1);
+    assert_eq!(captured[0].method, "PUT");
+    assert_eq!(captured[0].path, "/v1/update");
+    Ok(())
+}
+
+#[tokio::test]
+async fn send_bytes_request_returns_bytes_helper_result() -> TestResult {
+    let responses = vec![ScriptedResponse {
+        status: StatusCode::OK,
+        headers: vec![(
+            "content-type".to_string(),
+            "application/octet-stream".to_string(),
+        )],
+        delay_before_headers: None,
+        body: ScriptedBody::RawChunks(vec![b"done".to_vec()]),
+    }];
+    let (base_url, recorded, handle) = spawn_scripted_server(responses).await?;
+
+    let transport = default_transport(RetryPolicy::default());
+    let platform = default_platform(AuthStyle::None);
+    let ctx = empty_context();
+    let response = transport
+        .send_bytes_request(
+            &platform,
+            reqwest::Method::POST,
+            &format!("{base_url}/binary"),
+            HttpRequestBody::Bytes {
+                content_type: Some(HeaderValue::from_static("application/octet-stream")),
+                body: Bytes::from_static(b"\xaa\xbb"),
+            },
+            &ctx,
+            HttpRequestOptions::default()
+                .with_accept(HeaderValue::from_static("application/octet-stream"))
+                .with_expected_content_type("application/octet-stream"),
+        )
+        .await?;
+
+    assert_eq!(response.body, Bytes::from_static(b"done"));
+
+    await_server(handle).await?;
+
+    let captured = captured_requests(&recorded)?;
+    assert_eq!(captured.len(), 1);
+    assert_eq!(captured[0].method, "POST");
+    assert_eq!(captured[0].path, "/binary");
+    assert_eq!(captured[0].body, vec![0xaa, 0xbb]);
+    Ok(())
+}
