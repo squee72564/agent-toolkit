@@ -203,6 +203,17 @@ pub(crate) fn load_decoded_success_fixture(provider: &str, scenario: &str, model
     read_json(&path)
 }
 
+pub(crate) fn load_streaming_success_fixture(provider: &str, scenario: &str, model: &str) -> Value {
+    assert_valid_provider(provider);
+    assert_valid_fixture_segment("scenario", scenario);
+    assert_valid_fixture_segment("model", model);
+
+    let path = streaming_fixture_root(provider)
+        .join(scenario)
+        .join(format!("{model}.json"));
+    read_json(&path)
+}
+
 pub(crate) fn load_decoded_error_fixture_body(
     provider: &str,
     scenario: &str,

@@ -17,6 +17,7 @@ use super::{OpenAiDecodeEnvelope, OpenAiSpecErrorKind};
 fn base_request(messages: Vec<Message>) -> Request {
     Request {
         model_id: "gpt-4.1-mini".to_string(),
+        stream: false,
         messages,
         tools: Vec::new(),
         tool_choice: ToolChoice::Auto,

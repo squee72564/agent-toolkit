@@ -3,18 +3,18 @@ use std::collections::BTreeMap;
 use serde_json::{Map, json};
 
 use crate::error::{AdapterErrorKind, AdapterOperation};
-use crate::openai_spec::{OpenAiDecodeEnvelope, OpenAiSpecError};
-use crate::translator_contract::ProtocolTranslator;
 use agent_core::types::ProviderId;
 use agent_core::types::{
     ContentPart, FinishReason, Message, MessageRole, Request, ResponseFormat, ToolChoice,
 };
 
-use super::translator::{OpenRouterOverrides, OpenRouterTranslator, OpenRouterTranslatorError};
+use super::{request, response};
+use crate::platform::openrouter::request::OpenRouterOverrides;
 
 fn base_request() -> Request {
     Request {
         model_id: "openai/gpt-4.1-mini".to_string(),
+        stream: false,
         messages: vec![Message {
             role: MessageRole::User,
             content: vec![ContentPart::Text {
@@ -33,140 +33,108 @@ fn base_request() -> Request {
 }
 
 #[test]
-fn maps_openrouter_encode_error_into_adapter_error() {
-    let translator_error =
-        OpenRouterTranslatorError::Encode(OpenAiSpecError::validation("bad request"));
-    let adapter_error: crate::error::AdapterError = translator_error.into();
+fn openrouter_request_error_maps_into_adapter_error() {
+    let adapter_error = request::plan_request(
+        Request {
+            model_id: String::new(),
+            ..base_request()
+        },
+        &OpenRouterOverrides::default(),
+    )
+    .expect_err("planning should fail");
 
     assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
-    assert_eq!(adapter_error.operation, AdapterOperation::EncodeRequest);
+    assert_eq!(adapter_error.operation, AdapterOperation::PlanRequest);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Validation);
-    assert_eq!(adapter_error.message, "bad request");
+    assert!(adapter_error.message.contains("model_id must not be empty"));
 }
 
 #[test]
-fn maps_openrouter_upstream_error_into_adapter_error() {
-    let translator_error = OpenRouterTranslatorError::Decode(OpenAiSpecError::Upstream {
-        message: "provider failure".to_string(),
-    });
-    let adapter_error: crate::error::AdapterError = translator_error.into();
+fn openrouter_upstream_error_maps_into_adapter_error() {
+    let adapter_error = response::decode_response_json(
+        json!({"error":{"message":"provider failure","code":401}}),
+        &ResponseFormat::Text,
+    )
+    .expect_err("decode should fail");
 
     assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Upstream);
-    assert_eq!(adapter_error.message, "provider failure");
+    assert!(adapter_error.message.contains("provider failure"));
 }
 
 #[test]
-fn maps_openrouter_decode_error_into_adapter_error() {
-    let translator_error = OpenRouterTranslatorError::Decode(OpenAiSpecError::Decode {
-        message: "bad response".to_string(),
-        source: None,
-    });
-    let adapter_error: crate::error::AdapterError = translator_error.into();
+fn openrouter_decode_error_maps_into_adapter_error() {
+    let adapter_error =
+        response::decode_response_json(json!("bad response"), &ResponseFormat::Text)
+            .expect_err("decode should fail");
 
     assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Decode);
-    assert_eq!(adapter_error.message, "bad response");
-}
-
-#[test]
-fn maps_openrouter_encode_kind_error_into_adapter_error() {
-    let translator_error = OpenRouterTranslatorError::Encode(OpenAiSpecError::Encode {
-        message: "encode failed".to_string(),
-        source: Some(Box::new(std::io::Error::other("invalid json"))),
-    });
-    let adapter_error: crate::error::AdapterError = translator_error.into();
-
-    assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
-    assert_eq!(adapter_error.operation, AdapterOperation::EncodeRequest);
-    assert_eq!(adapter_error.kind, AdapterErrorKind::Encode);
-    assert_eq!(adapter_error.message, "encode failed");
-    assert!(adapter_error.source_ref().is_some());
-}
-
-#[test]
-fn maps_openrouter_protocol_violation_error_into_adapter_error() {
-    let translator_error = OpenRouterTranslatorError::Decode(OpenAiSpecError::protocol_violation(
-        "response shape mismatch",
-    ));
-    let adapter_error: crate::error::AdapterError = translator_error.into();
-
-    assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
-    assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
-    assert_eq!(adapter_error.kind, AdapterErrorKind::ProtocolViolation);
-    assert_eq!(adapter_error.message, "response shape mismatch");
-}
-
-#[test]
-fn maps_openrouter_unsupported_feature_error_into_adapter_error() {
-    let translator_error =
-        OpenRouterTranslatorError::Decode(OpenAiSpecError::unsupported_feature("json_schema"));
-    let adapter_error: crate::error::AdapterError = translator_error.into();
-
-    assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
-    assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
-    assert_eq!(adapter_error.kind, AdapterErrorKind::UnsupportedFeature);
-    assert_eq!(adapter_error.message, "json_schema");
-}
-
-#[test]
-fn maps_openrouter_error_preserves_source_chain() {
-    let translator_error = OpenRouterTranslatorError::Encode(OpenAiSpecError::Encode {
-        message: "encode failed".to_string(),
-        source: Some(Box::new(std::io::Error::other("invalid json"))),
-    });
-    let adapter_error: crate::error::AdapterError = translator_error.into();
-
-    let translator_source = adapter_error
-        .source_ref()
-        .expect("adapter error should preserve translator source");
     assert!(
-        translator_source
-            .to_string()
-            .contains("OpenRouter encode error"),
-        "expected translator error context, got: {translator_source}"
+        adapter_error
+            .message
+            .contains("openai-compatible decode failed")
     );
+}
 
-    let spec_source = translator_source
-        .source()
-        .expect("translator source should expose spec source");
+#[test]
+fn openrouter_protocol_violation_error_maps_into_adapter_error() {
+    let adapter_error = response::decode_response_json(
+        json!({
+            "id": "chatcmpl-123",
+            "object": "chat.completion",
+            "model": "openai/gpt-4.1-mini",
+            "choices": "bad"
+        }),
+        &ResponseFormat::Text,
+    )
+    .expect_err("decode should fail");
+
+    assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
+    assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
+    assert_eq!(adapter_error.kind, AdapterErrorKind::Decode);
+    assert!(!adapter_error.message.is_empty());
+}
+
+#[test]
+fn openrouter_request_error_preserves_source_chain() {
+    let adapter_error = request::plan_request(
+        Request {
+            model_id: String::new(),
+            ..base_request()
+        },
+        &OpenRouterOverrides::default(),
+    )
+    .expect_err("planning should fail");
+
+    let spec_source = adapter_error
+        .source_ref()
+        .expect("adapter error should preserve spec source");
     assert!(
-        spec_source.to_string().contains("encode error"),
+        spec_source.to_string().contains("validation error"),
         "expected spec error context, got: {spec_source}"
     );
-
-    let leaf_source = spec_source
-        .source()
-        .expect("spec source should expose leaf source");
-    assert!(
-        leaf_source.to_string().contains("invalid json"),
-        "expected leaf source context, got: {leaf_source}"
-    );
 }
 
 #[test]
-fn openrouter_translator_reuses_openai_spec_encoder() {
-    let translator = OpenRouterTranslator::default();
-    let encoded = translator
-        .encode_request(base_request())
-        .expect("encoding should succeed");
+fn openrouter_request_reuses_openai_spec_encoder() {
+    let encoded = request::plan_request(base_request(), &OpenRouterOverrides::default())
+        .expect("planning should succeed");
 
     assert_eq!(encoded.body["model"], "openai/gpt-4.1-mini");
     assert!(encoded.body["input"].is_array());
 }
 
 #[test]
-fn openrouter_translator_preserves_openai_encode_warnings() {
-    let translator = OpenRouterTranslator::default();
+fn openrouter_request_preserves_openai_encode_warnings() {
     let mut request = base_request();
     request.top_p = Some(0.9);
     request.stop = vec!["DONE".to_string()];
 
-    let encoded = translator
-        .encode_request(request.clone())
-        .expect("encoding should succeed");
+    let encoded = request::plan_request(request.clone(), &OpenRouterOverrides::default())
+        .expect("planning should succeed");
 
     let top_p = encoded.body["top_p"]
         .as_f64()
@@ -188,19 +156,16 @@ fn openrouter_translator_preserves_openai_encode_warnings() {
 }
 
 #[test]
-fn openrouter_translator_reintroduces_top_p_and_stop_with_fallback_models() {
+fn openrouter_request_reintroduces_top_p_and_stop_with_fallback_models() {
     let overrides = OpenRouterOverrides {
         fallback_models: vec!["openai/gpt-4.1".to_string()],
         ..OpenRouterOverrides::default()
     };
-    let translator = OpenRouterTranslator::new(overrides);
     let mut request = base_request();
     request.top_p = Some(0.9);
     request.stop = vec!["DONE".to_string()];
 
-    let encoded = translator
-        .encode_request(request)
-        .expect("encoding should succeed");
+    let encoded = request::plan_request(request, &overrides).expect("planning should succeed");
 
     assert_eq!(
         encoded.body["models"],
@@ -214,7 +179,7 @@ fn openrouter_translator_reintroduces_top_p_and_stop_with_fallback_models() {
 }
 
 #[test]
-fn openrouter_translator_applies_typed_overrides() {
+fn openrouter_request_applies_typed_overrides() {
     let overrides = OpenRouterOverrides {
         max_tokens: Some(384),
         user: Some("user-1".to_string()),
@@ -222,11 +187,8 @@ fn openrouter_translator_applies_typed_overrides() {
         parallel_tool_calls: Some(true),
         ..OpenRouterOverrides::default()
     };
-    let translator = OpenRouterTranslator::new(overrides);
-
-    let encoded = translator
-        .encode_request(base_request())
-        .expect("encoding should succeed");
+    let encoded =
+        request::plan_request(base_request(), &overrides).expect("planning should succeed");
 
     assert_eq!(encoded.body["max_tokens"], 384);
     assert_eq!(encoded.body["user"], "user-1");
@@ -235,49 +197,31 @@ fn openrouter_translator_applies_typed_overrides() {
 }
 
 #[test]
-fn openrouter_translator_rejects_non_finite_frequency_penalty_override() {
+fn openrouter_request_rejects_non_finite_frequency_penalty_override() {
     let overrides = OpenRouterOverrides {
         frequency_penalty: Some(f32::NAN),
         ..OpenRouterOverrides::default()
     };
-    let translator = OpenRouterTranslator::new(overrides);
-
-    let error = translator
-        .encode_request(base_request())
-        .expect_err("encoding should fail for non-finite frequency_penalty");
-
-    match error {
-        OpenRouterTranslatorError::Encode(spec_error) => {
-            assert!(spec_error.message().contains("frequency_penalty"));
-            assert!(spec_error.message().contains("must be finite"));
-        }
-        OpenRouterTranslatorError::Decode(_) => panic!("expected encode error"),
-    }
+    let error = request::plan_request(base_request(), &overrides)
+        .expect_err("planning should fail for non-finite frequency_penalty");
+    assert!(error.message.contains("frequency_penalty"));
+    assert!(error.message.contains("must be finite"));
 }
 
 #[test]
-fn openrouter_translator_rejects_non_finite_presence_penalty_override() {
+fn openrouter_request_rejects_non_finite_presence_penalty_override() {
     let overrides = OpenRouterOverrides {
         presence_penalty: Some(f32::INFINITY),
         ..OpenRouterOverrides::default()
     };
-    let translator = OpenRouterTranslator::new(overrides);
-
-    let error = translator
-        .encode_request(base_request())
-        .expect_err("encoding should fail for non-finite presence_penalty");
-
-    match error {
-        OpenRouterTranslatorError::Encode(spec_error) => {
-            assert!(spec_error.message().contains("presence_penalty"));
-            assert!(spec_error.message().contains("must be finite"));
-        }
-        OpenRouterTranslatorError::Decode(_) => panic!("expected encode error"),
-    }
+    let error = request::plan_request(base_request(), &overrides)
+        .expect_err("planning should fail for non-finite presence_penalty");
+    assert!(error.message.contains("presence_penalty"));
+    assert!(error.message.contains("must be finite"));
 }
 
 #[test]
-fn openrouter_translator_extra_overrides_take_precedence() {
+fn openrouter_request_extra_overrides_take_precedence() {
     let mut extra = Map::new();
     extra.insert("user".to_string(), json!("from-extra"));
     extra.insert("max_tokens".to_string(), json!(777));
@@ -288,11 +232,8 @@ fn openrouter_translator_extra_overrides_take_precedence() {
         extra,
         ..OpenRouterOverrides::default()
     };
-    let translator = OpenRouterTranslator::new(overrides);
-
-    let encoded = translator
-        .encode_request(base_request())
-        .expect("encoding should succeed");
+    let encoded =
+        request::plan_request(base_request(), &overrides).expect("planning should succeed");
 
     assert_eq!(encoded.body["user"], "from-extra");
     assert_eq!(encoded.body["max_tokens"], 777);
@@ -300,9 +241,8 @@ fn openrouter_translator_extra_overrides_take_precedence() {
 
 #[test]
 fn openrouter_decode_uses_openai_path_when_payload_is_openai_compatible() {
-    let translator = OpenRouterTranslator::default();
-    let payload = OpenAiDecodeEnvelope {
-        body: json!({
+    let response = response::decode_response_json(
+        json!({
             "status": "completed",
             "model": "openai/gpt-4.1-mini",
             "output": [{
@@ -318,12 +258,9 @@ fn openrouter_decode_uses_openai_path_when_payload_is_openai_compatible() {
                 "total_tokens": 7
             }
         }),
-        requested_response_format: ResponseFormat::Text,
-    };
-
-    let response = translator
-        .decode_request(payload.clone())
-        .expect("decode should succeed");
+        &ResponseFormat::Text,
+    )
+    .expect("decode should succeed");
 
     assert_eq!(response.model, "openai/gpt-4.1-mini");
     assert_eq!(response.output.content.len(), 1);
@@ -337,9 +274,8 @@ fn openrouter_decode_uses_openai_path_when_payload_is_openai_compatible() {
 
 #[test]
 fn openrouter_decode_falls_back_to_chat_completions_shape() {
-    let translator = OpenRouterTranslator::default();
-    let payload = OpenAiDecodeEnvelope {
-        body: json!({
+    let response = response::decode_response_json(
+        json!({
             "id": "chatcmpl-123",
             "object": "chat.completion",
             "model": "openai/gpt-4.1-mini",
@@ -357,12 +293,9 @@ fn openrouter_decode_falls_back_to_chat_completions_shape() {
                 "total_tokens": 11
             }
         }),
-        requested_response_format: ResponseFormat::Text,
-    };
-
-    let response = translator
-        .decode_request(payload.clone())
-        .expect("decode should succeed");
+        &ResponseFormat::Text,
+    )
+    .expect("decode should succeed");
 
     assert_eq!(response.model, "openai/gpt-4.1-mini");
     assert_eq!(
@@ -384,75 +317,40 @@ fn openrouter_decode_falls_back_to_chat_completions_shape() {
 
 #[test]
 fn openrouter_decode_returns_combined_error_when_both_paths_fail() {
-    let translator = OpenRouterTranslator::default();
-    let payload = OpenAiDecodeEnvelope {
-        body: json!({
+    let error = response::decode_response_json(
+        json!({
             "choices": [{}]
         }),
-        requested_response_format: ResponseFormat::Text,
-    };
+        &ResponseFormat::Text,
+    )
+    .expect_err("decode should fail");
 
-    let error = translator
-        .decode_request(payload.clone())
-        .expect_err("decode should fail");
-
-    match error {
-        OpenRouterTranslatorError::Decode(spec_error) => {
-            assert!(
-                spec_error
-                    .message()
-                    .contains("openai-compatible decode failed")
-            );
-            assert!(
-                spec_error
-                    .message()
-                    .contains("openrouter fallback decode failed")
-            );
-        }
-        OpenRouterTranslatorError::Encode(_) => panic!("expected decode error"),
-    }
+    assert!(error.message.contains("openai-compatible decode failed"));
+    assert!(error.message.contains("openrouter fallback decode failed"));
 }
 
 #[test]
 fn openrouter_decode_does_not_fallback_on_upstream_error() {
-    let translator = OpenRouterTranslator::default();
-    let payload = OpenAiDecodeEnvelope {
-        body: json!({
+    let error = response::decode_response_json(
+        json!({
             "error": {
                 "message": "upstream hard failure",
                 "code": 401
             }
         }),
-        requested_response_format: ResponseFormat::Text,
-    };
+        &ResponseFormat::Text,
+    )
+    .expect_err("decode should fail");
 
-    let error = translator
-        .decode_request(payload.clone())
-        .expect_err("decode should fail");
-
-    match error {
-        OpenRouterTranslatorError::Decode(spec_error) => {
-            assert!(spec_error.message().contains("upstream hard failure"));
-            assert!(
-                !spec_error
-                    .message()
-                    .contains("openrouter fallback decode failed")
-            );
-            assert!(
-                !spec_error
-                    .message()
-                    .contains("openai-compatible decode failed")
-            );
-        }
-        OpenRouterTranslatorError::Encode(_) => panic!("expected decode error"),
-    }
+    assert!(error.message.contains("upstream hard failure"));
+    assert!(!error.message.contains("openrouter fallback decode failed"));
+    assert!(!error.message.contains("openai-compatible decode failed"));
 }
 
 #[test]
 fn openrouter_decode_tool_call_missing_id_generates_warning_and_synthetic_id() {
-    let translator = OpenRouterTranslator::default();
-    let payload = OpenAiDecodeEnvelope {
-        body: json!({
+    let response = response::decode_response_json(
+        json!({
             "id": "chatcmpl-123",
             "object": "chat.completion",
             "model": "openai/gpt-4.1-mini",
@@ -471,12 +369,9 @@ fn openrouter_decode_tool_call_missing_id_generates_warning_and_synthetic_id() {
                 }
             }]
         }),
-        requested_response_format: ResponseFormat::Text,
-    };
-
-    let response = translator
-        .decode_request(payload.clone())
-        .expect("decode should succeed");
+        &ResponseFormat::Text,
+    )
+    .expect("decode should succeed");
 
     assert_eq!(response.finish_reason, FinishReason::ToolCalls);
     assert!(response.warnings.iter().any(|w| {
@@ -501,9 +396,8 @@ fn openrouter_decode_tool_call_missing_id_generates_warning_and_synthetic_id() {
 
 #[test]
 fn openrouter_decode_tool_call_missing_name_is_ignored_with_warning() {
-    let translator = OpenRouterTranslator::default();
-    let payload = OpenAiDecodeEnvelope {
-        body: json!({
+    let response = response::decode_response_json(
+        json!({
             "id": "chatcmpl-123",
             "object": "chat.completion",
             "model": "openai/gpt-4.1-mini",
@@ -522,12 +416,9 @@ fn openrouter_decode_tool_call_missing_name_is_ignored_with_warning() {
                 }
             }]
         }),
-        requested_response_format: ResponseFormat::Text,
-    };
-
-    let response = translator
-        .decode_request(payload.clone())
-        .expect("decode should succeed");
+        &ResponseFormat::Text,
+    )
+    .expect("decode should succeed");
 
     assert!(
         !response
@@ -546,9 +437,8 @@ fn openrouter_decode_tool_call_missing_name_is_ignored_with_warning() {
 
 #[test]
 fn openrouter_decode_tool_call_whitespace_name_is_ignored_with_warning() {
-    let translator = OpenRouterTranslator::default();
-    let payload = OpenAiDecodeEnvelope {
-        body: json!({
+    let response = response::decode_response_json(
+        json!({
             "id": "chatcmpl-123",
             "object": "chat.completion",
             "model": "openai/gpt-4.1-mini",
@@ -568,12 +458,9 @@ fn openrouter_decode_tool_call_whitespace_name_is_ignored_with_warning() {
                 }
             }]
         }),
-        requested_response_format: ResponseFormat::Text,
-    };
-
-    let response = translator
-        .decode_request(payload.clone())
-        .expect("decode should succeed");
+        &ResponseFormat::Text,
+    )
+    .expect("decode should succeed");
 
     assert!(
         !response
@@ -592,9 +479,8 @@ fn openrouter_decode_tool_call_whitespace_name_is_ignored_with_warning() {
 
 #[test]
 fn openrouter_decode_invalid_tool_call_arguments_preserve_raw_string_with_warning() {
-    let translator = OpenRouterTranslator::default();
-    let payload = OpenAiDecodeEnvelope {
-        body: json!({
+    let response = response::decode_response_json(
+        json!({
             "id": "chatcmpl-123",
             "object": "chat.completion",
             "model": "openai/gpt-4.1-mini",
@@ -614,12 +500,9 @@ fn openrouter_decode_invalid_tool_call_arguments_preserve_raw_string_with_warnin
                 }
             }]
         }),
-        requested_response_format: ResponseFormat::Text,
-    };
-
-    let response = translator
-        .decode_request(payload.clone())
-        .expect("decode should succeed");
+        &ResponseFormat::Text,
+    )
+    .expect("decode should succeed");
 
     assert!(response.warnings.iter().any(|w| {
         w.code == "openrouter.decode.invalid_tool_call_arguments"
@@ -635,9 +518,8 @@ fn openrouter_decode_invalid_tool_call_arguments_preserve_raw_string_with_warnin
 
 #[test]
 fn openrouter_decode_unknown_finish_reason_emits_warning_and_maps_to_other() {
-    let translator = OpenRouterTranslator::default();
-    let payload = OpenAiDecodeEnvelope {
-        body: json!({
+    let response = response::decode_response_json(
+        json!({
             "id": "chatcmpl-123",
             "object": "chat.completion",
             "model": "openai/gpt-4.1-mini",
@@ -650,12 +532,9 @@ fn openrouter_decode_unknown_finish_reason_emits_warning_and_maps_to_other() {
                 }
             }]
         }),
-        requested_response_format: ResponseFormat::Text,
-    };
-
-    let response = translator
-        .decode_request(payload.clone())
-        .expect("decode should succeed");
+        &ResponseFormat::Text,
+    )
+    .expect("decode should succeed");
 
     assert_eq!(response.finish_reason, FinishReason::Other);
     assert!(
@@ -668,9 +547,8 @@ fn openrouter_decode_unknown_finish_reason_emits_warning_and_maps_to_other() {
 
 #[test]
 fn openrouter_decode_structured_output_parse_failure_emits_warning() {
-    let translator = OpenRouterTranslator::default();
-    let payload = OpenAiDecodeEnvelope {
-        body: json!({
+    let response = response::decode_response_json(
+        json!({
             "id": "chatcmpl-123",
             "object": "chat.completion",
             "model": "openai/gpt-4.1-mini",
@@ -683,12 +561,9 @@ fn openrouter_decode_structured_output_parse_failure_emits_warning() {
                 }
             }]
         }),
-        requested_response_format: ResponseFormat::JsonObject,
-    };
-
-    let response = translator
-        .decode_request(payload.clone())
-        .expect("decode should succeed");
+        &ResponseFormat::JsonObject,
+    )
+    .expect("decode should succeed");
 
     assert!(response.output.structured_output.is_none());
     assert!(

@@ -3,17 +3,16 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use serde_json::{Value, json};
 
-use crate::anthropic_spec::{AnthropicDecodeEnvelope, AnthropicSpecError};
+use crate::anthropic_spec::AnthropicDecodeEnvelope;
 use crate::platform::test_fixtures::{
     choose_valid_success_fixture, list_decoded_error_fixture_models,
     list_decoded_error_fixture_relpaths, list_decoded_fixture_models,
     load_decoded_error_fixture_body, load_decoded_success_fixture,
     validate_decoded_error_fixture_shape,
 };
-use crate::translator_contract::ProtocolTranslator;
 use agent_core::types::{ContentPart, FinishReason, Response, ResponseFormat};
 
-use super::translator::{AnthropicTranslator, AnthropicTranslatorError};
+use super::response::decode_response_json;
 
 const PROVIDER: &str = "anthropic";
 const SUCCESS_SCENARIOS: [&str; 3] = ["basic_chat", "tool_call", "tool_call_reasoning"];
@@ -50,8 +49,7 @@ fn fixture_smoke_anthropic_errors() -> Result<(), String> {
             body,
             requested_response_format: ResponseFormat::Text,
         };
-        let error = AnthropicTranslator
-            .decode_request(payload.clone())
+        let error = decode_response_json(payload.body, &payload.requested_response_format)
             .expect_err("expected upstream decode error for error fixture");
         assert_anthropic_upstream_error(error, scenario, &chosen_model)?;
     }
@@ -112,8 +110,7 @@ fn fixture_full_anthropic_errors_sweep() -> Result<(), String> {
             body,
             requested_response_format: ResponseFormat::Text,
         };
-        let error = AnthropicTranslator
-            .decode_request(payload.clone())
+        let error = decode_response_json(payload.body, &payload.requested_response_format)
             .expect_err("expected upstream decode error for error fixture");
         assert_anthropic_upstream_error(error, scenario, model)?;
     }
@@ -222,8 +219,7 @@ fn validate_success_fixture_body(body: &Value, scenario: &str, _model: &str) -> 
         body: body.clone(),
         requested_response_format: ResponseFormat::Text,
     };
-    let response = AnthropicTranslator
-        .decode_request(payload.clone())
+    let response = decode_response_json(payload.body, &payload.requested_response_format)
         .map_err(|err| format!("decode failed: {err}"))?;
     assert_success_invariants(&response, scenario)
 }
@@ -286,28 +282,28 @@ fn has_tool_call(response: &Response) -> bool {
 }
 
 fn assert_anthropic_upstream_error(
-    error: AnthropicTranslatorError,
+    error: crate::error::AdapterError,
     scenario: &str,
     model: &str,
 ) -> Result<(), String> {
-    match error {
-        AnthropicTranslatorError::Decode(AnthropicSpecError::Upstream { message }) => {
-            if message.trim().is_empty() {
-                return Err(format!(
-                    "expected non-empty upstream message for {scenario}/{model}"
-                ));
-            }
-            if !message.contains("anthropic error:") {
-                return Err(format!(
-                    "expected provider context in upstream message for {scenario}/{model}: {message}"
-                ));
-            }
-            Ok(())
-        }
-        other => Err(format!(
-            "expected decode upstream error for fixture {scenario}/{model}, got: {other}"
-        )),
+    if error.kind != crate::error::AdapterErrorKind::Upstream {
+        return Err(format!(
+            "expected upstream adapter error for fixture {scenario}/{model}, got kind={:?} message={}",
+            error.kind, error.message
+        ));
     }
+    if error.message.trim().is_empty() {
+        return Err(format!(
+            "expected non-empty upstream message for {scenario}/{model}"
+        ));
+    }
+    if !error.message.contains("anthropic error:") {
+        return Err(format!(
+            "expected provider context in upstream message for {scenario}/{model}: {}",
+            error.message
+        ));
+    }
+    Ok(())
 }
 
 fn has_top_level_error_object(body: &Value) -> bool {

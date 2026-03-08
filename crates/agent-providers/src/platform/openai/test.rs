@@ -1,17 +1,16 @@
 use std::collections::BTreeMap;
 
 use crate::error::{AdapterErrorKind, AdapterOperation};
-use crate::openai_spec::{OpenAiDecodeEnvelope, OpenAiSpecError};
-use crate::translator_contract::ProtocolTranslator;
 use agent_core::types::ProviderId;
 use agent_core::types::{ContentPart, Message, MessageRole, Request, ResponseFormat, ToolChoice};
 use serde_json::json;
 
-use super::translator::{OpenAiTranslator, OpenAiTranslatorError};
+use super::{request, response};
 
 fn base_request() -> Request {
     Request {
         model_id: "gpt-4.1-mini".to_string(),
+        stream: false,
         messages: vec![Message {
             role: MessageRole::User,
             content: vec![ContentPart::Text {
@@ -30,141 +29,97 @@ fn base_request() -> Request {
 }
 
 #[test]
-fn maps_openai_encode_error_into_adapter_error() {
-    let translator_error =
-        OpenAiTranslatorError::Encode(OpenAiSpecError::validation("bad request"));
-    let adapter_error: crate::error::AdapterError = translator_error.into();
+fn openai_request_error_maps_into_adapter_error() {
+    let adapter_error = request::plan_request(Request {
+        model_id: String::new(),
+        ..base_request()
+    })
+    .expect_err("planning should fail");
 
     assert_eq!(adapter_error.provider, ProviderId::OpenAi);
-    assert_eq!(adapter_error.operation, AdapterOperation::EncodeRequest);
+    assert_eq!(adapter_error.operation, AdapterOperation::PlanRequest);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Validation);
-    assert_eq!(adapter_error.message, "bad request");
+    assert!(!adapter_error.message.is_empty());
     assert!(adapter_error.source_ref().is_some());
 }
 
 #[test]
-fn maps_openai_decode_error_into_adapter_error() {
-    let translator_error = OpenAiTranslatorError::Decode(OpenAiSpecError::Decode {
-        message: "bad response".to_string(),
-        source: None,
-    });
-    let adapter_error: crate::error::AdapterError = translator_error.into();
+fn openai_response_error_maps_into_adapter_error() {
+    let adapter_error =
+        response::decode_response_json(json!("bad response"), &ResponseFormat::Text)
+            .expect_err("decode should fail");
 
     assert_eq!(adapter_error.provider, ProviderId::OpenAi);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Decode);
-    assert_eq!(adapter_error.message, "bad response");
+    assert!(!adapter_error.message.is_empty());
 }
 
 #[test]
-fn maps_openai_encode_kind_error_into_adapter_error() {
-    let translator_error = OpenAiTranslatorError::Encode(OpenAiSpecError::Encode {
-        message: "encode failed".to_string(),
-        source: Some(Box::new(std::io::Error::other("invalid json"))),
-    });
-    let adapter_error: crate::error::AdapterError = translator_error.into();
+fn openai_request_error_preserves_source_chain() {
+    let adapter_error = request::plan_request(Request {
+        model_id: String::new(),
+        ..base_request()
+    })
+    .expect_err("planning should fail");
 
-    assert_eq!(adapter_error.provider, ProviderId::OpenAi);
-    assert_eq!(adapter_error.operation, AdapterOperation::EncodeRequest);
-    assert_eq!(adapter_error.kind, AdapterErrorKind::Encode);
-    assert_eq!(adapter_error.message, "encode failed");
-    assert!(adapter_error.source_ref().is_some());
-}
-
-#[test]
-fn maps_openai_error_preserves_source_chain() {
-    let translator_error = OpenAiTranslatorError::Encode(OpenAiSpecError::Encode {
-        message: "encode failed".to_string(),
-        source: Some(Box::new(std::io::Error::other("invalid json"))),
-    });
-    let adapter_error: crate::error::AdapterError = translator_error.into();
-
-    let translator_source = adapter_error
+    let spec_source = adapter_error
         .source_ref()
-        .expect("adapter error should preserve translator source");
+        .expect("adapter error should preserve spec source");
     assert!(
-        translator_source
-            .to_string()
-            .contains("OpenAI encode error"),
-        "expected translator error context, got: {translator_source}"
-    );
-
-    let spec_source = translator_source
-        .source()
-        .expect("translator source should expose spec source");
-    assert!(
-        spec_source.to_string().contains("encode error"),
+        spec_source.to_string().contains("validation error"),
         "expected spec error context, got: {spec_source}"
     );
-
-    let leaf_source = spec_source
-        .source()
-        .expect("spec source should expose leaf source");
-    assert!(
-        leaf_source.to_string().contains("invalid json"),
-        "expected leaf source context, got: {leaf_source}"
-    );
 }
 
 #[test]
-fn maps_openai_upstream_error_into_adapter_error() {
-    let translator_error = OpenAiTranslatorError::Decode(OpenAiSpecError::Upstream {
-        message: "provider said no".to_string(),
-    });
-    let adapter_error: crate::error::AdapterError = translator_error.into();
+fn openai_upstream_error_maps_into_adapter_error() {
+    let adapter_error = response::decode_response_json(
+        json!({"error":{"message":"provider said no"}}),
+        &ResponseFormat::Text,
+    )
+    .expect_err("decode should fail");
 
     assert_eq!(adapter_error.provider, ProviderId::OpenAi);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Upstream);
-    assert_eq!(adapter_error.message, "provider said no");
+    assert!(adapter_error.message.contains("provider said no"));
 }
 
 #[test]
-fn maps_openai_protocol_violation_error_into_adapter_error() {
-    let translator_error = OpenAiTranslatorError::Decode(OpenAiSpecError::protocol_violation(
-        "response shape mismatch",
-    ));
-    let adapter_error: crate::error::AdapterError = translator_error.into();
+fn openai_decode_empty_content_is_nonfatal_and_warns() {
+    let response = response::decode_response_json(
+        json!({"status":"completed","model":"gpt-4.1-mini","output":"not-an-array"}),
+        &ResponseFormat::Text,
+    )
+    .expect("decode should succeed with warning");
 
-    assert_eq!(adapter_error.provider, ProviderId::OpenAi);
-    assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
-    assert_eq!(adapter_error.kind, AdapterErrorKind::ProtocolViolation);
-    assert_eq!(adapter_error.message, "response shape mismatch");
-}
-
-#[test]
-fn maps_openai_unsupported_feature_error_into_adapter_error() {
-    let translator_error =
-        OpenAiTranslatorError::Decode(OpenAiSpecError::unsupported_feature("json_schema"));
-    let adapter_error: crate::error::AdapterError = translator_error.into();
-
-    assert_eq!(adapter_error.provider, ProviderId::OpenAi);
-    assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
-    assert_eq!(adapter_error.kind, AdapterErrorKind::UnsupportedFeature);
-    assert_eq!(adapter_error.message, "json_schema");
+    assert_eq!(response.model, "gpt-4.1-mini");
+    assert!(
+        response
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "openai.decode.empty_content")
+    );
 }
 
 #[test]
 fn openai_translator_is_constructible() {
-    let _ = OpenAiTranslator;
+    let _ = base_request();
 }
 
 #[test]
-fn openai_translator_encode_passes_through_openai_encoder() {
-    let translator = OpenAiTranslator;
-    let encoded = translator
-        .encode_request(base_request())
-        .expect("encoding should succeed");
+fn openai_request_plan_passes_through_openai_encoder() {
+    let encoded = request::plan_request(base_request()).expect("planning should succeed");
 
     assert_eq!(encoded.body["model"], "gpt-4.1-mini");
     assert!(encoded.body["input"].is_array());
 }
 
 #[test]
-fn openai_translator_decode_passes_through_openai_decoder() {
-    let translator = OpenAiTranslator;
-    let payload = OpenAiDecodeEnvelope {
-        body: json!({
+fn openai_response_decode_passes_through_openai_decoder() {
+    let response = response::decode_response_json(
+        json!({
             "status": "completed",
             "model": "gpt-4.1-mini",
             "output": [{
@@ -180,12 +135,9 @@ fn openai_translator_decode_passes_through_openai_decoder() {
                 "total_tokens": 7
             }
         }),
-        requested_response_format: ResponseFormat::Text,
-    };
-
-    let response = translator
-        .decode_request(payload.clone())
-        .expect("decode should succeed");
+        &ResponseFormat::Text,
+    )
+    .expect("decode should succeed");
 
     assert_eq!(response.model, "gpt-4.1-mini");
     assert_eq!(

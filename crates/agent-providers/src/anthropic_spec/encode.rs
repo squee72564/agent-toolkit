@@ -48,6 +48,7 @@ pub(crate) fn encode_anthropic_request(
 
     let Request {
         model_id,
+        stream: _,
         messages,
         tools,
         tool_choice,

@@ -19,6 +19,7 @@ use super::{AnthropicDecodeEnvelope, AnthropicSpecError, AnthropicSpecErrorKind}
 fn base_request(messages: Vec<Message>) -> Request {
     Request {
         model_id: "claude-sonnet-4.6".to_string(),
+        stream: false,
         messages,
         tools: Vec::new(),
         tool_choice: ToolChoice::Auto,
