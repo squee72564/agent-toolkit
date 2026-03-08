@@ -1,7 +1,8 @@
 use std::time::Duration;
 
 use agent_transport::{
-    HttpSseResponse, HttpTransport, HttpTransportBuilder, RetryPolicy, SseEvent, TransportError,
+    HttpResponseHead, HttpSseResponse, HttpTransport, HttpTransportBuilder, RetryPolicy, SseEvent,
+    SseLimits, TimeoutStage, TransportError,
 };
 
 fn assert_builder_type(_: HttpTransportBuilder) {}
@@ -16,11 +17,15 @@ fn root_and_module_types_are_interchangeable() {
     let policy_from_module: agent_transport::http::RetryPolicy = policy_from_root.clone();
     assert_eq!(policy_from_root, policy_from_module);
 
-    let err_from_root: TransportError = TransportError::Serialization;
+    let err_from_root: TransportError = TransportError::Timeout {
+        stage: TimeoutStage::Request,
+    };
     let err_from_module: agent_transport::http::TransportError = err_from_root;
     assert!(matches!(
         err_from_module,
-        agent_transport::http::TransportError::Serialization
+        agent_transport::http::TransportError::Timeout {
+            stage: agent_transport::http::TimeoutStage::Request
+        }
     ));
 }
 
@@ -35,7 +40,9 @@ fn root_reexports_allow_transport_construction() {
 
     let transport = HttpTransport::builder(reqwest::Client::new())
         .retry_policy(policy)
-        .timeout(Duration::from_secs(2))
+        .request_timeout(Duration::from_secs(2))
+        .stream_timeout(Duration::from_secs(2))
+        .sse_limits(SseLimits::default())
         .build();
     assert_transport_type(transport);
 
@@ -45,6 +52,8 @@ fn root_reexports_allow_transport_construction() {
 
 #[test]
 fn root_reexports_expose_http_json_response_type() {
+    let _ = std::mem::size_of::<HttpResponseHead>();
+    let _ = std::mem::size_of::<agent_transport::http::HttpResponseHead>();
     let _ = std::mem::size_of::<agent_transport::HttpJsonResponse>();
     let _ = std::mem::size_of::<agent_transport::http::HttpJsonResponse>();
     let _ = std::mem::size_of::<HttpSseResponse>();

@@ -16,6 +16,7 @@ async fn post_json_value_preserves_non_success_status_and_extracts_request_id() 
     let responses = vec![ScriptedResponse {
         status: StatusCode::BAD_REQUEST,
         headers: vec![("x-trace-id".to_string(), "trace-42".to_string())],
+        delay_before_headers: None,
         body: ScriptedBody::Fixed(json!({"error": "bad request"}).to_string()),
     }];
     let (base_url, recorded, handle) = spawn_scripted_server(responses).await?;
@@ -47,8 +48,8 @@ async fn post_json_value_preserves_non_success_status_and_extracts_request_id() 
         )
         .await?;
 
-    assert_eq!(response.status, StatusCode::BAD_REQUEST);
-    assert_eq!(response.request_id.as_deref(), Some("trace-42"));
+    assert_eq!(response.head.status, StatusCode::BAD_REQUEST);
+    assert_eq!(response.head.request_id.as_deref(), Some("trace-42"));
     assert_eq!(response.body, json!({"error": "bad request"}));
 
     await_server(handle).await?;
@@ -77,11 +78,13 @@ async fn get_json_retries_retryable_status_then_succeeds() -> TestResult {
         ScriptedResponse {
             status: StatusCode::SERVICE_UNAVAILABLE,
             headers: vec![],
+            delay_before_headers: None,
             body: ScriptedBody::Fixed(json!({"error": "try again"}).to_string()),
         },
         ScriptedResponse {
             status: StatusCode::OK,
             headers: vec![],
+            delay_before_headers: None,
             body: ScriptedBody::Fixed(json!({"ok": true}).to_string()),
         },
     ];
