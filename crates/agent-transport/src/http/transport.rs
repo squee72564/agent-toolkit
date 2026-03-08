@@ -190,12 +190,7 @@ impl HttpTransport {
                 let mut buffer = BytesMut::new();
                 let idle_timeout = options.stream_idle_timeout;
                 let first_chunk = self
-                    .read_stream_chunk(
-                        &mut response,
-                        &head,
-                        idle_timeout,
-                        TimeoutStage::FirstByte,
-                    )
+                    .read_stream_chunk(&mut response, &head, idle_timeout, TimeoutStage::FirstByte)
                     .await?;
 
                 let received_any_bytes = first_chunk.is_some();
@@ -238,8 +233,14 @@ impl HttpTransport {
         TResp: DeserializeOwned,
     {
         let payload = serde_json::to_vec(body).map_err(|_| TransportError::Serialization)?;
-        self.execute_json_request(platform, method, url, HttpRequestBody::Json(payload.into()), ctx)
-            .await
+        self.execute_json_request(
+            platform,
+            method,
+            url,
+            HttpRequestBody::Json(payload.into()),
+            ctx,
+        )
+        .await
     }
 
     async fn execute_json_request<TResp>(
