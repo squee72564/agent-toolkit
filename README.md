@@ -264,92 +264,91 @@ Observer precedence is `SendOptions::with_observer(...)` > `AgentToolkit::builde
 ```text
 .
 ├── AGENTS.md
+├── CONTRIBUTING.md
 ├── Cargo.lock
 ├── Cargo.toml
-├── crates
-│   ├── agent
-│   │   ├── Cargo.toml
-│   │   └── src
-│   │       ├── lib.rs
-│   │       └── test.rs
-│   ├── agent-core
-│   │   ├── Cargo.toml
-│   │   ├── src
-│   │   │   ├── error
-│   │   │   │   └── mod.rs
-│   │   │   ├── lib.rs
-│   │   │   ├── traits
-│   │   │   │   └── mod.rs
-│   │   │   └── types
-│   │   │       └── mod.rs
-│   │   └── tests
-│   │       └── message_helpers_test.rs
-│   ├── agent-providers
-│   │   ├── Cargo.toml
-│   │   ├── data
-│   │   │   ├── anthropic
-│   │   │   ├── openai
-│   │   │   └── openrouter
-│   │   └── src
-│   │       ├── adapter
-│   │       │   └── test.rs
-│   │       ├── adapter.rs
-│   │       ├── anthropic_spec
-│   │       │   ├── decode.rs
-│   │       │   ├── encode.rs
-│   │       │   ├── mod.rs
-│   │       │   ├── schema_rules.rs
-│   │       │   └── test.rs
-│   │       ├── error.rs
-│   │       ├── lib.rs
-│   │       ├── openai_spec
-│   │       │   ├── decode.rs
-│   │       │   ├── encode.rs
-│   │       │   ├── mod.rs
-│   │       │   ├── schema_rules.rs
-│   │       │   └── test.rs
-│   │       ├── platform
-│   │       │   ├── anthropic
-│   │       │   │   ├── fixtures_test.rs
-│   │       │   │   ├── mod.rs
-│   │       │   │   ├── test.rs
-│   │       │   │   └── translator.rs
-│   │       │   ├── mod.rs
-│   │       │   ├── openai
-│   │       │   │   ├── fixtures_test.rs
-│   │       │   │   ├── mod.rs
-│   │       │   │   ├── test.rs
-│   │       │   │   └── translator.rs
-│   │       │   ├── openrouter
-│   │       │   │   ├── fixtures_test.rs
-│   │       │   │   ├── mod.rs
-│   │       │   │   ├── test.rs
-│   │       │   │   └── translator.rs
-│   │       │   └── test_fixtures.rs
-│   │       └── translator_contract.rs
-│   ├── agent-runtime
-│   │   ├── Cargo.toml
-│   │   └── src
-│   │       ├── lib.rs
-│   │       └── test.rs
-│   ├── agent-tools
-│   │   ├── Cargo.toml
-│   │   ├── src
-│   │   │   ├── builder.rs
-│   │   │   ├── lib.rs
-│   │   │   └── schema.rs
-│   │   └── tests
-│   │       ├── registry_test.rs
-│   │       ├── schema_test.rs
-│   │       └── tool_builder_test.rs
-│   └── agent-transport
-│       ├── Cargo.toml
-│       └── src
-│           ├── http
-│           │   └── mod.rs
-│           └── lib.rs
 ├── README.md
-└── tests
+└── crates
+    ├── agent
+    │   ├── Cargo.toml
+    │   └── src
+    │       └── lib.rs
+    ├── agent-core
+    │   ├── Cargo.toml
+    │   └── src
+    │       ├── lib.rs
+    │       └── types.rs
+    ├── agent-providers
+    │   ├── Cargo.toml
+    │   └── src
+    │       ├── adapter
+    │       ├── adapter.rs
+    │       ├── anthropic_spec
+    │       │   ├── decode.rs
+    │       │   ├── encode.rs
+    │       │   ├── mod.rs
+    │       │   └── schema_rules.rs
+    │       ├── error.rs
+    │       ├── lib.rs
+    │       ├── openai_spec
+    │       │   ├── decode.rs
+    │       │   ├── encode.rs
+    │       │   ├── mod.rs
+    │       │   └── schema_rules.rs
+    │       ├── platform
+    │       │   ├── anthropic
+    │       │   │   ├── mod.rs
+    │       │   │   └── translator.rs
+    │       │   ├── mod.rs
+    │       │   ├── openai
+    │       │   │   ├── mod.rs
+    │       │   │   └── translator.rs
+    │       │   └── openrouter
+    │       │       ├── mod.rs
+    │       │       └── translator.rs
+    │       └── translator_contract.rs
+    ├── agent-runtime
+    │   ├── Cargo.toml
+    │   └── src
+    │       ├── agent_toolkit.rs
+    │       ├── base_client_builder.rs
+    │       ├── clients
+    │       │   ├── anthropic.rs
+    │       │   ├── mod.rs
+    │       │   ├── openai.rs
+    │       │   └── openrouter.rs
+    │       ├── conversation.rs
+    │       ├── fallback.rs
+    │       ├── lib.rs
+    │       ├── message_create_input.rs
+    │       ├── direct_messages_api.rs
+    │       ├── observer.rs
+    │       ├── provider_client.rs
+    │       ├── provider_config.rs
+    │       ├── provider_runtime.rs
+    │       ├── routed_messages_api.rs
+    │       ├── runtime_error.rs
+    │       ├── send_options.rs
+    │       ├── target.rs
+    │       └── types.rs
+    ├── agent-tools
+    │   ├── Cargo.toml
+    │   └── src
+    │       ├── builder.rs
+    │       ├── lib.rs
+    │       ├── registry.rs
+    │       ├── runtime.rs
+    │       ├── schema.rs
+    │       └── tool.rs
+    └── agent-transport
+        ├── Cargo.toml
+        └── src
+            ├── http
+            │   ├── builder.rs
+            │   ├── mod.rs
+            │   ├── retry_policy.rs
+            │   └── transport.rs
+            └── lib.rs
 ```
 
 ## Crates
