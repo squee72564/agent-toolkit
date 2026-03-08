@@ -4,4 +4,4 @@ pub mod translator;
 mod test;
 
 #[cfg(test)]
-mod fixtures_test;
+mod decoded_fixtures_test;

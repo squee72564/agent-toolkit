@@ -1,125 +1,144 @@
-use std::any::Any;
-use std::panic::{AssertUnwindSafe, catch_unwind};
-
 use serde_json::{Value, json};
 
-use crate::anthropic_spec::{AnthropicDecodeEnvelope, AnthropicSpecError};
+use crate::openai_spec::{OpenAiDecodeEnvelope, OpenAiSpecError};
 use crate::platform::test_fixtures::{
-    choose_valid_success_fixture, list_error_fixture_models, list_error_fixture_relpaths,
-    list_fixture_models, load_error_fixture_body, load_success_fixture,
-    validate_error_fixture_shape,
+    choose_valid_success_fixture, list_decoded_error_fixture_models,
+    list_decoded_error_fixture_relpaths, list_decoded_fixture_models,
+    load_decoded_error_fixture_body, load_decoded_success_fixture,
+    validate_decoded_error_fixture_shape,
 };
 use crate::translator_contract::ProtocolTranslator;
 use agent_core::types::{ContentPart, FinishReason, Response, ResponseFormat};
 
-use super::translator::{AnthropicTranslator, AnthropicTranslatorError};
+use super::translator::{OpenAiTranslator, OpenAiTranslatorError};
 
-const PROVIDER: &str = "anthropic";
+const PROVIDER: &str = "openai";
 const SUCCESS_SCENARIOS: [&str; 3] = ["basic_chat", "tool_call", "tool_call_reasoning"];
-const SMOKE_MODELS_ANTHROPIC: [&str; 2] = ["claude-sonnet-4-6", "claude-sonnet-4-5-20250929"];
+const SMOKE_MODELS_OPENAI: [&str; 2] = ["gpt-5-mini", "o3"];
 const SMOKE_ERROR_FIXTURES: [(&str, &str); 4] = [
-    ("invalid_auth", "claude-sonnet-4-5-20250929"),
+    ("invalid_auth", "gpt-5-mini"),
     ("invalid_model", "this-model-does-not-exist"),
-    ("invalid_request_schema", "claude-sonnet-4-5-20250929"),
-    ("invalid_tool_payload", "claude-sonnet-4-5-20250929"),
+    ("invalid_request_schema", "gpt-5-mini"),
+    ("invalid_tool_payload", "gpt-5-mini"),
 ];
+const QUARANTINED_ERROR_FIXTURES: [(&str, &str, &str); 1] = [(
+    "invalid_request_schema",
+    "gpt-5-mini",
+    "wrapper exists but response.body is a non-error OpenAI response payload",
+)];
 
 #[test]
-fn fixture_smoke_anthropic_basic_chat() -> Result<(), String> {
-    run_success_smoke_scenario("basic_chat", &SMOKE_MODELS_ANTHROPIC)
+fn fixture_smoke_openai_basic_chat() {
+    run_success_smoke_scenario("basic_chat", &SMOKE_MODELS_OPENAI);
 }
 
 #[test]
-fn fixture_smoke_anthropic_tool_call() -> Result<(), String> {
-    run_success_smoke_scenario("tool_call", &SMOKE_MODELS_ANTHROPIC)
+fn fixture_smoke_openai_tool_call() {
+    run_success_smoke_scenario("tool_call", &SMOKE_MODELS_OPENAI);
 }
 
 #[test]
-fn fixture_smoke_anthropic_tool_call_reasoning() -> Result<(), String> {
-    run_success_smoke_scenario("tool_call_reasoning", &SMOKE_MODELS_ANTHROPIC)
+fn fixture_smoke_openai_tool_call_reasoning() {
+    run_success_smoke_scenario("tool_call_reasoning", &SMOKE_MODELS_OPENAI);
 }
 
 #[test]
-fn fixture_smoke_anthropic_errors() -> Result<(), String> {
+fn fixture_smoke_openai_errors() -> Result<(), String> {
     for (scenario, preferred_model) in SMOKE_ERROR_FIXTURES {
-        let chosen_model = choose_error_fixture_model_for_upstream(scenario, preferred_model)?;
-
-        let body = load_error_fixture_body(PROVIDER, scenario, &chosen_model);
-        let payload = AnthropicDecodeEnvelope {
-            body,
-            requested_response_format: ResponseFormat::Text,
-        };
-        let error = AnthropicTranslator
-            .decode_request(payload.clone())
-            .expect_err("expected upstream decode error for error fixture");
-        assert_anthropic_upstream_error(error, scenario, &chosen_model)?;
-    }
-    Ok(())
-}
-
-#[test]
-#[ignore]
-fn fixture_full_anthropic_success_sweep() -> Result<(), String> {
-    for scenario in SUCCESS_SCENARIOS {
-        let models = list_fixture_models(PROVIDER, scenario);
-        if models.is_empty() {
+        if let Ok(chosen_model) = choose_error_fixture_model_for_upstream(scenario, preferred_model)
+        {
+            let body = load_decoded_error_fixture_body(PROVIDER, scenario, &chosen_model);
+            let payload = OpenAiDecodeEnvelope {
+                body,
+                requested_response_format: ResponseFormat::Text,
+            };
+            let error = OpenAiTranslator
+                .decode_request(payload.clone())
+                .expect_err("expected upstream decode error for error fixture");
+            assert_openai_upstream_error(error, scenario, &chosen_model)?;
+        } else if let Some(reason) = quarantine_error_reason(scenario, preferred_model) {
+            eprintln!(
+                "quarantined error fixture used as known anomaly: provider={PROVIDER} scenario={scenario} model={preferred_model} reason={reason}"
+            );
+        } else {
             return Err(format!(
-                "expected at least one fixture model for scenario {scenario}"
+                "no valid upstream error fixture available for provider={PROVIDER} scenario={scenario} preferred={preferred_model}"
             ));
         }
-        for model in models {
-            let body = load_success_fixture(PROVIDER, scenario, &model);
-            validate_success_fixture_body(&body, scenario, &model).map_err(|reason| {
-                format!("invalid success fixture {scenario}/{model}: {reason}")
-            })?;
-        }
     }
     Ok(())
 }
 
 #[test]
 #[ignore]
-fn fixture_full_anthropic_errors_sweep() -> Result<(), String> {
-    let relpaths = list_error_fixture_relpaths(PROVIDER);
+fn fixture_full_openai_success_sweep() {
+    for scenario in SUCCESS_SCENARIOS {
+        let models = list_decoded_fixture_models(PROVIDER, scenario);
+        assert!(
+            !models.is_empty(),
+            "expected at least one fixture model for scenario {scenario}"
+        );
+        for model in models {
+            let body = load_decoded_success_fixture(PROVIDER, scenario, &model);
+            validate_success_fixture_body(&body, scenario, &model).unwrap_or_else(|reason| {
+                panic!("invalid success fixture {scenario}/{model}: {reason}")
+            });
+        }
+    }
+}
+
+#[test]
+#[ignore]
+fn fixture_full_openai_errors_sweep() -> Result<(), String> {
+    let relpaths = list_decoded_error_fixture_relpaths(PROVIDER);
     if relpaths.is_empty() {
         return Err(format!(
             "expected at least one error fixture relpath for provider {PROVIDER}"
         ));
     }
+
+    let mut quarantined_seen = 0usize;
     for relpath in relpaths {
         let (scenario, model) = parse_error_relpath(&relpath)?;
-        validate_error_fixture_shape(PROVIDER, scenario, model).map_err(|reason| {
+        validate_decoded_error_fixture_shape(PROVIDER, scenario, model).map_err(|reason| {
             format!("invalid error fixture wrapper {scenario}/{model}: {reason}")
         })?;
 
-        let body = catch_unwind(AssertUnwindSafe(|| {
-            load_error_fixture_body(PROVIDER, scenario, model)
-        }))
-        .map_err(|payload| {
-            format!(
-                "failed to load error fixture body {scenario}/{model}: {}",
-                panic_payload_to_string(payload)
-            )
-        })?;
+        let body = load_decoded_error_fixture_body(PROVIDER, scenario, model);
         if !has_top_level_error_object(&body) {
+            if let Some(reason) = quarantine_error_reason(scenario, model) {
+                quarantined_seen += 1;
+                eprintln!(
+                    "quarantined error fixture skipped: provider={PROVIDER} scenario={scenario} model={model} reason={reason}"
+                );
+                continue;
+            }
             return Err(format!(
                 "error fixture missing top-level error object: {scenario}/{model}"
             ));
         }
 
-        let payload = AnthropicDecodeEnvelope {
+        let payload = OpenAiDecodeEnvelope {
             body,
             requested_response_format: ResponseFormat::Text,
         };
-        let error = AnthropicTranslator
+        let error = OpenAiTranslator
             .decode_request(payload.clone())
             .expect_err("expected upstream decode error for error fixture");
-        assert_anthropic_upstream_error(error, scenario, model)?;
+        assert_openai_upstream_error(error, scenario, model)?;
     }
+
+    if quarantined_seen != QUARANTINED_ERROR_FIXTURES.len() {
+        return Err(format!(
+            "quarantined OpenAI error fixture count changed; expected={}, saw={quarantined_seen}; review anomaly registry",
+            QUARANTINED_ERROR_FIXTURES.len()
+        ));
+    }
+
     Ok(())
 }
 
-fn run_success_smoke_scenario(scenario: &str, preferred_models: &[&str]) -> Result<(), String> {
+fn run_success_smoke_scenario(scenario: &str, preferred_models: &[&str]) {
     for preferred_model in preferred_models {
         let selected = choose_valid_success_fixture(
             PROVIDER,
@@ -135,31 +154,21 @@ fn run_success_smoke_scenario(scenario: &str, preferred_models: &[&str]) -> Resu
                 selected.requested_model, selected.chosen_model
             );
         }
-        validate_success_fixture_body(&selected.body, scenario, &selected.chosen_model).map_err(
-            |reason| {
-                format!(
+        validate_success_fixture_body(&selected.body, scenario, &selected.chosen_model)
+            .unwrap_or_else(|reason| {
+                panic!(
                     "selected fixture failed validation {scenario}/{}: {reason}",
                     selected.chosen_model
                 )
-            },
-        )?;
+            });
     }
-    Ok(())
 }
 
 fn choose_error_fixture_model_for_upstream(
     scenario: &str,
     preferred_model: &str,
 ) -> Result<String, String> {
-    let mut models = catch_unwind(AssertUnwindSafe(|| {
-        list_error_fixture_models(PROVIDER, scenario)
-    }))
-    .map_err(|payload| {
-        format!(
-            "failed to list error fixture models for provider={PROVIDER} scenario={scenario}: {}",
-            panic_payload_to_string(payload)
-        )
-    })?;
+    let mut models = list_decoded_error_fixture_models(PROVIDER, scenario);
     if let Some(pos) = models.iter().position(|model| model == preferred_model) {
         let preferred = models.remove(pos);
         models.insert(0, preferred);
@@ -167,36 +176,12 @@ fn choose_error_fixture_model_for_upstream(
 
     let mut rejected = Vec::new();
     for model in models {
-        let wrapper_shape = catch_unwind(AssertUnwindSafe(|| {
-            validate_error_fixture_shape(PROVIDER, scenario, &model)
-        }));
-        match wrapper_shape {
-            Ok(Ok(())) => {}
-            Ok(Err(reason)) => {
-                rejected.push(format!("{model}: invalid wrapper shape: {reason}"));
-                continue;
-            }
-            Err(payload) => {
-                rejected.push(format!(
-                    "{model}: wrapper shape validation panicked: {}",
-                    panic_payload_to_string(payload)
-                ));
-                continue;
-            }
+        if let Err(reason) = validate_decoded_error_fixture_shape(PROVIDER, scenario, &model) {
+            rejected.push(format!("{model}: invalid wrapper shape: {reason}"));
+            continue;
         }
 
-        let body = match catch_unwind(AssertUnwindSafe(|| {
-            load_error_fixture_body(PROVIDER, scenario, &model)
-        })) {
-            Ok(body) => body,
-            Err(payload) => {
-                rejected.push(format!(
-                    "{model}: failed to load response.body: {}",
-                    panic_payload_to_string(payload)
-                ));
-                continue;
-            }
-        };
+        let body = load_decoded_error_fixture_body(PROVIDER, scenario, &model);
         if has_top_level_error_object(&body) {
             if model != preferred_model {
                 eprintln!(
@@ -206,7 +191,7 @@ fn choose_error_fixture_model_for_upstream(
             return Ok(model);
         }
         rejected.push(format!(
-            "{model}: response.body missing top-level anthropic error object"
+            "{model}: response.body missing top-level openai error object"
         ));
     }
 
@@ -217,11 +202,11 @@ fn choose_error_fixture_model_for_upstream(
 }
 
 fn validate_success_fixture_body(body: &Value, scenario: &str, _model: &str) -> Result<(), String> {
-    let payload = AnthropicDecodeEnvelope {
+    let payload = OpenAiDecodeEnvelope {
         body: body.clone(),
         requested_response_format: ResponseFormat::Text,
     };
-    let response = AnthropicTranslator
+    let response = OpenAiTranslator
         .decode_request(payload.clone())
         .map_err(|err| format!("decode failed: {err}"))?;
     assert_success_invariants(&response, scenario)
@@ -284,19 +269,19 @@ fn has_tool_call(response: &Response) -> bool {
         .any(|part| matches!(part, ContentPart::ToolCall { .. }))
 }
 
-fn assert_anthropic_upstream_error(
-    error: AnthropicTranslatorError,
+fn assert_openai_upstream_error(
+    error: OpenAiTranslatorError,
     scenario: &str,
     model: &str,
 ) -> Result<(), String> {
     match error {
-        AnthropicTranslatorError::Decode(AnthropicSpecError::Upstream { message }) => {
+        OpenAiTranslatorError::Decode(OpenAiSpecError::Upstream { message }) => {
             if message.trim().is_empty() {
                 return Err(format!(
                     "expected non-empty upstream message for {scenario}/{model}"
                 ));
             }
-            if !message.contains("anthropic error:") {
+            if !message.contains("openai error:") {
                 return Err(format!(
                     "expected provider context in upstream message for {scenario}/{model}: {message}"
                 ));
@@ -310,10 +295,14 @@ fn assert_anthropic_upstream_error(
 }
 
 fn has_top_level_error_object(body: &Value) -> bool {
-    body.get("type")
-        .and_then(Value::as_str)
-        .is_some_and(|kind| kind == "error")
-        && body.get("error").is_some_and(Value::is_object)
+    body.get("error").is_some_and(Value::is_object)
+}
+
+fn quarantine_error_reason(scenario: &str, model: &str) -> Option<&'static str> {
+    QUARANTINED_ERROR_FIXTURES
+        .iter()
+        .find(|(s, m, _)| *s == scenario && *m == model)
+        .map(|(_, _, reason)| *reason)
 }
 
 fn parse_error_relpath(relpath: &str) -> Result<(&str, &str), String> {
@@ -347,20 +336,10 @@ fn parse_error_relpath(relpath: &str) -> Result<(&str, &str), String> {
     Ok((scenario, model))
 }
 
-fn panic_payload_to_string(payload: Box<dyn Any + Send>) -> String {
-    if let Some(message) = payload.downcast_ref::<String>() {
-        return message.clone();
-    }
-    if let Some(message) = payload.downcast_ref::<&'static str>() {
-        return (*message).to_string();
-    }
-    "unknown panic payload".to_string()
-}
-
 #[test]
 fn parse_error_relpath_accepts_valid_relpath() {
-    let parsed = parse_error_relpath("errors/invalid_auth/claude-sonnet-4-5-20250929.json");
-    assert_eq!(parsed, Ok(("invalid_auth", "claude-sonnet-4-5-20250929")));
+    let parsed = parse_error_relpath("errors/invalid_auth/gpt-5-mini.json");
+    assert_eq!(parsed, Ok(("invalid_auth", "gpt-5-mini")));
 }
 
 #[test]
@@ -396,20 +375,14 @@ fn parse_error_relpath_rejects_non_json_suffix() {
 }
 
 #[test]
-fn has_top_level_error_object_requires_error_type_and_object() {
+fn has_top_level_error_object_requires_error_object() {
     assert!(has_top_level_error_object(&json!({
-        "type": "error",
         "error": { "message": "bad request" }
     })));
     assert!(!has_top_level_error_object(&json!({
-        "error": { "message": "bad request" }
-    })));
-    assert!(!has_top_level_error_object(&json!({
-        "type": "message",
-        "error": { "message": "bad request" }
-    })));
-    assert!(!has_top_level_error_object(&json!({
-        "type": "error",
         "error": "bad request"
+    })));
+    assert!(!has_top_level_error_object(&json!({
+        "message": "bad request"
     })));
 }

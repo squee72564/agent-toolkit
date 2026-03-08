@@ -2,9 +2,10 @@ use serde_json::{Value, json};
 
 use crate::openai_spec::{OpenAiDecodeEnvelope, OpenAiSpecError};
 use crate::platform::test_fixtures::{
-    choose_valid_success_fixture, list_error_fixture_models, list_error_fixture_relpaths,
-    list_fixture_models, load_error_fixture_body, load_success_fixture,
-    validate_error_fixture_shape,
+    choose_valid_success_fixture, list_decoded_error_fixture_models,
+    list_decoded_error_fixture_relpaths, list_decoded_fixture_models,
+    load_decoded_error_fixture_body, load_decoded_success_fixture,
+    validate_decoded_error_fixture_shape,
 };
 use crate::translator_contract::ProtocolTranslator;
 use agent_core::types::{ContentPart, FinishReason, Response, ResponseFormat};
@@ -51,7 +52,7 @@ fn fixture_smoke_openrouter_errors() -> Result<(), String> {
     for (scenario, preferred_model) in SMOKE_ERROR_FIXTURES {
         let chosen_model = choose_error_fixture_model_for_upstream(scenario, preferred_model)?;
 
-        let body = load_error_fixture_body(PROVIDER, scenario, &chosen_model);
+        let body = load_decoded_error_fixture_body(PROVIDER, scenario, &chosen_model);
         let payload = OpenAiDecodeEnvelope {
             body,
             requested_response_format: ResponseFormat::Text,
@@ -68,7 +69,7 @@ fn fixture_smoke_openrouter_errors() -> Result<(), String> {
 #[ignore]
 fn fixture_full_openrouter_success_sweep() {
     for scenario in SUCCESS_SCENARIOS {
-        let models = list_fixture_models(PROVIDER, scenario);
+        let models = list_decoded_fixture_models(PROVIDER, scenario);
         assert!(
             !models.is_empty(),
             "expected at least one fixture model for scenario {scenario}"
@@ -76,7 +77,7 @@ fn fixture_full_openrouter_success_sweep() {
 
         let mut quarantined_seen = 0usize;
         for model in models {
-            let body = load_success_fixture(PROVIDER, scenario, &model);
+            let body = load_decoded_success_fixture(PROVIDER, scenario, &model);
             if let Err(reason) = validate_success_fixture_body(&body, scenario, &model) {
                 if let Some(quarantine_reason) = quarantine_success_reason(scenario, &model) {
                     quarantined_seen += 1;
@@ -103,7 +104,7 @@ fn fixture_full_openrouter_success_sweep() {
 #[test]
 #[ignore]
 fn fixture_full_openrouter_errors_sweep() -> Result<(), String> {
-    let relpaths = list_error_fixture_relpaths(PROVIDER);
+    let relpaths = list_decoded_error_fixture_relpaths(PROVIDER);
     if relpaths.is_empty() {
         return Err(format!(
             "expected at least one error fixture relpath for provider {PROVIDER}"
@@ -111,11 +112,11 @@ fn fixture_full_openrouter_errors_sweep() -> Result<(), String> {
     }
     for relpath in relpaths {
         let (scenario, model) = parse_error_relpath(&relpath)?;
-        validate_error_fixture_shape(PROVIDER, scenario, model).map_err(|reason| {
+        validate_decoded_error_fixture_shape(PROVIDER, scenario, model).map_err(|reason| {
             format!("invalid error fixture wrapper {scenario}/{model}: {reason}")
         })?;
 
-        let body = load_error_fixture_body(PROVIDER, scenario, model);
+        let body = load_decoded_error_fixture_body(PROVIDER, scenario, model);
         if !has_top_level_error_object(&body) {
             return Err(format!(
                 "error fixture missing top-level error object: {scenario}/{model}"
@@ -164,7 +165,7 @@ fn choose_error_fixture_model_for_upstream(
     scenario: &str,
     preferred_model: &str,
 ) -> Result<String, String> {
-    let mut models = list_error_fixture_models(PROVIDER, scenario);
+    let mut models = list_decoded_error_fixture_models(PROVIDER, scenario);
     if let Some(pos) = models.iter().position(|model| model == preferred_model) {
         let preferred = models.remove(pos);
         models.insert(0, preferred);
@@ -172,11 +173,11 @@ fn choose_error_fixture_model_for_upstream(
 
     let mut rejected = Vec::new();
     for model in models {
-        if let Err(reason) = validate_error_fixture_shape(PROVIDER, scenario, &model) {
+        if let Err(reason) = validate_decoded_error_fixture_shape(PROVIDER, scenario, &model) {
             rejected.push(format!("{model}: invalid wrapper shape: {reason}"));
             continue;
         }
-        let body = load_error_fixture_body(PROVIDER, scenario, &model);
+        let body = load_decoded_error_fixture_body(PROVIDER, scenario, &model);
         if has_top_level_error_object(&body) {
             if model != preferred_model {
                 eprintln!(
