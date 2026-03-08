@@ -256,6 +256,43 @@ async fn send_json_response_supports_non_post_methods_and_preserves_status() -> 
 }
 
 #[tokio::test]
+async fn send_json_mode_can_preserve_error_status_when_opted_in() -> TestResult {
+    let responses = vec![ScriptedResponse {
+        status: StatusCode::UNAUTHORIZED,
+        headers: vec![("content-type".to_string(), "application/json".to_string())],
+        delay_before_headers: None,
+        body: ScriptedBody::Fixed(json!({"error": {"message": "bad key"}}).to_string()),
+    }];
+    let (base_url, _recorded, handle) = spawn_scripted_server(responses).await?;
+
+    let transport = default_transport(RetryPolicy::default());
+    let platform = default_platform(AuthStyle::None);
+    let ctx = empty_context();
+    let response = transport
+        .send(HttpSendRequest {
+            platform: &platform,
+            method: reqwest::Method::POST,
+            url: &format!("{base_url}/v1/test"),
+            body: HttpRequestBody::Json(Bytes::from_static(br#"{"msg":"hello"}"#)),
+            ctx: &ctx,
+            options: HttpRequestOptions::json_defaults().with_allow_error_status(true),
+            response_mode: HttpResponseMode::Json,
+        })
+        .await?;
+
+    match response {
+        HttpResponse::Json(response) => {
+            assert_eq!(response.head.status, StatusCode::UNAUTHORIZED);
+            assert_eq!(response.body, json!({"error": {"message": "bad key"}}));
+        }
+        other => panic!("expected json response, got {other:?}"),
+    }
+
+    await_server(handle).await?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn send_bytes_request_returns_bytes_helper_result() -> TestResult {
     let responses = vec![ScriptedResponse {
         status: StatusCode::OK,

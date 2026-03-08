@@ -155,7 +155,9 @@ impl HttpTransport {
             .await?;
 
         let head = build_response_head(&response, &header_config);
-        if !head.status.is_success() {
+        if !(head.status.is_success()
+            || matches!(response_mode, HttpResponseMode::Json) && options.allow_error_status)
+        {
             return Err(TransportError::Status {
                 head: Box::new(head),
             });

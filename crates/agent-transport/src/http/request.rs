@@ -86,6 +86,7 @@ pub struct HttpRequestOptions {
     pub stream_setup_timeout: Option<Duration>,
     pub stream_idle_timeout: Option<Duration>,
     pub sse_limits: Option<SseLimits>,
+    pub allow_error_status: bool,
 }
 
 impl HttpRequestOptions {
@@ -116,6 +117,11 @@ impl HttpRequestOptions {
 
     pub fn with_sse_limits(mut self, limits: SseLimits) -> Self {
         self.sse_limits = Some(limits);
+        self
+    }
+
+    pub fn with_allow_error_status(mut self, allow_error_status: bool) -> Self {
+        self.allow_error_status = allow_error_status;
         self
     }
 
