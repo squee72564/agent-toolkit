@@ -38,6 +38,11 @@ impl ProviderClient {
         &self,
         input: MessageCreateInput,
     ) -> Result<(Response, ResponseMeta), RuntimeError> {
+        if input.stream {
+            return Err(RuntimeError::configuration(
+                "stream=true is not supported by the current messages/send response API yet",
+            ));
+        }
         let request =
             input.into_request_with_options(self.runtime.default_model.as_deref(), false)?;
         self.send_with_meta(request).await
@@ -53,6 +58,11 @@ impl ProviderClient {
         &self,
         request: Request,
     ) -> Result<(Response, ResponseMeta), RuntimeError> {
+        if request.stream {
+            return Err(RuntimeError::configuration(
+                "stream=true is not supported by the current messages/send response API yet",
+            ));
+        }
         let request_started_at = std::time::Instant::now();
         let observer = resolve_observer_for_request(self.runtime.observer.as_ref(), None, None);
         let request_start_event = RequestStartEvent {

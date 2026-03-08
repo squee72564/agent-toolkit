@@ -9,6 +9,7 @@ mod observer;
 mod provider_client;
 mod provider_config;
 mod provider_runtime;
+mod provider_stream_runtime;
 mod routed_messages_api;
 mod runtime_error;
 mod send_options;

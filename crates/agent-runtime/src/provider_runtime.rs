@@ -1,10 +1,16 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use agent_core::{AdapterContext, AuthCredentials, PlatformConfig, ProviderId, Request, Response};
+use agent_providers::request_plan::{ProviderResponseKind, ProviderTransportKind};
 use agent_providers::{adapter::ProviderAdapter, error::AdapterError};
-use agent_transport::{HttpJsonResponse, HttpTransport};
+use agent_transport::{
+    HttpJsonResponse, HttpRequestBody, HttpResponse, HttpResponseMode, HttpSendRequest,
+    HttpTransport,
+};
+use reqwest::Method;
 
 use crate::observer::RuntimeObserver;
+use crate::provider_stream_runtime::{ProviderStreamRuntime, StreamRuntimeError};
 use crate::runtime_error::RuntimeError;
 use crate::types::AttemptMeta;
 
@@ -73,10 +79,8 @@ impl ProviderRuntime {
             metadata,
             auth_token: Some(AuthCredentials::Token(self.auth_token.clone())),
         };
-        let url = join_url(&self.platform.base_url, self.adapter.endpoint_path());
-
         let provider_response = self
-            .execute_adapter_attempt(request, &url, &adapter_context)
+            .execute_adapter_attempt(request, &adapter_context)
             .await;
 
         match provider_response {
@@ -134,32 +138,158 @@ impl ProviderRuntime {
     async fn execute_adapter_attempt(
         &self,
         request: Request,
-        url: &str,
         adapter_context: &AdapterContext,
     ) -> Result<(Response, HttpJsonResponse), RuntimeError> {
         let response_format = request.response_format.clone();
-        let encoded = self
+        let plan = self
             .adapter
-            .encode_request(request)
+            .plan_request(request)
             .map_err(RuntimeError::from_adapter)?;
-        let mut provider_response = self
+        let endpoint_path = plan
+            .endpoint_path_override
+            .as_deref()
+            .unwrap_or(self.adapter.endpoint_path());
+        let url = join_url(&self.platform.base_url, endpoint_path);
+
+        match (plan.transport_kind, plan.response_kind) {
+            (ProviderTransportKind::HttpJson, ProviderResponseKind::JsonBody) => {
+                self.execute_json_attempt(plan, &response_format, &url, adapter_context)
+                    .await
+            }
+            (ProviderTransportKind::HttpSse, ProviderResponseKind::RawProviderStream) => {
+                self.execute_sse_attempt(plan, &response_format, &url, adapter_context)
+                    .await
+            }
+            (transport_kind, response_kind) => Err(RuntimeError::configuration(format!(
+                "unsupported provider execution plan for {:?}: transport={transport_kind:?}, response={response_kind:?}",
+                self.provider
+            ))),
+        }
+    }
+
+    async fn execute_json_attempt(
+        &self,
+        plan: agent_providers::request_plan::ProviderRequestPlan,
+        response_format: &agent_core::ResponseFormat,
+        url: &str,
+        adapter_context: &AdapterContext,
+    ) -> Result<(Response, HttpJsonResponse), RuntimeError> {
+        let body = serde_json::to_vec(&plan.body)
+            .map(Into::into)
+            .map(HttpRequestBody::Json)
+            .map_err(|error| {
+                RuntimeError::configuration(format!(
+                    "failed to serialize provider request body: {error}"
+                ))
+            })?;
+
+        let mut provider_response = match self
             .transport
-            .post_json_value(&self.platform, url, &encoded.body, adapter_context)
+            .send(HttpSendRequest {
+                platform: &self.platform,
+                method: Method::POST,
+                url,
+                body,
+                ctx: adapter_context,
+                options: plan.request_options.clone(),
+                response_mode: HttpResponseMode::Json,
+            })
             .await
-            .map_err(|error| RuntimeError::from_transport(self.provider, error))?;
+            .map_err(|error| RuntimeError::from_transport(self.provider, error))?
+        {
+            HttpResponse::Json(response) => response,
+            _ => unreachable!("JSON response mode must return a JSON response"),
+        };
         let provider_code = extract_provider_code(&provider_response.body);
         let response_body = std::mem::replace(&mut provider_response.body, serde_json::Value::Null);
         let mut response = self
             .adapter
-            .decode_response(response_body, &response_format)
+            .decode_response_json(response_body, response_format)
             .map_err(|mut error| {
                 if error.provider_code.is_none() {
                     error.provider_code = provider_code;
                 }
                 self.runtime_error_from_adapter(error, Some(&provider_response))
             })?;
-        prepend_encode_warnings(&mut response, encoded.warnings);
+        prepend_encode_warnings(&mut response, plan.warnings);
         Ok((response, provider_response))
+    }
+
+    async fn execute_sse_attempt(
+        &self,
+        plan: agent_providers::request_plan::ProviderRequestPlan,
+        response_format: &agent_core::ResponseFormat,
+        url: &str,
+        adapter_context: &AdapterContext,
+    ) -> Result<(Response, HttpJsonResponse), RuntimeError> {
+        let body = serde_json::to_vec(&plan.body)
+            .map(Into::into)
+            .map(HttpRequestBody::Json)
+            .map_err(|error| {
+                RuntimeError::configuration(format!(
+                    "failed to serialize provider request body: {error}"
+                ))
+            })?;
+
+        let sse_response = match self
+            .transport
+            .send(HttpSendRequest {
+                platform: &self.platform,
+                method: Method::POST,
+                url,
+                body,
+                ctx: adapter_context,
+                options: plan.request_options.clone(),
+                response_mode: HttpResponseMode::Sse,
+            })
+            .await
+            .map_err(|error| RuntimeError::from_transport(self.provider, error))?
+        {
+            HttpResponse::Sse(response) => *response,
+            _ => unreachable!("SSE response mode must return an SSE response"),
+        };
+
+        let mut projector = self.adapter.create_stream_projector();
+        let mut stream_runtime = ProviderStreamRuntime::new(self.provider);
+
+        match stream_runtime
+            .execute(
+                sse_response,
+                projector.as_mut(),
+                response_format,
+                plan.warnings,
+            )
+            .await
+        {
+            Ok(result) => Ok(result),
+            Err(StreamRuntimeError::Transport {
+                error,
+                request_id,
+                status_code,
+            }) => {
+                let mut runtime_error = RuntimeError::from_transport(self.provider, error);
+                if runtime_error.request_id.is_none() {
+                    runtime_error.request_id = request_id;
+                }
+                if runtime_error.status_code.is_none() {
+                    runtime_error.status_code = status_code;
+                }
+                Err(runtime_error)
+            }
+            Err(StreamRuntimeError::Adapter {
+                mut error,
+                request_id,
+                status_code,
+            }) => {
+                if error.request_id.is_none() {
+                    error.request_id = request_id;
+                }
+                if error.status_code.is_none() {
+                    error.status_code = status_code;
+                }
+                Err(RuntimeError::from_adapter(error))
+            }
+        }
     }
 
     fn runtime_error_from_adapter(

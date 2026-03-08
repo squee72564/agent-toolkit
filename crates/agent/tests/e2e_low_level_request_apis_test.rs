@@ -21,6 +21,7 @@ fn explicit_request(model_id: &str) -> Request {
 
     Request {
         model_id: model_id.to_string(),
+        stream: false,
         messages: vec![Message::new(
             MessageRole::User,
             vec![ContentPart::text("hello from explicit request")],
