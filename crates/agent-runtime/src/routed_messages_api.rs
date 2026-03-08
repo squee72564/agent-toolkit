@@ -7,11 +7,11 @@ use crate::send_options::SendOptions;
 use crate::types::ResponseMeta;
 
 #[derive(Debug, Clone)]
-pub struct RouterMessagesApi<'a> {
+pub struct RoutedMessagesApi<'a> {
     pub toolkit: &'a AgentToolkit,
 }
 
-impl RouterMessagesApi<'_> {
+impl RoutedMessagesApi<'_> {
     pub async fn create(
         &self,
         input: impl Into<MessageCreateInput>,

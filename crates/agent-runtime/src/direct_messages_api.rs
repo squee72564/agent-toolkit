@@ -6,11 +6,11 @@ use crate::runtime_error::RuntimeError;
 use crate::types::ResponseMeta;
 
 #[derive(Debug, Clone)]
-pub struct MessagesApi<'a> {
+pub struct DirectMessagesApi<'a> {
     pub client: &'a ProviderClient,
 }
 
-impl MessagesApi<'_> {
+impl DirectMessagesApi<'_> {
     pub async fn create(
         &self,
         input: impl Into<MessageCreateInput>,

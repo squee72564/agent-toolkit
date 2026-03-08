@@ -2,8 +2,8 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use agent_core::{Request, Response};
 
+use crate::direct_messages_api::DirectMessagesApi;
 use crate::message_create_input::MessageCreateInput;
-use crate::messages_api::MessagesApi;
 use crate::observer::{resolve_observer_for_request, safe_call_observer};
 use crate::provider_runtime::{ProviderAttemptOutcome, ProviderRuntime};
 use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
@@ -24,8 +24,8 @@ impl ProviderClient {
         }
     }
 
-    pub fn messages(&self) -> MessagesApi<'_> {
-        MessagesApi { client: self }
+    pub fn messages(&self) -> DirectMessagesApi<'_> {
+        DirectMessagesApi { client: self }
     }
 
     pub async fn create(&self, input: MessageCreateInput) -> Result<Response, RuntimeError> {

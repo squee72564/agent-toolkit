@@ -4,8 +4,8 @@ use agent_core::{ProviderId, Request, Response};
 use agent_transport::RetryPolicy;
 
 use crate::{
-    BaseClientBuilder, ResponseMeta, RuntimeError, RuntimeObserver, messages_api::MessagesApi,
-    provider_client::ProviderClient,
+    BaseClientBuilder, ResponseMeta, RuntimeError, RuntimeObserver,
+    direct_messages_api::DirectMessagesApi, provider_client::ProviderClient,
 };
 
 const OPENROUTER_API_KEY_ENV: &str = "OPENROUTER_API_KEY";
@@ -36,7 +36,7 @@ impl OpenRouterClient {
         builder.build()
     }
 
-    pub fn messages(&self) -> MessagesApi<'_> {
+    pub fn messages(&self) -> DirectMessagesApi<'_> {
         self.inner.messages()
     }
 

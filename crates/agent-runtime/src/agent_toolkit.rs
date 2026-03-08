@@ -7,7 +7,7 @@ use crate::observer::{RuntimeObserver, resolve_observer_for_request, safe_call_o
 use crate::provider_client::ProviderClient;
 use crate::provider_config::ProviderConfig;
 use crate::provider_runtime::ProviderAttemptOutcome;
-use crate::router_messages_api::RouterMessagesApi;
+use crate::routed_messages_api::RoutedMessagesApi;
 use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
 use crate::send_options::SendOptions;
 use crate::target::Target;
@@ -36,8 +36,8 @@ impl AgentToolkit {
         AgentToolkitBuilder::default()
     }
 
-    pub fn messages(&self) -> RouterMessagesApi<'_> {
-        RouterMessagesApi { toolkit: self }
+    pub fn messages(&self) -> RoutedMessagesApi<'_> {
+        RoutedMessagesApi { toolkit: self }
     }
 
     pub async fn send(
