@@ -10,16 +10,17 @@ use agent_core::types::{
 
 use crate::anthropic_spec::AnthropicDecodeEnvelope;
 use crate::openai_spec::OpenAiDecodeEnvelope;
-use crate::platform::anthropic::translator::AnthropicTranslator;
-use crate::platform::openai::translator::OpenAiTranslator;
-use crate::platform::openrouter::translator::OpenRouterTranslator;
-use crate::translator_contract::ProtocolTranslator;
+use crate::platform::anthropic::{request as anthropic_request, response as anthropic_response};
+use crate::platform::openai::{request as openai_request, response as openai_response};
+use crate::platform::openrouter::{request as openrouter_request, response as openrouter_response};
+use crate::request_plan::{ProviderResponseKind, ProviderTransportKind};
 
 use super::*;
 
 fn base_request() -> Request {
     Request {
         model_id: "openai/gpt-5-mini".to_string(),
+        stream: false,
         messages: vec![Message {
             role: MessageRole::User,
             content: vec![ContentPart::Text {
@@ -178,18 +179,19 @@ fn default_base_url_and_endpoint_path_are_expected() {
 }
 
 #[test]
-fn openai_adapter_encode_decode_matches_translator() {
+fn openai_adapter_plan_request_and_decode_match_translator() {
     let request = base_request();
     let adapter = adapter_for(ProviderId::OpenAi);
 
-    let translated_encoded = OpenAiTranslator
-        .encode_request(request.clone())
-        .expect("translator encode should succeed");
-    let adapter_encoded = adapter
-        .encode_request(request)
-        .expect("adapter encode should succeed");
-    assert_eq!(adapter_encoded.body, translated_encoded.body);
-    assert_eq!(adapter_encoded.warnings, translated_encoded.warnings);
+    let translated_encoded = openai_request::plan_request(request.clone())
+        .expect("request planning should succeed");
+    let adapter_plan = adapter
+        .plan_request(request)
+        .expect("adapter planning should succeed");
+    assert_eq!(adapter_plan.body, translated_encoded.body);
+    assert_eq!(adapter_plan.warnings, translated_encoded.warnings);
+    assert_eq!(adapter_plan.transport_kind, ProviderTransportKind::HttpJson);
+    assert_eq!(adapter_plan.response_kind, ProviderResponseKind::JsonBody);
 
     let body = json!({
         "status": "completed",
@@ -205,32 +207,36 @@ fn openai_adapter_encode_decode_matches_translator() {
         }
     });
     let requested_format = ResponseFormat::Text;
-    let translated_decoded = OpenAiTranslator
-        .decode_request(OpenAiDecodeEnvelope {
+    let translated_decoded = openai_response::decode_response_json(
+        OpenAiDecodeEnvelope {
             body: body.clone(),
             requested_response_format: requested_format.clone(),
-        })
-        .expect("translator decode should succeed");
+        }
+        .body,
+        &requested_format,
+    )
+    .expect("response decode should succeed");
     let adapter_decoded = adapter
-        .decode_response(body, &requested_format)
+        .decode_response_json(body, &requested_format)
         .expect("adapter decode should succeed");
     assert_eq!(adapter_decoded, translated_decoded);
 }
 
 #[test]
-fn anthropic_adapter_encode_decode_matches_translator() {
+fn anthropic_adapter_plan_request_and_decode_match_translator() {
     let mut request = base_request();
     request.model_id = "claude-sonnet-4-6".to_string();
     let adapter = adapter_for(ProviderId::Anthropic);
 
-    let translated_encoded = AnthropicTranslator
-        .encode_request(request.clone())
-        .expect("translator encode should succeed");
-    let adapter_encoded = adapter
-        .encode_request(request)
-        .expect("adapter encode should succeed");
-    assert_eq!(adapter_encoded.body, translated_encoded.body);
-    assert_eq!(adapter_encoded.warnings, translated_encoded.warnings);
+    let translated_encoded = anthropic_request::plan_request(request.clone())
+        .expect("request planning should succeed");
+    let adapter_plan = adapter
+        .plan_request(request)
+        .expect("adapter planning should succeed");
+    assert_eq!(adapter_plan.body, translated_encoded.body);
+    assert_eq!(adapter_plan.warnings, translated_encoded.warnings);
+    assert_eq!(adapter_plan.transport_kind, ProviderTransportKind::HttpJson);
+    assert_eq!(adapter_plan.response_kind, ProviderResponseKind::JsonBody);
 
     let body = json!({
         "role": "assistant",
@@ -240,14 +246,17 @@ fn anthropic_adapter_encode_decode_matches_translator() {
         "usage": {"input_tokens": 1, "output_tokens": 1}
     });
     let requested_format = ResponseFormat::Text;
-    let translated_decoded = AnthropicTranslator
-        .decode_request(AnthropicDecodeEnvelope {
+    let translated_decoded = anthropic_response::decode_response_json(
+        AnthropicDecodeEnvelope {
             body: body.clone(),
             requested_response_format: requested_format.clone(),
-        })
-        .expect("translator decode should succeed");
+        }
+        .body,
+        &requested_format,
+    )
+    .expect("response decode should succeed");
     let adapter_decoded = adapter
-        .decode_response(body, &requested_format)
+        .decode_response_json(body, &requested_format)
         .expect("adapter decode should succeed");
     assert_eq!(adapter_decoded, translated_decoded);
 }
@@ -275,7 +284,7 @@ fn openrouter_adapter_preserves_fallback_decode_warning() {
     });
 
     let response = adapter
-        .decode_response(payload.clone(), &ResponseFormat::Text)
+        .decode_response_json(payload.clone(), &ResponseFormat::Text)
         .expect("decode should succeed");
     assert!(
         response
@@ -284,20 +293,16 @@ fn openrouter_adapter_preserves_fallback_decode_warning() {
             .any(|warning| warning.code == "openrouter.decode.fallback_chat_completions")
     );
 
-    let translator_response = OpenRouterTranslator::default()
-        .decode_request(OpenAiDecodeEnvelope {
-            body: payload,
-            requested_response_format: ResponseFormat::Text,
-        })
-        .expect("translator decode should succeed");
-    assert_eq!(response, translator_response);
+    let direct_response = openrouter_response::decode_response_json(payload, &ResponseFormat::Text)
+        .expect("response decode should succeed");
+    assert_eq!(response, direct_response);
 }
 
 #[test]
 fn openai_adapter_decode_error_maps_provider_operation_and_kind() {
     let adapter = adapter_for(ProviderId::OpenAi);
     let error = adapter
-        .decode_response(json!("invalid"), &ResponseFormat::Text)
+        .decode_response_json(json!("invalid"), &ResponseFormat::Text)
         .expect_err("decode should fail for non-object payload");
 
     assert_adapter_error(
@@ -312,7 +317,7 @@ fn openai_adapter_decode_error_maps_provider_operation_and_kind() {
 fn anthropic_adapter_decode_error_maps_provider_operation_and_kind() {
     let adapter = adapter_for(ProviderId::Anthropic);
     let error = adapter
-        .decode_response(
+        .decode_response_json(
             json!({ "model": "claude-sonnet-4-6" }),
             &ResponseFormat::Text,
         )
@@ -330,7 +335,7 @@ fn anthropic_adapter_decode_error_maps_provider_operation_and_kind() {
 fn openrouter_adapter_decode_error_maps_provider_operation_and_kind() {
     let adapter = adapter_for(ProviderId::OpenRouter);
     let error = adapter
-        .decode_response(json!("invalid"), &ResponseFormat::Text)
+        .decode_response_json(json!("invalid"), &ResponseFormat::Text)
         .expect_err("decode should fail when both OpenAI and fallback decoding fail");
 
     assert_adapter_error(
@@ -342,56 +347,56 @@ fn openrouter_adapter_decode_error_maps_provider_operation_and_kind() {
 }
 
 #[test]
-fn openai_adapter_encode_validation_error_maps_provider_operation_and_kind() {
+fn openai_adapter_plan_validation_error_maps_provider_operation_and_kind() {
     let adapter = adapter_for(ProviderId::OpenAi);
     let mut request = base_request();
     request.messages.clear();
 
     let error = adapter
-        .encode_request(request)
-        .expect_err("encode should fail for empty messages");
+        .plan_request(request)
+        .expect_err("planning should fail for empty messages");
 
     assert_adapter_error(
         error,
         ProviderId::OpenAi,
-        AdapterOperation::EncodeRequest,
+        AdapterOperation::PlanRequest,
         AdapterErrorKind::Validation,
     );
 }
 
 #[test]
-fn anthropic_adapter_encode_validation_error_maps_provider_operation_and_kind() {
+fn anthropic_adapter_plan_validation_error_maps_provider_operation_and_kind() {
     let adapter = adapter_for(ProviderId::Anthropic);
     let mut request = base_request();
     request.model_id = "claude-sonnet-4-6".to_string();
     request.temperature = Some(1.5);
 
     let error = adapter
-        .encode_request(request)
-        .expect_err("encode should fail for out-of-range temperature");
+        .plan_request(request)
+        .expect_err("planning should fail for out-of-range temperature");
 
     assert_adapter_error(
         error,
         ProviderId::Anthropic,
-        AdapterOperation::EncodeRequest,
+        AdapterOperation::PlanRequest,
         AdapterErrorKind::Validation,
     );
 }
 
 #[test]
-fn openrouter_adapter_encode_validation_error_maps_provider_operation_and_kind() {
+fn openrouter_adapter_plan_validation_error_maps_provider_operation_and_kind() {
     let adapter = adapter_for(ProviderId::OpenRouter);
     let mut request = base_request();
     request.messages.clear();
 
     let error = adapter
-        .encode_request(request)
-        .expect_err("encode should fail for empty messages");
+        .plan_request(request)
+        .expect_err("planning should fail for empty messages");
 
     assert_adapter_error(
         error,
         ProviderId::OpenRouter,
-        AdapterOperation::EncodeRequest,
+        AdapterOperation::PlanRequest,
         AdapterErrorKind::Validation,
     );
 }
