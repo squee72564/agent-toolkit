@@ -54,13 +54,9 @@ fn fixture_root(provider: FixtureProvider) -> PathBuf {
     let data_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../agent-providers/data");
 
     match provider {
-        FixtureProvider::OpenAi => data_root.join("openai/responses/2026-02-27T03:25:13.281Z"),
-        FixtureProvider::Anthropic => {
-            data_root.join("anthropic/responses/2026-02-27T02:12:18.639Z")
-        }
-        FixtureProvider::OpenRouter => {
-            data_root.join("openrouter/responses/2026-02-27T02:34:30.762Z")
-        }
+        FixtureProvider::OpenAi => data_root.join("openai/responses/decoded"),
+        FixtureProvider::Anthropic => data_root.join("anthropic/responses/decoded"),
+        FixtureProvider::OpenRouter => data_root.join("openrouter/responses/decoded"),
     }
 }
 
