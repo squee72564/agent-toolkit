@@ -41,7 +41,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .default_model("gpt-5-mini")
         .build()?;
 
-    let mut convo = Conversation::with_user_text("What is ownership in Rust?");
+    let mut convo = Conversation::with_system_text("You are a helpful assistant.");
+    convo.push_user_text("What is ownership in Rust?");
     let response = client.messages().create(convo.to_input()).await?;
 
     // You control history updates in app code.
@@ -89,7 +90,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     registry.register_validated(weather_tool)?;
 
-    let mut convo = Conversation::with_user_text("What is weather in SF?");
+    let mut convo = Conversation::with_system_text("You are a helpful assistant.");
+    convo.push_user_text("What is weather in SF?");
     let input = convo
         .to_input()
         .with_tools(registry.tool_definitions())
