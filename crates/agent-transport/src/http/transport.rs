@@ -10,6 +10,7 @@ use thiserror::Error;
 use crate::http::builder::HttpTransportBuilder;
 use crate::http::request::{HttpJsonResponse, extract_request_id};
 use crate::http::retry_policy::RetryPolicy;
+use crate::http::sse::{HttpSseResponse, HttpSseStream, PendingSseEvent};
 
 #[derive(Debug, Error)]
 pub enum TransportError {
@@ -21,6 +22,8 @@ pub enum TransportError {
     Request(reqwest::Error),
     #[error("serialization error")]
     Serialization,
+    #[error("invalid SSE stream: {0}")]
+    SseParse(String),
 }
 
 impl From<reqwest::Error> for TransportError {
@@ -132,6 +135,43 @@ impl HttpTransport {
             status,
             body,
             request_id,
+        })
+    }
+
+    pub async fn post_sse<TReq>(
+        &self,
+        platform: &PlatformConfig,
+        url: &str,
+        body: &TReq,
+        ctx: &AdapterContext,
+    ) -> Result<HttpSseResponse, TransportError>
+    where
+        TReq: Serialize + ?Sized,
+    {
+        let payload: Bytes = serde_json::to_vec(body)
+            .map_err(|_| TransportError::Serialization)?
+            .into();
+        let (response, header_config) = self
+            .send_request_with_retry(platform, Method::POST, url, Some(payload), ctx)
+            .await?;
+
+        if let Err(error) = response.error_for_status_ref() {
+            return Err(TransportError::Request(error));
+        }
+
+        let status = response.status();
+        let headers = response.headers().clone();
+        let request_id = extract_request_id(&headers, &header_config);
+
+        Ok(HttpSseResponse {
+            status,
+            headers,
+            request_id,
+            stream: HttpSseStream {
+                response,
+                buffer: Vec::new(),
+                state: PendingSseEvent::default(),
+            },
         })
     }
 

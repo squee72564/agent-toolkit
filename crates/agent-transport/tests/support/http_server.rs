@@ -19,7 +19,14 @@ pub struct CapturedRequest {
 pub struct ScriptedResponse {
     pub status: StatusCode,
     pub headers: Vec<(String, String)>,
-    pub body: String,
+    pub body: ScriptedBody,
+}
+
+#[derive(Debug, Clone)]
+pub enum ScriptedBody {
+    Fixed(String),
+    Chunks(Vec<String>),
+    ChunksThenDisconnect(Vec<String>),
 }
 
 fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
@@ -127,6 +134,10 @@ async fn read_request(stream: &mut TcpStream) -> io::Result<CapturedRequest> {
 async fn write_response(stream: &mut TcpStream, response: &ScriptedResponse) -> io::Result<()> {
     let reason = response.status.canonical_reason().unwrap_or("Unknown");
     let mut response_text = format!("HTTP/1.1 {} {}\r\n", response.status.as_u16(), reason);
+    let is_streaming = matches!(
+        response.body,
+        ScriptedBody::Chunks(_) | ScriptedBody::ChunksThenDisconnect(_)
+    );
 
     let mut has_content_type = false;
     for (name, value) in &response.headers {
@@ -140,14 +151,43 @@ async fn write_response(stream: &mut TcpStream, response: &ScriptedResponse) -> 
     }
 
     if !has_content_type {
-        response_text.push_str("Content-Type: application/json\r\n");
+        let default_content_type = if is_streaming {
+            "text/event-stream"
+        } else {
+            "application/json"
+        };
+        response_text.push_str("Content-Type: ");
+        response_text.push_str(default_content_type);
+        response_text.push_str("\r\n");
     }
-    response_text.push_str("Connection: close\r\n");
-    response_text.push_str(&format!("Content-Length: {}\r\n\r\n", response.body.len()));
-    response_text.push_str(&response.body);
 
-    stream.write_all(response_text.as_bytes()).await?;
-    stream.shutdown().await
+    match &response.body {
+        ScriptedBody::Fixed(body) => {
+            response_text.push_str("Connection: close\r\n");
+            response_text.push_str(&format!("Content-Length: {}\r\n\r\n", body.len()));
+            response_text.push_str(body);
+            stream.write_all(response_text.as_bytes()).await?;
+            stream.shutdown().await
+        }
+        ScriptedBody::Chunks(chunks) | ScriptedBody::ChunksThenDisconnect(chunks) => {
+            response_text.push_str("Transfer-Encoding: chunked\r\n");
+            response_text.push_str("Connection: close\r\n\r\n");
+            stream.write_all(response_text.as_bytes()).await?;
+
+            for chunk in chunks {
+                let header = format!("{:X}\r\n", chunk.len());
+                stream.write_all(header.as_bytes()).await?;
+                stream.write_all(chunk.as_bytes()).await?;
+                stream.write_all(b"\r\n").await?;
+            }
+
+            if matches!(response.body, ScriptedBody::Chunks(_)) {
+                stream.write_all(b"0\r\n\r\n").await?;
+            }
+
+            stream.shutdown().await
+        }
+    }
 }
 
 pub async fn spawn_scripted_server(

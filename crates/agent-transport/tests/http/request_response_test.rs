@@ -7,7 +7,7 @@ use reqwest::StatusCode;
 use serde_json::{Value, json};
 
 use crate::support::http_server::{
-    ScriptedResponse, await_server, captured_requests, spawn_scripted_server,
+    ScriptedBody, ScriptedResponse, await_server, captured_requests, spawn_scripted_server,
 };
 use crate::support::{ExampleBody, TestResult, default_platform, default_transport, empty_context};
 
@@ -16,7 +16,7 @@ async fn post_json_value_preserves_non_success_status_and_extracts_request_id() 
     let responses = vec![ScriptedResponse {
         status: StatusCode::BAD_REQUEST,
         headers: vec![("x-trace-id".to_string(), "trace-42".to_string())],
-        body: json!({"error": "bad request"}).to_string(),
+        body: ScriptedBody::Fixed(json!({"error": "bad request"}).to_string()),
     }];
     let (base_url, recorded, handle) = spawn_scripted_server(responses).await?;
 
@@ -77,12 +77,12 @@ async fn get_json_retries_retryable_status_then_succeeds() -> TestResult {
         ScriptedResponse {
             status: StatusCode::SERVICE_UNAVAILABLE,
             headers: vec![],
-            body: json!({"error": "try again"}).to_string(),
+            body: ScriptedBody::Fixed(json!({"error": "try again"}).to_string()),
         },
         ScriptedResponse {
             status: StatusCode::OK,
             headers: vec![],
-            body: json!({"ok": true}).to_string(),
+            body: ScriptedBody::Fixed(json!({"ok": true}).to_string()),
         },
     ];
     let (base_url, recorded, handle) = spawn_scripted_server(responses).await?;

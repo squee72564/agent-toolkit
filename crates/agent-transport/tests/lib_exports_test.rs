@@ -1,10 +1,14 @@
 use std::time::Duration;
 
-use agent_transport::{HttpTransport, HttpTransportBuilder, RetryPolicy, TransportError};
+use agent_transport::{
+    HttpSseResponse, HttpTransport, HttpTransportBuilder, RetryPolicy, SseEvent, TransportError,
+};
 
 fn assert_builder_type(_: HttpTransportBuilder) {}
 fn assert_transport_type(_: HttpTransport) {}
 fn assert_response_type(_: agent_transport::HttpJsonResponse) {}
+fn assert_sse_response_type(_: agent_transport::HttpSseResponse) {}
+fn assert_sse_event_type(_: agent_transport::SseEvent) {}
 
 #[test]
 fn root_and_module_types_are_interchangeable() {
@@ -43,6 +47,13 @@ fn root_reexports_allow_transport_construction() {
 fn root_reexports_expose_http_json_response_type() {
     let _ = std::mem::size_of::<agent_transport::HttpJsonResponse>();
     let _ = std::mem::size_of::<agent_transport::http::HttpJsonResponse>();
+    let _ = std::mem::size_of::<HttpSseResponse>();
+    let _ = std::mem::size_of::<agent_transport::http::HttpSseResponse>();
+    let _ = std::mem::size_of::<SseEvent>();
+    let _ = std::mem::size_of::<agent_transport::http::SseEvent>();
 
     let _assert_fn: fn(agent_transport::http::HttpJsonResponse) = assert_response_type;
+    let _assert_sse_response_fn: fn(agent_transport::http::HttpSseResponse) =
+        assert_sse_response_type;
+    let _assert_sse_event_fn: fn(agent_transport::http::SseEvent) = assert_sse_event_type;
 }

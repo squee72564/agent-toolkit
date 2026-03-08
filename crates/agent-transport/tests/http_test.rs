@@ -6,3 +6,5 @@ mod headers_test;
 mod request_response_test;
 #[path = "http/retry_policy_test.rs"]
 mod retry_policy_test;
+#[path = "http/streaming_test.rs"]
+mod streaming_test;
