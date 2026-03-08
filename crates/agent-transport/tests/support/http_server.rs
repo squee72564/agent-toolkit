@@ -29,6 +29,8 @@ pub enum ScriptedBody {
     Fixed(String),
     Chunks(Vec<String>),
     ChunksThenDisconnect(Vec<String>),
+    TimedChunks(Vec<(Duration, String)>),
+    TimedChunksThenDisconnect(Vec<(Duration, String)>),
     RawChunks(Vec<Vec<u8>>),
     RawChunksThenDisconnect(Vec<Vec<u8>>),
 }
@@ -146,6 +148,8 @@ async fn write_response(stream: &mut TcpStream, response: &ScriptedResponse) -> 
         response.body,
         ScriptedBody::Chunks(_)
             | ScriptedBody::ChunksThenDisconnect(_)
+            | ScriptedBody::TimedChunks(_)
+            | ScriptedBody::TimedChunksThenDisconnect(_)
             | ScriptedBody::RawChunks(_)
             | ScriptedBody::RawChunksThenDisconnect(_)
     );
@@ -193,6 +197,25 @@ async fn write_response(stream: &mut TcpStream, response: &ScriptedResponse) -> 
             }
 
             if matches!(response.body, ScriptedBody::Chunks(_)) {
+                stream.write_all(b"0\r\n\r\n").await?;
+            }
+
+            stream.shutdown().await
+        }
+        ScriptedBody::TimedChunks(chunks) | ScriptedBody::TimedChunksThenDisconnect(chunks) => {
+            response_text.push_str("Transfer-Encoding: chunked\r\n");
+            response_text.push_str("Connection: close\r\n\r\n");
+            stream.write_all(response_text.as_bytes()).await?;
+
+            for (delay, chunk) in chunks {
+                tokio::time::sleep(*delay).await;
+                let header = format!("{:X}\r\n", chunk.len());
+                stream.write_all(header.as_bytes()).await?;
+                stream.write_all(chunk.as_bytes()).await?;
+                stream.write_all(b"\r\n").await?;
+            }
+
+            if matches!(response.body, ScriptedBody::TimedChunks(_)) {
                 stream.write_all(b"0\r\n\r\n").await?;
             }
 

@@ -3,7 +3,10 @@ use std::io::ErrorKind;
 use std::time::Duration;
 
 use agent_core::types::AuthStyle;
-use agent_transport::{RetryPolicy, SseLimits, TimeoutStage, TransportError};
+use agent_transport::{
+    HttpRequestBody, HttpRequestOptions, HttpResponse, HttpResponseMode, HttpSendRequest,
+    RetryPolicy, SseLimits, TimeoutStage, TransportError,
+};
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
@@ -239,7 +242,12 @@ async fn post_sse_rejects_non_sse_content_type() -> TestResult {
     }];
     let (base_url, _recorded, handle) = spawn_scripted_server(responses).await?;
 
-    let transport = default_transport(RetryPolicy::default());
+    let transport = default_transport(RetryPolicy {
+        max_attempts: 2,
+        initial_backoff: Duration::from_millis(1),
+        max_backoff: Duration::from_millis(1),
+        ..RetryPolicy::default()
+    });
     let error = transport
         .post_sse(
             &default_platform(AuthStyle::None),
@@ -452,5 +460,161 @@ async fn post_sse_reports_disconnect_with_partial_frame() -> TestResult {
     assert!(matches!(error, TransportError::StreamTerminated { .. }));
 
     await_server(handle).await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn send_sse_times_out_waiting_for_first_byte() -> TestResult {
+    let responses = vec![ScriptedResponse {
+        status: StatusCode::OK,
+        headers: vec![],
+        delay_before_headers: None,
+        body: ScriptedBody::TimedChunks(vec![(
+            Duration::from_millis(100),
+            "data: late\n\n".to_string(),
+        )]),
+    }];
+    let (base_url, _recorded, handle) = spawn_scripted_server(responses).await?;
+
+    let transport = default_transport(RetryPolicy::default());
+    let platform = default_platform(AuthStyle::None);
+    let ctx = empty_context();
+    let error = transport
+        .send(HttpSendRequest {
+            platform: &platform,
+            method: reqwest::Method::POST,
+            url: &format!("{base_url}/stream"),
+            body: HttpRequestBody::Json(serde_json::to_vec(&ExampleBody { msg: "hello" })?.into()),
+            ctx: &ctx,
+            options: HttpRequestOptions::default()
+                .with_accept(reqwest::header::HeaderValue::from_static(
+                    "text/event-stream",
+                ))
+                .with_expected_content_type("text/event-stream")
+                .with_stream_idle_timeout(Duration::from_millis(20)),
+            response_mode: HttpResponseMode::Sse,
+        })
+        .await
+        .expect_err("first byte timeout should fail");
+
+    assert!(matches!(
+        error,
+        TransportError::Timeout {
+            stage: TimeoutStage::FirstByte
+        }
+    ));
+
+    if let Err(error) = await_server(handle).await {
+        assert_eq!(error.kind(), ErrorKind::BrokenPipe);
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn send_sse_times_out_when_stream_goes_idle_after_first_event() -> TestResult {
+    let responses = vec![ScriptedResponse {
+        status: StatusCode::OK,
+        headers: vec![],
+        delay_before_headers: None,
+        body: ScriptedBody::TimedChunksThenDisconnect(vec![
+            (Duration::from_millis(0), "data: partial\n\n".to_string()),
+            (Duration::from_millis(100), "data: late\n\n".to_string()),
+        ]),
+    }];
+    let (base_url, _recorded, handle) = spawn_scripted_server(responses).await?;
+
+    let transport = default_transport(RetryPolicy::default());
+    let platform = default_platform(AuthStyle::None);
+    let ctx = empty_context();
+    let mut response = match transport
+        .send(HttpSendRequest {
+            platform: &platform,
+            method: reqwest::Method::POST,
+            url: &format!("{base_url}/stream"),
+            body: HttpRequestBody::Json(serde_json::to_vec(&ExampleBody { msg: "hello" })?.into()),
+            ctx: &ctx,
+            options: HttpRequestOptions::default()
+                .with_accept(reqwest::header::HeaderValue::from_static(
+                    "text/event-stream",
+                ))
+                .with_expected_content_type("text/event-stream")
+                .with_stream_idle_timeout(Duration::from_millis(20)),
+            response_mode: HttpResponseMode::Sse,
+        })
+        .await?
+    {
+        HttpResponse::Sse(response) => *response,
+        other => panic!("expected sse response, got {other:?}"),
+    };
+
+    let event = response.stream.next_event().await?.expect("first event");
+    assert_eq!(event.data, "partial");
+
+    let error = response
+        .stream
+        .next_event()
+        .await
+        .expect_err("idle timeout should fail");
+    assert!(matches!(
+        error,
+        TransportError::Timeout {
+            stage: TimeoutStage::StreamIdle
+        }
+    ));
+
+    if let Err(error) = await_server(handle).await {
+        assert_eq!(error.kind(), ErrorKind::BrokenPipe);
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn send_sse_request_options_override_setup_timeout() -> TestResult {
+    let responses = vec![ScriptedResponse {
+        status: StatusCode::OK,
+        headers: vec![],
+        delay_before_headers: Some(Duration::from_millis(40)),
+        body: ScriptedBody::Chunks(vec!["data: ready\n\n".to_string()]),
+    }];
+    let (base_url, _recorded, handle) = spawn_scripted_server(responses).await?;
+
+    let transport = agent_transport::HttpTransport::builder(reqwest::Client::new())
+        .retry_policy(RetryPolicy {
+            max_attempts: 1,
+            ..RetryPolicy::default()
+        })
+        .stream_timeout(Duration::from_millis(200))
+        .build();
+    let platform = default_platform(AuthStyle::None);
+    let ctx = empty_context();
+
+    let error = transport
+        .send(HttpSendRequest {
+            platform: &platform,
+            method: reqwest::Method::POST,
+            url: &format!("{base_url}/stream"),
+            body: HttpRequestBody::Json(serde_json::to_vec(&ExampleBody { msg: "hello" })?.into()),
+            ctx: &ctx,
+            options: HttpRequestOptions::default()
+                .with_accept(reqwest::header::HeaderValue::from_static(
+                    "text/event-stream",
+                ))
+                .with_expected_content_type("text/event-stream")
+                .with_stream_setup_timeout(Duration::from_millis(10)),
+            response_mode: HttpResponseMode::Sse,
+        })
+        .await
+        .expect_err("request-scoped setup timeout should win");
+
+    assert!(matches!(
+        error,
+        TransportError::Timeout {
+            stage: TimeoutStage::StreamSetup
+        }
+    ));
+
+    if let Err(error) = await_server(handle).await {
+        assert_eq!(error.kind(), ErrorKind::BrokenPipe);
+    }
     Ok(())
 }

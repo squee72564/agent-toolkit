@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use agent_core::{AdapterContext, AuthCredentials, AuthStyle, PlatformConfig};
 use base64::Engine;
 use bytes::Bytes;
@@ -10,6 +12,7 @@ use reqwest::{
 };
 use serde_json::Value;
 
+use crate::http::sse::SseLimits;
 use crate::http::transport::{HttpTransport, TimeoutStage, TransportError};
 
 const REQUEST_ID_HEADER_KEY: &str = "transport.request_id_header";
@@ -28,39 +31,110 @@ pub struct HttpJsonResponse {
     pub body: Value,
 }
 
+#[derive(Debug, Clone)]
+pub struct HttpBytesResponse {
+    pub head: HttpResponseHead,
+    pub body: Bytes,
+}
+
+#[derive(Debug, Clone)]
+pub enum HttpRequestBody {
+    None,
+    Json(Bytes),
+    Bytes {
+        content_type: Option<HeaderValue>,
+        body: Bytes,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HttpResponseMode {
+    Json,
+    Sse,
+    Bytes,
+}
+
+#[derive(Debug)]
+pub enum HttpResponse {
+    Json(HttpJsonResponse),
+    Sse(Box<crate::http::HttpSseResponse>),
+    Bytes(HttpBytesResponse),
+}
+
+pub struct HttpSendRequest<'a> {
+    pub platform: &'a PlatformConfig,
+    pub method: Method,
+    pub url: &'a str,
+    pub body: HttpRequestBody,
+    pub ctx: &'a AdapterContext,
+    pub options: HttpRequestOptions,
+    pub response_mode: HttpResponseMode,
+}
+
+pub(crate) struct RequestExecution<'a> {
+    pub platform: &'a PlatformConfig,
+    pub method: Method,
+    pub url: &'a str,
+    pub body: &'a HttpRequestBody,
+    pub ctx: &'a AdapterContext,
+    pub options: &'a HttpRequestOptions,
+    pub response_mode: HttpResponseMode,
+}
+
 pub struct HeaderConfig {
     pub headers: HeaderMap,
     pub request_id_header: HeaderName,
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct HttpRequestOptions {
+#[derive(Debug, Clone, Default)]
+pub struct HttpRequestOptions {
     pub accept: Option<HeaderValue>,
-    pub body_content_type: Option<HeaderValue>,
-    pub timeout_mode: TimeoutMode,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum TimeoutMode {
-    Request,
-    StreamSetup,
+    pub expected_content_type: Option<String>,
+    pub request_timeout: Option<Duration>,
+    pub stream_setup_timeout: Option<Duration>,
+    pub stream_idle_timeout: Option<Duration>,
+    pub sse_limits: Option<SseLimits>,
 }
 
 impl HttpRequestOptions {
-    pub(crate) fn json() -> Self {
-        Self {
-            accept: None,
-            body_content_type: Some(HeaderValue::from_static("application/json")),
-            timeout_mode: TimeoutMode::Request,
-        }
+    pub fn with_accept(mut self, accept: HeaderValue) -> Self {
+        self.accept = Some(accept);
+        self
     }
 
-    pub(crate) fn sse() -> Self {
-        Self {
-            accept: Some(HeaderValue::from_static("text/event-stream")),
-            body_content_type: Some(HeaderValue::from_static("application/json")),
-            timeout_mode: TimeoutMode::StreamSetup,
-        }
+    pub fn with_expected_content_type(mut self, expected: impl Into<String>) -> Self {
+        self.expected_content_type = Some(expected.into());
+        self
+    }
+
+    pub fn with_request_timeout(mut self, timeout: Duration) -> Self {
+        self.request_timeout = Some(timeout);
+        self
+    }
+
+    pub fn with_stream_setup_timeout(mut self, timeout: Duration) -> Self {
+        self.stream_setup_timeout = Some(timeout);
+        self
+    }
+
+    pub fn with_stream_idle_timeout(mut self, timeout: Duration) -> Self {
+        self.stream_idle_timeout = Some(timeout);
+        self
+    }
+
+    pub fn with_sse_limits(mut self, limits: SseLimits) -> Self {
+        self.sse_limits = Some(limits);
+        self
+    }
+
+    pub(crate) fn json_defaults() -> Self {
+        Self::default()
+    }
+
+    pub(crate) fn sse_defaults() -> Self {
+        Self::default()
+            .with_accept(HeaderValue::from_static("text/event-stream"))
+            .with_expected_content_type("text/event-stream")
     }
 }
 
@@ -100,79 +174,69 @@ impl HttpTransport {
 
     pub(crate) async fn send_request_with_retry(
         &self,
-        platform: &PlatformConfig,
-        method: Method,
-        url: &str,
-        body: Option<Bytes>,
-        ctx: &AdapterContext,
-        options: &HttpRequestOptions,
+        request: RequestExecution<'_>,
     ) -> Result<(reqwest::Response, HeaderConfig), TransportError> {
-        let header_config = self.build_header_config(platform, ctx)?;
+        let header_config = self.build_header_config(request.platform, request.ctx)?;
         let max_attempts = self.retry_policy.max_attempts.max(1);
         let mut attempt: u8 = 0;
+        let uses_stream_timeouts = matches!(request.response_mode, HttpResponseMode::Sse);
 
         loop {
             attempt += 1;
 
             let mut request_builder = self
                 .client
-                .request(method.clone(), url)
+                .request(request.method.clone(), request.url)
                 .headers(header_config.headers.clone());
 
-            if matches!(options.timeout_mode, TimeoutMode::Request) {
-                request_builder = request_builder.timeout(self.request_timeout);
+            if uses_stream_timeouts {
+                let setup_timeout = request
+                    .options
+                    .stream_setup_timeout
+                    .unwrap_or(self.stream_timeout);
+                request_builder = request_builder.timeout(setup_timeout);
+            } else {
+                let request_timeout = request
+                    .options
+                    .request_timeout
+                    .unwrap_or(self.request_timeout);
+                request_builder = request_builder.timeout(request_timeout);
             }
 
-            if let Some(accept) = &options.accept {
+            if let Some(accept) = &request.options.accept {
                 request_builder = request_builder.header(reqwest::header::ACCEPT, accept.clone());
             }
 
-            if let Some(payload) = &body {
-                request_builder = request_builder
-                    .header(
-                        CONTENT_TYPE,
-                        options.body_content_type.clone().unwrap_or_else(|| {
-                            HeaderValue::from_static("application/octet-stream")
-                        }),
-                    )
-                    .body(payload.clone());
+            match request.body {
+                HttpRequestBody::None => {}
+                HttpRequestBody::Json(payload) => {
+                    request_builder = request_builder
+                        .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
+                        .body(payload.clone());
+                }
+                HttpRequestBody::Bytes { content_type, body } => {
+                    if let Some(content_type) = content_type {
+                        request_builder =
+                            request_builder.header(CONTENT_TYPE, content_type.clone());
+                    }
+                    request_builder = request_builder.body(body.clone());
+                }
             }
 
-            let response = match options.timeout_mode {
-                TimeoutMode::Request => match request_builder.send().await {
-                    Ok(resp) => resp,
-                    Err(err) => {
-                        if attempt < max_attempts && is_retryable_transport(&err) {
-                            self.sleep_before_retry(attempt).await;
-                            continue;
-                        }
-
-                        return Err(map_reqwest_error(err, TimeoutMode::Request));
+            let response = match request_builder.send().await {
+                Ok(resp) => resp,
+                Err(err) => {
+                    if attempt < max_attempts && is_retryable_transport(&err) {
+                        self.sleep_before_retry(attempt).await;
+                        continue;
                     }
-                },
-                TimeoutMode::StreamSetup => {
-                    let setup_timeout = self.stream_timeout;
-                    match tokio::time::timeout(setup_timeout, request_builder.send()).await {
-                        Ok(Ok(resp)) => resp,
-                        Ok(Err(err)) => {
-                            if attempt < max_attempts && is_retryable_transport(&err) {
-                                self.sleep_before_retry(attempt).await;
-                                continue;
-                            }
 
-                            return Err(map_reqwest_error(err, TimeoutMode::StreamSetup));
-                        }
-                        Err(_) => {
-                            if attempt < max_attempts {
-                                self.sleep_before_retry(attempt).await;
-                                continue;
-                            }
-
-                            return Err(TransportError::Timeout {
-                                stage: TimeoutStage::StreamSetup,
-                            });
-                        }
-                    }
+                    let stage = if uses_stream_timeouts {
+                        TimeoutStage::StreamSetup
+                    } else {
+                        TimeoutStage::Request
+                    };
+                    return Err(map_reqwest_error(err, stage));
                 }
             };
 
@@ -228,14 +292,9 @@ pub(crate) fn content_type_matches(headers: &HeaderMap, expected: &str) -> bool 
         .is_some_and(|content_type| content_type.eq_ignore_ascii_case(expected))
 }
 
-fn map_reqwest_error(error: reqwest::Error, timeout_mode: TimeoutMode) -> TransportError {
+fn map_reqwest_error(error: reqwest::Error, stage: TimeoutStage) -> TransportError {
     if error.is_timeout() {
-        return TransportError::Timeout {
-            stage: match timeout_mode {
-                TimeoutMode::Request => TimeoutStage::Request,
-                TimeoutMode::StreamSetup => TimeoutStage::StreamSetup,
-            },
-        };
+        return TransportError::Timeout { stage };
     }
 
     TransportError::Request(error)

@@ -2,8 +2,13 @@ use std::collections::BTreeMap;
 use std::time::Duration;
 
 use agent_core::types::{AdapterContext, AuthStyle};
-use agent_transport::RetryPolicy;
+use agent_transport::{
+    HttpRequestBody, HttpRequestOptions, HttpResponse, HttpResponseMode, HttpSendRequest,
+    RetryPolicy,
+};
+use bytes::Bytes;
 use reqwest::StatusCode;
+use reqwest::header::HeaderValue;
 use serde_json::{Value, json};
 
 use crate::support::http_server::{
@@ -114,5 +119,102 @@ async fn get_json_retries_retryable_status_then_succeeds() -> TestResult {
     assert_eq!(captured.len(), 2);
     assert_eq!(captured[0].path, "/retry");
     assert_eq!(captured[1].path, "/retry");
+    Ok(())
+}
+
+#[tokio::test]
+async fn send_bytes_without_body_does_not_set_content_type() -> TestResult {
+    let responses = vec![ScriptedResponse {
+        status: StatusCode::OK,
+        headers: vec![("content-type".to_string(), "text/plain".to_string())],
+        delay_before_headers: None,
+        body: ScriptedBody::Fixed("pong".to_string()),
+    }];
+    let (base_url, recorded, handle) = spawn_scripted_server(responses).await?;
+
+    let transport = default_transport(RetryPolicy::default());
+    let platform = default_platform(AuthStyle::None);
+    let ctx = empty_context();
+    let response = transport
+        .send(HttpSendRequest {
+            platform: &platform,
+            method: reqwest::Method::GET,
+            url: &format!("{base_url}/ping"),
+            body: HttpRequestBody::None,
+            ctx: &ctx,
+            options: HttpRequestOptions::default().with_expected_content_type("text/plain"),
+            response_mode: HttpResponseMode::Bytes,
+        })
+        .await?;
+
+    match response {
+        HttpResponse::Bytes(response) => assert_eq!(response.body, Bytes::from_static(b"pong")),
+        other => panic!("expected bytes response, got {other:?}"),
+    }
+
+    await_server(handle).await?;
+
+    let captured = captured_requests(&recorded)?;
+    assert_eq!(captured.len(), 1);
+    assert_eq!(captured[0].method, "GET");
+    assert_eq!(captured[0].path, "/ping");
+    assert!(!captured[0].headers.contains_key("content-type"));
+    assert!(captured[0].body.is_empty());
+    Ok(())
+}
+
+#[tokio::test]
+async fn send_bytes_preserves_raw_payload_and_explicit_content_type() -> TestResult {
+    let responses = vec![ScriptedResponse {
+        status: StatusCode::OK,
+        headers: vec![(
+            "content-type".to_string(),
+            "application/octet-stream".to_string(),
+        )],
+        delay_before_headers: None,
+        body: ScriptedBody::RawChunks(vec![b"ok".to_vec()]),
+    }];
+    let (base_url, recorded, handle) = spawn_scripted_server(responses).await?;
+
+    let transport = default_transport(RetryPolicy::default());
+    let platform = default_platform(AuthStyle::None);
+    let ctx = empty_context();
+    let response = transport
+        .send(HttpSendRequest {
+            platform: &platform,
+            method: reqwest::Method::POST,
+            url: &format!("{base_url}/upload"),
+            body: HttpRequestBody::Bytes {
+                content_type: Some(HeaderValue::from_static("application/octet-stream")),
+                body: Bytes::from_static(b"\x00\x01\x02"),
+            },
+            ctx: &ctx,
+            options: HttpRequestOptions::default()
+                .with_accept(HeaderValue::from_static("application/octet-stream"))
+                .with_expected_content_type("application/octet-stream"),
+            response_mode: HttpResponseMode::Bytes,
+        })
+        .await?;
+
+    match response {
+        HttpResponse::Bytes(response) => assert_eq!(response.body, Bytes::from_static(b"ok")),
+        other => panic!("expected bytes response, got {other:?}"),
+    }
+
+    await_server(handle).await?;
+
+    let captured = captured_requests(&recorded)?;
+    assert_eq!(captured.len(), 1);
+    assert_eq!(captured[0].method, "POST");
+    assert_eq!(captured[0].path, "/upload");
+    assert_eq!(
+        captured[0].headers.get("content-type").map(String::as_str),
+        Some("application/octet-stream")
+    );
+    assert_eq!(
+        captured[0].headers.get("accept").map(String::as_str),
+        Some("application/octet-stream")
+    );
+    assert_eq!(captured[0].body, vec![0, 1, 2]);
     Ok(())
 }

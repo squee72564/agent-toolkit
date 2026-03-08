@@ -1,6 +1,8 @@
+use std::time::Duration;
+
 use bytes::BytesMut;
 
-use crate::http::transport::TransportError;
+use crate::http::transport::{StreamTerminationReason, TimeoutStage, TransportError};
 
 #[derive(Debug, Clone)]
 pub struct SseEvent {
@@ -41,6 +43,8 @@ pub struct HttpSseStream {
     pub(crate) buffer_offset: usize,
     pub(crate) state: PendingSseEvent,
     pub(crate) limits: SseLimits,
+    pub(crate) idle_timeout: Option<Duration>,
+    pub(crate) received_any_bytes: bool,
 }
 
 #[derive(Debug, Default)]
@@ -81,9 +85,10 @@ impl HttpSseStream {
                 return Ok(Some(event));
             }
 
-            match self.response.chunk().await {
+            match self.read_next_chunk().await {
                 Ok(Some(chunk)) => {
                     self.buffer.extend_from_slice(&chunk);
+                    self.received_any_bytes = true;
                     self.enforce_buffer_limit()?;
                 }
                 Ok(None) => {
@@ -93,6 +98,7 @@ impl HttpSseStream {
 
                     if !self.remaining_buffer().ends_with(b"\n") {
                         return Err(TransportError::StreamTerminated {
+                            reason: StreamTerminationReason::Protocol,
                             message: "stream ended with a partial SSE frame".to_string(),
                             head: Box::new(self.head.clone()),
                         });
@@ -105,10 +111,7 @@ impl HttpSseStream {
                     return Ok(self.state.finish());
                 }
                 Err(error) => {
-                    return Err(TransportError::StreamTerminated {
-                        message: error.to_string(),
-                        head: Box::new(self.head.clone()),
-                    });
+                    return Err(error);
                 }
             }
         }
@@ -194,7 +197,7 @@ impl HttpSseStream {
         Ok(None)
     }
 
-    fn enforce_buffer_limit(&self) -> Result<(), TransportError> {
+    pub(crate) fn enforce_buffer_limit(&self) -> Result<(), TransportError> {
         let buffered = self.remaining_buffer().len();
         if buffered > self.limits.max_buffer_bytes {
             return Err(TransportError::SseLimit {
@@ -226,6 +229,37 @@ impl HttpSseStream {
 
     fn remaining_buffer(&self) -> &[u8] {
         &self.buffer[self.buffer_offset..]
+    }
+
+    async fn read_next_chunk(&mut self) -> Result<Option<bytes::Bytes>, TransportError> {
+        match self.idle_timeout {
+            Some(idle_timeout) => {
+                match tokio::time::timeout(idle_timeout, self.response.chunk()).await {
+                    Ok(Ok(chunk)) => Ok(chunk),
+                    Ok(Err(error)) => Err(TransportError::StreamTerminated {
+                        reason: StreamTerminationReason::Disconnect,
+                        message: error.to_string(),
+                        head: Box::new(self.head.clone()),
+                    }),
+                    Err(_) => Err(TransportError::Timeout {
+                        stage: if self.received_any_bytes {
+                            TimeoutStage::StreamIdle
+                        } else {
+                            TimeoutStage::FirstByte
+                        },
+                    }),
+                }
+            }
+            None => self
+                .response
+                .chunk()
+                .await
+                .map_err(|error| TransportError::StreamTerminated {
+                    reason: StreamTerminationReason::Disconnect,
+                    message: error.to_string(),
+                    head: Box::new(self.head.clone()),
+                }),
+        }
     }
 }
 
