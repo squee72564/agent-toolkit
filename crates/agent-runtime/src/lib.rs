@@ -7,6 +7,7 @@ mod direct_streaming_api;
 mod fallback;
 mod message_create_input;
 mod message_response_stream;
+mod message_text_stream;
 mod observer;
 mod provider_client;
 mod provider_config;
@@ -32,6 +33,7 @@ pub use crate::fallback::{
 };
 pub use crate::message_create_input::MessageCreateInput;
 pub use crate::message_response_stream::{MessageResponseStream, StreamCompletion};
+pub use crate::message_text_stream::MessageTextStream;
 pub use crate::observer::RuntimeObserver;
 pub use crate::provider_config::ProviderConfig;
 pub use crate::routed_messages_api::RoutedMessagesApi;

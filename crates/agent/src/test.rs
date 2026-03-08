@@ -115,11 +115,16 @@ fn top_level_transport_reexports_are_constructible() {
 #[test]
 fn streaming_reexports_are_accessible() {
     fn assert_streaming_type<T>() {}
+    fn assert_text_conversion(stream: super::MessageResponseStream) -> super::MessageTextStream {
+        stream.into_text_stream()
+    }
 
     assert_streaming_type::<super::DirectStreamingApi<'static>>();
     assert_streaming_type::<super::RoutedStreamingApi<'static>>();
     assert_streaming_type::<super::MessageResponseStream>();
+    assert_streaming_type::<super::MessageTextStream>();
     assert_streaming_type::<StreamCompletion>();
+    let _ = assert_text_conversion;
 }
 
 #[derive(Debug)]

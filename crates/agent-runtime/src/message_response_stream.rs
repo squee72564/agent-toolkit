@@ -8,6 +8,7 @@ use agent_core::{CanonicalStreamEnvelope, Request, Response};
 use futures_core::Stream;
 
 use crate::AgentToolkit;
+use crate::message_text_stream::MessageTextStream;
 use crate::observer::{RuntimeObserver, resolve_observer_for_request, safe_call_observer};
 use crate::provider_runtime::{OpenedProviderStream, ProviderStreamAttemptOutcome};
 use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
@@ -39,6 +40,10 @@ impl std::fmt::Debug for MessageResponseStream {
 }
 
 impl MessageResponseStream {
+    pub fn into_text_stream(self) -> MessageTextStream {
+        MessageTextStream::new(self)
+    }
+
     pub(crate) fn new_direct(
         request: Request,
         request_started_at: Instant,
