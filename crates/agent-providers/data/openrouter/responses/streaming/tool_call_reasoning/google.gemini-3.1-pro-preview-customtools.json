@@ -1,0 +1,380 @@
+{
+  "provider": "openrouter",
+  "scenario": "tool_call_reasoning",
+  "captured_at": "2026-03-08T20:22:18.447Z",
+  "request": {
+    "url": "https://openrouter.ai/api/v1/chat/completions",
+    "method": "POST",
+    "model": "google/gemini-3.1-pro-preview-customtools",
+    "headers": {
+      "Authorization": "<redacted>",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "model": "google/gemini-3.1-pro-preview-customtools",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant."
+        },
+        {
+          "role": "user",
+          "content": "What is the weather in San Francisco?"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "type": "function",
+              "index": 0,
+              "id": "call_34db77af73cb494b982ee291",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"city\": \"San Francisco\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_34db77af73cb494b982ee291",
+          "content": "{ \"city\": \"San Francisco\", \"celcius\": 16, \"farhenheit\": 60}"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "get_weather",
+            "description": "Get current weather by city",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "city"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "stream": true,
+      "temperature": 0,
+      "max_tokens": 1024
+    }
+  },
+  "response": {
+    "status": 200,
+    "status_text": "OK",
+    "headers": {
+      "access-control-allow-origin": "*",
+      "cache-control": "no-cache",
+      "cf-ray": "9d948d00582ddb66-LAX",
+      "connection": "keep-alive",
+      "content-type": "text/event-stream",
+      "date": "Sun, 08 Mar 2026 20:22:16 GMT",
+      "permissions-policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "referrer-policy": "no-referrer, strict-origin-when-cross-origin",
+      "server": "cloudflare",
+      "transfer-encoding": "chunked",
+      "x-content-type-options": "nosniff"
+    },
+    "content_type": "text/event-stream"
+  },
+  "stream": {
+    "format": "sse",
+    "chunk_count": 16,
+    "chunks": [
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      "data: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Initiating Step-by-Step Execution**\\n\\nNow I am moving forward with the plan, breaking it down into manageable actions. I'm focusing on the next immediate step to achieve the goal and considering the necessary actions for seamless execution. The aim is to ensure progress is made methodically, addressing the task at hand directly.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Initiating Step-by-Step Execution**\\n\\nNow I am moving forward with the plan, breaking it down into manageable actions. I'm focusing on the next immediate step to achieve the goal and considering the necessary actions for seamless execution. The aim is to ensure progress is made methodically, addressing the task at hand directly.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      "data: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"The current weather in San Francisco is 16\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"°C (60°F).\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"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\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}\n\n",
+      "data: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[],\"usage\":{\"prompt_tokens\":122,\"completion_tokens\":341,\"total_tokens\":463,\"cost\":0.004336,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.004336,\"upstream_inference_prompt_cost\":0.000244,\"upstream_inference_completions_cost\":0.004092},\"completion_tokens_details\":{\"reasoning_tokens\":323,\"image_tokens\":0,\"audio_tokens\":0}}}\n\n",
+      "data: [DONE]\n\n"
+    ],
+    "raw_text": ": OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\ndata: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Initiating Step-by-Step Execution**\\n\\nNow I am moving forward with the plan, breaking it down into manageable actions. I'm focusing on the next immediate step to achieve the goal and considering the necessary actions for seamless execution. The aim is to ensure progress is made methodically, addressing the task at hand directly.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Initiating Step-by-Step Execution**\\n\\nNow I am moving forward with the plan, breaking it down into manageable actions. I'm focusing on the next immediate step to achieve the goal and considering the necessary actions for seamless execution. The aim is to ensure progress is made methodically, addressing the task at hand directly.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\ndata: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"The current weather in San Francisco is 16\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"°C (60°F).\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"EpYNCpMNAb4+9vuoFkO9BnRpNMOyDVfht/WyyqzEQ69LTmsZ1JFgUCuygDrT3vrGUCiiIm8ULr9M7I+4CV2AwAkHH3lv1U0SoFjlsLY7+HA+Hp36KEj41dBmIyeHCC+rF76qHMKqXLgiBQ3574BPSmfViTpTbwJ1FdC62gNoNgi7LkcTlY1jftR1PfuSBQBQhi5w1TyBPQ1tw7zQ1C9jUKhOB//MR9QlPc5BXWyqfKdcCDRj0VJvQdt4mZpKqR8Et88hqvfoFhEuG0Yju0hlIaMG2CH/v5gP+nMhnHqb+j3MdILRMV2h9kUw1+D2TIQ00Nxz2u6Zyk0dSQ6CYZwD7d1j7dgZ1XyJtJ9U586TVFbHsNUN8UjKPjWDFsUqSvPafuMPXz329TCekre08y9B7BGXCvZ1oeypHFAw9FvIV3+4rAK0y/lGfjbyqygqajxDYquoA7eX3r2h+PFXrWFqfqeJCukOZdzypIrjPlDJeiYAVYBlqhkzGKCcCMhtNSNhPHy+lmgao1ElcqeOHLOveqxezgD1Grn/ZPmdcTM/mnZTdpBiSBuAs67szIL/1Yo6SuMT9F5/lzJTknSqIkB3q7F7WxaOlbUGb/iIdp0hJ4ensMNXvV/OrPO70UnbTTA7ios/qegz3ivMmDR/ra9vgzeh006WzX5fIomugQMmkGWY6EclDBnMRyWQNG361VGLYgmmUJL5I0KBCbAu8tFffxbUMwSCtFMc1RO0hh2t7RbAnnowoF/hS0RO6wxFqGS4Ji2hwE/+Ory7zlF3U8aYHuc38E69F0DU+/SASXY1zxwlP/RcTDBD20mx79V0IovZvOZQDjCdavzJ1dJimGCw0MTAZCpcRx/AayDpv8LVPhDC9/VIaJbEQOmP4nfQYc1LzbVQUK6oN2WXphYb9KvChu8Cvndg+1Guc4VPYHpDtaH4zl+HR1jiE1NEuHAHJI7Bj7qNYce9TZ5blyRatYwAI5A+6xsirAnbU+5e/4dDj75hLn+li6pZHb/L5InSf3WRIl+VMWSkQ3EV32ypc3rAXUZm2gr384Saecs2299uUGMGAnKF0tuN2/HSEQdZt1vGxag5JipQ+yMYmxaqqa1nagzCtCSY9yH51t2Bio+nEdBBhkviOaem2wOAC/pXxOFq0LeFoJCBznZhaW6FDnCOUq3QMAA3mSYXyxgRb0vv3jen3sGqIKExspdohxPBT54b+VlDNJiwsYJlcf4xwMW6+zLnInqoVBd4h4OPlknQA+x2OitKmQtbewbfRH6CIevqx0b2DH2rrIWiGkSPqXB5w7C5HGj0xjC72LHG96a9dL21I1TU8+itOmvJ+bcqCUFybLFpJB2dWWHB11R31L6NUQ3wH0mazD3jnm1rHlTB+EtUsjp9H8LGIGKdNpIgqRdsR8Lw3yBNmAfiH5PN32EGnzbRZGu0WpWKzHQ/dsAYobSYj60bWKBKkQDqjjhcpk/dim5kwtLnLIdt2W2tw38zgifdpw2XdYFcncd3m3tXlLbcm3jgW6RfgkvLd4MgvC1TDhAus2hflCXneXDzgpQ2H6M9qpJTDsNMVWzD2Ec4R3qFquiw0AHMgyhd73uVoANpn2VMZwRhSTMatzHFChuXFo5McTb+xKi+QJMdvHjcK7o6C5zTxkSnNosd8NSgfWy2V8n2jgjIBRcUoWE4EUvlcpsgzy/DQAJzpzR/6+I01EsF5SBRSJg41BGc5sgQ1lGQGq0oem1BLShD6vIzM1HF9YR+XiTuwzyNV6/wnrN+4cD5EMv6TUWE4qOvFShPchHzKmDLsXcPWox9XJ0rSX83T+e5TCmcPJjbAhMECgsoCAFtMTsnc7yG+5RpiQ+doXwkhaCuCp7IQW+JnavdODMIna2fEStoVPCJXQaptAHLTP73AHDMW/8FEbkaprMJzproErtx1fcp2d0kCoVfb3zD+T1acy6voSTaaAZq/AC623P4a8qlCVCppH3cBEmgPFY/hxMHXtabpEQH9vE1Vh7qfYnvbuZv8zVKe866ZYo5rMaKRclSD/OGWThH1NanKAtlTZizDTOYUbp1eg7vMpZ/Mvb8d+SG8FeBAXmhM80i5BjUKbl3+NM23itRQy43RTJcuHTVbq3ohk2ZVWG4Z+SL48mkNAyyM/Xnu+QZRDw4jBpxY7+4JJqYS8Yv+RO1+3gweoiKkOj1AS+kb1Zc5eY9/YtUCWaA4o45JtFrB0EuYPoIh1/p2yyY/3bHQFWKsTeSiaKrNqClegaK\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}\n\ndata: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[],\"usage\":{\"prompt_tokens\":122,\"completion_tokens\":341,\"total_tokens\":463,\"cost\":0.004336,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.004336,\"upstream_inference_prompt_cost\":0.000244,\"upstream_inference_completions_cost\":0.004092},\"completion_tokens_details\":{\"reasoning_tokens\":323,\"image_tokens\":0,\"audio_tokens\":0}}}\n\ndata: [DONE]\n\n",
+    "events": [
+      {
+        "index": 0,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 1,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 2,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 3,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 4,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 5,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 6,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Initiating Step-by-Step Execution**\\n\\nNow I am moving forward with the plan, breaking it down into manageable actions. I'm focusing on the next immediate step to achieve the goal and considering the necessary actions for seamless execution. The aim is to ensure progress is made methodically, addressing the task at hand directly.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Initiating Step-by-Step Execution**\\n\\nNow I am moving forward with the plan, breaking it down into manageable actions. I'm focusing on the next immediate step to achieve the goal and considering the necessary actions for seamless execution. The aim is to ensure progress is made methodically, addressing the task at hand directly.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Initiating Step-by-Step Execution**\\n\\nNow I am moving forward with the plan, breaking it down into manageable actions. I'm focusing on the next immediate step to achieve the goal and considering the necessary actions for seamless execution. The aim is to ensure progress is made methodically, addressing the task at hand directly.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Initiating Step-by-Step Execution**\\n\\nNow I am moving forward with the plan, breaking it down into manageable actions. I'm focusing on the next immediate step to achieve the goal and considering the necessary actions for seamless execution. The aim is to ensure progress is made methodically, addressing the task at hand directly.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Initiating Step-by-Step Execution**\\n\\nNow I am moving forward with the plan, breaking it down into manageable actions. I'm focusing on the next immediate step to achieve the goal and considering the necessary actions for seamless execution. The aim is to ensure progress is made methodically, addressing the task at hand directly.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Initiating Step-by-Step Execution**\\n\\nNow I am moving forward with the plan, breaking it down into manageable actions. I'm focusing on the next immediate step to achieve the goal and considering the necessary actions for seamless execution. The aim is to ensure progress is made methodically, addressing the task at hand directly.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773001333-ji5wRs9SfQTJ55sOLOZe",
+          "object": "chat.completion.chunk",
+          "created": 1773001333,
+          "model": "google/gemini-3.1-pro-preview-customtools-20260219",
+          "provider": "Google AI Studio",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": "**Initiating Step-by-Step Execution**\n\nNow I am moving forward with the plan, breaking it down into manageable actions. I'm focusing on the next immediate step to achieve the goal and considering the necessary actions for seamless execution. The aim is to ensure progress is made methodically, addressing the task at hand directly.\n\n\n",
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.text",
+                    "text": "**Initiating Step-by-Step Execution**\n\nNow I am moving forward with the plan, breaking it down into manageable actions. I'm focusing on the next immediate step to achieve the goal and considering the necessary actions for seamless execution. The aim is to ensure progress is made methodically, addressing the task at hand directly.\n\n\n",
+                    "format": "google-gemini-v1",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 7,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 8,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 9,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 10,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"The current weather in San Francisco is 16\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"The current weather in San Francisco is 16\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"The current weather in San Francisco is 16\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773001333-ji5wRs9SfQTJ55sOLOZe",
+          "object": "chat.completion.chunk",
+          "created": 1773001333,
+          "model": "google/gemini-3.1-pro-preview-customtools-20260219",
+          "provider": "Google AI Studio",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "The current weather in San Francisco is 16",
+                "role": "assistant"
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 11,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"°C (60°F).\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"°C (60°F).\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"°C (60°F).\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773001333-ji5wRs9SfQTJ55sOLOZe",
+          "object": "chat.completion.chunk",
+          "created": 1773001333,
+          "model": "google/gemini-3.1-pro-preview-customtools-20260219",
+          "provider": "Google AI Studio",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "°C (60°F).",
+                "role": "assistant"
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 12,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"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\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"EpYNCpMNAb4+9vuoFkO9BnRpNMOyDVfht/WyyqzEQ69LTmsZ1JFgUCuygDrT3vrGUCiiIm8ULr9M7I+4CV2AwAkHH3lv1U0SoFjlsLY7+HA+Hp36KEj41dBmIyeHCC+rF76qHMKqXLgiBQ3574BPSmfViTpTbwJ1FdC62gNoNgi7LkcTlY1jftR1PfuSBQBQhi5w1TyBPQ1tw7zQ1C9jUKhOB//MR9QlPc5BXWyqfKdcCDRj0VJvQdt4mZpKqR8Et88hqvfoFhEuG0Yju0hlIaMG2CH/v5gP+nMhnHqb+j3MdILRMV2h9kUw1+D2TIQ00Nxz2u6Zyk0dSQ6CYZwD7d1j7dgZ1XyJtJ9U586TVFbHsNUN8UjKPjWDFsUqSvPafuMPXz329TCekre08y9B7BGXCvZ1oeypHFAw9FvIV3+4rAK0y/lGfjbyqygqajxDYquoA7eX3r2h+PFXrWFqfqeJCukOZdzypIrjPlDJeiYAVYBlqhkzGKCcCMhtNSNhPHy+lmgao1ElcqeOHLOveqxezgD1Grn/ZPmdcTM/mnZTdpBiSBuAs67szIL/1Yo6SuMT9F5/lzJTknSqIkB3q7F7WxaOlbUGb/iIdp0hJ4ensMNXvV/OrPO70UnbTTA7ios/qegz3ivMmDR/ra9vgzeh006WzX5fIomugQMmkGWY6EclDBnMRyWQNG361VGLYgmmUJL5I0KBCbAu8tFffxbUMwSCtFMc1RO0hh2t7RbAnnowoF/hS0RO6wxFqGS4Ji2hwE/+Ory7zlF3U8aYHuc38E69F0DU+/SASXY1zxwlP/RcTDBD20mx79V0IovZvOZQDjCdavzJ1dJimGCw0MTAZCpcRx/AayDpv8LVPhDC9/VIaJbEQOmP4nfQYc1LzbVQUK6oN2WXphYb9KvChu8Cvndg+1Guc4VPYHpDtaH4zl+HR1jiE1NEuHAHJI7Bj7qNYce9TZ5blyRatYwAI5A+6xsirAnbU+5e/4dDj75hLn+li6pZHb/L5InSf3WRIl+VMWSkQ3EV32ypc3rAXUZm2gr384Saecs2299uUGMGAnKF0tuN2/HSEQdZt1vGxag5JipQ+yMYmxaqqa1nagzCtCSY9yH51t2Bio+nEdBBhkviOaem2wOAC/pXxOFq0LeFoJCBznZhaW6FDnCOUq3QMAA3mSYXyxgRb0vv3jen3sGqIKExspdohxPBT54b+VlDNJiwsYJlcf4xwMW6+zLnInqoVBd4h4OPlknQA+x2OitKmQtbewbfRH6CIevqx0b2DH2rrIWiGkSPqXB5w7C5HGj0xjC72LHG96a9dL21I1TU8+itOmvJ+bcqCUFybLFpJB2dWWHB11R31L6NUQ3wH0mazD3jnm1rHlTB+EtUsjp9H8LGIGKdNpIgqRdsR8Lw3yBNmAfiH5PN32EGnzbRZGu0WpWKzHQ/dsAYobSYj60bWKBKkQDqjjhcpk/dim5kwtLnLIdt2W2tw38zgifdpw2XdYFcncd3m3tXlLbcm3jgW6RfgkvLd4MgvC1TDhAus2hflCXneXDzgpQ2H6M9qpJTDsNMVWzD2Ec4R3qFquiw0AHMgyhd73uVoANpn2VMZwRhSTMatzHFChuXFo5McTb+xKi+QJMdvHjcK7o6C5zTxkSnNosd8NSgfWy2V8n2jgjIBRcUoWE4EUvlcpsgzy/DQAJzpzR/6+I01EsF5SBRSJg41BGc5sgQ1lGQGq0oem1BLShD6vIzM1HF9YR+XiTuwzyNV6/wnrN+4cD5EMv6TUWE4qOvFShPchHzKmDLsXcPWox9XJ0rSX83T+e5TCmcPJjbAhMECgsoCAFtMTsnc7yG+5RpiQ+doXwkhaCuCp7IQW+JnavdODMIna2fEStoVPCJXQaptAHLTP73AHDMW/8FEbkaprMJzproErtx1fcp2d0kCoVfb3zD+T1acy6voSTaaAZq/AC623P4a8qlCVCppH3cBEmgPFY/hxMHXtabpEQH9vE1Vh7qfYnvbuZv8zVKe866ZYo5rMaKRclSD/OGWThH1NanKAtlTZizDTOYUbp1eg7vMpZ/Mvb8d+SG8FeBAXmhM80i5BjUKbl3+NM23itRQy43RTJcuHTVbq3ohk2ZVWG4Z+SL48mkNAyyM/Xnu+QZRDw4jBpxY7+4JJqYS8Yv+RO1+3gweoiKkOj1AS+kb1Zc5eY9/YtUCWaA4o45JtFrB0EuYPoIh1/p2yyY/3bHQFWKsTeSiaKrNqClegaK\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"EpYNCpMNAb4+9vuoFkO9BnRpNMOyDVfht/WyyqzEQ69LTmsZ1JFgUCuygDrT3vrGUCiiIm8ULr9M7I+4CV2AwAkHH3lv1U0SoFjlsLY7+HA+Hp36KEj41dBmIyeHCC+rF76qHMKqXLgiBQ3574BPSmfViTpTbwJ1FdC62gNoNgi7LkcTlY1jftR1PfuSBQBQhi5w1TyBPQ1tw7zQ1C9jUKhOB//MR9QlPc5BXWyqfKdcCDRj0VJvQdt4mZpKqR8Et88hqvfoFhEuG0Yju0hlIaMG2CH/v5gP+nMhnHqb+j3MdILRMV2h9kUw1+D2TIQ00Nxz2u6Zyk0dSQ6CYZwD7d1j7dgZ1XyJtJ9U586TVFbHsNUN8UjKPjWDFsUqSvPafuMPXz329TCekre08y9B7BGXCvZ1oeypHFAw9FvIV3+4rAK0y/lGfjbyqygqajxDYquoA7eX3r2h+PFXrWFqfqeJCukOZdzypIrjPlDJeiYAVYBlqhkzGKCcCMhtNSNhPHy+lmgao1ElcqeOHLOveqxezgD1Grn/ZPmdcTM/mnZTdpBiSBuAs67szIL/1Yo6SuMT9F5/lzJTknSqIkB3q7F7WxaOlbUGb/iIdp0hJ4ensMNXvV/OrPO70UnbTTA7ios/qegz3ivMmDR/ra9vgzeh006WzX5fIomugQMmkGWY6EclDBnMRyWQNG361VGLYgmmUJL5I0KBCbAu8tFffxbUMwSCtFMc1RO0hh2t7RbAnnowoF/hS0RO6wxFqGS4Ji2hwE/+Ory7zlF3U8aYHuc38E69F0DU+/SASXY1zxwlP/RcTDBD20mx79V0IovZvOZQDjCdavzJ1dJimGCw0MTAZCpcRx/AayDpv8LVPhDC9/VIaJbEQOmP4nfQYc1LzbVQUK6oN2WXphYb9KvChu8Cvndg+1Guc4VPYHpDtaH4zl+HR1jiE1NEuHAHJI7Bj7qNYce9TZ5blyRatYwAI5A+6xsirAnbU+5e/4dDj75hLn+li6pZHb/L5InSf3WRIl+VMWSkQ3EV32ypc3rAXUZm2gr384Saecs2299uUGMGAnKF0tuN2/HSEQdZt1vGxag5JipQ+yMYmxaqqa1nagzCtCSY9yH51t2Bio+nEdBBhkviOaem2wOAC/pXxOFq0LeFoJCBznZhaW6FDnCOUq3QMAA3mSYXyxgRb0vv3jen3sGqIKExspdohxPBT54b+VlDNJiwsYJlcf4xwMW6+zLnInqoVBd4h4OPlknQA+x2OitKmQtbewbfRH6CIevqx0b2DH2rrIWiGkSPqXB5w7C5HGj0xjC72LHG96a9dL21I1TU8+itOmvJ+bcqCUFybLFpJB2dWWHB11R31L6NUQ3wH0mazD3jnm1rHlTB+EtUsjp9H8LGIGKdNpIgqRdsR8Lw3yBNmAfiH5PN32EGnzbRZGu0WpWKzHQ/dsAYobSYj60bWKBKkQDqjjhcpk/dim5kwtLnLIdt2W2tw38zgifdpw2XdYFcncd3m3tXlLbcm3jgW6RfgkvLd4MgvC1TDhAus2hflCXneXDzgpQ2H6M9qpJTDsNMVWzD2Ec4R3qFquiw0AHMgyhd73uVoANpn2VMZwRhSTMatzHFChuXFo5McTb+xKi+QJMdvHjcK7o6C5zTxkSnNosd8NSgfWy2V8n2jgjIBRcUoWE4EUvlcpsgzy/DQAJzpzR/6+I01EsF5SBRSJg41BGc5sgQ1lGQGq0oem1BLShD6vIzM1HF9YR+XiTuwzyNV6/wnrN+4cD5EMv6TUWE4qOvFShPchHzKmDLsXcPWox9XJ0rSX83T+e5TCmcPJjbAhMECgsoCAFtMTsnc7yG+5RpiQ+doXwkhaCuCp7IQW+JnavdODMIna2fEStoVPCJXQaptAHLTP73AHDMW/8FEbkaprMJzproErtx1fcp2d0kCoVfb3zD+T1acy6voSTaaAZq/AC623P4a8qlCVCppH3cBEmgPFY/hxMHXtabpEQH9vE1Vh7qfYnvbuZv8zVKe866ZYo5rMaKRclSD/OGWThH1NanKAtlTZizDTOYUbp1eg7vMpZ/Mvb8d+SG8FeBAXmhM80i5BjUKbl3+NM23itRQy43RTJcuHTVbq3ohk2ZVWG4Z+SL48mkNAyyM/Xnu+QZRDw4jBpxY7+4JJqYS8Yv+RO1+3gweoiKkOj1AS+kb1Zc5eY9/YtUCWaA4o45JtFrB0EuYPoIh1/p2yyY/3bHQFWKsTeSiaKrNqClegaK\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773001333-ji5wRs9SfQTJ55sOLOZe",
+          "object": "chat.completion.chunk",
+          "created": 1773001333,
+          "model": "google/gemini-3.1-pro-preview-customtools-20260219",
+          "provider": "Google AI Studio",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": null,
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.encrypted",
+                    "data": "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",
+                    "format": "google-gemini-v1",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 13,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}",
+        "data_json": {
+          "id": "gen-1773001333-ji5wRs9SfQTJ55sOLOZe",
+          "object": "chat.completion.chunk",
+          "created": 1773001333,
+          "model": "google/gemini-3.1-pro-preview-customtools-20260219",
+          "provider": "Google AI Studio",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": null
+              },
+              "finish_reason": "stop",
+              "native_finish_reason": "STOP"
+            }
+          ]
+        }
+      },
+      {
+        "index": 14,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[],\"usage\":{\"prompt_tokens\":122,\"completion_tokens\":341,\"total_tokens\":463,\"cost\":0.004336,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.004336,\"upstream_inference_prompt_cost\":0.000244,\"upstream_inference_completions_cost\":0.004092},\"completion_tokens_details\":{\"reasoning_tokens\":323,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[],\"usage\":{\"prompt_tokens\":122,\"completion_tokens\":341,\"total_tokens\":463,\"cost\":0.004336,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.004336,\"upstream_inference_prompt_cost\":0.000244,\"upstream_inference_completions_cost\":0.004092},\"completion_tokens_details\":{\"reasoning_tokens\":323,\"image_tokens\":0,\"audio_tokens\":0}}}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001333-ji5wRs9SfQTJ55sOLOZe\",\"object\":\"chat.completion.chunk\",\"created\":1773001333,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[],\"usage\":{\"prompt_tokens\":122,\"completion_tokens\":341,\"total_tokens\":463,\"cost\":0.004336,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.004336,\"upstream_inference_prompt_cost\":0.000244,\"upstream_inference_completions_cost\":0.004092},\"completion_tokens_details\":{\"reasoning_tokens\":323,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data_json": {
+          "id": "gen-1773001333-ji5wRs9SfQTJ55sOLOZe",
+          "object": "chat.completion.chunk",
+          "created": 1773001333,
+          "model": "google/gemini-3.1-pro-preview-customtools-20260219",
+          "provider": "Google AI Studio",
+          "choices": [],
+          "usage": {
+            "prompt_tokens": 122,
+            "completion_tokens": 341,
+            "total_tokens": 463,
+            "cost": 0.004336,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.004336,
+              "upstream_inference_prompt_cost": 0.000244,
+              "upstream_inference_completions_cost": 0.004092
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 323,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "index": 15,
+        "event": null,
+        "data": "[DONE]",
+        "data_lines": [
+          "[DONE]"
+        ],
+        "raw": "data: [DONE]"
+      }
+    ]
+  }
+}

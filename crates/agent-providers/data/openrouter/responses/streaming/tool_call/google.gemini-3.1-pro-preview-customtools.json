@@ -1,0 +1,363 @@
+{
+  "provider": "openrouter",
+  "scenario": "tool_call",
+  "captured_at": "2026-03-08T20:18:19.342Z",
+  "request": {
+    "url": "https://openrouter.ai/api/v1/chat/completions",
+    "method": "POST",
+    "model": "google/gemini-3.1-pro-preview-customtools",
+    "headers": {
+      "Authorization": "<redacted>",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "model": "google/gemini-3.1-pro-preview-customtools",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant."
+        },
+        {
+          "role": "user",
+          "content": "What is the weather in San Francisco?"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "get_weather",
+            "description": "Get current weather by city",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "city"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "stream": true,
+      "temperature": 0,
+      "max_tokens": 1024
+    }
+  },
+  "response": {
+    "status": 200,
+    "status_text": "OK",
+    "headers": {
+      "access-control-allow-origin": "*",
+      "cache-control": "no-cache",
+      "cf-ray": "9d9487311879db66-LAX",
+      "connection": "keep-alive",
+      "content-type": "text/event-stream",
+      "date": "Sun, 08 Mar 2026 20:18:18 GMT",
+      "permissions-policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "referrer-policy": "no-referrer, strict-origin-when-cross-origin",
+      "server": "cloudflare",
+      "transfer-encoding": "chunked",
+      "x-content-type-options": "nosniff"
+    },
+    "content_type": "text/event-stream"
+  },
+  "stream": {
+    "format": "sse",
+    "chunk_count": 13,
+    "chunks": [
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n",
+      "data: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Initiating Further Analysis**\\n\\nI'm now focusing on deepening my analysis to ensure I'm advancing toward the next stage effectively. I'm carefully considering how to integrate the information I have obtained into a coherent framework.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Initiating Further Analysis**\\n\\nI'm now focusing on deepening my analysis to ensure I'm advancing toward the next stage effectively. I'm carefully considering how to integrate the information I have obtained into a coherent framework.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"EvEFCu4FAb4+9vtfQgPgGMypaL7fCSW5jBdKOh2inCndY+I+gcXlzAi6ezuY1adP/y37xEZ4e1YB5mjehBiJZufyTPu7KIDqhMgUIOoTjtGgOb7JTqDAzAjATpbR9wPbOKWaCWYChgC3SbDqunyfI0TuivHL+yGF3l0Kw4QTxvEpmGrqxcqixghkRHWZPBzL9G2kBfq6x5L3areq6Uk0/Gll/EYTW6247QTyeb2HBV+/L4hEe8C3yGifihcLF+hu+yATZ87duAvGJqOHo0eQqO3NZuELtnjzbcs207EzRx9y0oe9cAHEiKZ+C/u2aGTAxVeeDF42frCtbKB2pkQUeqdd0SA4wghliXVVUgfF10hyv6Zn9/8+YxcgF3HGG0UjNIknEc56ba5CdBIB2abJXihVu7qNl8hRcfNNXr1C0VDV3e8HPNrFOy3OSdsRzFtNfglQpROsWOiwbKQKOjLz/dJtps+NZV0b9fWZwhHlobFm9YFmbx79dwZUgfeRqXcnAdmWHIb5Dus81YMj49nzaIvi4QKzkwuK4ZWrz2JZNTHnHbzffRU/ux8Sc2N3plWH9Nqq3YTqIZw6sGTaUS9hVAAqA9+pT4m+hrRKmWe1S2IuTJ/l602eMhwuSOTveSk84q2l+ByFRWWm8qM/MV3oO1HrjWzEm32So2M/Z4RtkkrzT39kCz7UmCo7Us6gHU4kB7NuAxSjn341qLJ2N/Tbj2V0ul6XguRkpFqfbZkNjxHrQVsvAiH3doyhOdrbQzC81bVICRHdK9xwTd7SWsABhQ0xm6cfHnOSQdkSj8qO7HM+BkYxj1W4+JPVHEdXg+EOxsJq8BGMarxry/FPkboe+RFIXOmxbC0iiGbvfCXt23PVSJoVIBSUjHB/MHbWtAFAkTlFOgCmdMplUSl7q/aqlq91Yre2qdBDswrIumaS848mDQToYvBr6KyvRtKEe8+9BY012vYog7vOxvmSMtiAo0HEFgVoQSAIWlEKJ4vF/+0pJwy+\",\"format\":\"google-gemini-v1\",\"id\":\"tool_get_weather_wnKhddo1KCunmoCp7RCf\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"tool_get_weather_wnKhddo1KCunmoCp7RCf\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      "data: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"STOP\"}]}\n\n",
+      "data: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[],\"usage\":{\"prompt_tokens\":58,\"completion_tokens\":158,\"total_tokens\":216,\"cost\":0.002012,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.002012,\"upstream_inference_prompt_cost\":0.000116,\"upstream_inference_completions_cost\":0.001896},\"completion_tokens_details\":{\"reasoning_tokens\":141,\"image_tokens\":0,\"audio_tokens\":0}}}\n\n",
+      "data: [DONE]\n\n"
+    ],
+    "raw_text": ": OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\ndata: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Initiating Further Analysis**\\n\\nI'm now focusing on deepening my analysis to ensure I'm advancing toward the next stage effectively. I'm carefully considering how to integrate the information I have obtained into a coherent framework.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Initiating Further Analysis**\\n\\nI'm now focusing on deepening my analysis to ensure I'm advancing toward the next stage effectively. I'm carefully considering how to integrate the information I have obtained into a coherent framework.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"EvEFCu4FAb4+9vtfQgPgGMypaL7fCSW5jBdKOh2inCndY+I+gcXlzAi6ezuY1adP/y37xEZ4e1YB5mjehBiJZufyTPu7KIDqhMgUIOoTjtGgOb7JTqDAzAjATpbR9wPbOKWaCWYChgC3SbDqunyfI0TuivHL+yGF3l0Kw4QTxvEpmGrqxcqixghkRHWZPBzL9G2kBfq6x5L3areq6Uk0/Gll/EYTW6247QTyeb2HBV+/L4hEe8C3yGifihcLF+hu+yATZ87duAvGJqOHo0eQqO3NZuELtnjzbcs207EzRx9y0oe9cAHEiKZ+C/u2aGTAxVeeDF42frCtbKB2pkQUeqdd0SA4wghliXVVUgfF10hyv6Zn9/8+YxcgF3HGG0UjNIknEc56ba5CdBIB2abJXihVu7qNl8hRcfNNXr1C0VDV3e8HPNrFOy3OSdsRzFtNfglQpROsWOiwbKQKOjLz/dJtps+NZV0b9fWZwhHlobFm9YFmbx79dwZUgfeRqXcnAdmWHIb5Dus81YMj49nzaIvi4QKzkwuK4ZWrz2JZNTHnHbzffRU/ux8Sc2N3plWH9Nqq3YTqIZw6sGTaUS9hVAAqA9+pT4m+hrRKmWe1S2IuTJ/l602eMhwuSOTveSk84q2l+ByFRWWm8qM/MV3oO1HrjWzEm32So2M/Z4RtkkrzT39kCz7UmCo7Us6gHU4kB7NuAxSjn341qLJ2N/Tbj2V0ul6XguRkpFqfbZkNjxHrQVsvAiH3doyhOdrbQzC81bVICRHdK9xwTd7SWsABhQ0xm6cfHnOSQdkSj8qO7HM+BkYxj1W4+JPVHEdXg+EOxsJq8BGMarxry/FPkboe+RFIXOmxbC0iiGbvfCXt23PVSJoVIBSUjHB/MHbWtAFAkTlFOgCmdMplUSl7q/aqlq91Yre2qdBDswrIumaS848mDQToYvBr6KyvRtKEe8+9BY012vYog7vOxvmSMtiAo0HEFgVoQSAIWlEKJ4vF/+0pJwy+\",\"format\":\"google-gemini-v1\",\"id\":\"tool_get_weather_wnKhddo1KCunmoCp7RCf\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"tool_get_weather_wnKhddo1KCunmoCp7RCf\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n: OPENROUTER PROCESSING\n\ndata: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"STOP\"}]}\n\ndata: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[],\"usage\":{\"prompt_tokens\":58,\"completion_tokens\":158,\"total_tokens\":216,\"cost\":0.002012,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.002012,\"upstream_inference_prompt_cost\":0.000116,\"upstream_inference_completions_cost\":0.001896},\"completion_tokens_details\":{\"reasoning_tokens\":141,\"image_tokens\":0,\"audio_tokens\":0}}}\n\ndata: [DONE]\n\n",
+    "events": [
+      {
+        "index": 0,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 1,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 2,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 3,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 4,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 5,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 6,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Initiating Further Analysis**\\n\\nI'm now focusing on deepening my analysis to ensure I'm advancing toward the next stage effectively. I'm carefully considering how to integrate the information I have obtained into a coherent framework.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Initiating Further Analysis**\\n\\nI'm now focusing on deepening my analysis to ensure I'm advancing toward the next stage effectively. I'm carefully considering how to integrate the information I have obtained into a coherent framework.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Initiating Further Analysis**\\n\\nI'm now focusing on deepening my analysis to ensure I'm advancing toward the next stage effectively. I'm carefully considering how to integrate the information I have obtained into a coherent framework.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Initiating Further Analysis**\\n\\nI'm now focusing on deepening my analysis to ensure I'm advancing toward the next stage effectively. I'm carefully considering how to integrate the information I have obtained into a coherent framework.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Initiating Further Analysis**\\n\\nI'm now focusing on deepening my analysis to ensure I'm advancing toward the next stage effectively. I'm carefully considering how to integrate the information I have obtained into a coherent framework.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Initiating Further Analysis**\\n\\nI'm now focusing on deepening my analysis to ensure I'm advancing toward the next stage effectively. I'm carefully considering how to integrate the information I have obtained into a coherent framework.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773001095-pGMzNGTrE4oOgeRUUaRw",
+          "object": "chat.completion.chunk",
+          "created": 1773001095,
+          "model": "google/gemini-3.1-pro-preview-customtools-20260219",
+          "provider": "Google AI Studio",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": "**Initiating Further Analysis**\n\nI'm now focusing on deepening my analysis to ensure I'm advancing toward the next stage effectively. I'm carefully considering how to integrate the information I have obtained into a coherent framework.\n\n\n",
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.text",
+                    "text": "**Initiating Further Analysis**\n\nI'm now focusing on deepening my analysis to ensure I'm advancing toward the next stage effectively. I'm carefully considering how to integrate the information I have obtained into a coherent framework.\n\n\n",
+                    "format": "google-gemini-v1",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 7,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"EvEFCu4FAb4+9vtfQgPgGMypaL7fCSW5jBdKOh2inCndY+I+gcXlzAi6ezuY1adP/y37xEZ4e1YB5mjehBiJZufyTPu7KIDqhMgUIOoTjtGgOb7JTqDAzAjATpbR9wPbOKWaCWYChgC3SbDqunyfI0TuivHL+yGF3l0Kw4QTxvEpmGrqxcqixghkRHWZPBzL9G2kBfq6x5L3areq6Uk0/Gll/EYTW6247QTyeb2HBV+/L4hEe8C3yGifihcLF+hu+yATZ87duAvGJqOHo0eQqO3NZuELtnjzbcs207EzRx9y0oe9cAHEiKZ+C/u2aGTAxVeeDF42frCtbKB2pkQUeqdd0SA4wghliXVVUgfF10hyv6Zn9/8+YxcgF3HGG0UjNIknEc56ba5CdBIB2abJXihVu7qNl8hRcfNNXr1C0VDV3e8HPNrFOy3OSdsRzFtNfglQpROsWOiwbKQKOjLz/dJtps+NZV0b9fWZwhHlobFm9YFmbx79dwZUgfeRqXcnAdmWHIb5Dus81YMj49nzaIvi4QKzkwuK4ZWrz2JZNTHnHbzffRU/ux8Sc2N3plWH9Nqq3YTqIZw6sGTaUS9hVAAqA9+pT4m+hrRKmWe1S2IuTJ/l602eMhwuSOTveSk84q2l+ByFRWWm8qM/MV3oO1HrjWzEm32So2M/Z4RtkkrzT39kCz7UmCo7Us6gHU4kB7NuAxSjn341qLJ2N/Tbj2V0ul6XguRkpFqfbZkNjxHrQVsvAiH3doyhOdrbQzC81bVICRHdK9xwTd7SWsABhQ0xm6cfHnOSQdkSj8qO7HM+BkYxj1W4+JPVHEdXg+EOxsJq8BGMarxry/FPkboe+RFIXOmxbC0iiGbvfCXt23PVSJoVIBSUjHB/MHbWtAFAkTlFOgCmdMplUSl7q/aqlq91Yre2qdBDswrIumaS848mDQToYvBr6KyvRtKEe8+9BY012vYog7vOxvmSMtiAo0HEFgVoQSAIWlEKJ4vF/+0pJwy+\",\"format\":\"google-gemini-v1\",\"id\":\"tool_get_weather_wnKhddo1KCunmoCp7RCf\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"EvEFCu4FAb4+9vtfQgPgGMypaL7fCSW5jBdKOh2inCndY+I+gcXlzAi6ezuY1adP/y37xEZ4e1YB5mjehBiJZufyTPu7KIDqhMgUIOoTjtGgOb7JTqDAzAjATpbR9wPbOKWaCWYChgC3SbDqunyfI0TuivHL+yGF3l0Kw4QTxvEpmGrqxcqixghkRHWZPBzL9G2kBfq6x5L3areq6Uk0/Gll/EYTW6247QTyeb2HBV+/L4hEe8C3yGifihcLF+hu+yATZ87duAvGJqOHo0eQqO3NZuELtnjzbcs207EzRx9y0oe9cAHEiKZ+C/u2aGTAxVeeDF42frCtbKB2pkQUeqdd0SA4wghliXVVUgfF10hyv6Zn9/8+YxcgF3HGG0UjNIknEc56ba5CdBIB2abJXihVu7qNl8hRcfNNXr1C0VDV3e8HPNrFOy3OSdsRzFtNfglQpROsWOiwbKQKOjLz/dJtps+NZV0b9fWZwhHlobFm9YFmbx79dwZUgfeRqXcnAdmWHIb5Dus81YMj49nzaIvi4QKzkwuK4ZWrz2JZNTHnHbzffRU/ux8Sc2N3plWH9Nqq3YTqIZw6sGTaUS9hVAAqA9+pT4m+hrRKmWe1S2IuTJ/l602eMhwuSOTveSk84q2l+ByFRWWm8qM/MV3oO1HrjWzEm32So2M/Z4RtkkrzT39kCz7UmCo7Us6gHU4kB7NuAxSjn341qLJ2N/Tbj2V0ul6XguRkpFqfbZkNjxHrQVsvAiH3doyhOdrbQzC81bVICRHdK9xwTd7SWsABhQ0xm6cfHnOSQdkSj8qO7HM+BkYxj1W4+JPVHEdXg+EOxsJq8BGMarxry/FPkboe+RFIXOmxbC0iiGbvfCXt23PVSJoVIBSUjHB/MHbWtAFAkTlFOgCmdMplUSl7q/aqlq91Yre2qdBDswrIumaS848mDQToYvBr6KyvRtKEe8+9BY012vYog7vOxvmSMtiAo0HEFgVoQSAIWlEKJ4vF/+0pJwy+\",\"format\":\"google-gemini-v1\",\"id\":\"tool_get_weather_wnKhddo1KCunmoCp7RCf\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"EvEFCu4FAb4+9vtfQgPgGMypaL7fCSW5jBdKOh2inCndY+I+gcXlzAi6ezuY1adP/y37xEZ4e1YB5mjehBiJZufyTPu7KIDqhMgUIOoTjtGgOb7JTqDAzAjATpbR9wPbOKWaCWYChgC3SbDqunyfI0TuivHL+yGF3l0Kw4QTxvEpmGrqxcqixghkRHWZPBzL9G2kBfq6x5L3areq6Uk0/Gll/EYTW6247QTyeb2HBV+/L4hEe8C3yGifihcLF+hu+yATZ87duAvGJqOHo0eQqO3NZuELtnjzbcs207EzRx9y0oe9cAHEiKZ+C/u2aGTAxVeeDF42frCtbKB2pkQUeqdd0SA4wghliXVVUgfF10hyv6Zn9/8+YxcgF3HGG0UjNIknEc56ba5CdBIB2abJXihVu7qNl8hRcfNNXr1C0VDV3e8HPNrFOy3OSdsRzFtNfglQpROsWOiwbKQKOjLz/dJtps+NZV0b9fWZwhHlobFm9YFmbx79dwZUgfeRqXcnAdmWHIb5Dus81YMj49nzaIvi4QKzkwuK4ZWrz2JZNTHnHbzffRU/ux8Sc2N3plWH9Nqq3YTqIZw6sGTaUS9hVAAqA9+pT4m+hrRKmWe1S2IuTJ/l602eMhwuSOTveSk84q2l+ByFRWWm8qM/MV3oO1HrjWzEm32So2M/Z4RtkkrzT39kCz7UmCo7Us6gHU4kB7NuAxSjn341qLJ2N/Tbj2V0ul6XguRkpFqfbZkNjxHrQVsvAiH3doyhOdrbQzC81bVICRHdK9xwTd7SWsABhQ0xm6cfHnOSQdkSj8qO7HM+BkYxj1W4+JPVHEdXg+EOxsJq8BGMarxry/FPkboe+RFIXOmxbC0iiGbvfCXt23PVSJoVIBSUjHB/MHbWtAFAkTlFOgCmdMplUSl7q/aqlq91Yre2qdBDswrIumaS848mDQToYvBr6KyvRtKEe8+9BY012vYog7vOxvmSMtiAo0HEFgVoQSAIWlEKJ4vF/+0pJwy+\",\"format\":\"google-gemini-v1\",\"id\":\"tool_get_weather_wnKhddo1KCunmoCp7RCf\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773001095-pGMzNGTrE4oOgeRUUaRw",
+          "object": "chat.completion.chunk",
+          "created": 1773001095,
+          "model": "google/gemini-3.1-pro-preview-customtools-20260219",
+          "provider": "Google AI Studio",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": null,
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.encrypted",
+                    "data": "EvEFCu4FAb4+9vtfQgPgGMypaL7fCSW5jBdKOh2inCndY+I+gcXlzAi6ezuY1adP/y37xEZ4e1YB5mjehBiJZufyTPu7KIDqhMgUIOoTjtGgOb7JTqDAzAjATpbR9wPbOKWaCWYChgC3SbDqunyfI0TuivHL+yGF3l0Kw4QTxvEpmGrqxcqixghkRHWZPBzL9G2kBfq6x5L3areq6Uk0/Gll/EYTW6247QTyeb2HBV+/L4hEe8C3yGifihcLF+hu+yATZ87duAvGJqOHo0eQqO3NZuELtnjzbcs207EzRx9y0oe9cAHEiKZ+C/u2aGTAxVeeDF42frCtbKB2pkQUeqdd0SA4wghliXVVUgfF10hyv6Zn9/8+YxcgF3HGG0UjNIknEc56ba5CdBIB2abJXihVu7qNl8hRcfNNXr1C0VDV3e8HPNrFOy3OSdsRzFtNfglQpROsWOiwbKQKOjLz/dJtps+NZV0b9fWZwhHlobFm9YFmbx79dwZUgfeRqXcnAdmWHIb5Dus81YMj49nzaIvi4QKzkwuK4ZWrz2JZNTHnHbzffRU/ux8Sc2N3plWH9Nqq3YTqIZw6sGTaUS9hVAAqA9+pT4m+hrRKmWe1S2IuTJ/l602eMhwuSOTveSk84q2l+ByFRWWm8qM/MV3oO1HrjWzEm32So2M/Z4RtkkrzT39kCz7UmCo7Us6gHU4kB7NuAxSjn341qLJ2N/Tbj2V0ul6XguRkpFqfbZkNjxHrQVsvAiH3doyhOdrbQzC81bVICRHdK9xwTd7SWsABhQ0xm6cfHnOSQdkSj8qO7HM+BkYxj1W4+JPVHEdXg+EOxsJq8BGMarxry/FPkboe+RFIXOmxbC0iiGbvfCXt23PVSJoVIBSUjHB/MHbWtAFAkTlFOgCmdMplUSl7q/aqlq91Yre2qdBDswrIumaS848mDQToYvBr6KyvRtKEe8+9BY012vYog7vOxvmSMtiAo0HEFgVoQSAIWlEKJ4vF/+0pJwy+",
+                    "format": "google-gemini-v1",
+                    "id": "tool_get_weather_wnKhddo1KCunmoCp7RCf",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 8,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"tool_get_weather_wnKhddo1KCunmoCp7RCf\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"tool_get_weather_wnKhddo1KCunmoCp7RCf\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"tool_get_weather_wnKhddo1KCunmoCp7RCf\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773001095-pGMzNGTrE4oOgeRUUaRw",
+          "object": "chat.completion.chunk",
+          "created": 1773001095,
+          "model": "google/gemini-3.1-pro-preview-customtools-20260219",
+          "provider": "Google AI Studio",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "index": 0,
+                    "id": "tool_get_weather_wnKhddo1KCunmoCp7RCf",
+                    "type": "function",
+                    "function": {
+                      "name": "get_weather",
+                      "arguments": ""
+                    }
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 9,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773001095-pGMzNGTrE4oOgeRUUaRw",
+          "object": "chat.completion.chunk",
+          "created": 1773001095,
+          "model": "google/gemini-3.1-pro-preview-customtools-20260219",
+          "provider": "Google AI Studio",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "index": 0,
+                    "function": {
+                      "arguments": "{\"city\":\"San Francisco\"}"
+                    }
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 10,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 11,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"STOP\"}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"STOP\"}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"STOP\"}]}",
+        "data_json": {
+          "id": "gen-1773001095-pGMzNGTrE4oOgeRUUaRw",
+          "object": "chat.completion.chunk",
+          "created": 1773001095,
+          "model": "google/gemini-3.1-pro-preview-customtools-20260219",
+          "provider": "Google AI Studio",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": null
+              },
+              "finish_reason": "tool_calls",
+              "native_finish_reason": "STOP"
+            }
+          ]
+        }
+      },
+      {
+        "index": 12,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[],\"usage\":{\"prompt_tokens\":58,\"completion_tokens\":158,\"total_tokens\":216,\"cost\":0.002012,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.002012,\"upstream_inference_prompt_cost\":0.000116,\"upstream_inference_completions_cost\":0.001896},\"completion_tokens_details\":{\"reasoning_tokens\":141,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[],\"usage\":{\"prompt_tokens\":58,\"completion_tokens\":158,\"total_tokens\":216,\"cost\":0.002012,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.002012,\"upstream_inference_prompt_cost\":0.000116,\"upstream_inference_completions_cost\":0.001896},\"completion_tokens_details\":{\"reasoning_tokens\":141,\"image_tokens\":0,\"audio_tokens\":0}}}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001095-pGMzNGTrE4oOgeRUUaRw\",\"object\":\"chat.completion.chunk\",\"created\":1773001095,\"model\":\"google/gemini-3.1-pro-preview-customtools-20260219\",\"provider\":\"Google AI Studio\",\"choices\":[],\"usage\":{\"prompt_tokens\":58,\"completion_tokens\":158,\"total_tokens\":216,\"cost\":0.002012,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.002012,\"upstream_inference_prompt_cost\":0.000116,\"upstream_inference_completions_cost\":0.001896},\"completion_tokens_details\":{\"reasoning_tokens\":141,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data_json": {
+          "id": "gen-1773001095-pGMzNGTrE4oOgeRUUaRw",
+          "object": "chat.completion.chunk",
+          "created": 1773001095,
+          "model": "google/gemini-3.1-pro-preview-customtools-20260219",
+          "provider": "Google AI Studio",
+          "choices": [],
+          "usage": {
+            "prompt_tokens": 58,
+            "completion_tokens": 158,
+            "total_tokens": 216,
+            "cost": 0.002012,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.002012,
+              "upstream_inference_prompt_cost": 0.000116,
+              "upstream_inference_completions_cost": 0.001896
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 141,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "index": 13,
+        "event": null,
+        "data": "[DONE]",
+        "data_lines": [
+          "[DONE]"
+        ],
+        "raw": "data: [DONE]"
+      }
+    ]
+  }
+}

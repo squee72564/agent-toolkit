@@ -1,0 +1,200 @@
+{
+  "provider": "openrouter",
+  "scenario": "basic_chat",
+  "captured_at": "2026-03-08T20:14:41.431Z",
+  "request": {
+    "url": "https://openrouter.ai/api/v1/chat/completions",
+    "method": "POST",
+    "model": "google/gemini-2.5-flash",
+    "headers": {
+      "Authorization": "<redacted>",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "model": "google/gemini-2.5-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant."
+        },
+        {
+          "role": "user",
+          "content": "Hello World!"
+        },
+        {
+          "role": "assistant",
+          "content": "Hello! How can I assist you today?"
+        },
+        {
+          "role": "user",
+          "content": "tell me how you are doing today in 5 words."
+        }
+      ],
+      "stream": true,
+      "temperature": 0,
+      "max_tokens": 1024
+    }
+  },
+  "response": {
+    "status": 200,
+    "status_text": "OK",
+    "headers": {
+      "access-control-allow-origin": "*",
+      "cache-control": "no-cache",
+      "cf-ray": "9d9481f1dfe9db66-LAX",
+      "connection": "keep-alive",
+      "content-type": "text/event-stream",
+      "date": "Sun, 08 Mar 2026 20:14:41 GMT",
+      "permissions-policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "referrer-policy": "no-referrer, strict-origin-when-cross-origin",
+      "server": "cloudflare",
+      "transfer-encoding": "chunked",
+      "x-content-type-options": "nosniff"
+    },
+    "content_type": "text/event-stream"
+  },
+  "stream": {
+    "format": "sse",
+    "chunk_count": 5,
+    "chunks": [
+      "data: {\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" am doing well, thanks!\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}\n\n",
+      "data: {\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":7,\"total_tokens\":37,\"cost\":0.0000265,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0000265,\"upstream_inference_prompt_cost\":0.000009,\"upstream_inference_completions_cost\":0.0000175},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}\n\n",
+      "data: [DONE]\n\n"
+    ],
+    "raw_text": "data: {\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" am doing well, thanks!\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}\n\ndata: {\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":7,\"total_tokens\":37,\"cost\":0.0000265,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0000265,\"upstream_inference_prompt_cost\":0.000009,\"upstream_inference_completions_cost\":0.0000175},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}\n\ndata: [DONE]\n\n",
+    "events": [
+      {
+        "index": 0,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA",
+          "object": "chat.completion.chunk",
+          "created": 1773000880,
+          "model": "google/gemini-2.5-flash",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "I",
+                "role": "assistant"
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 1,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" am doing well, thanks!\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" am doing well, thanks!\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" am doing well, thanks!\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA",
+          "object": "chat.completion.chunk",
+          "created": 1773000880,
+          "model": "google/gemini-2.5-flash",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": " am doing well, thanks!",
+                "role": "assistant"
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 2,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}",
+        "data_json": {
+          "id": "gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA",
+          "object": "chat.completion.chunk",
+          "created": 1773000880,
+          "model": "google/gemini-2.5-flash",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant"
+              },
+              "finish_reason": "stop",
+              "native_finish_reason": "STOP"
+            }
+          ]
+        }
+      },
+      {
+        "index": 3,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":7,\"total_tokens\":37,\"cost\":0.0000265,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0000265,\"upstream_inference_prompt_cost\":0.000009,\"upstream_inference_completions_cost\":0.0000175},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":7,\"total_tokens\":37,\"cost\":0.0000265,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0000265,\"upstream_inference_prompt_cost\":0.000009,\"upstream_inference_completions_cost\":0.0000175},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA\",\"object\":\"chat.completion.chunk\",\"created\":1773000880,\"model\":\"google/gemini-2.5-flash\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":7,\"total_tokens\":37,\"cost\":0.0000265,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0000265,\"upstream_inference_prompt_cost\":0.000009,\"upstream_inference_completions_cost\":0.0000175},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data_json": {
+          "id": "gen-1773000880-W5sGVdS5Jh9WPOQ7WIuA",
+          "object": "chat.completion.chunk",
+          "created": 1773000880,
+          "model": "google/gemini-2.5-flash",
+          "provider": "Google",
+          "choices": [],
+          "usage": {
+            "prompt_tokens": 30,
+            "completion_tokens": 7,
+            "total_tokens": 37,
+            "cost": 0.0000265,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0000265,
+              "upstream_inference_prompt_cost": 0.000009,
+              "upstream_inference_completions_cost": 0.0000175
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "index": 4,
+        "event": null,
+        "data": "[DONE]",
+        "data_lines": [
+          "[DONE]"
+        ],
+        "raw": "data: [DONE]"
+      }
+    ]
+  }
+}

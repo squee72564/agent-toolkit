@@ -1,0 +1,404 @@
+{
+  "provider": "openrouter",
+  "scenario": "tool_call",
+  "captured_at": "2026-03-08T20:18:30.415Z",
+  "request": {
+    "url": "https://openrouter.ai/api/v1/chat/completions",
+    "method": "POST",
+    "model": "google/gemini-3-pro-preview",
+    "headers": {
+      "Authorization": "<redacted>",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "model": "google/gemini-3-pro-preview",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant."
+        },
+        {
+          "role": "user",
+          "content": "What is the weather in San Francisco?"
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "get_weather",
+            "description": "Get current weather by city",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "city"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      ],
+      "stream": true,
+      "temperature": 0,
+      "max_tokens": 1024
+    }
+  },
+  "response": {
+    "status": 200,
+    "status_text": "OK",
+    "headers": {
+      "access-control-allow-origin": "*",
+      "cache-control": "no-cache",
+      "cf-ray": "9d94876b4808db66-LAX",
+      "connection": "keep-alive",
+      "content-type": "text/event-stream",
+      "date": "Sun, 08 Mar 2026 20:18:30 GMT",
+      "permissions-policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "referrer-policy": "no-referrer, strict-origin-when-cross-origin",
+      "server": "cloudflare",
+      "transfer-encoding": "chunked",
+      "x-content-type-options": "nosniff"
+    },
+    "content_type": "text/event-stream"
+  },
+  "stream": {
+    "format": "sse",
+    "chunk_count": 19,
+    "chunks": [
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      "data: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Analyzing the Request**\\n\\nI've homed in on the user's weather query. My aim is to leverage the `get_weather` function effectively. The key now is the \\\"San Francisco\\\" city parameter; I am preparing to execute the function call with this value.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Analyzing the Request**\\n\\nI've homed in on the user's weather query. My aim is to leverage the `get_weather` function effectively. The key now is the \\\"San Francisco\\\" city parameter; I am preparing to execute the function call with this value.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"CiQBjz1rX8qnVvEHevYTZ31SfnZMil/hNnpjsuSyxc5UJdH8F8UKdAGPPWtfo0/hY/cL474cUB2vbCwodf9x+SPLc4VZm5nxueI73ah+kll+rDrSTxrlB1g4lZC51m8oQ88tcTSr5GiHAf/NK1cEYgIf0c/Q4rkedvjNEBcpdUZMJ2gBZPtix4E8YjohYc//J5cY0+Ht8qqcQVUMCnkBjz1rX6AUaLUa3clfO3G5wGwcY5HpmxCVEWXsvq+soouaorlIzzzIvR7Ynhmh+sU0pIyTb6zaqMFGiJ8LwyE6spcVsCMNDpkCEXrVVK0poppsQtuMxhmTySKk9dS6IU97+YlCi1W3Sda19ygSf/ymnnt+WiAGZ5+wCn4Bjz1rX3WV1+VJX0Ed45x6fq/Dl848bPJKIkpmFldDelHaekZGvA6hceYNvMKHkDNLQYBXsTZnm0s903/tH417cxbXbtlTB8wFg6cz4WAltIlBba9Jz4vJVUspPmLnAPbK4j7gwnEeyvJsFbaDr/F7T045Wjw0MIIy1CiJ/B0=\",\"format\":\"google-gemini-v1\",\"id\":\"tool_get_weather_QCubCUClW9fbCpGQFbG5\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"tool_get_weather_QCubCUClW9fbCpGQFbG5\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"STOP\"}]}\n\n",
+      "data: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":26,\"completion_tokens\":68,\"total_tokens\":94,\"cost\":0.000868,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000868,\"upstream_inference_prompt_cost\":0.000052,\"upstream_inference_completions_cost\":0.000816},\"completion_tokens_details\":{\"reasoning_tokens\":58,\"image_tokens\":0,\"audio_tokens\":0}}}\n\n",
+      "data: [DONE]\n\n"
+    ],
+    "raw_text": ": OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\ndata: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Analyzing the Request**\\n\\nI've homed in on the user's weather query. My aim is to leverage the `get_weather` function effectively. The key now is the \\\"San Francisco\\\" city parameter; I am preparing to execute the function call with this value.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Analyzing the Request**\\n\\nI've homed in on the user's weather query. My aim is to leverage the `get_weather` function effectively. The key now is the \\\"San Francisco\\\" city parameter; I am preparing to execute the function call with this value.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"CiQBjz1rX8qnVvEHevYTZ31SfnZMil/hNnpjsuSyxc5UJdH8F8UKdAGPPWtfo0/hY/cL474cUB2vbCwodf9x+SPLc4VZm5nxueI73ah+kll+rDrSTxrlB1g4lZC51m8oQ88tcTSr5GiHAf/NK1cEYgIf0c/Q4rkedvjNEBcpdUZMJ2gBZPtix4E8YjohYc//J5cY0+Ht8qqcQVUMCnkBjz1rX6AUaLUa3clfO3G5wGwcY5HpmxCVEWXsvq+soouaorlIzzzIvR7Ynhmh+sU0pIyTb6zaqMFGiJ8LwyE6spcVsCMNDpkCEXrVVK0poppsQtuMxhmTySKk9dS6IU97+YlCi1W3Sda19ygSf/ymnnt+WiAGZ5+wCn4Bjz1rX3WV1+VJX0Ed45x6fq/Dl848bPJKIkpmFldDelHaekZGvA6hceYNvMKHkDNLQYBXsTZnm0s903/tH417cxbXbtlTB8wFg6cz4WAltIlBba9Jz4vJVUspPmLnAPbK4j7gwnEeyvJsFbaDr/F7T045Wjw0MIIy1CiJ/B0=\",\"format\":\"google-gemini-v1\",\"id\":\"tool_get_weather_QCubCUClW9fbCpGQFbG5\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"tool_get_weather_QCubCUClW9fbCpGQFbG5\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"STOP\"}]}\n\ndata: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":26,\"completion_tokens\":68,\"total_tokens\":94,\"cost\":0.000868,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000868,\"upstream_inference_prompt_cost\":0.000052,\"upstream_inference_completions_cost\":0.000816},\"completion_tokens_details\":{\"reasoning_tokens\":58,\"image_tokens\":0,\"audio_tokens\":0}}}\n\ndata: [DONE]\n\n",
+    "events": [
+      {
+        "index": 0,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 1,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 2,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 3,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 4,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 5,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 6,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 7,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 8,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 9,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 10,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 11,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 12,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Analyzing the Request**\\n\\nI've homed in on the user's weather query. My aim is to leverage the `get_weather` function effectively. The key now is the \\\"San Francisco\\\" city parameter; I am preparing to execute the function call with this value.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Analyzing the Request**\\n\\nI've homed in on the user's weather query. My aim is to leverage the `get_weather` function effectively. The key now is the \\\"San Francisco\\\" city parameter; I am preparing to execute the function call with this value.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Analyzing the Request**\\n\\nI've homed in on the user's weather query. My aim is to leverage the `get_weather` function effectively. The key now is the \\\"San Francisco\\\" city parameter; I am preparing to execute the function call with this value.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Analyzing the Request**\\n\\nI've homed in on the user's weather query. My aim is to leverage the `get_weather` function effectively. The key now is the \\\"San Francisco\\\" city parameter; I am preparing to execute the function call with this value.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Analyzing the Request**\\n\\nI've homed in on the user's weather query. My aim is to leverage the `get_weather` function effectively. The key now is the \\\"San Francisco\\\" city parameter; I am preparing to execute the function call with this value.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Analyzing the Request**\\n\\nI've homed in on the user's weather query. My aim is to leverage the `get_weather` function effectively. The key now is the \\\"San Francisco\\\" city parameter; I am preparing to execute the function call with this value.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773001105-CiXNx7GbBalaMkidOceJ",
+          "object": "chat.completion.chunk",
+          "created": 1773001105,
+          "model": "google/gemini-3-pro-preview-20251117",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": "**Analyzing the Request**\n\nI've homed in on the user's weather query. My aim is to leverage the `get_weather` function effectively. The key now is the \"San Francisco\" city parameter; I am preparing to execute the function call with this value.\n\n\n",
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.text",
+                    "text": "**Analyzing the Request**\n\nI've homed in on the user's weather query. My aim is to leverage the `get_weather` function effectively. The key now is the \"San Francisco\" city parameter; I am preparing to execute the function call with this value.\n\n\n",
+                    "format": "google-gemini-v1",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 13,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"CiQBjz1rX8qnVvEHevYTZ31SfnZMil/hNnpjsuSyxc5UJdH8F8UKdAGPPWtfo0/hY/cL474cUB2vbCwodf9x+SPLc4VZm5nxueI73ah+kll+rDrSTxrlB1g4lZC51m8oQ88tcTSr5GiHAf/NK1cEYgIf0c/Q4rkedvjNEBcpdUZMJ2gBZPtix4E8YjohYc//J5cY0+Ht8qqcQVUMCnkBjz1rX6AUaLUa3clfO3G5wGwcY5HpmxCVEWXsvq+soouaorlIzzzIvR7Ynhmh+sU0pIyTb6zaqMFGiJ8LwyE6spcVsCMNDpkCEXrVVK0poppsQtuMxhmTySKk9dS6IU97+YlCi1W3Sda19ygSf/ymnnt+WiAGZ5+wCn4Bjz1rX3WV1+VJX0Ed45x6fq/Dl848bPJKIkpmFldDelHaekZGvA6hceYNvMKHkDNLQYBXsTZnm0s903/tH417cxbXbtlTB8wFg6cz4WAltIlBba9Jz4vJVUspPmLnAPbK4j7gwnEeyvJsFbaDr/F7T045Wjw0MIIy1CiJ/B0=\",\"format\":\"google-gemini-v1\",\"id\":\"tool_get_weather_QCubCUClW9fbCpGQFbG5\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"CiQBjz1rX8qnVvEHevYTZ31SfnZMil/hNnpjsuSyxc5UJdH8F8UKdAGPPWtfo0/hY/cL474cUB2vbCwodf9x+SPLc4VZm5nxueI73ah+kll+rDrSTxrlB1g4lZC51m8oQ88tcTSr5GiHAf/NK1cEYgIf0c/Q4rkedvjNEBcpdUZMJ2gBZPtix4E8YjohYc//J5cY0+Ht8qqcQVUMCnkBjz1rX6AUaLUa3clfO3G5wGwcY5HpmxCVEWXsvq+soouaorlIzzzIvR7Ynhmh+sU0pIyTb6zaqMFGiJ8LwyE6spcVsCMNDpkCEXrVVK0poppsQtuMxhmTySKk9dS6IU97+YlCi1W3Sda19ygSf/ymnnt+WiAGZ5+wCn4Bjz1rX3WV1+VJX0Ed45x6fq/Dl848bPJKIkpmFldDelHaekZGvA6hceYNvMKHkDNLQYBXsTZnm0s903/tH417cxbXbtlTB8wFg6cz4WAltIlBba9Jz4vJVUspPmLnAPbK4j7gwnEeyvJsFbaDr/F7T045Wjw0MIIy1CiJ/B0=\",\"format\":\"google-gemini-v1\",\"id\":\"tool_get_weather_QCubCUClW9fbCpGQFbG5\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"CiQBjz1rX8qnVvEHevYTZ31SfnZMil/hNnpjsuSyxc5UJdH8F8UKdAGPPWtfo0/hY/cL474cUB2vbCwodf9x+SPLc4VZm5nxueI73ah+kll+rDrSTxrlB1g4lZC51m8oQ88tcTSr5GiHAf/NK1cEYgIf0c/Q4rkedvjNEBcpdUZMJ2gBZPtix4E8YjohYc//J5cY0+Ht8qqcQVUMCnkBjz1rX6AUaLUa3clfO3G5wGwcY5HpmxCVEWXsvq+soouaorlIzzzIvR7Ynhmh+sU0pIyTb6zaqMFGiJ8LwyE6spcVsCMNDpkCEXrVVK0poppsQtuMxhmTySKk9dS6IU97+YlCi1W3Sda19ygSf/ymnnt+WiAGZ5+wCn4Bjz1rX3WV1+VJX0Ed45x6fq/Dl848bPJKIkpmFldDelHaekZGvA6hceYNvMKHkDNLQYBXsTZnm0s903/tH417cxbXbtlTB8wFg6cz4WAltIlBba9Jz4vJVUspPmLnAPbK4j7gwnEeyvJsFbaDr/F7T045Wjw0MIIy1CiJ/B0=\",\"format\":\"google-gemini-v1\",\"id\":\"tool_get_weather_QCubCUClW9fbCpGQFbG5\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773001105-CiXNx7GbBalaMkidOceJ",
+          "object": "chat.completion.chunk",
+          "created": 1773001105,
+          "model": "google/gemini-3-pro-preview-20251117",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": null,
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.encrypted",
+                    "data": "CiQBjz1rX8qnVvEHevYTZ31SfnZMil/hNnpjsuSyxc5UJdH8F8UKdAGPPWtfo0/hY/cL474cUB2vbCwodf9x+SPLc4VZm5nxueI73ah+kll+rDrSTxrlB1g4lZC51m8oQ88tcTSr5GiHAf/NK1cEYgIf0c/Q4rkedvjNEBcpdUZMJ2gBZPtix4E8YjohYc//J5cY0+Ht8qqcQVUMCnkBjz1rX6AUaLUa3clfO3G5wGwcY5HpmxCVEWXsvq+soouaorlIzzzIvR7Ynhmh+sU0pIyTb6zaqMFGiJ8LwyE6spcVsCMNDpkCEXrVVK0poppsQtuMxhmTySKk9dS6IU97+YlCi1W3Sda19ygSf/ymnnt+WiAGZ5+wCn4Bjz1rX3WV1+VJX0Ed45x6fq/Dl848bPJKIkpmFldDelHaekZGvA6hceYNvMKHkDNLQYBXsTZnm0s903/tH417cxbXbtlTB8wFg6cz4WAltIlBba9Jz4vJVUspPmLnAPbK4j7gwnEeyvJsFbaDr/F7T045Wjw0MIIy1CiJ/B0=",
+                    "format": "google-gemini-v1",
+                    "id": "tool_get_weather_QCubCUClW9fbCpGQFbG5",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 14,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"tool_get_weather_QCubCUClW9fbCpGQFbG5\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"tool_get_weather_QCubCUClW9fbCpGQFbG5\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"tool_get_weather_QCubCUClW9fbCpGQFbG5\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773001105-CiXNx7GbBalaMkidOceJ",
+          "object": "chat.completion.chunk",
+          "created": 1773001105,
+          "model": "google/gemini-3-pro-preview-20251117",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "index": 0,
+                    "id": "tool_get_weather_QCubCUClW9fbCpGQFbG5",
+                    "type": "function",
+                    "function": {
+                      "name": "get_weather",
+                      "arguments": ""
+                    }
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 15,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773001105-CiXNx7GbBalaMkidOceJ",
+          "object": "chat.completion.chunk",
+          "created": 1773001105,
+          "model": "google/gemini-3-pro-preview-20251117",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": null,
+                "role": "assistant",
+                "tool_calls": [
+                  {
+                    "index": 0,
+                    "function": {
+                      "arguments": "{\"city\":\"San Francisco\"}"
+                    }
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 16,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"STOP\"}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"STOP\"}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"STOP\"}]}",
+        "data_json": {
+          "id": "gen-1773001105-CiXNx7GbBalaMkidOceJ",
+          "object": "chat.completion.chunk",
+          "created": 1773001105,
+          "model": "google/gemini-3-pro-preview-20251117",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": null
+              },
+              "finish_reason": "tool_calls",
+              "native_finish_reason": "STOP"
+            }
+          ]
+        }
+      },
+      {
+        "index": 17,
+        "event": null,
+        "data": "{\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":26,\"completion_tokens\":68,\"total_tokens\":94,\"cost\":0.000868,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000868,\"upstream_inference_prompt_cost\":0.000052,\"upstream_inference_completions_cost\":0.000816},\"completion_tokens_details\":{\"reasoning_tokens\":58,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data_lines": [
+          "{\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":26,\"completion_tokens\":68,\"total_tokens\":94,\"cost\":0.000868,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000868,\"upstream_inference_prompt_cost\":0.000052,\"upstream_inference_completions_cost\":0.000816},\"completion_tokens_details\":{\"reasoning_tokens\":58,\"image_tokens\":0,\"audio_tokens\":0}}}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773001105-CiXNx7GbBalaMkidOceJ\",\"object\":\"chat.completion.chunk\",\"created\":1773001105,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":26,\"completion_tokens\":68,\"total_tokens\":94,\"cost\":0.000868,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000868,\"upstream_inference_prompt_cost\":0.000052,\"upstream_inference_completions_cost\":0.000816},\"completion_tokens_details\":{\"reasoning_tokens\":58,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data_json": {
+          "id": "gen-1773001105-CiXNx7GbBalaMkidOceJ",
+          "object": "chat.completion.chunk",
+          "created": 1773001105,
+          "model": "google/gemini-3-pro-preview-20251117",
+          "provider": "Google",
+          "choices": [],
+          "usage": {
+            "prompt_tokens": 26,
+            "completion_tokens": 68,
+            "total_tokens": 94,
+            "cost": 0.000868,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.000868,
+              "upstream_inference_prompt_cost": 0.000052,
+              "upstream_inference_completions_cost": 0.000816
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 58,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "index": 18,
+        "event": null,
+        "data": "[DONE]",
+        "data_lines": [
+          "[DONE]"
+        ],
+        "raw": "data: [DONE]"
+      }
+    ]
+  }
+}

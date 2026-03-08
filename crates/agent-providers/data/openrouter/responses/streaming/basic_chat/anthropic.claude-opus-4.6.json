@@ -1,0 +1,279 @@
+{
+  "provider": "openrouter",
+  "scenario": "basic_chat",
+  "captured_at": "2026-03-08T20:15:53.461Z",
+  "request": {
+    "url": "https://openrouter.ai/api/v1/chat/completions",
+    "method": "POST",
+    "model": "anthropic/claude-opus-4.6",
+    "headers": {
+      "Authorization": "<redacted>",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "model": "anthropic/claude-opus-4.6",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant."
+        },
+        {
+          "role": "user",
+          "content": "Hello World!"
+        },
+        {
+          "role": "assistant",
+          "content": "Hello! How can I assist you today?"
+        },
+        {
+          "role": "user",
+          "content": "tell me how you are doing today in 5 words."
+        }
+      ],
+      "stream": true,
+      "temperature": 0,
+      "max_tokens": 1024
+    }
+  },
+  "response": {
+    "status": 200,
+    "status_text": "OK",
+    "headers": {
+      "access-control-allow-origin": "*",
+      "cache-control": "no-cache",
+      "cf-ray": "9d9483ab389edb66-LAX",
+      "connection": "keep-alive",
+      "content-type": "text/event-stream",
+      "date": "Sun, 08 Mar 2026 20:15:53 GMT",
+      "permissions-policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "referrer-policy": "no-referrer, strict-origin-when-cross-origin",
+      "server": "cloudflare",
+      "transfer-encoding": "chunked",
+      "x-content-type-options": "nosniff"
+    },
+    "content_type": "text/event-stream"
+  },
+  "stream": {
+    "format": "sse",
+    "chunk_count": 9,
+    "chunks": [
+      ": OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      "data: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I am\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" doing great\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\", thanks\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"!\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\"}]}\n\n",
+      "data: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[],\"usage\":{\"prompt_tokens\":45,\"completion_tokens\":10,\"total_tokens\":55,\"cost\":0.000475,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000475,\"upstream_inference_prompt_cost\":0.000225,\"upstream_inference_completions_cost\":0.00025},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}\n\n",
+      "data: [DONE]\n\n"
+    ],
+    "raw_text": ": OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\ndata: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I am\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" doing great\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\", thanks\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"!\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\"}]}\n\ndata: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[],\"usage\":{\"prompt_tokens\":45,\"completion_tokens\":10,\"total_tokens\":55,\"cost\":0.000475,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000475,\"upstream_inference_prompt_cost\":0.000225,\"upstream_inference_completions_cost\":0.00025},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}\n\ndata: [DONE]\n\n",
+    "events": [
+      {
+        "index": 0,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 1,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 2,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 3,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I am\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I am\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I am\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773000951-3vCVrnIIJcgjBCdHmu9N",
+          "object": "chat.completion.chunk",
+          "created": 1773000951,
+          "model": "anthropic/claude-4.6-opus-20260205",
+          "provider": "Amazon Bedrock",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "I am",
+                "role": "assistant"
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 4,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" doing great\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" doing great\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" doing great\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773000951-3vCVrnIIJcgjBCdHmu9N",
+          "object": "chat.completion.chunk",
+          "created": 1773000951,
+          "model": "anthropic/claude-4.6-opus-20260205",
+          "provider": "Amazon Bedrock",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": " doing great",
+                "role": "assistant"
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 5,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\", thanks\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\", thanks\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\", thanks\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773000951-3vCVrnIIJcgjBCdHmu9N",
+          "object": "chat.completion.chunk",
+          "created": 1773000951,
+          "model": "anthropic/claude-4.6-opus-20260205",
+          "provider": "Amazon Bedrock",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": ", thanks",
+                "role": "assistant"
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 6,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"!\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"!\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"!\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773000951-3vCVrnIIJcgjBCdHmu9N",
+          "object": "chat.completion.chunk",
+          "created": 1773000951,
+          "model": "anthropic/claude-4.6-opus-20260205",
+          "provider": "Amazon Bedrock",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "!",
+                "role": "assistant"
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 7,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\"}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\"}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"stop\",\"native_finish_reason\":\"stop\"}]}",
+        "data_json": {
+          "id": "gen-1773000951-3vCVrnIIJcgjBCdHmu9N",
+          "object": "chat.completion.chunk",
+          "created": 1773000951,
+          "model": "anthropic/claude-4.6-opus-20260205",
+          "provider": "Amazon Bedrock",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant"
+              },
+              "finish_reason": "stop",
+              "native_finish_reason": "stop"
+            }
+          ]
+        }
+      },
+      {
+        "index": 8,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[],\"usage\":{\"prompt_tokens\":45,\"completion_tokens\":10,\"total_tokens\":55,\"cost\":0.000475,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000475,\"upstream_inference_prompt_cost\":0.000225,\"upstream_inference_completions_cost\":0.00025},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[],\"usage\":{\"prompt_tokens\":45,\"completion_tokens\":10,\"total_tokens\":55,\"cost\":0.000475,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000475,\"upstream_inference_prompt_cost\":0.000225,\"upstream_inference_completions_cost\":0.00025},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000951-3vCVrnIIJcgjBCdHmu9N\",\"object\":\"chat.completion.chunk\",\"created\":1773000951,\"model\":\"anthropic/claude-4.6-opus-20260205\",\"provider\":\"Amazon Bedrock\",\"choices\":[],\"usage\":{\"prompt_tokens\":45,\"completion_tokens\":10,\"total_tokens\":55,\"cost\":0.000475,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000475,\"upstream_inference_prompt_cost\":0.000225,\"upstream_inference_completions_cost\":0.00025},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data_json": {
+          "id": "gen-1773000951-3vCVrnIIJcgjBCdHmu9N",
+          "object": "chat.completion.chunk",
+          "created": 1773000951,
+          "model": "anthropic/claude-4.6-opus-20260205",
+          "provider": "Amazon Bedrock",
+          "choices": [],
+          "usage": {
+            "prompt_tokens": 45,
+            "completion_tokens": 10,
+            "total_tokens": 55,
+            "cost": 0.000475,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.000475,
+              "upstream_inference_prompt_cost": 0.000225,
+              "upstream_inference_completions_cost": 0.00025
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "index": 9,
+        "event": null,
+        "data": "[DONE]",
+        "data_lines": [
+          "[DONE]"
+        ],
+        "raw": "data: [DONE]"
+      }
+    ]
+  }
+}

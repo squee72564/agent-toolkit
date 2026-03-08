@@ -1,0 +1,497 @@
+{
+  "provider": "openrouter",
+  "scenario": "basic_chat",
+  "captured_at": "2026-03-08T20:14:39.997Z",
+  "request": {
+    "url": "https://openrouter.ai/api/v1/chat/completions",
+    "method": "POST",
+    "model": "google/gemini-2.5-pro",
+    "headers": {
+      "Authorization": "<redacted>",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "model": "google/gemini-2.5-pro",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant."
+        },
+        {
+          "role": "user",
+          "content": "Hello World!"
+        },
+        {
+          "role": "assistant",
+          "content": "Hello! How can I assist you today?"
+        },
+        {
+          "role": "user",
+          "content": "tell me how you are doing today in 5 words."
+        }
+      ],
+      "stream": true,
+      "temperature": 0,
+      "max_tokens": 1024
+    }
+  },
+  "response": {
+    "status": 200,
+    "status_text": "OK",
+    "headers": {
+      "access-control-allow-origin": "*",
+      "cache-control": "no-cache",
+      "cf-ray": "9d9481ade984db66-LAX",
+      "connection": "keep-alive",
+      "content-type": "text/event-stream",
+      "date": "Sun, 08 Mar 2026 20:14:32 GMT",
+      "permissions-policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "referrer-policy": "no-referrer, strict-origin-when-cross-origin",
+      "server": "cloudflare",
+      "transfer-encoding": "chunked",
+      "x-content-type-options": "nosniff"
+    },
+    "content_type": "text/event-stream"
+  },
+  "stream": {
+    "format": "sse",
+    "chunk_count": 30,
+    "chunks": [
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      "data: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Considering Constraints Precisely**\\n\\nI'm presently focused on understanding the user's input: a request for a progress update under rigorous conditions. I've pinpointed the demand for concise, focused reporting—specifically, a five-word summary. This constraint forms the core of my current processing.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Considering Constraints Precisely**\\n\\nI'm presently focused on understanding the user's input: a request for a progress update under rigorous conditions. I've pinpointed the demand for concise, focused reporting—specifically, a five-word summary. This constraint forms the core of my current processing.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      "data: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Refining Phrase Selection**\\n\\nMy focus has shifted. I've successfully met the five-word limit constraint. I'm now comparing phrase options, weighing their suitability. \\\"Here to assist you today\\\" and \\\"Ready and waiting to assist\\\" feel most effective, conveying availability and proactive intent, while remaining concise.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Refining Phrase Selection**\\n\\nMy focus has shifted. I've successfully met the five-word limit constraint. I'm now comparing phrase options, weighing their suitability. \\\"Here to assist you today\\\" and \\\"Ready and waiting to assist\\\" feel most effective, conveying availability and proactive intent, while remaining concise.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      "data: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Synthesizing Optimal Response**\\n\\nMy process has advanced further. I've analyzed potential responses, settling on a final selection. I've decided to refine the original \\\"Ready and waiting to assist,\\\" considering context. Now, I'm confident in \\\"Ready to answer your query.\\\" This response is concise and directly addresses user needs.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Synthesizing Optimal Response**\\n\\nMy process has advanced further. I've analyzed potential responses, settling on a final selection. I've decided to refine the original \\\"Ready and waiting to assist,\\\" considering context. Now, I'm confident in \\\"Ready to answer your query.\\\" This response is concise and directly addresses user needs.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      "data: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Revising Phrase Selection**\\n\\nI've been further refining my chosen phrases. While \\\"Ready and waiting to assist\\\" was a frontrunner, I'm now leaning toward something simpler: \\\"Ready to help you now.\\\" This option directly addresses the user's implicit question. I am confident it is the best fit.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Revising Phrase Selection**\\n\\nI've been further refining my chosen phrases. While \\\"Ready and waiting to assist\\\" was a frontrunner, I'm now leaning toward something simpler: \\\"Ready to help you now.\\\" This option directly addresses the user's implicit question. I am confident it is the best fit.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Ready and waiting to assist.\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}\n\n",
+      "data: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":988,\"total_tokens\":1018,\"cost\":0.0099175,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0099175,\"upstream_inference_prompt_cost\":0.0000375,\"upstream_inference_completions_cost\":0.00988},\"completion_tokens_details\":{\"reasoning_tokens\":982,\"image_tokens\":0,\"audio_tokens\":0}}}\n\n",
+      "data: [DONE]\n\n"
+    ],
+    "raw_text": ": OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\ndata: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Considering Constraints Precisely**\\n\\nI'm presently focused on understanding the user's input: a request for a progress update under rigorous conditions. I've pinpointed the demand for concise, focused reporting—specifically, a five-word summary. This constraint forms the core of my current processing.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Considering Constraints Precisely**\\n\\nI'm presently focused on understanding the user's input: a request for a progress update under rigorous conditions. I've pinpointed the demand for concise, focused reporting—specifically, a five-word summary. This constraint forms the core of my current processing.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\ndata: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Refining Phrase Selection**\\n\\nMy focus has shifted. I've successfully met the five-word limit constraint. I'm now comparing phrase options, weighing their suitability. \\\"Here to assist you today\\\" and \\\"Ready and waiting to assist\\\" feel most effective, conveying availability and proactive intent, while remaining concise.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Refining Phrase Selection**\\n\\nMy focus has shifted. I've successfully met the five-word limit constraint. I'm now comparing phrase options, weighing their suitability. \\\"Here to assist you today\\\" and \\\"Ready and waiting to assist\\\" feel most effective, conveying availability and proactive intent, while remaining concise.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\ndata: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Synthesizing Optimal Response**\\n\\nMy process has advanced further. I've analyzed potential responses, settling on a final selection. I've decided to refine the original \\\"Ready and waiting to assist,\\\" considering context. Now, I'm confident in \\\"Ready to answer your query.\\\" This response is concise and directly addresses user needs.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Synthesizing Optimal Response**\\n\\nMy process has advanced further. I've analyzed potential responses, settling on a final selection. I've decided to refine the original \\\"Ready and waiting to assist,\\\" considering context. Now, I'm confident in \\\"Ready to answer your query.\\\" This response is concise and directly addresses user needs.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\ndata: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Revising Phrase Selection**\\n\\nI've been further refining my chosen phrases. While \\\"Ready and waiting to assist\\\" was a frontrunner, I'm now leaning toward something simpler: \\\"Ready to help you now.\\\" This option directly addresses the user's implicit question. I am confident it is the best fit.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Revising Phrase Selection**\\n\\nI've been further refining my chosen phrases. While \\\"Ready and waiting to assist\\\" was a frontrunner, I'm now leaning toward something simpler: \\\"Ready to help you now.\\\" This option directly addresses the user's implicit question. I am confident it is the best fit.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Ready and waiting to assist.\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}\n\ndata: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":988,\"total_tokens\":1018,\"cost\":0.0099175,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0099175,\"upstream_inference_prompt_cost\":0.0000375,\"upstream_inference_completions_cost\":0.00988},\"completion_tokens_details\":{\"reasoning_tokens\":982,\"image_tokens\":0,\"audio_tokens\":0}}}\n\ndata: [DONE]\n\n",
+    "events": [
+      {
+        "index": 0,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 1,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 2,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 3,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 4,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 5,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Considering Constraints Precisely**\\n\\nI'm presently focused on understanding the user's input: a request for a progress update under rigorous conditions. I've pinpointed the demand for concise, focused reporting—specifically, a five-word summary. This constraint forms the core of my current processing.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Considering Constraints Precisely**\\n\\nI'm presently focused on understanding the user's input: a request for a progress update under rigorous conditions. I've pinpointed the demand for concise, focused reporting—specifically, a five-word summary. This constraint forms the core of my current processing.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Considering Constraints Precisely**\\n\\nI'm presently focused on understanding the user's input: a request for a progress update under rigorous conditions. I've pinpointed the demand for concise, focused reporting—specifically, a five-word summary. This constraint forms the core of my current processing.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Considering Constraints Precisely**\\n\\nI'm presently focused on understanding the user's input: a request for a progress update under rigorous conditions. I've pinpointed the demand for concise, focused reporting—specifically, a five-word summary. This constraint forms the core of my current processing.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Considering Constraints Precisely**\\n\\nI'm presently focused on understanding the user's input: a request for a progress update under rigorous conditions. I've pinpointed the demand for concise, focused reporting—specifically, a five-word summary. This constraint forms the core of my current processing.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Considering Constraints Precisely**\\n\\nI'm presently focused on understanding the user's input: a request for a progress update under rigorous conditions. I've pinpointed the demand for concise, focused reporting—specifically, a five-word summary. This constraint forms the core of my current processing.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773000870-nQ2hlwdJEWL75tpA2HdH",
+          "object": "chat.completion.chunk",
+          "created": 1773000870,
+          "model": "google/gemini-2.5-pro",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": "**Considering Constraints Precisely**\n\nI'm presently focused on understanding the user's input: a request for a progress update under rigorous conditions. I've pinpointed the demand for concise, focused reporting—specifically, a five-word summary. This constraint forms the core of my current processing.\n\n\n",
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.text",
+                    "text": "**Considering Constraints Precisely**\n\nI'm presently focused on understanding the user's input: a request for a progress update under rigorous conditions. I've pinpointed the demand for concise, focused reporting—specifically, a five-word summary. This constraint forms the core of my current processing.\n\n\n",
+                    "format": "google-gemini-v1",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 6,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 7,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 8,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 9,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 10,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 11,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 12,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Refining Phrase Selection**\\n\\nMy focus has shifted. I've successfully met the five-word limit constraint. I'm now comparing phrase options, weighing their suitability. \\\"Here to assist you today\\\" and \\\"Ready and waiting to assist\\\" feel most effective, conveying availability and proactive intent, while remaining concise.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Refining Phrase Selection**\\n\\nMy focus has shifted. I've successfully met the five-word limit constraint. I'm now comparing phrase options, weighing their suitability. \\\"Here to assist you today\\\" and \\\"Ready and waiting to assist\\\" feel most effective, conveying availability and proactive intent, while remaining concise.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Refining Phrase Selection**\\n\\nMy focus has shifted. I've successfully met the five-word limit constraint. I'm now comparing phrase options, weighing their suitability. \\\"Here to assist you today\\\" and \\\"Ready and waiting to assist\\\" feel most effective, conveying availability and proactive intent, while remaining concise.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Refining Phrase Selection**\\n\\nMy focus has shifted. I've successfully met the five-word limit constraint. I'm now comparing phrase options, weighing their suitability. \\\"Here to assist you today\\\" and \\\"Ready and waiting to assist\\\" feel most effective, conveying availability and proactive intent, while remaining concise.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Refining Phrase Selection**\\n\\nMy focus has shifted. I've successfully met the five-word limit constraint. I'm now comparing phrase options, weighing their suitability. \\\"Here to assist you today\\\" and \\\"Ready and waiting to assist\\\" feel most effective, conveying availability and proactive intent, while remaining concise.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Refining Phrase Selection**\\n\\nMy focus has shifted. I've successfully met the five-word limit constraint. I'm now comparing phrase options, weighing their suitability. \\\"Here to assist you today\\\" and \\\"Ready and waiting to assist\\\" feel most effective, conveying availability and proactive intent, while remaining concise.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773000870-nQ2hlwdJEWL75tpA2HdH",
+          "object": "chat.completion.chunk",
+          "created": 1773000870,
+          "model": "google/gemini-2.5-pro",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": "**Refining Phrase Selection**\n\nMy focus has shifted. I've successfully met the five-word limit constraint. I'm now comparing phrase options, weighing their suitability. \"Here to assist you today\" and \"Ready and waiting to assist\" feel most effective, conveying availability and proactive intent, while remaining concise.\n\n\n",
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.text",
+                    "text": "**Refining Phrase Selection**\n\nMy focus has shifted. I've successfully met the five-word limit constraint. I'm now comparing phrase options, weighing their suitability. \"Here to assist you today\" and \"Ready and waiting to assist\" feel most effective, conveying availability and proactive intent, while remaining concise.\n\n\n",
+                    "format": "google-gemini-v1",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 13,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 14,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 15,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 16,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 17,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 18,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 19,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Synthesizing Optimal Response**\\n\\nMy process has advanced further. I've analyzed potential responses, settling on a final selection. I've decided to refine the original \\\"Ready and waiting to assist,\\\" considering context. Now, I'm confident in \\\"Ready to answer your query.\\\" This response is concise and directly addresses user needs.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Synthesizing Optimal Response**\\n\\nMy process has advanced further. I've analyzed potential responses, settling on a final selection. I've decided to refine the original \\\"Ready and waiting to assist,\\\" considering context. Now, I'm confident in \\\"Ready to answer your query.\\\" This response is concise and directly addresses user needs.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Synthesizing Optimal Response**\\n\\nMy process has advanced further. I've analyzed potential responses, settling on a final selection. I've decided to refine the original \\\"Ready and waiting to assist,\\\" considering context. Now, I'm confident in \\\"Ready to answer your query.\\\" This response is concise and directly addresses user needs.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Synthesizing Optimal Response**\\n\\nMy process has advanced further. I've analyzed potential responses, settling on a final selection. I've decided to refine the original \\\"Ready and waiting to assist,\\\" considering context. Now, I'm confident in \\\"Ready to answer your query.\\\" This response is concise and directly addresses user needs.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Synthesizing Optimal Response**\\n\\nMy process has advanced further. I've analyzed potential responses, settling on a final selection. I've decided to refine the original \\\"Ready and waiting to assist,\\\" considering context. Now, I'm confident in \\\"Ready to answer your query.\\\" This response is concise and directly addresses user needs.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Synthesizing Optimal Response**\\n\\nMy process has advanced further. I've analyzed potential responses, settling on a final selection. I've decided to refine the original \\\"Ready and waiting to assist,\\\" considering context. Now, I'm confident in \\\"Ready to answer your query.\\\" This response is concise and directly addresses user needs.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773000870-nQ2hlwdJEWL75tpA2HdH",
+          "object": "chat.completion.chunk",
+          "created": 1773000870,
+          "model": "google/gemini-2.5-pro",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": "**Synthesizing Optimal Response**\n\nMy process has advanced further. I've analyzed potential responses, settling on a final selection. I've decided to refine the original \"Ready and waiting to assist,\" considering context. Now, I'm confident in \"Ready to answer your query.\" This response is concise and directly addresses user needs.\n\n\n",
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.text",
+                    "text": "**Synthesizing Optimal Response**\n\nMy process has advanced further. I've analyzed potential responses, settling on a final selection. I've decided to refine the original \"Ready and waiting to assist,\" considering context. Now, I'm confident in \"Ready to answer your query.\" This response is concise and directly addresses user needs.\n\n\n",
+                    "format": "google-gemini-v1",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 20,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 21,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 22,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 23,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 24,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 25,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Revising Phrase Selection**\\n\\nI've been further refining my chosen phrases. While \\\"Ready and waiting to assist\\\" was a frontrunner, I'm now leaning toward something simpler: \\\"Ready to help you now.\\\" This option directly addresses the user's implicit question. I am confident it is the best fit.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Revising Phrase Selection**\\n\\nI've been further refining my chosen phrases. While \\\"Ready and waiting to assist\\\" was a frontrunner, I'm now leaning toward something simpler: \\\"Ready to help you now.\\\" This option directly addresses the user's implicit question. I am confident it is the best fit.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Revising Phrase Selection**\\n\\nI've been further refining my chosen phrases. While \\\"Ready and waiting to assist\\\" was a frontrunner, I'm now leaning toward something simpler: \\\"Ready to help you now.\\\" This option directly addresses the user's implicit question. I am confident it is the best fit.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Revising Phrase Selection**\\n\\nI've been further refining my chosen phrases. While \\\"Ready and waiting to assist\\\" was a frontrunner, I'm now leaning toward something simpler: \\\"Ready to help you now.\\\" This option directly addresses the user's implicit question. I am confident it is the best fit.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Revising Phrase Selection**\\n\\nI've been further refining my chosen phrases. While \\\"Ready and waiting to assist\\\" was a frontrunner, I'm now leaning toward something simpler: \\\"Ready to help you now.\\\" This option directly addresses the user's implicit question. I am confident it is the best fit.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Revising Phrase Selection**\\n\\nI've been further refining my chosen phrases. While \\\"Ready and waiting to assist\\\" was a frontrunner, I'm now leaning toward something simpler: \\\"Ready to help you now.\\\" This option directly addresses the user's implicit question. I am confident it is the best fit.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773000870-nQ2hlwdJEWL75tpA2HdH",
+          "object": "chat.completion.chunk",
+          "created": 1773000870,
+          "model": "google/gemini-2.5-pro",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": "**Revising Phrase Selection**\n\nI've been further refining my chosen phrases. While \"Ready and waiting to assist\" was a frontrunner, I'm now leaning toward something simpler: \"Ready to help you now.\" This option directly addresses the user's implicit question. I am confident it is the best fit.\n\n\n",
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.text",
+                    "text": "**Revising Phrase Selection**\n\nI've been further refining my chosen phrases. While \"Ready and waiting to assist\" was a frontrunner, I'm now leaning toward something simpler: \"Ready to help you now.\" This option directly addresses the user's implicit question. I am confident it is the best fit.\n\n\n",
+                    "format": "google-gemini-v1",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 26,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Ready and waiting to assist.\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Ready and waiting to assist.\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Ready and waiting to assist.\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773000870-nQ2hlwdJEWL75tpA2HdH",
+          "object": "chat.completion.chunk",
+          "created": 1773000870,
+          "model": "google/gemini-2.5-pro",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "Ready and waiting to assist.",
+                "role": "assistant"
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 27,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}",
+        "data_json": {
+          "id": "gen-1773000870-nQ2hlwdJEWL75tpA2HdH",
+          "object": "chat.completion.chunk",
+          "created": 1773000870,
+          "model": "google/gemini-2.5-pro",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": null
+              },
+              "finish_reason": "stop",
+              "native_finish_reason": "STOP"
+            }
+          ]
+        }
+      },
+      {
+        "index": 28,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":988,\"total_tokens\":1018,\"cost\":0.0099175,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0099175,\"upstream_inference_prompt_cost\":0.0000375,\"upstream_inference_completions_cost\":0.00988},\"completion_tokens_details\":{\"reasoning_tokens\":982,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":988,\"total_tokens\":1018,\"cost\":0.0099175,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0099175,\"upstream_inference_prompt_cost\":0.0000375,\"upstream_inference_completions_cost\":0.00988},\"completion_tokens_details\":{\"reasoning_tokens\":982,\"image_tokens\":0,\"audio_tokens\":0}}}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000870-nQ2hlwdJEWL75tpA2HdH\",\"object\":\"chat.completion.chunk\",\"created\":1773000870,\"model\":\"google/gemini-2.5-pro\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":988,\"total_tokens\":1018,\"cost\":0.0099175,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0099175,\"upstream_inference_prompt_cost\":0.0000375,\"upstream_inference_completions_cost\":0.00988},\"completion_tokens_details\":{\"reasoning_tokens\":982,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data_json": {
+          "id": "gen-1773000870-nQ2hlwdJEWL75tpA2HdH",
+          "object": "chat.completion.chunk",
+          "created": 1773000870,
+          "model": "google/gemini-2.5-pro",
+          "provider": "Google",
+          "choices": [],
+          "usage": {
+            "prompt_tokens": 30,
+            "completion_tokens": 988,
+            "total_tokens": 1018,
+            "cost": 0.0099175,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0099175,
+              "upstream_inference_prompt_cost": 0.0000375,
+              "upstream_inference_completions_cost": 0.00988
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 982,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "index": 29,
+        "event": null,
+        "data": "[DONE]",
+        "data_lines": [
+          "[DONE]"
+        ],
+        "raw": "data: [DONE]"
+      }
+    ]
+  }
+}

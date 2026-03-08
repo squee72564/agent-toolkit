@@ -1,0 +1,404 @@
+{
+  "provider": "openrouter",
+  "scenario": "basic_chat",
+  "captured_at": "2026-03-08T20:14:13.570Z",
+  "request": {
+    "url": "https://openrouter.ai/api/v1/chat/completions",
+    "method": "POST",
+    "model": "google/gemini-3-pro-preview",
+    "headers": {
+      "Authorization": "<redacted>",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "model": "google/gemini-3-pro-preview",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant."
+        },
+        {
+          "role": "user",
+          "content": "Hello World!"
+        },
+        {
+          "role": "assistant",
+          "content": "Hello! How can I assist you today?"
+        },
+        {
+          "role": "user",
+          "content": "tell me how you are doing today in 5 words."
+        }
+      ],
+      "stream": true,
+      "temperature": 0,
+      "max_tokens": 1024
+    }
+  },
+  "response": {
+    "status": 200,
+    "status_text": "OK",
+    "headers": {
+      "access-control-allow-origin": "*",
+      "cache-control": "no-cache",
+      "cf-ray": "9d94811ca87adb66-LAX",
+      "connection": "keep-alive",
+      "content-type": "text/event-stream",
+      "date": "Sun, 08 Mar 2026 20:14:11 GMT",
+      "permissions-policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "referrer-policy": "no-referrer, strict-origin-when-cross-origin",
+      "server": "cloudflare",
+      "transfer-encoding": "chunked",
+      "x-content-type-options": "nosniff"
+    },
+    "content_type": "text/event-stream"
+  },
+  "stream": {
+    "format": "sse",
+    "chunk_count": 22,
+    "chunks": [
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      "data: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Evaluating User Input's Nuances**\\n\\nI've carefully analyzed the user's prompt, isolating the key directive to respond concisely. I'm focusing on crafting a response that is both compliant and conveys a polite acknowledgment of the user's inquiry, while still adhering to the imposed constraints. I'm prioritizing accuracy and efficiency.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Evaluating User Input's Nuances**\\n\\nI've carefully analyzed the user's prompt, isolating the key directive to respond concisely. I'm focusing on crafting a response that is both compliant and conveys a polite acknowledgment of the user's inquiry, while still adhering to the imposed constraints. I'm prioritizing accuracy and efficiency.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      "data: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Choosing the Best Response**\\n\\nI'm now comparing the top choices to narrow down the final answer. Considering politeness and helpfulness, I've eliminated some options. The goal is a balance of efficiency and a professional tone while maintaining the constraints. I'm leaning toward an option that explicitly offers assistance.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Choosing the Best Response**\\n\\nI'm now comparing the top choices to narrow down the final answer. Considering politeness and helpfulness, I've eliminated some options. The goal is a balance of efficiency and a professional tone while maintaining the constraints. I'm leaning toward an option that explicitly offers assistance.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I am doing great, thanks!\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"ClwBjz1rXykuJYxUCjaV6sncDLrNIMNr5KdVMqd5fw9eCFPo2mQC3jFOvMSAI30wCImL+hBHCKjEofGhWM+/Rm2r/hkx7MKd9c67um8eF2nTRrcm9DrXCwoTMq73awpsAY89a18dnUwGZUJGFbDBeSBweAARJn6+cHtzjFrd7gRFVsi+Npx9Vx+bdJYH7SR10rXlwdxkD2jHCrqbDrxL/grA0KnbLXTM20Jnfp3kvoIGvc9/PfikzPn+Yo6TmeYUgi0VGg9KOTU6gz2zCp8BAY89a1/118Q6OaseE+GULxfYyKfqhKoTpoxOVFBCxMGcRGJoyE8B5WnLOUgK57pXWXioW/rRn+yxIDNSzbKxkkioMyCPdx0EJ4ygtre0kLihAVvUc888GwQ2BQTgnKXDEMgSnLUxopzEkkfB9cFXFynVWAI011UtbRnAc8SGuBdRauHmUS7IoRBDFLKazeZ85cqepnInWAzdylWAr/OLCpABAY89a1+LC9GQp4Q1hl93rWiqEhYPnhUetAAe3vJzPZnfcpNZ1sP7WB2ASn0iVm5dgEXf57oenaTsc57oAk/I1pK2ndodrGT9EbK8UtTUr5zTaXSxVbEnXG7TAgF7TQz9gG0rtnYCy+I5zp58xx6L+6Mz961oBMJOo8Oq4sCichee2sMzFBBRAsQAFGUciioPCrcBAY89a18PaioJcnQG0pUvdPoyeRKlhnwDkDk9Trjtw8Yj4vc9v8Z9Y5kZaXLvtLG0D69TLUP24IRf9EYF42o9xKwlztEsO09DaJ2Kx192EqfxINzoI5EPHedeRAjGW4bGFcs3ixI3054xG5pOUCAbdB602oSFHLoAwDIaJ2r8TxKLmPFrYrZtsTVqipwds1QJKagmIXkTR2+qESm+rDiBzftPPM8qc/jwf/DHTgnJWbLYCW44DwVGCsQBAY89a1/WUmFKJ04SNKv+DKYextWHYS9ORMuM0G4ZWK+tTFlA/wUEORUHyEdp3iZBFAcvGKD2jmJAE7EgdGGWE5QXhQb2apCm0lgJOafzgh9OTqBrDKvCEflnpOFbH82BiPBmvsbYMACCz7fJlvKBSoTvPqRklD65u7zkI9QwquHWQEZG0eilWRz2tPqpn+b5PQqp+DlXOJouUFtOJNEwK2EcLzmIu89Y+g2yz6SADhJLa1fDgBRC/D6/Q3g4uGaA2nFOqQqRAgGPPWtfgr08/cQPT4MAeXKWt+k9hFpkMGpG8iTBzohelTT3tKze6Ml9+Nd6i2L+J+bW0WBn6pbSoCL7JvzhIhcCE59UXiCyhJ610qN7NuVhP/vhmjgUWQFankbaijLb4nJY7s8yfSR+JNUiXD2s7KCybtcN2OGGmyDmWE9zzCjbq59UrOdO4QOIW0P1twqJqJHz/82N8sZBXwGtmXR7q4xEYCOGlp1iTL3rRaBLimQ77xHqmFsdGYvt9CY6Z+GeLEFloejl1Vv7qgs4yIPd4+2vU9BpkKfmVjVlZdmv5KewcYOgqvCCVzafCJCHGh5QliQ2WW/zA04RP0yNpU5PbeFJBifOrrtEC5KXPRwkBINpwgrMAQGPPWtfzSnvzxcj4Btet8cqQ9IHRWrkP/YKJUKr6ns8PGFNnrU8HUosST3a8w8u6kVOq0nNjZ7F27jl4NFkZt3QbSlrwPbVxop0tQZCob6GW6kTeIYQKVoJmyzi0K7N8M+p0aSH3/1ugBMiPkvK7sx5UX7nZhR5d6EnLoQhJQ2u2xknBRkiSqq3KR+de7LZ/gaXmAdItIm8+qxIlszTbnjGy8HLTIi8VucjAZ7XY8PkovZi2dMhRTjBYYod35WZPct1M8fT6dpCuDfqOQopAY89a19hh0VdSteq4lwjlobzAgxiO6Mb72cG/0wAlrn3/EXb5Y4oE3I=\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
+      "data: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}\n\n",
+      "data: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":336,\"total_tokens\":366,\"cost\":0.004092,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.004092,\"upstream_inference_prompt_cost\":0.00006,\"upstream_inference_completions_cost\":0.004032},\"completion_tokens_details\":{\"reasoning_tokens\":329,\"image_tokens\":0,\"audio_tokens\":0}}}\n\n",
+      "data: [DONE]\n\n"
+    ],
+    "raw_text": ": OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\ndata: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Evaluating User Input's Nuances**\\n\\nI've carefully analyzed the user's prompt, isolating the key directive to respond concisely. I'm focusing on crafting a response that is both compliant and conveys a polite acknowledgment of the user's inquiry, while still adhering to the imposed constraints. I'm prioritizing accuracy and efficiency.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Evaluating User Input's Nuances**\\n\\nI've carefully analyzed the user's prompt, isolating the key directive to respond concisely. I'm focusing on crafting a response that is both compliant and conveys a polite acknowledgment of the user's inquiry, while still adhering to the imposed constraints. I'm prioritizing accuracy and efficiency.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\ndata: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Choosing the Best Response**\\n\\nI'm now comparing the top choices to narrow down the final answer. Considering politeness and helpfulness, I've eliminated some options. The goal is a balance of efficiency and a professional tone while maintaining the constraints. I'm leaning toward an option that explicitly offers assistance.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Choosing the Best Response**\\n\\nI'm now comparing the top choices to narrow down the final answer. Considering politeness and helpfulness, I've eliminated some options. The goal is a balance of efficiency and a professional tone while maintaining the constraints. I'm leaning toward an option that explicitly offers assistance.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I am doing great, thanks!\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"ClwBjz1rXykuJYxUCjaV6sncDLrNIMNr5KdVMqd5fw9eCFPo2mQC3jFOvMSAI30wCImL+hBHCKjEofGhWM+/Rm2r/hkx7MKd9c67um8eF2nTRrcm9DrXCwoTMq73awpsAY89a18dnUwGZUJGFbDBeSBweAARJn6+cHtzjFrd7gRFVsi+Npx9Vx+bdJYH7SR10rXlwdxkD2jHCrqbDrxL/grA0KnbLXTM20Jnfp3kvoIGvc9/PfikzPn+Yo6TmeYUgi0VGg9KOTU6gz2zCp8BAY89a1/118Q6OaseE+GULxfYyKfqhKoTpoxOVFBCxMGcRGJoyE8B5WnLOUgK57pXWXioW/rRn+yxIDNSzbKxkkioMyCPdx0EJ4ygtre0kLihAVvUc888GwQ2BQTgnKXDEMgSnLUxopzEkkfB9cFXFynVWAI011UtbRnAc8SGuBdRauHmUS7IoRBDFLKazeZ85cqepnInWAzdylWAr/OLCpABAY89a1+LC9GQp4Q1hl93rWiqEhYPnhUetAAe3vJzPZnfcpNZ1sP7WB2ASn0iVm5dgEXf57oenaTsc57oAk/I1pK2ndodrGT9EbK8UtTUr5zTaXSxVbEnXG7TAgF7TQz9gG0rtnYCy+I5zp58xx6L+6Mz961oBMJOo8Oq4sCichee2sMzFBBRAsQAFGUciioPCrcBAY89a18PaioJcnQG0pUvdPoyeRKlhnwDkDk9Trjtw8Yj4vc9v8Z9Y5kZaXLvtLG0D69TLUP24IRf9EYF42o9xKwlztEsO09DaJ2Kx192EqfxINzoI5EPHedeRAjGW4bGFcs3ixI3054xG5pOUCAbdB602oSFHLoAwDIaJ2r8TxKLmPFrYrZtsTVqipwds1QJKagmIXkTR2+qESm+rDiBzftPPM8qc/jwf/DHTgnJWbLYCW44DwVGCsQBAY89a1/WUmFKJ04SNKv+DKYextWHYS9ORMuM0G4ZWK+tTFlA/wUEORUHyEdp3iZBFAcvGKD2jmJAE7EgdGGWE5QXhQb2apCm0lgJOafzgh9OTqBrDKvCEflnpOFbH82BiPBmvsbYMACCz7fJlvKBSoTvPqRklD65u7zkI9QwquHWQEZG0eilWRz2tPqpn+b5PQqp+DlXOJouUFtOJNEwK2EcLzmIu89Y+g2yz6SADhJLa1fDgBRC/D6/Q3g4uGaA2nFOqQqRAgGPPWtfgr08/cQPT4MAeXKWt+k9hFpkMGpG8iTBzohelTT3tKze6Ml9+Nd6i2L+J+bW0WBn6pbSoCL7JvzhIhcCE59UXiCyhJ610qN7NuVhP/vhmjgUWQFankbaijLb4nJY7s8yfSR+JNUiXD2s7KCybtcN2OGGmyDmWE9zzCjbq59UrOdO4QOIW0P1twqJqJHz/82N8sZBXwGtmXR7q4xEYCOGlp1iTL3rRaBLimQ77xHqmFsdGYvt9CY6Z+GeLEFloejl1Vv7qgs4yIPd4+2vU9BpkKfmVjVlZdmv5KewcYOgqvCCVzafCJCHGh5QliQ2WW/zA04RP0yNpU5PbeFJBifOrrtEC5KXPRwkBINpwgrMAQGPPWtfzSnvzxcj4Btet8cqQ9IHRWrkP/YKJUKr6ns8PGFNnrU8HUosST3a8w8u6kVOq0nNjZ7F27jl4NFkZt3QbSlrwPbVxop0tQZCob6GW6kTeIYQKVoJmyzi0K7N8M+p0aSH3/1ugBMiPkvK7sx5UX7nZhR5d6EnLoQhJQ2u2xknBRkiSqq3KR+de7LZ/gaXmAdItIm8+qxIlszTbnjGy8HLTIi8VucjAZ7XY8PkovZi2dMhRTjBYYod35WZPct1M8fT6dpCuDfqOQopAY89a19hh0VdSteq4lwjlobzAgxiO6Mb72cG/0wAlrn3/EXb5Y4oE3I=\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}\n\ndata: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":336,\"total_tokens\":366,\"cost\":0.004092,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.004092,\"upstream_inference_prompt_cost\":0.00006,\"upstream_inference_completions_cost\":0.004032},\"completion_tokens_details\":{\"reasoning_tokens\":329,\"image_tokens\":0,\"audio_tokens\":0}}}\n\ndata: [DONE]\n\n",
+    "events": [
+      {
+        "index": 0,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 1,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 2,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 3,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 4,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 5,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 6,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 7,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 8,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 9,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 10,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Evaluating User Input's Nuances**\\n\\nI've carefully analyzed the user's prompt, isolating the key directive to respond concisely. I'm focusing on crafting a response that is both compliant and conveys a polite acknowledgment of the user's inquiry, while still adhering to the imposed constraints. I'm prioritizing accuracy and efficiency.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Evaluating User Input's Nuances**\\n\\nI've carefully analyzed the user's prompt, isolating the key directive to respond concisely. I'm focusing on crafting a response that is both compliant and conveys a polite acknowledgment of the user's inquiry, while still adhering to the imposed constraints. I'm prioritizing accuracy and efficiency.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Evaluating User Input's Nuances**\\n\\nI've carefully analyzed the user's prompt, isolating the key directive to respond concisely. I'm focusing on crafting a response that is both compliant and conveys a polite acknowledgment of the user's inquiry, while still adhering to the imposed constraints. I'm prioritizing accuracy and efficiency.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Evaluating User Input's Nuances**\\n\\nI've carefully analyzed the user's prompt, isolating the key directive to respond concisely. I'm focusing on crafting a response that is both compliant and conveys a polite acknowledgment of the user's inquiry, while still adhering to the imposed constraints. I'm prioritizing accuracy and efficiency.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Evaluating User Input's Nuances**\\n\\nI've carefully analyzed the user's prompt, isolating the key directive to respond concisely. I'm focusing on crafting a response that is both compliant and conveys a polite acknowledgment of the user's inquiry, while still adhering to the imposed constraints. I'm prioritizing accuracy and efficiency.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Evaluating User Input's Nuances**\\n\\nI've carefully analyzed the user's prompt, isolating the key directive to respond concisely. I'm focusing on crafting a response that is both compliant and conveys a polite acknowledgment of the user's inquiry, while still adhering to the imposed constraints. I'm prioritizing accuracy and efficiency.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773000846-6LcG0Rz2dbP0mHtPJMSx",
+          "object": "chat.completion.chunk",
+          "created": 1773000846,
+          "model": "google/gemini-3-pro-preview-20251117",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": "**Evaluating User Input's Nuances**\n\nI've carefully analyzed the user's prompt, isolating the key directive to respond concisely. I'm focusing on crafting a response that is both compliant and conveys a polite acknowledgment of the user's inquiry, while still adhering to the imposed constraints. I'm prioritizing accuracy and efficiency.\n\n\n",
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.text",
+                    "text": "**Evaluating User Input's Nuances**\n\nI've carefully analyzed the user's prompt, isolating the key directive to respond concisely. I'm focusing on crafting a response that is both compliant and conveys a polite acknowledgment of the user's inquiry, while still adhering to the imposed constraints. I'm prioritizing accuracy and efficiency.\n\n\n",
+                    "format": "google-gemini-v1",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 11,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 12,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 13,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 14,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 15,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 16,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Choosing the Best Response**\\n\\nI'm now comparing the top choices to narrow down the final answer. Considering politeness and helpfulness, I've eliminated some options. The goal is a balance of efficiency and a professional tone while maintaining the constraints. I'm leaning toward an option that explicitly offers assistance.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Choosing the Best Response**\\n\\nI'm now comparing the top choices to narrow down the final answer. Considering politeness and helpfulness, I've eliminated some options. The goal is a balance of efficiency and a professional tone while maintaining the constraints. I'm leaning toward an option that explicitly offers assistance.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Choosing the Best Response**\\n\\nI'm now comparing the top choices to narrow down the final answer. Considering politeness and helpfulness, I've eliminated some options. The goal is a balance of efficiency and a professional tone while maintaining the constraints. I'm leaning toward an option that explicitly offers assistance.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Choosing the Best Response**\\n\\nI'm now comparing the top choices to narrow down the final answer. Considering politeness and helpfulness, I've eliminated some options. The goal is a balance of efficiency and a professional tone while maintaining the constraints. I'm leaning toward an option that explicitly offers assistance.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":\"**Choosing the Best Response**\\n\\nI'm now comparing the top choices to narrow down the final answer. Considering politeness and helpfulness, I've eliminated some options. The goal is a balance of efficiency and a professional tone while maintaining the constraints. I'm leaning toward an option that explicitly offers assistance.\\n\\n\\n\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"**Choosing the Best Response**\\n\\nI'm now comparing the top choices to narrow down the final answer. Considering politeness and helpfulness, I've eliminated some options. The goal is a balance of efficiency and a professional tone while maintaining the constraints. I'm leaning toward an option that explicitly offers assistance.\\n\\n\\n\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773000846-6LcG0Rz2dbP0mHtPJMSx",
+          "object": "chat.completion.chunk",
+          "created": 1773000846,
+          "model": "google/gemini-3-pro-preview-20251117",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": "**Choosing the Best Response**\n\nI'm now comparing the top choices to narrow down the final answer. Considering politeness and helpfulness, I've eliminated some options. The goal is a balance of efficiency and a professional tone while maintaining the constraints. I'm leaning toward an option that explicitly offers assistance.\n\n\n",
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.text",
+                    "text": "**Choosing the Best Response**\n\nI'm now comparing the top choices to narrow down the final answer. Considering politeness and helpfulness, I've eliminated some options. The goal is a balance of efficiency and a professional tone while maintaining the constraints. I'm leaning toward an option that explicitly offers assistance.\n\n\n",
+                    "format": "google-gemini-v1",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 17,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I am doing great, thanks!\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I am doing great, thanks!\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I am doing great, thanks!\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773000846-6LcG0Rz2dbP0mHtPJMSx",
+          "object": "chat.completion.chunk",
+          "created": 1773000846,
+          "model": "google/gemini-3-pro-preview-20251117",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "I am doing great, thanks!",
+                "role": "assistant"
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 18,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"ClwBjz1rXykuJYxUCjaV6sncDLrNIMNr5KdVMqd5fw9eCFPo2mQC3jFOvMSAI30wCImL+hBHCKjEofGhWM+/Rm2r/hkx7MKd9c67um8eF2nTRrcm9DrXCwoTMq73awpsAY89a18dnUwGZUJGFbDBeSBweAARJn6+cHtzjFrd7gRFVsi+Npx9Vx+bdJYH7SR10rXlwdxkD2jHCrqbDrxL/grA0KnbLXTM20Jnfp3kvoIGvc9/PfikzPn+Yo6TmeYUgi0VGg9KOTU6gz2zCp8BAY89a1/118Q6OaseE+GULxfYyKfqhKoTpoxOVFBCxMGcRGJoyE8B5WnLOUgK57pXWXioW/rRn+yxIDNSzbKxkkioMyCPdx0EJ4ygtre0kLihAVvUc888GwQ2BQTgnKXDEMgSnLUxopzEkkfB9cFXFynVWAI011UtbRnAc8SGuBdRauHmUS7IoRBDFLKazeZ85cqepnInWAzdylWAr/OLCpABAY89a1+LC9GQp4Q1hl93rWiqEhYPnhUetAAe3vJzPZnfcpNZ1sP7WB2ASn0iVm5dgEXf57oenaTsc57oAk/I1pK2ndodrGT9EbK8UtTUr5zTaXSxVbEnXG7TAgF7TQz9gG0rtnYCy+I5zp58xx6L+6Mz961oBMJOo8Oq4sCichee2sMzFBBRAsQAFGUciioPCrcBAY89a18PaioJcnQG0pUvdPoyeRKlhnwDkDk9Trjtw8Yj4vc9v8Z9Y5kZaXLvtLG0D69TLUP24IRf9EYF42o9xKwlztEsO09DaJ2Kx192EqfxINzoI5EPHedeRAjGW4bGFcs3ixI3054xG5pOUCAbdB602oSFHLoAwDIaJ2r8TxKLmPFrYrZtsTVqipwds1QJKagmIXkTR2+qESm+rDiBzftPPM8qc/jwf/DHTgnJWbLYCW44DwVGCsQBAY89a1/WUmFKJ04SNKv+DKYextWHYS9ORMuM0G4ZWK+tTFlA/wUEORUHyEdp3iZBFAcvGKD2jmJAE7EgdGGWE5QXhQb2apCm0lgJOafzgh9OTqBrDKvCEflnpOFbH82BiPBmvsbYMACCz7fJlvKBSoTvPqRklD65u7zkI9QwquHWQEZG0eilWRz2tPqpn+b5PQqp+DlXOJouUFtOJNEwK2EcLzmIu89Y+g2yz6SADhJLa1fDgBRC/D6/Q3g4uGaA2nFOqQqRAgGPPWtfgr08/cQPT4MAeXKWt+k9hFpkMGpG8iTBzohelTT3tKze6Ml9+Nd6i2L+J+bW0WBn6pbSoCL7JvzhIhcCE59UXiCyhJ610qN7NuVhP/vhmjgUWQFankbaijLb4nJY7s8yfSR+JNUiXD2s7KCybtcN2OGGmyDmWE9zzCjbq59UrOdO4QOIW0P1twqJqJHz/82N8sZBXwGtmXR7q4xEYCOGlp1iTL3rRaBLimQ77xHqmFsdGYvt9CY6Z+GeLEFloejl1Vv7qgs4yIPd4+2vU9BpkKfmVjVlZdmv5KewcYOgqvCCVzafCJCHGh5QliQ2WW/zA04RP0yNpU5PbeFJBifOrrtEC5KXPRwkBINpwgrMAQGPPWtfzSnvzxcj4Btet8cqQ9IHRWrkP/YKJUKr6ns8PGFNnrU8HUosST3a8w8u6kVOq0nNjZ7F27jl4NFkZt3QbSlrwPbVxop0tQZCob6GW6kTeIYQKVoJmyzi0K7N8M+p0aSH3/1ugBMiPkvK7sx5UX7nZhR5d6EnLoQhJQ2u2xknBRkiSqq3KR+de7LZ/gaXmAdItIm8+qxIlszTbnjGy8HLTIi8VucjAZ7XY8PkovZi2dMhRTjBYYod35WZPct1M8fT6dpCuDfqOQopAY89a19hh0VdSteq4lwjlobzAgxiO6Mb72cG/0wAlrn3/EXb5Y4oE3I=\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"ClwBjz1rXykuJYxUCjaV6sncDLrNIMNr5KdVMqd5fw9eCFPo2mQC3jFOvMSAI30wCImL+hBHCKjEofGhWM+/Rm2r/hkx7MKd9c67um8eF2nTRrcm9DrXCwoTMq73awpsAY89a18dnUwGZUJGFbDBeSBweAARJn6+cHtzjFrd7gRFVsi+Npx9Vx+bdJYH7SR10rXlwdxkD2jHCrqbDrxL/grA0KnbLXTM20Jnfp3kvoIGvc9/PfikzPn+Yo6TmeYUgi0VGg9KOTU6gz2zCp8BAY89a1/118Q6OaseE+GULxfYyKfqhKoTpoxOVFBCxMGcRGJoyE8B5WnLOUgK57pXWXioW/rRn+yxIDNSzbKxkkioMyCPdx0EJ4ygtre0kLihAVvUc888GwQ2BQTgnKXDEMgSnLUxopzEkkfB9cFXFynVWAI011UtbRnAc8SGuBdRauHmUS7IoRBDFLKazeZ85cqepnInWAzdylWAr/OLCpABAY89a1+LC9GQp4Q1hl93rWiqEhYPnhUetAAe3vJzPZnfcpNZ1sP7WB2ASn0iVm5dgEXf57oenaTsc57oAk/I1pK2ndodrGT9EbK8UtTUr5zTaXSxVbEnXG7TAgF7TQz9gG0rtnYCy+I5zp58xx6L+6Mz961oBMJOo8Oq4sCichee2sMzFBBRAsQAFGUciioPCrcBAY89a18PaioJcnQG0pUvdPoyeRKlhnwDkDk9Trjtw8Yj4vc9v8Z9Y5kZaXLvtLG0D69TLUP24IRf9EYF42o9xKwlztEsO09DaJ2Kx192EqfxINzoI5EPHedeRAjGW4bGFcs3ixI3054xG5pOUCAbdB602oSFHLoAwDIaJ2r8TxKLmPFrYrZtsTVqipwds1QJKagmIXkTR2+qESm+rDiBzftPPM8qc/jwf/DHTgnJWbLYCW44DwVGCsQBAY89a1/WUmFKJ04SNKv+DKYextWHYS9ORMuM0G4ZWK+tTFlA/wUEORUHyEdp3iZBFAcvGKD2jmJAE7EgdGGWE5QXhQb2apCm0lgJOafzgh9OTqBrDKvCEflnpOFbH82BiPBmvsbYMACCz7fJlvKBSoTvPqRklD65u7zkI9QwquHWQEZG0eilWRz2tPqpn+b5PQqp+DlXOJouUFtOJNEwK2EcLzmIu89Y+g2yz6SADhJLa1fDgBRC/D6/Q3g4uGaA2nFOqQqRAgGPPWtfgr08/cQPT4MAeXKWt+k9hFpkMGpG8iTBzohelTT3tKze6Ml9+Nd6i2L+J+bW0WBn6pbSoCL7JvzhIhcCE59UXiCyhJ610qN7NuVhP/vhmjgUWQFankbaijLb4nJY7s8yfSR+JNUiXD2s7KCybtcN2OGGmyDmWE9zzCjbq59UrOdO4QOIW0P1twqJqJHz/82N8sZBXwGtmXR7q4xEYCOGlp1iTL3rRaBLimQ77xHqmFsdGYvt9CY6Z+GeLEFloejl1Vv7qgs4yIPd4+2vU9BpkKfmVjVlZdmv5KewcYOgqvCCVzafCJCHGh5QliQ2WW/zA04RP0yNpU5PbeFJBifOrrtEC5KXPRwkBINpwgrMAQGPPWtfzSnvzxcj4Btet8cqQ9IHRWrkP/YKJUKr6ns8PGFNnrU8HUosST3a8w8u6kVOq0nNjZ7F27jl4NFkZt3QbSlrwPbVxop0tQZCob6GW6kTeIYQKVoJmyzi0K7N8M+p0aSH3/1ugBMiPkvK7sx5UX7nZhR5d6EnLoQhJQ2u2xknBRkiSqq3KR+de7LZ/gaXmAdItIm8+qxIlszTbnjGy8HLTIi8VucjAZ7XY8PkovZi2dMhRTjBYYod35WZPct1M8fT6dpCuDfqOQopAY89a19hh0VdSteq4lwjlobzAgxiO6Mb72cG/0wAlrn3/EXb5Y4oE3I=\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"ClwBjz1rXykuJYxUCjaV6sncDLrNIMNr5KdVMqd5fw9eCFPo2mQC3jFOvMSAI30wCImL+hBHCKjEofGhWM+/Rm2r/hkx7MKd9c67um8eF2nTRrcm9DrXCwoTMq73awpsAY89a18dnUwGZUJGFbDBeSBweAARJn6+cHtzjFrd7gRFVsi+Npx9Vx+bdJYH7SR10rXlwdxkD2jHCrqbDrxL/grA0KnbLXTM20Jnfp3kvoIGvc9/PfikzPn+Yo6TmeYUgi0VGg9KOTU6gz2zCp8BAY89a1/118Q6OaseE+GULxfYyKfqhKoTpoxOVFBCxMGcRGJoyE8B5WnLOUgK57pXWXioW/rRn+yxIDNSzbKxkkioMyCPdx0EJ4ygtre0kLihAVvUc888GwQ2BQTgnKXDEMgSnLUxopzEkkfB9cFXFynVWAI011UtbRnAc8SGuBdRauHmUS7IoRBDFLKazeZ85cqepnInWAzdylWAr/OLCpABAY89a1+LC9GQp4Q1hl93rWiqEhYPnhUetAAe3vJzPZnfcpNZ1sP7WB2ASn0iVm5dgEXf57oenaTsc57oAk/I1pK2ndodrGT9EbK8UtTUr5zTaXSxVbEnXG7TAgF7TQz9gG0rtnYCy+I5zp58xx6L+6Mz961oBMJOo8Oq4sCichee2sMzFBBRAsQAFGUciioPCrcBAY89a18PaioJcnQG0pUvdPoyeRKlhnwDkDk9Trjtw8Yj4vc9v8Z9Y5kZaXLvtLG0D69TLUP24IRf9EYF42o9xKwlztEsO09DaJ2Kx192EqfxINzoI5EPHedeRAjGW4bGFcs3ixI3054xG5pOUCAbdB602oSFHLoAwDIaJ2r8TxKLmPFrYrZtsTVqipwds1QJKagmIXkTR2+qESm+rDiBzftPPM8qc/jwf/DHTgnJWbLYCW44DwVGCsQBAY89a1/WUmFKJ04SNKv+DKYextWHYS9ORMuM0G4ZWK+tTFlA/wUEORUHyEdp3iZBFAcvGKD2jmJAE7EgdGGWE5QXhQb2apCm0lgJOafzgh9OTqBrDKvCEflnpOFbH82BiPBmvsbYMACCz7fJlvKBSoTvPqRklD65u7zkI9QwquHWQEZG0eilWRz2tPqpn+b5PQqp+DlXOJouUFtOJNEwK2EcLzmIu89Y+g2yz6SADhJLa1fDgBRC/D6/Q3g4uGaA2nFOqQqRAgGPPWtfgr08/cQPT4MAeXKWt+k9hFpkMGpG8iTBzohelTT3tKze6Ml9+Nd6i2L+J+bW0WBn6pbSoCL7JvzhIhcCE59UXiCyhJ610qN7NuVhP/vhmjgUWQFankbaijLb4nJY7s8yfSR+JNUiXD2s7KCybtcN2OGGmyDmWE9zzCjbq59UrOdO4QOIW0P1twqJqJHz/82N8sZBXwGtmXR7q4xEYCOGlp1iTL3rRaBLimQ77xHqmFsdGYvt9CY6Z+GeLEFloejl1Vv7qgs4yIPd4+2vU9BpkKfmVjVlZdmv5KewcYOgqvCCVzafCJCHGh5QliQ2WW/zA04RP0yNpU5PbeFJBifOrrtEC5KXPRwkBINpwgrMAQGPPWtfzSnvzxcj4Btet8cqQ9IHRWrkP/YKJUKr6ns8PGFNnrU8HUosST3a8w8u6kVOq0nNjZ7F27jl4NFkZt3QbSlrwPbVxop0tQZCob6GW6kTeIYQKVoJmyzi0K7N8M+p0aSH3/1ugBMiPkvK7sx5UX7nZhR5d6EnLoQhJQ2u2xknBRkiSqq3KR+de7LZ/gaXmAdItIm8+qxIlszTbnjGy8HLTIi8VucjAZ7XY8PkovZi2dMhRTjBYYod35WZPct1M8fT6dpCuDfqOQopAY89a19hh0VdSteq4lwjlobzAgxiO6Mb72cG/0wAlrn3/EXb5Y4oE3I=\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data_json": {
+          "id": "gen-1773000846-6LcG0Rz2dbP0mHtPJMSx",
+          "object": "chat.completion.chunk",
+          "created": 1773000846,
+          "model": "google/gemini-3-pro-preview-20251117",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": null,
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.encrypted",
+                    "data": "ClwBjz1rXykuJYxUCjaV6sncDLrNIMNr5KdVMqd5fw9eCFPo2mQC3jFOvMSAI30wCImL+hBHCKjEofGhWM+/Rm2r/hkx7MKd9c67um8eF2nTRrcm9DrXCwoTMq73awpsAY89a18dnUwGZUJGFbDBeSBweAARJn6+cHtzjFrd7gRFVsi+Npx9Vx+bdJYH7SR10rXlwdxkD2jHCrqbDrxL/grA0KnbLXTM20Jnfp3kvoIGvc9/PfikzPn+Yo6TmeYUgi0VGg9KOTU6gz2zCp8BAY89a1/118Q6OaseE+GULxfYyKfqhKoTpoxOVFBCxMGcRGJoyE8B5WnLOUgK57pXWXioW/rRn+yxIDNSzbKxkkioMyCPdx0EJ4ygtre0kLihAVvUc888GwQ2BQTgnKXDEMgSnLUxopzEkkfB9cFXFynVWAI011UtbRnAc8SGuBdRauHmUS7IoRBDFLKazeZ85cqepnInWAzdylWAr/OLCpABAY89a1+LC9GQp4Q1hl93rWiqEhYPnhUetAAe3vJzPZnfcpNZ1sP7WB2ASn0iVm5dgEXf57oenaTsc57oAk/I1pK2ndodrGT9EbK8UtTUr5zTaXSxVbEnXG7TAgF7TQz9gG0rtnYCy+I5zp58xx6L+6Mz961oBMJOo8Oq4sCichee2sMzFBBRAsQAFGUciioPCrcBAY89a18PaioJcnQG0pUvdPoyeRKlhnwDkDk9Trjtw8Yj4vc9v8Z9Y5kZaXLvtLG0D69TLUP24IRf9EYF42o9xKwlztEsO09DaJ2Kx192EqfxINzoI5EPHedeRAjGW4bGFcs3ixI3054xG5pOUCAbdB602oSFHLoAwDIaJ2r8TxKLmPFrYrZtsTVqipwds1QJKagmIXkTR2+qESm+rDiBzftPPM8qc/jwf/DHTgnJWbLYCW44DwVGCsQBAY89a1/WUmFKJ04SNKv+DKYextWHYS9ORMuM0G4ZWK+tTFlA/wUEORUHyEdp3iZBFAcvGKD2jmJAE7EgdGGWE5QXhQb2apCm0lgJOafzgh9OTqBrDKvCEflnpOFbH82BiPBmvsbYMACCz7fJlvKBSoTvPqRklD65u7zkI9QwquHWQEZG0eilWRz2tPqpn+b5PQqp+DlXOJouUFtOJNEwK2EcLzmIu89Y+g2yz6SADhJLa1fDgBRC/D6/Q3g4uGaA2nFOqQqRAgGPPWtfgr08/cQPT4MAeXKWt+k9hFpkMGpG8iTBzohelTT3tKze6Ml9+Nd6i2L+J+bW0WBn6pbSoCL7JvzhIhcCE59UXiCyhJ610qN7NuVhP/vhmjgUWQFankbaijLb4nJY7s8yfSR+JNUiXD2s7KCybtcN2OGGmyDmWE9zzCjbq59UrOdO4QOIW0P1twqJqJHz/82N8sZBXwGtmXR7q4xEYCOGlp1iTL3rRaBLimQ77xHqmFsdGYvt9CY6Z+GeLEFloejl1Vv7qgs4yIPd4+2vU9BpkKfmVjVlZdmv5KewcYOgqvCCVzafCJCHGh5QliQ2WW/zA04RP0yNpU5PbeFJBifOrrtEC5KXPRwkBINpwgrMAQGPPWtfzSnvzxcj4Btet8cqQ9IHRWrkP/YKJUKr6ns8PGFNnrU8HUosST3a8w8u6kVOq0nNjZ7F27jl4NFkZt3QbSlrwPbVxop0tQZCob6GW6kTeIYQKVoJmyzi0K7N8M+p0aSH3/1ugBMiPkvK7sx5UX7nZhR5d6EnLoQhJQ2u2xknBRkiSqq3KR+de7LZ/gaXmAdItIm8+qxIlszTbnjGy8HLTIi8VucjAZ7XY8PkovZi2dMhRTjBYYod35WZPct1M8fT6dpCuDfqOQopAY89a19hh0VdSteq4lwjlobzAgxiO6Mb72cG/0wAlrn3/EXb5Y4oE3I=",
+                    "format": "google-gemini-v1",
+                    "index": 0
+                  }
+                ]
+              },
+              "finish_reason": null,
+              "native_finish_reason": null
+            }
+          ]
+        }
+      },
+      {
+        "index": 19,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}",
+        "data_json": {
+          "id": "gen-1773000846-6LcG0Rz2dbP0mHtPJMSx",
+          "object": "chat.completion.chunk",
+          "created": 1773000846,
+          "model": "google/gemini-3-pro-preview-20251117",
+          "provider": "Google",
+          "choices": [
+            {
+              "index": 0,
+              "delta": {
+                "content": "",
+                "role": "assistant",
+                "reasoning": null
+              },
+              "finish_reason": "stop",
+              "native_finish_reason": "STOP"
+            }
+          ]
+        }
+      },
+      {
+        "index": 20,
+        "event": null,
+        "data": "{\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":336,\"total_tokens\":366,\"cost\":0.004092,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.004092,\"upstream_inference_prompt_cost\":0.00006,\"upstream_inference_completions_cost\":0.004032},\"completion_tokens_details\":{\"reasoning_tokens\":329,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data_lines": [
+          "{\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":336,\"total_tokens\":366,\"cost\":0.004092,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.004092,\"upstream_inference_prompt_cost\":0.00006,\"upstream_inference_completions_cost\":0.004032},\"completion_tokens_details\":{\"reasoning_tokens\":329,\"image_tokens\":0,\"audio_tokens\":0}}}"
+        ],
+        "raw": "data: {\"id\":\"gen-1773000846-6LcG0Rz2dbP0mHtPJMSx\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3-pro-preview-20251117\",\"provider\":\"Google\",\"choices\":[],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":336,\"total_tokens\":366,\"cost\":0.004092,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.004092,\"upstream_inference_prompt_cost\":0.00006,\"upstream_inference_completions_cost\":0.004032},\"completion_tokens_details\":{\"reasoning_tokens\":329,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data_json": {
+          "id": "gen-1773000846-6LcG0Rz2dbP0mHtPJMSx",
+          "object": "chat.completion.chunk",
+          "created": 1773000846,
+          "model": "google/gemini-3-pro-preview-20251117",
+          "provider": "Google",
+          "choices": [],
+          "usage": {
+            "prompt_tokens": 30,
+            "completion_tokens": 336,
+            "total_tokens": 366,
+            "cost": 0.004092,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.004092,
+              "upstream_inference_prompt_cost": 0.00006,
+              "upstream_inference_completions_cost": 0.004032
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 329,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "index": 21,
+        "event": null,
+        "data": "[DONE]",
+        "data_lines": [
+          "[DONE]"
+        ],
+        "raw": "data: [DONE]"
+      }
+    ]
+  }
+}
