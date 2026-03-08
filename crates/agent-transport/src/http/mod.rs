@@ -1,5 +1,7 @@
 mod builder;
+mod headers;
 mod request;
+mod response;
 mod retry_policy;
 mod sse;
 mod transport;

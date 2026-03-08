@@ -6,11 +6,11 @@ use crate::http::transport::HttpTransport;
 
 #[derive(Clone)]
 pub struct HttpTransportBuilder {
-    pub client: reqwest::Client,
-    pub retry_policy: RetryPolicy,
-    pub request_timeout: Duration,
-    pub stream_timeout: Duration,
-    pub sse_limits: SseLimits,
+    pub(crate) client: reqwest::Client,
+    pub(crate) retry_policy: RetryPolicy,
+    pub(crate) request_timeout: Duration,
+    pub(crate) stream_timeout: Duration,
+    pub(crate) sse_limits: SseLimits,
 }
 
 impl HttpTransportBuilder {
