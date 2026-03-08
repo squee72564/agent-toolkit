@@ -1,7 +1,7 @@
 use std::error::Error as StdError;
 use std::fmt;
 
-use agent_toolkit::tools::{ToolBuilder, ToolOutput, ToolRegistry, ToolRegistryError};
+use agent_toolkit::tools::{ToolBuilder, ToolOutput, ToolRegistry, ToolRuntime, ToolRuntimeError};
 use agent_toolkit::{ContentPart, Conversation, MessageCreateInput, Response, ToolChoice};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -9,13 +9,13 @@ use serde_json::json;
 
 #[derive(Debug)]
 pub enum ToolLoopError {
-    Registry(ToolRegistryError),
+    Runtime(ToolRuntimeError),
 }
 
 impl fmt::Display for ToolLoopError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Registry(error) => write!(f, "tool registry error: {error}"),
+            Self::Runtime(error) => write!(f, "tool runtime error: {error}"),
         }
     }
 }
@@ -23,14 +23,14 @@ impl fmt::Display for ToolLoopError {
 impl StdError for ToolLoopError {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
-            Self::Registry(error) => Some(error),
+            Self::Runtime(error) => Some(error),
         }
     }
 }
 
-impl From<ToolRegistryError> for ToolLoopError {
-    fn from(value: ToolRegistryError) -> Self {
-        Self::Registry(value)
+impl From<ToolRuntimeError> for ToolLoopError {
+    fn from(value: ToolRuntimeError) -> Self {
+        Self::Runtime(value)
     }
 }
 
@@ -50,6 +50,7 @@ pub async fn orchestrate_tool_calls(
     if tool_calls.is_empty() {
         return Ok(None);
     }
+    let runtime = ToolRuntime::new(registry);
 
     for tool_call in tool_calls {
         conversation.push_assistant_tool_call(
@@ -58,8 +59,8 @@ pub async fn orchestrate_tool_calls(
             tool_call.arguments_json.clone(),
         );
 
-        let output = registry
-            .execute_validated(&tool_call.name, tool_call.arguments_json)
+        let output = runtime
+            .execute(&tool_call.name, tool_call.arguments_json)
             .await?;
 
         conversation.push_tool_result_json(tool_call.id, output.content);
@@ -172,13 +173,15 @@ struct TypedEchoOut {
 pub async fn execute_raw_echo(
     registry: &ToolRegistry,
     value: serde_json::Value,
-) -> Result<ToolOutput, ToolRegistryError> {
-    registry.execute_validated("raw_echo", value).await
+) -> Result<ToolOutput, ToolRuntimeError> {
+    ToolRuntime::new(registry).execute("raw_echo", value).await
 }
 
 pub async fn execute_typed_echo(
     registry: &ToolRegistry,
     value: serde_json::Value,
-) -> Result<ToolOutput, ToolRegistryError> {
-    registry.execute_validated("typed_echo", value).await
+) -> Result<ToolOutput, ToolRuntimeError> {
+    ToolRuntime::new(registry)
+        .execute("typed_echo", value)
+        .await
 }
