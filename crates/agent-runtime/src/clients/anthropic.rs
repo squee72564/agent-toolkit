@@ -80,8 +80,13 @@ impl AnthropicClientBuilder {
         self
     }
 
-    pub fn timeout(mut self, timeout: Duration) -> Self {
-        self.inner.timeout = Some(timeout);
+    pub fn request_timeout(mut self, timeout: Duration) -> Self {
+        self.inner.request_timeout = Some(timeout);
+        self
+    }
+
+    pub fn stream_timeout(mut self, timeout: Duration) -> Self {
+        self.inner.stream_timeout = Some(timeout);
         self
     }
 

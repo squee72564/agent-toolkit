@@ -85,8 +85,8 @@ impl ProviderRuntime {
                     provider: self.provider,
                     model: selected_model,
                     success: true,
-                    status_code: Some(http_response.status.as_u16()),
-                    request_id: http_response.request_id.clone(),
+                    status_code: Some(http_response.head.status.as_u16()),
+                    request_id: http_response.head.request_id.clone(),
                     error_kind: None,
                     error_message: None,
                 },
@@ -169,10 +169,10 @@ impl ProviderRuntime {
     ) -> RuntimeError {
         if let Some(response) = response {
             if adapter_error.status_code.is_none() {
-                adapter_error.status_code = Some(response.status.as_u16());
+                adapter_error.status_code = Some(response.head.status.as_u16());
             }
             if adapter_error.request_id.is_none() {
-                adapter_error.request_id = response.request_id.clone();
+                adapter_error.request_id = response.head.request_id.clone();
             }
             if adapter_error.provider_code.is_none() {
                 adapter_error.provider_code = extract_provider_code(&response.body);

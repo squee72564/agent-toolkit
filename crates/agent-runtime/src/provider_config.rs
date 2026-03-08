@@ -8,7 +8,8 @@ pub struct ProviderConfig {
     pub base_url: Option<String>,
     pub default_model: Option<String>,
     pub retry_policy: Option<RetryPolicy>,
-    pub timeout: Option<Duration>,
+    pub request_timeout: Option<Duration>,
+    pub stream_timeout: Option<Duration>,
 }
 
 impl ProviderConfig {
@@ -34,8 +35,13 @@ impl ProviderConfig {
         self
     }
 
-    pub fn with_timeout(mut self, timeout: Duration) -> Self {
-        self.timeout = Some(timeout);
+    pub fn with_request_timeout(mut self, timeout: Duration) -> Self {
+        self.request_timeout = Some(timeout);
+        self
+    }
+
+    pub fn with_stream_timeout(mut self, timeout: Duration) -> Self {
+        self.stream_timeout = Some(timeout);
         self
     }
 }

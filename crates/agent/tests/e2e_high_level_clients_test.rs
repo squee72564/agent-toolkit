@@ -151,7 +151,8 @@ async fn openrouter_tool_enabled_flow_handles_tool_orchestration_and_meta() {
         .api_key("test-openrouter-key")
         .base_url(server.base_url())
         .default_model("openai.gpt-5-mini")
-        .timeout(Duration::from_secs(2))
+        .request_timeout(Duration::from_secs(2))
+        .stream_timeout(Duration::from_secs(2))
         .build()
         .expect("build openrouter client");
 
