@@ -31,6 +31,20 @@ pub struct RuntimeError {
     pub source: Option<Box<dyn StdError + Send + Sync>>,
 }
 
+impl Clone for RuntimeError {
+    fn clone(&self) -> Self {
+        Self {
+            kind: self.kind,
+            message: self.message.clone(),
+            provider: self.provider,
+            status_code: self.status_code,
+            request_id: self.request_id.clone(),
+            provider_code: self.provider_code.clone(),
+            source: None,
+        }
+    }
+}
+
 impl RuntimeError {
     pub fn configuration(message: impl Into<String>) -> Self {
         Self {

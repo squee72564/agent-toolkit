@@ -21,6 +21,7 @@ mod observer_test;
 mod provider_stream_runtime_test;
 mod runtime_error_test;
 mod send_options_test;
+mod streaming_api_test;
 
 fn runtime_error(
     kind: RuntimeErrorKind,

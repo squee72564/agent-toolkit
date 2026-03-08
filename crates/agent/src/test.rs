@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use super::{
     AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, HttpJsonResponse, ProviderId,
-    RequestEndEvent, RequestStartEvent, RetryPolicy, RuntimeObserver, core, protocols, runtime,
-    tools, transport,
+    RequestEndEvent, RequestStartEvent, RetryPolicy, RuntimeObserver, StreamCompletion, core,
+    protocols, runtime, tools, transport,
 };
 
 #[test]
@@ -110,6 +110,16 @@ fn top_level_transport_reexports_are_constructible() {
     assert_eq!(retry.max_attempts, 3);
     assert_eq!(retry.initial_backoff, Duration::from_millis(100));
     assert_eq!(retry.max_backoff, Duration::from_millis(2_000));
+}
+
+#[test]
+fn streaming_reexports_are_accessible() {
+    fn assert_streaming_type<T>() {}
+
+    assert_streaming_type::<super::DirectStreamingApi<'static>>();
+    assert_streaming_type::<super::RoutedStreamingApi<'static>>();
+    assert_streaming_type::<super::MessageResponseStream>();
+    assert_streaming_type::<StreamCompletion>();
 }
 
 #[derive(Debug)]

@@ -37,51 +37,53 @@ impl ProviderStreamRuntime {
         )
     }
 
-    pub(crate) async fn execute(
+    pub(crate) async fn next_envelope(
         &mut self,
-        mut response: HttpSseResponse,
+        response: &mut HttpSseResponse,
         projector: &mut dyn ProviderStreamProjector,
-        response_format: &ResponseFormat,
-        prepended_warnings: Vec<RuntimeWarning>,
-    ) -> Result<(Response, HttpJsonResponse), StreamRuntimeError> {
-        let mut transcript = Vec::new();
-
-        loop {
-            let Some(sse_event) = response.stream.next_event().await.map_err(|error| {
-                StreamRuntimeError::Transport {
+        operation: AdapterOperation,
+    ) -> Result<Option<CanonicalStreamEnvelope>, StreamRuntimeError> {
+        let Some(sse_event) =
+            response
+                .stream
+                .next_event()
+                .await
+                .map_err(|error| StreamRuntimeError::Transport {
                     error,
                     request_id: response.head.request_id.clone(),
                     status_code: Some(response.head.status.as_u16()),
-                }
-            })?
-            else {
-                break;
-            };
+                })?
+        else {
+            return Ok(None);
+        };
 
-            let raw = self.wrap_sse_event(sse_event);
-            let canonical =
-                projector
-                    .project(raw.clone())
-                    .map_err(|error| StreamRuntimeError::Adapter {
-                        error,
-                        request_id: response.head.request_id.clone(),
-                        status_code: Some(response.head.status.as_u16()),
-                    })?;
-            self.state
-                .apply_events(&canonical)
-                .map_err(|message| StreamRuntimeError::Adapter {
-                    error: AdapterError::new(
-                        AdapterErrorKind::ProtocolViolation,
-                        self.provider,
-                        AdapterOperation::FinalizeStream,
-                        message,
-                    ),
+        let raw = self.wrap_sse_event(sse_event);
+        let canonical =
+            projector
+                .project(raw.clone())
+                .map_err(|error| StreamRuntimeError::Adapter {
+                    error,
                     request_id: response.head.request_id.clone(),
                     status_code: Some(response.head.status.as_u16()),
                 })?;
-            transcript.push(CanonicalStreamEnvelope { raw, canonical });
-        }
+        self.apply_projected_events(
+            &canonical,
+            response.head.request_id.clone(),
+            Some(response.head.status.as_u16()),
+            operation,
+        )?;
+        Ok(Some(CanonicalStreamEnvelope { raw, canonical }))
+    }
 
+    pub(crate) fn finalize_response(
+        &mut self,
+        response: HttpSseResponse,
+        projector: &mut dyn ProviderStreamProjector,
+        response_format: &ResponseFormat,
+        prepended_warnings: Vec<RuntimeWarning>,
+        transcript: Vec<CanonicalStreamEnvelope>,
+        operation: AdapterOperation,
+    ) -> Result<(Response, HttpJsonResponse), StreamRuntimeError> {
         let final_events = projector
             .finish()
             .map_err(|error| StreamRuntimeError::Adapter {
@@ -89,18 +91,12 @@ impl ProviderStreamRuntime {
                 request_id: response.head.request_id.clone(),
                 status_code: Some(response.head.status.as_u16()),
             })?;
-        self.state
-            .apply_events(&final_events)
-            .map_err(|message| StreamRuntimeError::Adapter {
-                error: AdapterError::new(
-                    AdapterErrorKind::ProtocolViolation,
-                    self.provider,
-                    AdapterOperation::FinalizeStream,
-                    message,
-                ),
-                request_id: response.head.request_id.clone(),
-                status_code: Some(response.head.status.as_u16()),
-            })?;
+        self.apply_projected_events(
+            &final_events,
+            response.head.request_id.clone(),
+            Some(response.head.status.as_u16()),
+            operation,
+        )?;
 
         let state = std::mem::take(&mut self.state);
         let response_body = state.into_response(
@@ -119,6 +115,27 @@ impl ProviderStreamRuntime {
         };
 
         Ok((response_body, http_response))
+    }
+
+    fn apply_projected_events(
+        &mut self,
+        events: &[CanonicalStreamEvent],
+        request_id: Option<String>,
+        status_code: Option<u16>,
+        operation: AdapterOperation,
+    ) -> Result<(), StreamRuntimeError> {
+        self.state
+            .apply_events(events)
+            .map_err(|message| StreamRuntimeError::Adapter {
+                error: AdapterError::new(
+                    AdapterErrorKind::ProtocolViolation,
+                    self.provider,
+                    operation,
+                    message,
+                ),
+                request_id,
+                status_code,
+            })
     }
 }
 

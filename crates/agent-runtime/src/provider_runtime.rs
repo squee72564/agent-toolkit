@@ -1,11 +1,17 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use agent_core::{AdapterContext, AuthCredentials, PlatformConfig, ProviderId, Request, Response};
+use agent_core::{
+    AdapterContext, AuthCredentials, CanonicalStreamEnvelope, PlatformConfig, ProviderId, Request,
+    Response, ResponseFormat, RuntimeWarning,
+};
+use agent_providers::error::AdapterOperation;
 use agent_providers::request_plan::{ProviderResponseKind, ProviderTransportKind};
-use agent_providers::{adapter::ProviderAdapter, error::AdapterError};
+use agent_providers::{
+    adapter::ProviderAdapter, error::AdapterError, streaming::ProviderStreamProjector,
+};
 use agent_transport::{
     HttpJsonResponse, HttpRequestBody, HttpResponse, HttpResponseMode, HttpSendRequest,
-    HttpTransport,
+    HttpSseResponse, HttpTransport,
 };
 use reqwest::Method;
 
@@ -47,6 +53,74 @@ pub(crate) enum ProviderAttemptOutcome {
         error: RuntimeError,
         meta: AttemptMeta,
     },
+}
+
+pub(crate) enum ProviderStreamAttemptOutcome {
+    Opened {
+        stream: Box<OpenedProviderStream>,
+        meta: AttemptMeta,
+    },
+    Failure {
+        error: RuntimeError,
+        meta: AttemptMeta,
+    },
+}
+
+pub(crate) struct OpenedProviderStream {
+    provider: ProviderId,
+    response: HttpSseResponse,
+    response_format: ResponseFormat,
+    prepended_warnings: Vec<RuntimeWarning>,
+    projector: Box<dyn ProviderStreamProjector>,
+    runtime: ProviderStreamRuntime,
+    transcript: Vec<CanonicalStreamEnvelope>,
+}
+
+impl std::fmt::Debug for OpenedProviderStream {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OpenedProviderStream")
+            .finish_non_exhaustive()
+    }
+}
+
+impl OpenedProviderStream {
+    pub(crate) async fn next_envelope(
+        &mut self,
+    ) -> Result<Option<CanonicalStreamEnvelope>, RuntimeError> {
+        match self
+            .runtime
+            .next_envelope(
+                &mut self.response,
+                self.projector.as_mut(),
+                AdapterOperation::ProjectStreamEvent,
+            )
+            .await
+        {
+            Ok(Some(envelope)) => {
+                self.transcript.push(envelope.clone());
+                Ok(Some(envelope))
+            }
+            Ok(None) => Ok(None),
+            Err(error) => Err(map_stream_runtime_error(self.provider, error)),
+        }
+    }
+
+    pub(crate) fn finish(self) -> Result<(Response, HttpJsonResponse), RuntimeError> {
+        let provider = self.provider;
+        self.runtime_finalized()
+            .map_err(|error| map_stream_runtime_error(provider, error))
+    }
+
+    fn runtime_finalized(mut self) -> Result<(Response, HttpJsonResponse), StreamRuntimeError> {
+        self.runtime.finalize_response(
+            self.response,
+            self.projector.as_mut(),
+            &self.response_format,
+            self.prepended_warnings,
+            self.transcript,
+            AdapterOperation::FinalizeStream,
+        )
+    }
 }
 
 impl ProviderRuntime {
@@ -97,6 +171,67 @@ impl ProviderRuntime {
                 response,
             },
             Err(error) => ProviderAttemptOutcome::Failure {
+                meta: AttemptMeta {
+                    provider: self.provider,
+                    model: selected_model,
+                    success: false,
+                    status_code: error.status_code,
+                    request_id: error.request_id.clone(),
+                    error_kind: Some(error.kind),
+                    error_message: Some(error.message.clone()),
+                },
+                error,
+            },
+        }
+    }
+
+    pub(crate) async fn open_stream_attempt(
+        &self,
+        mut request: Request,
+        model_override: Option<&str>,
+        metadata: BTreeMap<String, String>,
+    ) -> ProviderStreamAttemptOutcome {
+        let selected_model = match self.resolve_model(&request.model_id, model_override) {
+            Ok(model) => model,
+            Err(error) => {
+                return ProviderStreamAttemptOutcome::Failure {
+                    meta: AttemptMeta {
+                        provider: self.provider,
+                        model: "<unset-model>".to_string(),
+                        success: false,
+                        status_code: None,
+                        request_id: None,
+                        error_kind: Some(error.kind),
+                        error_message: Some(error.message.clone()),
+                    },
+                    error,
+                };
+            }
+        };
+        request.model_id = selected_model.clone();
+
+        let adapter_context = AdapterContext {
+            metadata,
+            auth_token: Some(AuthCredentials::Token(self.auth_token.clone())),
+        };
+
+        match self
+            .execute_stream_open_attempt(request, &adapter_context)
+            .await
+        {
+            Ok(stream) => ProviderStreamAttemptOutcome::Opened {
+                meta: AttemptMeta {
+                    provider: self.provider,
+                    model: selected_model,
+                    success: true,
+                    status_code: Some(stream.response.head.status.as_u16()),
+                    request_id: stream.response.head.request_id.clone(),
+                    error_kind: None,
+                    error_message: None,
+                },
+                stream: Box::new(stream),
+            },
+            Err(error) => ProviderStreamAttemptOutcome::Failure {
                 meta: AttemptMeta {
                     provider: self.provider,
                     model: selected_model,
@@ -222,6 +357,47 @@ impl ProviderRuntime {
         url: &str,
         adapter_context: &AdapterContext,
     ) -> Result<(Response, HttpJsonResponse), RuntimeError> {
+        let mut stream = self
+            .open_sse_stream(plan, response_format.clone(), url, adapter_context)
+            .await?;
+        while stream.next_envelope().await?.is_some() {}
+        stream.finish()
+    }
+
+    async fn execute_stream_open_attempt(
+        &self,
+        request: Request,
+        adapter_context: &AdapterContext,
+    ) -> Result<OpenedProviderStream, RuntimeError> {
+        let response_format = request.response_format.clone();
+        let plan = self
+            .adapter
+            .plan_request(request)
+            .map_err(RuntimeError::from_adapter)?;
+        let endpoint_path = plan
+            .endpoint_path_override
+            .as_deref()
+            .unwrap_or(self.adapter.endpoint_path());
+        let url = join_url(&self.platform.base_url, endpoint_path);
+        match (plan.transport_kind, plan.response_kind) {
+            (ProviderTransportKind::HttpSse, ProviderResponseKind::RawProviderStream) => {
+                self.open_sse_stream(plan, response_format, &url, adapter_context)
+                    .await
+            }
+            (transport_kind, response_kind) => Err(RuntimeError::configuration(format!(
+                "streaming API requires an SSE stream plan for {:?}: transport={transport_kind:?}, response={response_kind:?}",
+                self.provider
+            ))),
+        }
+    }
+
+    async fn open_sse_stream(
+        &self,
+        plan: agent_providers::request_plan::ProviderRequestPlan,
+        response_format: ResponseFormat,
+        url: &str,
+        adapter_context: &AdapterContext,
+    ) -> Result<OpenedProviderStream, RuntimeError> {
         let body = serde_json::to_vec(&plan.body)
             .map(Into::into)
             .map(HttpRequestBody::Json)
@@ -231,7 +407,7 @@ impl ProviderRuntime {
                 ))
             })?;
 
-        let sse_response = match self
+        let response = match self
             .transport
             .send(HttpSendRequest {
                 platform: &self.platform,
@@ -249,47 +425,15 @@ impl ProviderRuntime {
             _ => unreachable!("SSE response mode must return an SSE response"),
         };
 
-        let mut projector = self.adapter.create_stream_projector();
-        let mut stream_runtime = ProviderStreamRuntime::new(self.provider);
-
-        match stream_runtime
-            .execute(
-                sse_response,
-                projector.as_mut(),
-                response_format,
-                plan.warnings,
-            )
-            .await
-        {
-            Ok(result) => Ok(result),
-            Err(StreamRuntimeError::Transport {
-                error,
-                request_id,
-                status_code,
-            }) => {
-                let mut runtime_error = RuntimeError::from_transport(self.provider, error);
-                if runtime_error.request_id.is_none() {
-                    runtime_error.request_id = request_id;
-                }
-                if runtime_error.status_code.is_none() {
-                    runtime_error.status_code = status_code;
-                }
-                Err(runtime_error)
-            }
-            Err(StreamRuntimeError::Adapter {
-                mut error,
-                request_id,
-                status_code,
-            }) => {
-                if error.request_id.is_none() {
-                    error.request_id = request_id;
-                }
-                if error.status_code.is_none() {
-                    error.status_code = status_code;
-                }
-                Err(RuntimeError::from_adapter(error))
-            }
-        }
+        Ok(OpenedProviderStream {
+            provider: self.provider,
+            response,
+            response_format,
+            prepended_warnings: plan.warnings,
+            projector: self.adapter.create_stream_projector(),
+            runtime: ProviderStreamRuntime::new(self.provider),
+            transcript: Vec::new(),
+        })
     }
 
     fn runtime_error_from_adapter(
@@ -309,6 +453,38 @@ impl ProviderRuntime {
             }
         }
         RuntimeError::from_adapter(adapter_error)
+    }
+}
+
+fn map_stream_runtime_error(provider: ProviderId, error: StreamRuntimeError) -> RuntimeError {
+    match error {
+        StreamRuntimeError::Transport {
+            error,
+            request_id,
+            status_code,
+        } => {
+            let mut runtime_error = RuntimeError::from_transport(provider, error);
+            if runtime_error.request_id.is_none() {
+                runtime_error.request_id = request_id;
+            }
+            if runtime_error.status_code.is_none() {
+                runtime_error.status_code = status_code;
+            }
+            runtime_error
+        }
+        StreamRuntimeError::Adapter {
+            mut error,
+            request_id,
+            status_code,
+        } => {
+            if error.request_id.is_none() {
+                error.request_id = request_id;
+            }
+            if error.status_code.is_none() {
+                error.status_code = status_code;
+            }
+            RuntimeError::from_adapter(error)
+        }
     }
 }
 

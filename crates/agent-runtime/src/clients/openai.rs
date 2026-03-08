@@ -5,6 +5,7 @@ use agent_transport::RetryPolicy;
 
 use crate::base_client_builder::BaseClientBuilder;
 use crate::direct_messages_api::DirectMessagesApi;
+use crate::direct_streaming_api::DirectStreamingApi;
 use crate::observer::RuntimeObserver;
 use crate::provider_client::ProviderClient;
 use crate::runtime_error::RuntimeError;
@@ -40,6 +41,10 @@ impl OpenAiClient {
 
     pub fn messages(&self) -> DirectMessagesApi<'_> {
         self.inner.messages()
+    }
+
+    pub fn streaming(&self) -> DirectStreamingApi<'_> {
+        self.inner.streaming()
     }
 
     pub async fn send(&self, request: Request) -> Result<Response, RuntimeError> {
