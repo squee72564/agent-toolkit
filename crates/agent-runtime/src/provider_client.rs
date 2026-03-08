@@ -13,28 +13,28 @@ use crate::types::{
 };
 
 #[derive(Debug, Clone)]
-pub struct ProviderClient {
-    pub runtime: Arc<ProviderRuntime>,
+pub(crate) struct ProviderClient {
+    pub(crate) runtime: Arc<ProviderRuntime>,
 }
 
 impl ProviderClient {
-    pub fn new(runtime: ProviderRuntime) -> Self {
+    pub(crate) fn new(runtime: ProviderRuntime) -> Self {
         Self {
             runtime: Arc::new(runtime),
         }
     }
 
     pub fn messages(&self) -> DirectMessagesApi<'_> {
-        DirectMessagesApi { client: self }
+        DirectMessagesApi::new(self)
     }
 
-    pub async fn create(&self, input: MessageCreateInput) -> Result<Response, RuntimeError> {
+    pub(crate) async fn create(&self, input: MessageCreateInput) -> Result<Response, RuntimeError> {
         self.create_with_meta(input)
             .await
             .map(|(response, _)| response)
     }
 
-    pub async fn create_with_meta(
+    pub(crate) async fn create_with_meta(
         &self,
         input: MessageCreateInput,
     ) -> Result<(Response, ResponseMeta), RuntimeError> {
@@ -43,13 +43,13 @@ impl ProviderClient {
         self.send_with_meta(request).await
     }
 
-    pub async fn send(&self, request: Request) -> Result<Response, RuntimeError> {
+    pub(crate) async fn send(&self, request: Request) -> Result<Response, RuntimeError> {
         self.send_with_meta(request)
             .await
             .map(|(response, _)| response)
     }
 
-    pub async fn send_with_meta(
+    pub(crate) async fn send_with_meta(
         &self,
         request: Request,
     ) -> Result<(Response, ResponseMeta), RuntimeError> {

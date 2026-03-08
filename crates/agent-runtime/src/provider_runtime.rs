@@ -9,14 +9,14 @@ use crate::runtime_error::RuntimeError;
 use crate::types::AttemptMeta;
 
 #[derive(Clone)]
-pub struct ProviderRuntime {
-    pub provider: ProviderId,
-    pub adapter: &'static dyn ProviderAdapter,
-    pub platform: PlatformConfig,
-    pub auth_token: String,
-    pub default_model: Option<String>,
-    pub transport: HttpTransport,
-    pub observer: Option<Arc<dyn RuntimeObserver>>,
+pub(crate) struct ProviderRuntime {
+    pub(crate) provider: ProviderId,
+    pub(crate) adapter: &'static dyn ProviderAdapter,
+    pub(crate) platform: PlatformConfig,
+    pub(crate) auth_token: String,
+    pub(crate) default_model: Option<String>,
+    pub(crate) transport: HttpTransport,
+    pub(crate) observer: Option<Arc<dyn RuntimeObserver>>,
 }
 
 impl std::fmt::Debug for ProviderRuntime {
@@ -32,7 +32,7 @@ impl std::fmt::Debug for ProviderRuntime {
     }
 }
 
-pub enum ProviderAttemptOutcome {
+pub(crate) enum ProviderAttemptOutcome {
     Success {
         response: Response,
         meta: AttemptMeta,
@@ -44,7 +44,7 @@ pub enum ProviderAttemptOutcome {
 }
 
 impl ProviderRuntime {
-    pub async fn execute_attempt(
+    pub(crate) async fn execute_attempt(
         &self,
         mut request: Request,
         model_override: Option<&str>,

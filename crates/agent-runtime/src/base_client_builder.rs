@@ -10,18 +10,18 @@ use crate::provider_runtime::ProviderRuntime;
 use crate::runtime_error::RuntimeError;
 
 #[derive(Clone, Default)]
-pub struct BaseClientBuilder {
-    pub api_key: Option<String>,
-    pub base_url: Option<String>,
-    pub default_model: Option<String>,
-    pub retry_policy: Option<RetryPolicy>,
-    pub timeout: Option<Duration>,
-    pub client: Option<reqwest::Client>,
-    pub observer: Option<Arc<dyn RuntimeObserver>>,
+pub(crate) struct BaseClientBuilder {
+    pub(crate) api_key: Option<String>,
+    pub(crate) base_url: Option<String>,
+    pub(crate) default_model: Option<String>,
+    pub(crate) retry_policy: Option<RetryPolicy>,
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) client: Option<reqwest::Client>,
+    pub(crate) observer: Option<Arc<dyn RuntimeObserver>>,
 }
 
 impl BaseClientBuilder {
-    pub fn from_provider_config(config: ProviderConfig) -> Self {
+    pub(crate) fn from_provider_config(config: ProviderConfig) -> Self {
         Self {
             api_key: Some(config.api_key),
             base_url: config.base_url,
@@ -33,7 +33,10 @@ impl BaseClientBuilder {
         }
     }
 
-    pub fn build_runtime(self, provider: ProviderId) -> Result<ProviderRuntime, RuntimeError> {
+    pub(crate) fn build_runtime(
+        self,
+        provider: ProviderId,
+    ) -> Result<ProviderRuntime, RuntimeError> {
         let adapter = adapter_for(provider);
         let api_key = self.api_key.ok_or_else(|| {
             RuntimeError::configuration(format!("missing API key for provider {provider:?}"))

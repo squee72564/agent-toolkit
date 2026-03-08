@@ -3,10 +3,12 @@ use std::{sync::Arc, time::Duration};
 use agent_core::{ProviderId, Request, Response};
 use agent_transport::RetryPolicy;
 
-use crate::{
-    BaseClientBuilder, ResponseMeta, RuntimeError, RuntimeObserver,
-    direct_messages_api::DirectMessagesApi, provider_client::ProviderClient,
-};
+use crate::base_client_builder::BaseClientBuilder;
+use crate::direct_messages_api::DirectMessagesApi;
+use crate::observer::RuntimeObserver;
+use crate::provider_client::ProviderClient;
+use crate::runtime_error::RuntimeError;
+use crate::types::ResponseMeta;
 
 const OPENROUTER_API_KEY_ENV: &str = "OPENROUTER_API_KEY";
 const OPENROUTER_BASE_URL_ENV: &str = "OPENROUTER_BASE_URL";

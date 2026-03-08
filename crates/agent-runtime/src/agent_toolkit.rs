@@ -18,8 +18,8 @@ use crate::types::{
 
 #[derive(Clone)]
 pub struct AgentToolkit {
-    pub clients: HashMap<ProviderId, ProviderClient>,
-    pub observer: Option<Arc<dyn RuntimeObserver>>,
+    pub(crate) clients: HashMap<ProviderId, ProviderClient>,
+    pub(crate) observer: Option<Arc<dyn RuntimeObserver>>,
 }
 
 impl std::fmt::Debug for AgentToolkit {
@@ -37,7 +37,7 @@ impl AgentToolkit {
     }
 
     pub fn messages(&self) -> RoutedMessagesApi<'_> {
-        RoutedMessagesApi { toolkit: self }
+        RoutedMessagesApi::new(self)
     }
 
     pub async fn send(

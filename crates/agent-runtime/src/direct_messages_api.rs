@@ -7,10 +7,14 @@ use crate::types::ResponseMeta;
 
 #[derive(Debug, Clone)]
 pub struct DirectMessagesApi<'a> {
-    pub client: &'a ProviderClient,
+    client: &'a ProviderClient,
 }
 
 impl DirectMessagesApi<'_> {
+    pub(crate) fn new(client: &ProviderClient) -> DirectMessagesApi<'_> {
+        DirectMessagesApi { client }
+    }
+
     pub async fn create(
         &self,
         input: impl Into<MessageCreateInput>,

@@ -1,4 +1,5 @@
 use super::*;
+use crate::observer::resolve_observer_for_request;
 
 #[test]
 fn resolve_observer_for_request_uses_expected_precedence() {

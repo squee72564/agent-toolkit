@@ -8,10 +8,14 @@ use crate::types::ResponseMeta;
 
 #[derive(Debug, Clone)]
 pub struct RoutedMessagesApi<'a> {
-    pub toolkit: &'a AgentToolkit,
+    toolkit: &'a AgentToolkit,
 }
 
 impl RoutedMessagesApi<'_> {
+    pub(crate) fn new(toolkit: &AgentToolkit) -> RoutedMessagesApi<'_> {
+        RoutedMessagesApi { toolkit }
+    }
+
     pub async fn create(
         &self,
         input: impl Into<MessageCreateInput>,

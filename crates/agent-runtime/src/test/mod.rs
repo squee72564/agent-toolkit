@@ -8,6 +8,9 @@ use agent_providers::adapter::adapter_for;
 use agent_transport::HttpTransport;
 use serde_json::json;
 
+use crate::provider_client::ProviderClient;
+use crate::provider_runtime::ProviderRuntime;
+
 use super::*;
 
 mod agent_toolkit_test;
