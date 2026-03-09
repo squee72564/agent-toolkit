@@ -262,23 +262,21 @@ fn anthropic_adapter_plan_request_and_decode_match_translator() {
 }
 
 #[test]
-fn openrouter_adapter_preserves_fallback_decode_warning() {
+fn openrouter_adapter_matches_direct_responses_decode() {
     let adapter = adapter_for(ProviderId::OpenRouter);
     let payload = json!({
-        "id": "chatcmpl-123",
-        "object": "chat.completion",
+        "status": "completed",
         "model": "openai/gpt-5-mini",
-        "choices": [{
-            "index": 0,
-            "finish_reason": "stop",
-            "message": {
-                "role": "assistant",
-                "content": "hello from openrouter format"
-            }
+        "output": [{
+            "type": "message",
+            "content": [{
+                "type": "output_text",
+                "text": "hello from openrouter format"
+            }]
         }],
         "usage": {
-            "prompt_tokens": 5,
-            "completion_tokens": 6,
+            "input_tokens": 5,
+            "output_tokens": 6,
             "total_tokens": 11
         }
     });
@@ -286,12 +284,7 @@ fn openrouter_adapter_preserves_fallback_decode_warning() {
     let response = adapter
         .decode_response_json(payload.clone(), &ResponseFormat::Text)
         .expect("decode should succeed");
-    assert!(
-        response
-            .warnings
-            .iter()
-            .any(|warning| warning.code == "openrouter.decode.fallback_chat_completions")
-    );
+    assert!(response.warnings.is_empty());
 
     let direct_response = openrouter_response::decode_response_json(payload, &ResponseFormat::Text)
         .expect("response decode should succeed");
@@ -336,7 +329,7 @@ fn openrouter_adapter_decode_error_maps_provider_operation_and_kind() {
     let adapter = adapter_for(ProviderId::OpenRouter);
     let error = adapter
         .decode_response_json(json!("invalid"), &ResponseFormat::Text)
-        .expect_err("decode should fail when both OpenAI and fallback decoding fail");
+        .expect_err("decode should fail for non-object payload");
 
     assert_adapter_error(
         error,

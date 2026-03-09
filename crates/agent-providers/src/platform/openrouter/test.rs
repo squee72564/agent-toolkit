@@ -4,9 +4,7 @@ use serde_json::{Map, json};
 
 use crate::error::{AdapterErrorKind, AdapterOperation};
 use agent_core::types::ProviderId;
-use agent_core::types::{
-    ContentPart, FinishReason, Message, MessageRole, Request, ResponseFormat, ToolChoice,
-};
+use agent_core::types::{ContentPart, Message, MessageRole, Request, ResponseFormat, ToolChoice};
 
 use super::{request, response};
 use crate::platform::openrouter::request::OpenRouterOverrides;
@@ -72,11 +70,7 @@ fn openrouter_decode_error_maps_into_adapter_error() {
     assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Decode);
-    assert!(
-        adapter_error
-            .message
-            .contains("openai-compatible decode failed")
-    );
+    assert!(!adapter_error.message.is_empty());
 }
 
 #[test]
@@ -263,18 +257,18 @@ fn openrouter_decode_uses_openai_path_when_payload_is_openai_compatible() {
     .expect("decode should succeed");
 
     assert_eq!(response.model, "openai/gpt-4.1-mini");
-    assert_eq!(response.output.content.len(), 1);
-    assert!(
-        response
-            .warnings
-            .iter()
-            .all(|w| w.code != "openrouter.decode.fallback_chat_completions")
+    assert_eq!(
+        response.output.content,
+        vec![ContentPart::Text {
+            text: "hello from openai format".to_string()
+        }]
     );
+    assert!(response.warnings.is_empty());
 }
 
 #[test]
-fn openrouter_decode_falls_back_to_chat_completions_shape() {
-    let response = response::decode_response_json(
+fn openrouter_decode_rejects_chat_completions_shape() {
+    let error = response::decode_response_json(
         json!({
             "id": "chatcmpl-123",
             "object": "chat.completion",
@@ -286,51 +280,18 @@ fn openrouter_decode_falls_back_to_chat_completions_shape() {
                     "role": "assistant",
                     "content": "hello from openrouter format"
                 }
-            }],
-            "usage": {
-                "prompt_tokens": 5,
-                "completion_tokens": 6,
-                "total_tokens": 11
-            }
-        }),
-        &ResponseFormat::Text,
-    )
-    .expect("decode should succeed");
-
-    assert_eq!(response.model, "openai/gpt-4.1-mini");
-    assert_eq!(
-        response.output.content,
-        vec![ContentPart::Text {
-            text: "hello from openrouter format".to_string()
-        }]
-    );
-    assert_eq!(response.usage.input_tokens, Some(5));
-    assert_eq!(response.usage.output_tokens, Some(6));
-    assert_eq!(response.usage.total_tokens, Some(11));
-    assert!(
-        response
-            .warnings
-            .iter()
-            .any(|w| w.code == "openrouter.decode.fallback_chat_completions")
-    );
-}
-
-#[test]
-fn openrouter_decode_returns_combined_error_when_both_paths_fail() {
-    let error = response::decode_response_json(
-        json!({
-            "choices": [{}]
+            }]
         }),
         &ResponseFormat::Text,
     )
     .expect_err("decode should fail");
 
-    assert!(error.message.contains("openai-compatible decode failed"));
-    assert!(error.message.contains("openrouter fallback decode failed"));
+    assert_eq!(error.kind, AdapterErrorKind::Decode);
+    assert!(!error.message.is_empty());
 }
 
 #[test]
-fn openrouter_decode_does_not_fallback_on_upstream_error() {
+fn openrouter_decode_maps_upstream_error_without_fallback_context() {
     let error = response::decode_response_json(
         json!({
             "error": {
@@ -342,234 +303,7 @@ fn openrouter_decode_does_not_fallback_on_upstream_error() {
     )
     .expect_err("decode should fail");
 
+    assert_eq!(error.kind, AdapterErrorKind::Upstream);
     assert!(error.message.contains("upstream hard failure"));
-    assert!(!error.message.contains("openrouter fallback decode failed"));
-    assert!(!error.message.contains("openai-compatible decode failed"));
-}
-
-#[test]
-fn openrouter_decode_tool_call_missing_id_generates_warning_and_synthetic_id() {
-    let response = response::decode_response_json(
-        json!({
-            "id": "chatcmpl-123",
-            "object": "chat.completion",
-            "model": "openai/gpt-4.1-mini",
-            "choices": [{
-                "index": 0,
-                "finish_reason": "tool_calls",
-                "message": {
-                    "role": "assistant",
-                    "tool_calls": [{
-                        "type": "function",
-                        "function": {
-                            "name": "lookup_weather",
-                            "arguments": "{\"city\":\"SF\"}"
-                        }
-                    }]
-                }
-            }]
-        }),
-        &ResponseFormat::Text,
-    )
-    .expect("decode should succeed");
-
-    assert_eq!(response.finish_reason, FinishReason::ToolCalls);
-    assert!(response.warnings.iter().any(|w| {
-        w.code == "openrouter.decode.missing_tool_call_id"
-            && w.message.contains("generated synthetic id")
-    }));
-    assert!(
-        response
-            .warnings
-            .iter()
-            .any(|w| w.code == "openrouter.decode.fallback_chat_completions")
-    );
-    assert!(response.output.content.iter().any(|part| {
-        matches!(
-            part,
-            ContentPart::ToolCall { tool_call } if tool_call.id == "openrouter_tool_call_0"
-                && tool_call.name == "lookup_weather"
-                && tool_call.arguments_json == json!({"city":"SF"})
-        )
-    }));
-}
-
-#[test]
-fn openrouter_decode_tool_call_missing_name_is_ignored_with_warning() {
-    let response = response::decode_response_json(
-        json!({
-            "id": "chatcmpl-123",
-            "object": "chat.completion",
-            "model": "openai/gpt-4.1-mini",
-            "choices": [{
-                "index": 0,
-                "finish_reason": "tool_calls",
-                "message": {
-                    "role": "assistant",
-                    "tool_calls": [{
-                        "id": "call_1",
-                        "type": "function",
-                        "function": {
-                            "arguments": "{\"city\":\"SF\"}"
-                        }
-                    }]
-                }
-            }]
-        }),
-        &ResponseFormat::Text,
-    )
-    .expect("decode should succeed");
-
-    assert!(
-        !response
-            .output
-            .content
-            .iter()
-            .any(|part| matches!(part, ContentPart::ToolCall { .. }))
-    );
-    assert!(
-        response
-            .warnings
-            .iter()
-            .any(|w| w.code == "openrouter.decode.missing_tool_call_name")
-    );
-}
-
-#[test]
-fn openrouter_decode_tool_call_whitespace_name_is_ignored_with_warning() {
-    let response = response::decode_response_json(
-        json!({
-            "id": "chatcmpl-123",
-            "object": "chat.completion",
-            "model": "openai/gpt-4.1-mini",
-            "choices": [{
-                "index": 0,
-                "finish_reason": "tool_calls",
-                "message": {
-                    "role": "assistant",
-                    "tool_calls": [{
-                        "id": "call_1",
-                        "type": "function",
-                        "function": {
-                            "name": "   ",
-                            "arguments": "{\"city\":\"SF\"}"
-                        }
-                    }]
-                }
-            }]
-        }),
-        &ResponseFormat::Text,
-    )
-    .expect("decode should succeed");
-
-    assert!(
-        !response
-            .output
-            .content
-            .iter()
-            .any(|part| matches!(part, ContentPart::ToolCall { .. }))
-    );
-    assert!(
-        response
-            .warnings
-            .iter()
-            .any(|w| w.code == "openrouter.decode.missing_tool_call_name")
-    );
-}
-
-#[test]
-fn openrouter_decode_invalid_tool_call_arguments_preserve_raw_string_with_warning() {
-    let response = response::decode_response_json(
-        json!({
-            "id": "chatcmpl-123",
-            "object": "chat.completion",
-            "model": "openai/gpt-4.1-mini",
-            "choices": [{
-                "index": 0,
-                "finish_reason": "tool_calls",
-                "message": {
-                    "role": "assistant",
-                    "tool_calls": [{
-                        "id": "call_1",
-                        "type": "function",
-                        "function": {
-                            "name": "lookup_weather",
-                            "arguments": "{not json"
-                        }
-                    }]
-                }
-            }]
-        }),
-        &ResponseFormat::Text,
-    )
-    .expect("decode should succeed");
-
-    assert!(response.warnings.iter().any(|w| {
-        w.code == "openrouter.decode.invalid_tool_call_arguments"
-            && w.message.contains("preserved raw string")
-    }));
-    assert!(response.output.content.iter().any(|part| {
-        matches!(
-            part,
-            ContentPart::ToolCall { tool_call } if tool_call.arguments_json == json!("{not json")
-        )
-    }));
-}
-
-#[test]
-fn openrouter_decode_unknown_finish_reason_emits_warning_and_maps_to_other() {
-    let response = response::decode_response_json(
-        json!({
-            "id": "chatcmpl-123",
-            "object": "chat.completion",
-            "model": "openai/gpt-4.1-mini",
-            "choices": [{
-                "index": 0,
-                "finish_reason": "provider_custom_reason",
-                "message": {
-                    "role": "assistant",
-                    "content": "hello"
-                }
-            }]
-        }),
-        &ResponseFormat::Text,
-    )
-    .expect("decode should succeed");
-
-    assert_eq!(response.finish_reason, FinishReason::Other);
-    assert!(
-        response
-            .warnings
-            .iter()
-            .any(|w| w.code == "openrouter.decode.unknown_finish_reason")
-    );
-}
-
-#[test]
-fn openrouter_decode_structured_output_parse_failure_emits_warning() {
-    let response = response::decode_response_json(
-        json!({
-            "id": "chatcmpl-123",
-            "object": "chat.completion",
-            "model": "openai/gpt-4.1-mini",
-            "choices": [{
-                "index": 0,
-                "finish_reason": "stop",
-                "message": {
-                    "role": "assistant",
-                    "content": "not-json"
-                }
-            }]
-        }),
-        &ResponseFormat::JsonObject,
-    )
-    .expect("decode should succeed");
-
-    assert!(response.output.structured_output.is_none());
-    assert!(
-        response
-            .warnings
-            .iter()
-            .any(|w| w.code == "openrouter.decode.structured_output_parse_failed")
-    );
+    assert!(!error.message.contains("fallback"));
 }

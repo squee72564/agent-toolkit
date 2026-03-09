@@ -1,11 +1,11 @@
-use agent_core::{ContentPart, ResponseFormat};
+use agent_core::ResponseFormat;
 use serde_json::json;
 
 use crate::platform::openrouter::response::decode_response_json;
 
 #[test]
-fn openrouter_response_decoder_handles_chat_completions_fallback() {
-    let response = decode_response_json(
+fn openrouter_response_decoder_rejects_chat_completions_payloads() {
+    let error = decode_response_json(
         json!({
             "id": "chatcmpl-123",
             "object": "chat.completion",
@@ -26,14 +26,7 @@ fn openrouter_response_decoder_handles_chat_completions_fallback() {
         }),
         &ResponseFormat::Text,
     )
-    .expect("decode should succeed");
+    .expect_err("decode should fail");
 
-    assert_eq!(response.model, "openai/gpt-5-mini");
-    assert_eq!(response.output.content, vec![ContentPart::text("hello")]);
-    assert!(
-        response
-            .warnings
-            .iter()
-            .any(|warning| warning.code == "openrouter.decode.fallback_chat_completions")
-    );
+    assert!(!error.message.is_empty());
 }
