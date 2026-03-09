@@ -41,7 +41,7 @@ impl CompiledToolSchema {
             .as_object()
             .ok_or(ToolSchemaError::RootSchemaMustBeObject)?;
 
-        if !declares_object_type(schema_object) {
+        if !permits_object_root_schema(schema_object) {
             return Err(ToolSchemaError::RootSchemaMustBeObject);
         }
 
@@ -77,10 +77,48 @@ impl CompiledToolSchema {
     }
 }
 
-fn declares_object_type(schema_object: &Map<String, Value>) -> bool {
-    schema_object
-        .get("type")
-        .is_some_and(declares_object_type_value)
+impl ToolArgsValidationError {
+    pub(crate) fn decode_failure(name: &str, message: String) -> Self {
+        let issue = ValidationIssue {
+            instance_path: "$".to_string(),
+            keyword_path: "$".to_string(),
+            message: message.clone(),
+        };
+
+        Self::ValidationFailed {
+            message: format!("tool '{name}' input decode failed: {message}"),
+            issues: vec![issue],
+        }
+    }
+}
+
+fn permits_object_root_schema(schema_object: &Map<String, Value>) -> bool {
+    match schema_object.get("type") {
+        Some(type_value) => declares_object_type_value(type_value),
+        None => schema_object.keys().any(|key| {
+            matches!(
+                key.as_str(),
+                "$ref"
+                    | "additionalProperties"
+                    | "allOf"
+                    | "anyOf"
+                    | "dependentRequired"
+                    | "dependentSchemas"
+                    | "else"
+                    | "if"
+                    | "maxProperties"
+                    | "minProperties"
+                    | "not"
+                    | "oneOf"
+                    | "patternProperties"
+                    | "properties"
+                    | "propertyNames"
+                    | "required"
+                    | "then"
+                    | "unevaluatedProperties"
+            )
+        }),
+    }
 }
 
 fn declares_object_type_value(type_value: &Value) -> bool {
@@ -108,15 +146,21 @@ fn build_validation_failed_message(issues: &[ValidationIssue]) -> String {
 
     issues
         .iter()
-        .map(|issue| format!("{}: {}", issue.instance_path, issue.message))
+        .map(|issue| {
+            format!(
+                "{} [{}]: {}",
+                issue.instance_path, issue.keyword_path, issue.message
+            )
+        })
         .collect::<Vec<_>>()
         .join("; ")
 }
 
 fn normalize_json_pointer(path: &str) -> String {
-    if path.is_empty() {
-        "$".to_string()
-    } else {
-        path.to_string()
+    match path {
+        "" | "#" => "$".to_string(),
+        _ => path
+            .strip_prefix('#')
+            .map_or_else(|| path.to_string(), |stripped| format!("${stripped}")),
     }
 }

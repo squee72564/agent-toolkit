@@ -56,15 +56,34 @@ fn fails_when_root_type_union_does_not_include_object() {
 }
 
 #[test]
-fn fails_when_root_object_schema_has_no_type_declaration() {
+fn compiles_root_object_schema_with_properties_but_no_type_declaration() {
     let definition = test_definition(json!({
         "properties": {
             "query": { "type": "string" }
         }
     }));
 
-    let error = CompiledToolSchema::from_definition(&definition).unwrap_err();
-    assert!(matches!(error, ToolSchemaError::RootSchemaMustBeObject));
+    let compiled = CompiledToolSchema::from_definition(&definition);
+    assert!(compiled.is_ok());
+}
+
+#[test]
+fn compiles_root_schema_with_ref_but_no_explicit_type() {
+    let definition = test_definition(json!({
+        "$ref": "#/$defs/query_tool",
+        "$defs": {
+            "query_tool": {
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string" }
+                },
+                "required": ["query"]
+            }
+        }
+    }));
+
+    let compiled = CompiledToolSchema::from_definition(&definition);
+    assert!(compiled.is_ok());
 }
 
 #[test]
@@ -184,7 +203,12 @@ fn validate_args_reports_sorted_issues_and_stable_message() {
 
     let reconstructed = issues
         .iter()
-        .map(|issue| format!("{}: {}", issue.instance_path, issue.message))
+        .map(|issue| {
+            format!(
+                "{} [{}]: {}",
+                issue.instance_path, issue.keyword_path, issue.message
+            )
+        })
         .collect::<Vec<_>>()
         .join("; ");
     assert_eq!(message, reconstructed);
