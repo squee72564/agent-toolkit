@@ -110,6 +110,10 @@ pub fn build_registry_with_raw_and_typed_tools() -> ToolRegistry {
                 .description("Fixture-compatible weather tool")
                 .schema(json!({
                     "type": "object",
+                    "properties": {
+                        "city": { "type": "string" }
+                    },
+                    "required": ["city"],
                     "additionalProperties": true
                 }))
                 .handler(|args| async move {

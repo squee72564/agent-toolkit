@@ -175,7 +175,7 @@ fn default_base_url_and_endpoint_path_are_expected() {
 
     let openrouter = adapter_for(ProviderId::OpenRouter);
     assert_eq!(openrouter.default_base_url(), "https://openrouter.ai/api");
-    assert_eq!(openrouter.endpoint_path(), "/v1/chat/completions");
+    assert_eq!(openrouter.endpoint_path(), "/v1/responses");
 }
 
 #[test]

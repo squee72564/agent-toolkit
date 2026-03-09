@@ -9,8 +9,10 @@ use agent_toolkit::{
     RequestEndEvent, RequestStartEvent, RuntimeObserver, SendOptions, Target, openai,
 };
 
-use e2e::live::{maybe_observer_event_count, provider_api_key};
-use e2e::timeout::with_test_timeout;
+use e2e::live::{
+    assert_live_response_meta, default_live_model, require_provider_api_key, response_text,
+    with_live_test_timeout,
+};
 
 #[derive(Debug, Default)]
 struct RecordingObserver {
@@ -49,10 +51,63 @@ impl RuntimeObserver for RecordingObserver {
     }
 }
 
+fn assert_stream_observer_lifecycle(events: &[&'static str]) {
+    assert!(
+        matches!(events.first(), Some(&"request_start")),
+        "expected request_start to be the first observer event, got {events:?}"
+    );
+    assert!(
+        matches!(events.last(), Some(&"request_end")),
+        "expected request_end to be the last observer event, got {events:?}"
+    );
+
+    let request_start_count = events
+        .iter()
+        .filter(|event| **event == "request_start")
+        .count();
+    let request_end_count = events
+        .iter()
+        .filter(|event| **event == "request_end")
+        .count();
+    let attempt_start_count = events
+        .iter()
+        .filter(|event| **event == "attempt_start")
+        .count();
+    let terminal_attempt_count = events
+        .iter()
+        .filter(|event| matches!(**event, "attempt_success" | "attempt_failure"))
+        .count();
+
+    assert_eq!(request_start_count, 1, "expected one request_start event");
+    assert_eq!(request_end_count, 1, "expected one request_end event");
+    assert!(
+        attempt_start_count >= 1,
+        "expected at least one attempt_start event"
+    );
+    assert!(
+        terminal_attempt_count >= 1,
+        "expected at least one terminal attempt event"
+    );
+    assert!(
+        events
+            .iter()
+            .position(|event| *event == "attempt_start")
+            .is_some_and(|index| index > 0),
+        "expected attempt_start after request_start"
+    );
+    assert!(
+        events
+            .iter()
+            .rposition(|event| matches!(*event, "attempt_success" | "attempt_failure"))
+            .is_some_and(|index| index < events.len() - 1),
+        "expected a terminal attempt event before request_end"
+    );
+}
+
 #[tokio::test]
 async fn live_openai_streaming_emits_observer_lifecycle_events() {
-    let Some(api_key) = provider_api_key(ProviderId::OpenAi) else {
-        eprintln!("skipping live OpenAI observer test: OPENAI_API_KEY is not set");
+    let Some(api_key) = require_provider_api_key(ProviderId::OpenAi, "live OpenAI observer test")
+    else {
         return;
     };
 
@@ -61,86 +116,80 @@ async fn live_openai_streaming_emits_observer_lifecycle_events() {
 
     let client = openai()
         .api_key(api_key)
-        .default_model("gpt-5-mini")
+        .default_model(default_live_model(ProviderId::OpenAi))
         .observer(observer_trait)
         .build()
         .expect("build openai client");
 
-    let stream = with_test_timeout(
-        client.streaming().create(
-            MessageCreateInput::user("Say hello in five words."),
-        ),
+    let stream = with_live_test_timeout(
+        client
+            .streaming()
+            .create(MessageCreateInput::user("Say hello in five words.")),
     )
     .await
     .expect("stream should open");
 
-    let completion = with_test_timeout(stream.into_text_stream().finish())
+    let completion = with_live_test_timeout(stream.into_text_stream().finish())
         .await
         .expect("stream should finish");
 
+    assert_live_response_meta(&completion.meta, ProviderId::OpenAi);
     assert!(
-        !completion.response.output.content.is_empty(),
+        !response_text(&completion.response.output.content)
+            .trim()
+            .is_empty(),
         "expected finalized response content"
     );
 
     let events = observer.snapshot();
-    assert!(
-        events.contains(&"request_start"),
-        "expected request_start event in observer trace"
-    );
-    assert!(
-        events.contains(&"attempt_start"),
-        "expected attempt_start event in observer trace"
-    );
-    assert!(
-        events.contains(&"request_end"),
-        "expected request_end event in observer trace"
-    );
-    assert!(
-        events.contains(&"attempt_success") || events.contains(&"attempt_failure"),
-        "expected terminal attempt event in observer trace"
-    );
-
-    let _ = maybe_observer_event_count(observer.as_ref());
+    assert_stream_observer_lifecycle(&events);
 }
 
 #[tokio::test]
 async fn live_openai_routed_streaming_supports_per_call_observer_override() {
-    let Some(api_key) = provider_api_key(ProviderId::OpenAi) else {
-        eprintln!("skipping live OpenAI routed observer test: OPENAI_API_KEY is not set");
+    let Some(api_key) =
+        require_provider_api_key(ProviderId::OpenAi, "live OpenAI routed observer test")
+    else {
         return;
     };
 
+    let toolkit_observer = Arc::new(RecordingObserver::default());
+    let toolkit_observer_trait: Arc<dyn RuntimeObserver> = toolkit_observer.clone();
     let toolkit = agent_toolkit::AgentToolkit::builder()
         .with_openai(
-            agent_toolkit::ProviderConfig::new(api_key).with_default_model("gpt-5-mini"),
+            agent_toolkit::ProviderConfig::new(api_key)
+                .with_default_model(default_live_model(ProviderId::OpenAi)),
         )
+        .observer(toolkit_observer_trait)
         .build()
         .expect("build toolkit");
 
     let observer = Arc::new(RecordingObserver::default());
     let observer_trait: Arc<dyn RuntimeObserver> = observer.clone();
 
-    let stream = with_test_timeout(toolkit.streaming().create(
+    let stream = with_live_test_timeout(toolkit.streaming().create(
         MessageCreateInput::user("Say hello in five words."),
         SendOptions::for_target(Target::new(ProviderId::OpenAi)).with_observer(observer_trait),
     ))
     .await
     .expect("routed stream should open");
 
-    let completion = with_test_timeout(stream.into_text_stream().finish())
+    let completion = with_live_test_timeout(stream.into_text_stream().finish())
         .await
         .expect("routed stream should finish");
 
-    assert_eq!(completion.meta.selected_provider, ProviderId::OpenAi);
+    assert_live_response_meta(&completion.meta, ProviderId::OpenAi);
+    assert!(
+        !response_text(&completion.response.output.content)
+            .trim()
+            .is_empty(),
+        "expected finalized routed response content"
+    );
+    assert!(
+        toolkit_observer.snapshot().is_empty(),
+        "expected per-call observer override to take precedence over the toolkit observer"
+    );
 
     let events = observer.snapshot();
-    assert!(
-        events.contains(&"request_start"),
-        "expected request_start event in override observer trace"
-    );
-    assert!(
-        events.contains(&"request_end"),
-        "expected request_end event in override observer trace"
-    );
+    assert_stream_observer_lifecycle(&events);
 }

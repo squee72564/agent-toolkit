@@ -39,7 +39,7 @@ const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api";
 
 const OPENAI_ENDPOINT_PATH: &str = "/v1/responses";
 const ANTHROPIC_ENDPOINT_PATH: &str = "/v1/messages";
-const OPENROUTER_ENDPOINT_PATH: &str = "/v1/chat/completions";
+const OPENROUTER_ENDPOINT_PATH: &str = "/v1/responses";
 
 #[derive(Debug, Clone, Copy)]
 pub struct OpenAiAdapter;

@@ -182,7 +182,7 @@ async fn fallback_rule_retry_on_provider_code_is_honored() {
     let openrouter_ok = load_fixture_json(
         FixtureProvider::OpenRouter,
         FixtureScenario::BasicChat,
-        "openai.gpt-5-mini.json",
+        "openai.gpt-5.4.json",
     );
 
     let openai_server = MockServer::spawn(vec![MockResponse::json(429, coded_error)]).await;
@@ -204,7 +204,7 @@ async fn fallback_rule_retry_on_provider_code_is_honored() {
         .with_openrouter(
             ProviderConfig::new("openrouter-key")
                 .with_base_url(openrouter_server.base_url())
-                .with_default_model("openai.gpt-5-mini"),
+                .with_default_model("openai.gpt-5.4"),
         )
         .build()
         .expect("build toolkit");

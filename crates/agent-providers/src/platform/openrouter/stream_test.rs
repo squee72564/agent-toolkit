@@ -33,11 +33,11 @@ fn openrouter_stream_projector_completes_on_done_payload() {
 
 #[test]
 fn openrouter_stream_projector_ignores_leading_comments_and_completes_basic_chat_once() {
-    let fixture = load_streaming_success_fixture("openrouter", "basic_chat", "openai.gpt-5-mini");
+    let fixture = load_streaming_success_fixture("openrouter", "basic_chat", "openai.gpt-5.4");
     let mut projector = OpenRouterStreamProjector::default();
     let events = fixture_events(&fixture);
 
-    for (sequence, event) in events.iter().take(6).enumerate() {
+    for (sequence, event) in events.iter().take(2).enumerate() {
         let canonical = projector
             .project(ProviderRawStreamEvent::from_sse(
                 ProviderId::OpenRouter,
@@ -55,7 +55,7 @@ fn openrouter_stream_projector_ignores_leading_comments_and_completes_basic_chat
     }
 
     let mut canonical = Vec::new();
-    for (sequence, event) in events.into_iter().enumerate().skip(6) {
+    for (sequence, event) in events.into_iter().enumerate().skip(2) {
         canonical.extend(
             projector
                 .project(ProviderRawStreamEvent::from_sse(
@@ -73,15 +73,15 @@ fn openrouter_stream_projector_ignores_leading_comments_and_completes_basic_chat
     assert_eq!(
         canonical.first(),
         Some(&CanonicalStreamEvent::ResponseStarted {
-            model: Some("openai/gpt-5-mini-2025-08-07".to_string()),
-            response_id: Some("gen-1773000819-LhgGXZTMQHKmJCHzbIIP".to_string()),
+            model: Some("openai/gpt-5.4-20260305".to_string()),
+            response_id: Some("gen-1773017858-XXCcNEyekwclyaLS5JuS".to_string()),
         })
     );
     assert!(
         canonical.contains(&CanonicalStreamEvent::OutputItemStarted {
             output_index: 0,
             item: StreamOutputItemStart::Message {
-                item_id: None,
+                item_id: Some("msg_tmp_w6z9h2jc6ki".to_string()),
                 role: MessageRole::Assistant,
             },
         })
@@ -89,15 +89,17 @@ fn openrouter_stream_projector_ignores_leading_comments_and_completes_basic_chat
     assert!(
         canonical.contains(&CanonicalStreamEvent::OutputItemCompleted {
             output_index: 0,
-            item: StreamOutputItemEnd::Message { item_id: None },
+            item: StreamOutputItemEnd::Message {
+                item_id: Some("msg_tmp_w6z9h2jc6ki".to_string()),
+            },
         })
     );
     assert!(canonical.contains(&CanonicalStreamEvent::UsageUpdated {
         usage: agent_core::Usage {
             input_tokens: Some(50),
-            output_tokens: Some(248),
+            output_tokens: Some(11),
             cached_input_tokens: Some(0),
-            total_tokens: Some(298),
+            total_tokens: Some(61),
         },
     }));
 
@@ -108,7 +110,7 @@ fn openrouter_stream_projector_ignores_leading_comments_and_completes_basic_chat
             _ => None,
         })
         .collect::<String>();
-    assert_eq!(text, "I'm doing well, thank you.");
+    assert_eq!(text, "Doing well, ready to help!");
 
     let completed = canonical
         .iter()
@@ -126,7 +128,7 @@ fn openrouter_stream_projector_ignores_leading_comments_and_completes_basic_chat
 
 #[test]
 fn openrouter_stream_projector_accumulates_tool_call_fixture_arguments() {
-    let fixture = load_streaming_success_fixture("openrouter", "tool_call", "openai.gpt-5-mini");
+    let fixture = load_streaming_success_fixture("openrouter", "tool_call", "openai.gpt-5.4");
     let mut projector = OpenRouterStreamProjector::default();
     let mut canonical = Vec::new();
 
@@ -149,8 +151,8 @@ fn openrouter_stream_projector_accumulates_tool_call_fixture_arguments() {
         canonical.contains(&CanonicalStreamEvent::OutputItemStarted {
             output_index: 0,
             item: StreamOutputItemStart::ToolCall {
-                item_id: Some("call_Zk3ETASnea1PRXzkiPctuApW".to_string()),
-                tool_call_id: Some("call_Zk3ETASnea1PRXzkiPctuApW".to_string()),
+                item_id: Some("fc_tmp_1trdxhy16ld".to_string()),
+                tool_call_id: Some("call_LUFIV7qTRIhlKVibajduem4d".to_string()),
                 name: "get_weather".to_string(),
             },
         })
@@ -159,8 +161,8 @@ fn openrouter_stream_projector_accumulates_tool_call_fixture_arguments() {
         canonical.contains(&CanonicalStreamEvent::OutputItemCompleted {
             output_index: 0,
             item: StreamOutputItemEnd::ToolCall {
-                item_id: Some("call_Zk3ETASnea1PRXzkiPctuApW".to_string()),
-                tool_call_id: Some("call_Zk3ETASnea1PRXzkiPctuApW".to_string()),
+                item_id: Some("fc_tmp_1trdxhy16ld".to_string()),
+                tool_call_id: Some("call_LUFIV7qTRIhlKVibajduem4d".to_string()),
                 name: "get_weather".to_string(),
                 arguments_json_text: "{\"city\":\"San Francisco\"}".to_string(),
             },

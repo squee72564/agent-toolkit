@@ -1,33 +1,15 @@
-use std::collections::BTreeMap;
-
 use agent_core::{
     CanonicalStreamEvent, FinishReason, MessageRole, ProviderRawStreamEvent, RawStreamPayload,
     StreamOutputItemEnd, StreamOutputItemStart, Usage,
 };
 
-use crate::error::AdapterError;
+use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
 use crate::streaming::ProviderStreamProjector;
-
-#[derive(Debug, Clone)]
-struct OpenRouterMessageState {
-    item_id: Option<String>,
-    completed: bool,
-}
-
-#[derive(Debug, Clone, Default)]
-struct OpenRouterToolCallState {
-    item_id: Option<String>,
-    tool_call_id: Option<String>,
-    name: Option<String>,
-    arguments: String,
-}
 
 #[derive(Debug, Default)]
 pub(crate) struct OpenRouterStreamProjector {
     response_started: bool,
     completed: bool,
-    message_items: BTreeMap<u32, OpenRouterMessageState>,
-    tool_calls: BTreeMap<(u32, u32), OpenRouterToolCallState>,
 }
 
 impl ProviderStreamProjector for OpenRouterStreamProjector {
@@ -47,166 +29,169 @@ impl ProviderStreamProjector for OpenRouterStreamProjector {
                 }])
             }
             RawStreamPayload::Json { value } => {
-                let mut events = Vec::new();
+                if json_str(value, "type").is_none() {
+                    return Err(AdapterError::new(
+                        AdapterErrorKind::ProtocolViolation,
+                        agent_core::ProviderId::OpenRouter,
+                        AdapterOperation::ProjectStreamEvent,
+                        "OpenRouter streaming expected Responses SSE payload with top-level 'type'",
+                    ));
+                }
 
+                Ok(self.project_responses_event(value))
+            }
+        }
+    }
+}
+
+impl OpenRouterStreamProjector {
+    fn project_responses_event(&mut self, value: &serde_json::Value) -> Vec<CanonicalStreamEvent> {
+        let event_type = json_str(value, "type");
+        let mut events = Vec::new();
+
+        match event_type {
+            Some("response.created") | Some("response.in_progress") => {
                 if !self.response_started {
                     self.response_started = true;
                     events.push(CanonicalStreamEvent::ResponseStarted {
-                        model: json_str(value, "model").map(ToOwned::to_owned),
-                        response_id: json_str(value, "id").map(ToOwned::to_owned),
+                        model: value
+                            .get("response")
+                            .and_then(|response| json_str(response, "model"))
+                            .map(ToOwned::to_owned),
+                        response_id: value
+                            .get("response")
+                            .and_then(|response| json_str(response, "id"))
+                            .map(ToOwned::to_owned),
                     });
                 }
-
-                if let Some(usage) = value.get("usage").and_then(parse_openrouter_usage) {
-                    events.push(CanonicalStreamEvent::UsageUpdated { usage });
-                }
-
-                let choices = value
-                    .get("choices")
-                    .and_then(serde_json::Value::as_array)
-                    .cloned()
-                    .unwrap_or_default();
-
-                for choice in choices {
-                    let output_index = choice
-                        .get("index")
-                        .and_then(serde_json::Value::as_u64)
-                        .and_then(|value| u32::try_from(value).ok())
-                        .unwrap_or(0);
-
-                    if let Some(delta) = choice.get("delta") {
-                        if let Some(content) = json_str(delta, "content")
-                            && !content.is_empty()
-                        {
-                            if let std::collections::btree_map::Entry::Vacant(entry) =
-                                self.message_items.entry(output_index)
-                            {
-                                entry.insert(OpenRouterMessageState {
-                                    item_id: None,
-                                    completed: false,
-                                });
+            }
+            Some("response.output_item.added") => {
+                if let Some(output_index) = json_u32(value, "output_index")
+                    && let Some(item) = value.get("item")
+                {
+                    match json_str(item, "type") {
+                        Some("message") => events.push(CanonicalStreamEvent::OutputItemStarted {
+                            output_index,
+                            item: StreamOutputItemStart::Message {
+                                item_id: json_str(item, "id").map(ToOwned::to_owned),
+                                role: parse_message_role(json_str(item, "role"))
+                                    .unwrap_or(MessageRole::Assistant),
+                            },
+                        }),
+                        Some("function_call") => {
+                            if let Some(name) = json_str(item, "name") {
                                 events.push(CanonicalStreamEvent::OutputItemStarted {
                                     output_index,
-                                    item: StreamOutputItemStart::Message {
-                                        item_id: None,
-                                        role: MessageRole::Assistant,
+                                    item: StreamOutputItemStart::ToolCall {
+                                        item_id: json_str(item, "id").map(ToOwned::to_owned),
+                                        tool_call_id: json_str(item, "call_id")
+                                            .map(ToOwned::to_owned),
+                                        name: name.to_string(),
                                     },
                                 });
                             }
-                            events.push(CanonicalStreamEvent::TextDelta {
-                                output_index,
-                                content_index: 0,
-                                item_id: None,
-                                delta: content.to_string(),
-                            });
                         }
-
-                        if let Some(tool_calls) = delta
-                            .get("tool_calls")
-                            .and_then(serde_json::Value::as_array)
-                        {
-                            for (fallback_index, tool_call) in tool_calls.iter().enumerate() {
-                                let tool_call_index = tool_call
-                                    .get("index")
-                                    .and_then(serde_json::Value::as_u64)
-                                    .and_then(|value| u32::try_from(value).ok())
-                                    .unwrap_or_else(|| u32::try_from(fallback_index).unwrap_or(0));
-                                let key = (output_index, tool_call_index);
-                                let state = self.tool_calls.entry(key).or_default();
-
-                                let mut should_start = false;
-                                if state.name.is_none() {
-                                    state.name = tool_call
-                                        .get("function")
-                                        .and_then(|function| json_str(function, "name"))
-                                        .map(ToOwned::to_owned);
-                                    should_start = state.name.is_some();
-                                }
-                                if state.tool_call_id.is_none() {
-                                    state.tool_call_id =
-                                        json_str(tool_call, "id").map(ToOwned::to_owned);
-                                }
-                                if state.item_id.is_none() {
-                                    state.item_id =
-                                        json_str(tool_call, "id").map(ToOwned::to_owned);
-                                }
-                                if should_start {
-                                    events.push(CanonicalStreamEvent::OutputItemStarted {
-                                        output_index,
-                                        item: StreamOutputItemStart::ToolCall {
-                                            item_id: state.item_id.clone(),
-                                            tool_call_id: state.tool_call_id.clone(),
-                                            name: state.name.clone().unwrap_or_default(),
-                                        },
-                                    });
-                                }
-                                if let Some(arguments) = tool_call
-                                    .get("function")
-                                    .and_then(|function| json_str(function, "arguments"))
-                                {
-                                    state.arguments.push_str(arguments);
-                                    events.push(CanonicalStreamEvent::ToolCallArgumentsDelta {
-                                        output_index,
-                                        tool_call_index,
-                                        item_id: state.item_id.clone(),
-                                        tool_call_id: state.tool_call_id.clone(),
-                                        tool_name: state.name.clone(),
-                                        delta: arguments.to_string(),
-                                    });
-                                }
-                            }
-                        }
+                        _ => {}
                     }
-
-                    if let Some(finish_reason) = parse_finish_reason(
-                        choice
-                            .get("finish_reason")
-                            .and_then(serde_json::Value::as_str),
-                    ) {
-                        if let Some(message) = self.message_items.get_mut(&output_index)
-                            && !message.completed
-                        {
-                            message.completed = true;
+                }
+            }
+            Some("response.output_text.delta") => {
+                if let Some(delta) = json_str(value, "delta") {
+                    events.push(CanonicalStreamEvent::TextDelta {
+                        output_index: json_u32(value, "output_index").unwrap_or(0),
+                        content_index: json_u32(value, "content_index").unwrap_or(0),
+                        item_id: json_str(value, "item_id").map(ToOwned::to_owned),
+                        delta: delta.to_string(),
+                    });
+                }
+            }
+            Some("response.function_call_arguments.delta") => {
+                if let Some(delta) = json_str(value, "delta") {
+                    let output_index = json_u32(value, "output_index").unwrap_or(0);
+                    events.push(CanonicalStreamEvent::ToolCallArgumentsDelta {
+                        output_index,
+                        tool_call_index: output_index,
+                        item_id: json_str(value, "item_id").map(ToOwned::to_owned),
+                        tool_call_id: None,
+                        tool_name: None,
+                        delta: delta.to_string(),
+                    });
+                }
+            }
+            Some("response.output_item.done") => {
+                if let Some(output_index) = json_u32(value, "output_index")
+                    && let Some(item) = value.get("item")
+                {
+                    match json_str(item, "type") {
+                        Some("message") => {
                             events.push(CanonicalStreamEvent::OutputItemCompleted {
                                 output_index,
                                 item: StreamOutputItemEnd::Message {
-                                    item_id: message.item_id.clone(),
+                                    item_id: json_str(item, "id").map(ToOwned::to_owned),
                                 },
                             });
                         }
-
-                        let tool_keys: Vec<_> = self
-                            .tool_calls
-                            .keys()
-                            .copied()
-                            .filter(|(choice_index, _)| *choice_index == output_index)
-                            .collect();
-                        for key in tool_keys {
-                            if let Some(state) = self.tool_calls.remove(&key)
-                                && let Some(name) = state.name
-                            {
+                        Some("function_call") => {
+                            if let Some(name) = json_str(item, "name") {
                                 events.push(CanonicalStreamEvent::OutputItemCompleted {
                                     output_index,
                                     item: StreamOutputItemEnd::ToolCall {
-                                        item_id: state.item_id,
-                                        tool_call_id: state.tool_call_id,
-                                        name,
-                                        arguments_json_text: state.arguments,
+                                        item_id: json_str(item, "id").map(ToOwned::to_owned),
+                                        tool_call_id: json_str(item, "call_id")
+                                            .map(ToOwned::to_owned),
+                                        name: name.to_string(),
+                                        arguments_json_text: json_str(item, "arguments")
+                                            .unwrap_or("")
+                                            .to_string(),
                                     },
                                 });
                             }
                         }
-
-                        if !self.completed {
-                            self.completed = true;
-                            events.push(CanonicalStreamEvent::Completed { finish_reason });
-                        }
+                        _ => {}
                     }
                 }
-
-                Ok(events)
             }
+            Some("response.completed") => {
+                if let Some(response) = value.get("response") {
+                    if let Some(message) = response
+                        .get("error")
+                        .and_then(|error| json_str(error, "message"))
+                    {
+                        events.push(CanonicalStreamEvent::Failed {
+                            message: message.to_string(),
+                        });
+                        self.completed = true;
+                        return events;
+                    }
+
+                    if let Some(usage) = response.get("usage").and_then(parse_openrouter_usage) {
+                        events.push(CanonicalStreamEvent::UsageUpdated { usage });
+                    }
+
+                    if !self.completed {
+                        self.completed = true;
+                        events.push(CanonicalStreamEvent::Completed {
+                            finish_reason: infer_responses_finish_reason(response),
+                        });
+                    }
+                }
+            }
+            Some("error") => {
+                if let Some(message) = value
+                    .get("error")
+                    .and_then(|error| json_str(error, "message"))
+                    .or_else(|| json_str(value, "message"))
+                {
+                    self.completed = true;
+                    events.push(CanonicalStreamEvent::Failed {
+                        message: message.to_string(),
+                    });
+                }
+            }
+            _ => {}
         }
+
+        events
     }
 }
 
@@ -214,15 +199,20 @@ fn json_str<'a>(value: &'a serde_json::Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(serde_json::Value::as_str)
 }
 
-fn parse_finish_reason(reason: Option<&str>) -> Option<FinishReason> {
-    match reason {
-        Some("stop") | Some("end_turn") => Some(FinishReason::Stop),
-        Some("length") | Some("max_tokens") => Some(FinishReason::Length),
-        Some("tool_calls") | Some("tool_use") => Some(FinishReason::ToolCalls),
-        Some("content_filter") => Some(FinishReason::ContentFilter),
-        Some("error") => Some(FinishReason::Error),
-        Some(_) => Some(FinishReason::Other),
-        None => None,
+fn json_u32(value: &serde_json::Value, key: &str) -> Option<u32> {
+    value
+        .get(key)
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|value| u32::try_from(value).ok())
+}
+
+fn parse_message_role(role: Option<&str>) -> Option<MessageRole> {
+    match role {
+        Some("system") => Some(MessageRole::System),
+        Some("user") => Some(MessageRole::User),
+        Some("assistant") => Some(MessageRole::Assistant),
+        Some("tool") => Some(MessageRole::Tool),
+        _ => None,
     }
 }
 
@@ -230,16 +220,37 @@ fn parse_openrouter_usage(value: &serde_json::Value) -> Option<Usage> {
     Some(Usage {
         input_tokens: value
             .get("prompt_tokens")
+            .or_else(|| value.get("input_tokens"))
             .and_then(serde_json::Value::as_u64),
         output_tokens: value
             .get("completion_tokens")
+            .or_else(|| value.get("output_tokens"))
             .and_then(serde_json::Value::as_u64),
         cached_input_tokens: value
             .get("prompt_tokens_details")
+            .or_else(|| value.get("input_tokens_details"))
             .and_then(|details| details.get("cached_tokens"))
             .and_then(serde_json::Value::as_u64),
         total_tokens: value
             .get("total_tokens")
             .and_then(serde_json::Value::as_u64),
     })
+}
+
+fn infer_responses_finish_reason(response: &serde_json::Value) -> FinishReason {
+    let has_function_call = response
+        .get("output")
+        .and_then(serde_json::Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .any(|item| json_str(item, "type") == Some("function_call"))
+        })
+        .unwrap_or(false);
+
+    if has_function_call {
+        FinishReason::ToolCalls
+    } else {
+        FinishReason::Stop
+    }
 }

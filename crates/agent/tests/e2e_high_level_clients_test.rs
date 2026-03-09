@@ -133,12 +133,12 @@ async fn openrouter_tool_enabled_flow_handles_tool_orchestration_and_meta() {
     let tool_call_response = load_fixture_json(
         FixtureProvider::OpenRouter,
         FixtureScenario::ToolCall,
-        "openai.gpt-5-mini.json",
+        "openai.gpt-5.4.json",
     );
     let final_response = load_fixture_json(
         FixtureProvider::OpenRouter,
         FixtureScenario::BasicChat,
-        "openai.gpt-5-mini.json",
+        "openai.gpt-5.4.json",
     );
 
     let server = MockServer::spawn(vec![
@@ -150,7 +150,7 @@ async fn openrouter_tool_enabled_flow_handles_tool_orchestration_and_meta() {
     let client = openrouter()
         .api_key("test-openrouter-key")
         .base_url(server.base_url())
-        .default_model("openai.gpt-5-mini")
+        .default_model("openai.gpt-5.4")
         .request_timeout(Duration::from_secs(2))
         .stream_timeout(Duration::from_secs(2))
         .build()
@@ -168,7 +168,7 @@ async fn openrouter_tool_enabled_flow_handles_tool_orchestration_and_meta() {
     .expect("first openrouter request succeeds");
 
     assert_eq!(first_meta.selected_provider, ProviderId::OpenRouter);
-    assert_eq!(first_meta.selected_model, "openai.gpt-5-mini");
+    assert_eq!(first_meta.selected_model, "openai.gpt-5.4");
 
     let next_input = orchestrate_tool_calls(&first_response, &mut conversation, &registry)
         .await
@@ -202,9 +202,9 @@ async fn openrouter_tool_enabled_flow_handles_tool_orchestration_and_meta() {
     assert_eq!(requests.len(), 2);
 
     let request = &requests[0];
-    assert_post_path(request, "/v1/chat/completions");
+    assert_post_path(request, "/v1/responses");
     assert_auth_bearer(request, "test-openrouter-key");
-    assert_json_string(&request.body_json, "/model", "openai.gpt-5-mini");
+    assert_json_string(&request.body_json, "/model", "openai.gpt-5.4");
     assert_json_object_has_key(&request.body_json, "/tools/0", "name");
     assert_json_object_has_key(&request.body_json, "/tools/0", "parameters");
 }

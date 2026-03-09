@@ -131,7 +131,7 @@ async fn toolkit_send_with_meta_honors_target_model_and_send_metadata_headers() 
     let fixture = load_fixture_json(
         FixtureProvider::OpenRouter,
         FixtureScenario::BasicChat,
-        "openai.gpt-5-mini.json",
+        "openai.gpt-5.4.json",
     );
     let server = MockServer::spawn(vec![
         MockResponse::json(200, fixture).with_header("x-request-id", "low_openrouter_1"),
@@ -149,9 +149,8 @@ async fn toolkit_send_with_meta_honors_target_model_and_send_metadata_headers() 
 
     let request = explicit_request("openai.gpt-5-nano");
 
-    let mut options = SendOptions::for_target(
-        Target::new(ProviderId::OpenRouter).with_model("openai.gpt-5-mini"),
-    );
+    let mut options =
+        SendOptions::for_target(Target::new(ProviderId::OpenRouter).with_model("openai.gpt-5.4"));
     options.metadata.insert(
         "transport.header.x-e2e-meta".to_string(),
         "header-value".to_string(),
@@ -162,16 +161,16 @@ async fn toolkit_send_with_meta_honors_target_model_and_send_metadata_headers() 
         .expect("toolkit send_with_meta should succeed");
 
     assert_eq!(meta.selected_provider, ProviderId::OpenRouter);
-    assert_eq!(meta.selected_model, "openai.gpt-5-mini");
+    assert_eq!(meta.selected_model, "openai.gpt-5.4");
 
     let captured = server.captured_requests().await;
     assert_eq!(captured.len(), 1);
 
     let req = &captured[0];
-    assert_post_path(req, "/v1/chat/completions");
+    assert_post_path(req, "/v1/responses");
     assert_auth_bearer(req, "openrouter-key");
     assert_header(req, "x-e2e-meta", "header-value");
-    assert_json_string(&req.body_json, "/model", "openai.gpt-5-mini");
+    assert_json_string(&req.body_json, "/model", "openai.gpt-5.4");
 }
 
 #[tokio::test]
