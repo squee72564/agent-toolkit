@@ -26,6 +26,7 @@ pub(crate) struct OpenAiEncodeInput<'a> {
 pub(crate) fn encode_openai_request(req: Request) -> Result<OpenAiEncodedRequest, OpenAiSpecError> {
     let Request {
         model_id,
+        stream: _,
         messages,
         tools,
         tool_choice,

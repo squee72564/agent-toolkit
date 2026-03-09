@@ -1,0 +1,91 @@
+{
+  "id": "gen-1773017840-gTSPTPSJJbTYVjoRUhJZ",
+  "object": "response",
+  "created_at": 1773017840,
+  "model": "google/gemini-3.1-flash-lite-preview-20260303",
+  "status": "completed",
+  "completed_at": 1773017840,
+  "output": [
+    {
+      "id": "rs_tmp_0lijka3mk28p",
+      "type": "reasoning",
+      "status": "completed",
+      "summary": [],
+      "encrypted_content": "AY89a1+4D8HKX1r5HXb28hrg56xP5uiNwTAPHctXtE+vm9PnPSaURCPF8Q0+2xVCO3U=",
+      "format": "google-gemini-v1"
+    },
+    {
+      "id": "fc_tmp_qzdt9wj6qs",
+      "type": "function_call",
+      "status": "completed",
+      "call_id": "tool_get_weather_fLdsLZD4YLR3krqxAagz",
+      "name": "get_weather",
+      "arguments": "{\"city\":\"San Francisco\"}"
+    }
+  ],
+  "error": null,
+  "incomplete_details": null,
+  "tools": [
+    {
+      "type": "function",
+      "name": "get_weather",
+      "description": "Get current weather by city",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "city"
+        ],
+        "additionalProperties": false
+      },
+      "strict": null
+    }
+  ],
+  "tool_choice": "auto",
+  "parallel_tool_calls": true,
+  "max_output_tokens": 1024,
+  "temperature": 0,
+  "top_p": 1,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "top_logprobs": 0,
+  "max_tool_calls": null,
+  "metadata": {},
+  "background": false,
+  "previous_response_id": null,
+  "service_tier": "auto",
+  "truncation": "disabled",
+  "store": false,
+  "instructions": "You are a helpful assistant.",
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "reasoning": null,
+  "safety_identifier": null,
+  "prompt_cache_key": null,
+  "user": null,
+  "usage": {
+    "input_tokens": 36,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 17,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 53,
+    "cost": 0.0000345,
+    "is_byok": false,
+    "cost_details": {
+      "upstream_inference_cost": 0.0000345,
+      "upstream_inference_input_cost": 0.000009,
+      "upstream_inference_output_cost": 0.0000255
+    }
+  }
+}

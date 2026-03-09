@@ -131,7 +131,7 @@ impl ContentPart {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum MessageRole {
     System,
@@ -285,6 +285,8 @@ pub struct RuntimeWarning {
 #[serde(deny_unknown_fields)]
 pub struct Request {
     pub model_id: String,
+    #[serde(default)]
+    pub stream: bool,
     pub messages: Vec<Message>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tools: Vec<ToolDefinition>,

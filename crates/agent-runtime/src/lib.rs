@@ -3,13 +3,18 @@ mod base_client_builder;
 mod clients;
 mod conversation;
 mod direct_messages_api;
+mod direct_streaming_api;
 mod fallback;
 mod message_create_input;
+mod message_response_stream;
+mod message_text_stream;
 mod observer;
 mod provider_client;
 mod provider_config;
 mod provider_runtime;
+mod provider_stream_runtime;
 mod routed_messages_api;
+mod routed_streaming_api;
 mod runtime_error;
 mod send_options;
 mod target;
@@ -22,13 +27,17 @@ pub use crate::clients::{
 };
 pub use crate::conversation::Conversation;
 pub use crate::direct_messages_api::DirectMessagesApi;
+pub use crate::direct_streaming_api::DirectStreamingApi;
 pub use crate::fallback::{
     FallbackAction, FallbackMatch, FallbackMode, FallbackPolicy, FallbackRule,
 };
 pub use crate::message_create_input::MessageCreateInput;
+pub use crate::message_response_stream::{MessageResponseStream, StreamCompletion};
+pub use crate::message_text_stream::MessageTextStream;
 pub use crate::observer::RuntimeObserver;
 pub use crate::provider_config::ProviderConfig;
 pub use crate::routed_messages_api::RoutedMessagesApi;
+pub use crate::routed_streaming_api::RoutedStreamingApi;
 pub use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
 pub use crate::send_options::SendOptions;
 pub use crate::target::Target;

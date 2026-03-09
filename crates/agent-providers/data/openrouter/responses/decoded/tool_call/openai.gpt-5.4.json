@@ -1,0 +1,83 @@
+{
+  "id": "gen-1773017835-Z8BWR8NTtceWnmqebRcP",
+  "object": "response",
+  "created_at": 1773017835,
+  "model": "openai/gpt-5.4-20260305",
+  "status": "completed",
+  "completed_at": 1773017835,
+  "output": [
+    {
+      "id": "fc_tmp_6zfmz694o",
+      "type": "function_call",
+      "status": "completed",
+      "call_id": "call_I3gmH0kIpdHLjq1s74YCkJMT",
+      "name": "get_weather",
+      "arguments": "{\"city\":\"San Francisco\"}"
+    }
+  ],
+  "error": null,
+  "incomplete_details": null,
+  "tools": [
+    {
+      "type": "function",
+      "name": "get_weather",
+      "description": "Get current weather by city",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "city"
+        ],
+        "additionalProperties": false
+      },
+      "strict": null
+    }
+  ],
+  "tool_choice": "auto",
+  "parallel_tool_calls": true,
+  "max_output_tokens": 1024,
+  "temperature": 0,
+  "top_p": 1,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "top_logprobs": 0,
+  "max_tool_calls": null,
+  "metadata": {},
+  "background": false,
+  "previous_response_id": null,
+  "service_tier": "auto",
+  "truncation": "disabled",
+  "store": false,
+  "instructions": "You are a helpful assistant.",
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "reasoning": null,
+  "safety_identifier": null,
+  "prompt_cache_key": null,
+  "user": null,
+  "usage": {
+    "input_tokens": 60,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 19,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 79,
+    "cost": 0.000435,
+    "is_byok": false,
+    "cost_details": {
+      "upstream_inference_cost": 0.000435,
+      "upstream_inference_input_cost": 0.00015,
+      "upstream_inference_output_cost": 0.000285
+    }
+  }
+}

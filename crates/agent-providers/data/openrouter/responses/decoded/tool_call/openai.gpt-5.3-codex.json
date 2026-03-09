@@ -1,0 +1,96 @@
+{
+  "id": "gen-1773017835-hpsG3UUlt6G7unw14od9",
+  "object": "response",
+  "created_at": 1773017835,
+  "model": "openai/gpt-5.3-codex-20260224",
+  "status": "completed",
+  "completed_at": 1773017836,
+  "output": [
+    {
+      "id": "rs_tmp_a5976urrpvr",
+      "type": "reasoning",
+      "status": "completed",
+      "summary": [
+        {
+          "type": "summary_text",
+          "text": "**Planning weather data retrieval**"
+        }
+      ],
+      "encrypted_content": "gAAAAABprhrsSZXSn0-CO2bnGx4wY2OLN5a7qCF8VEa6O_DLB7N7k68rnyDhh-q2MoXVV4NWm-03KEvsVOsgIUuWYz9Tu3YA6N85MSvsvuMASxAY8TZroLrcX6m1C7NUJ9K2ONMk7S6vstwjVf4LNRZWx-ERFRTSUQH3EieTwEGTs6c661dUjasES1CBo00eZBG90m6TTu72m3K5IcZcgpKEcKkIozKX1S-gySwn_YQEf93XYc8ntzV93kTRFayllJ31Z-72jnbdEniiVr2Od6H7vrg5E7FWjK2IXBrKDICKsxltbxxHIn7xOSOwAU3qAeSC2ukrpc_y-WGrhPuxIgaao2Co0LcMA1O1PAO415t6BNO1gSqRFofocMrWPVRfv9i7NkdN7Urbbdwq4rr5UF-bWxvlzApCm0IBhL32Rb8k0VCvsN-hF_6H_vWsKbHdT39584nDwxwezFxnC8THGUPz94ohSiBF3WVCDMY-Lom_pM0wLa4oFf2YAv3PHL5aH3dbTo0UTzctNXlnJoiIsTjx_sAUI52aPNMNKVSFFblvIS-qS4DrlI0NzQR4pGVu_gZB3bvVkbrvXDppVqTo2Q61zhLtBsCcKQuus7SlU86uieAh_wf0ofLCXO_ePLwNAwaZSud6V4QNTufCuUK2y7ouvZymib_dCoAfnfp9_cC5ajaBQhUJ4gsgij_T9h-6vEqWUiC8UfEtr0VEQHNELHvzx3uSsIWkWB2HmCufOCIOzMfaI04DgMeeWUWKstgOYoN-Whc7cpA9QTipqE1JGmlglgNawjL7dX2eF7gNOpgMsPikgWYEI611GwAe013akXWwNB0cbflCaeilTyHxw1zxqPujQSpJfKJ3R542UxwsbI271Q-HDvM=",
+      "format": "openai-responses-v1"
+    },
+    {
+      "id": "fc_tmp_cwilbrnbcts",
+      "type": "function_call",
+      "status": "completed",
+      "call_id": "call_nY3zQXELgRTH4xKUey8c4OIa",
+      "name": "get_weather",
+      "arguments": "{\"city\":\"San Francisco\"}"
+    }
+  ],
+  "error": null,
+  "incomplete_details": null,
+  "tools": [
+    {
+      "type": "function",
+      "name": "get_weather",
+      "description": "Get current weather by city",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "city"
+        ],
+        "additionalProperties": false
+      },
+      "strict": null
+    }
+  ],
+  "tool_choice": "auto",
+  "parallel_tool_calls": true,
+  "max_output_tokens": 1024,
+  "temperature": 0,
+  "top_p": 1,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "top_logprobs": 0,
+  "max_tool_calls": null,
+  "metadata": {},
+  "background": false,
+  "previous_response_id": null,
+  "service_tier": "auto",
+  "truncation": "disabled",
+  "store": false,
+  "instructions": "You are a helpful assistant.",
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "reasoning": null,
+  "safety_identifier": null,
+  "prompt_cache_key": null,
+  "user": null,
+  "usage": {
+    "input_tokens": 60,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 31,
+    "output_tokens_details": {
+      "reasoning_tokens": 10
+    },
+    "total_tokens": 91,
+    "cost": 0.000539,
+    "is_byok": false,
+    "cost_details": {
+      "upstream_inference_cost": 0.000539,
+      "upstream_inference_input_cost": 0.000105,
+      "upstream_inference_output_cost": 0.000434
+    }
+  }
+}

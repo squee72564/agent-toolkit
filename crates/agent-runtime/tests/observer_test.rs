@@ -13,9 +13,8 @@ use agent_runtime::{
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
-const OPENAI_SUCCESS_BODY: &str = include_str!(
-    "../../agent-providers/data/openai/responses/2026-02-27T03:25:13.281Z/basic_chat/gpt-5-mini.json"
-);
+const OPENAI_SUCCESS_BODY: &str =
+    include_str!("../../agent-providers/data/openai/responses/decoded/basic_chat/gpt-5-mini.json");
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Clone, PartialEq, Eq)]

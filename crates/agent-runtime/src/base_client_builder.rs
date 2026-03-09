@@ -15,7 +15,8 @@ pub(crate) struct BaseClientBuilder {
     pub(crate) base_url: Option<String>,
     pub(crate) default_model: Option<String>,
     pub(crate) retry_policy: Option<RetryPolicy>,
-    pub(crate) timeout: Option<Duration>,
+    pub(crate) request_timeout: Option<Duration>,
+    pub(crate) stream_timeout: Option<Duration>,
     pub(crate) client: Option<reqwest::Client>,
     pub(crate) observer: Option<Arc<dyn RuntimeObserver>>,
 }
@@ -27,7 +28,8 @@ impl BaseClientBuilder {
             base_url: config.base_url,
             default_model: config.default_model,
             retry_policy: config.retry_policy,
-            timeout: config.timeout,
+            request_timeout: config.request_timeout,
+            stream_timeout: config.stream_timeout,
             client: None,
             observer: None,
         }
@@ -59,8 +61,11 @@ impl BaseClientBuilder {
         if let Some(retry_policy) = self.retry_policy {
             transport_builder = transport_builder.retry_policy(retry_policy);
         }
-        if let Some(timeout) = self.timeout {
-            transport_builder = transport_builder.timeout(timeout);
+        if let Some(timeout) = self.request_timeout {
+            transport_builder = transport_builder.request_timeout(timeout);
+        }
+        if let Some(timeout) = self.stream_timeout {
+            transport_builder = transport_builder.stream_timeout(timeout);
         }
 
         let transport = transport_builder.build();
@@ -90,7 +95,8 @@ impl std::fmt::Debug for BaseClientBuilder {
             .field("base_url", &self.base_url)
             .field("default_model", &self.default_model)
             .field("retry_policy", &self.retry_policy)
-            .field("timeout", &self.timeout)
+            .field("request_timeout", &self.request_timeout)
+            .field("stream_timeout", &self.stream_timeout)
             .field("client", &self.client.as_ref().map(|_| "configured"))
             .field("observer", &self.observer.as_ref().map(|_| "configured"))
             .finish()

@@ -8,13 +8,13 @@ fn adapter_error_new_initializes_expected_defaults() {
     let error = AdapterError::new(
         AdapterErrorKind::Validation,
         ProviderId::OpenAi,
-        AdapterOperation::EncodeRequest,
+        AdapterOperation::PlanRequest,
         "invalid request",
     );
 
     assert_eq!(error.kind, AdapterErrorKind::Validation);
     assert_eq!(error.provider, ProviderId::OpenAi);
-    assert_eq!(error.operation, AdapterOperation::EncodeRequest);
+    assert_eq!(error.operation, AdapterOperation::PlanRequest);
     assert_eq!(error.message, "invalid request");
     assert!(error.source_ref().is_none());
     assert_eq!(error.status_code, None);
@@ -44,7 +44,7 @@ fn adapter_error_metadata_builders_set_values() {
     let error = AdapterError::new(
         AdapterErrorKind::Upstream,
         ProviderId::OpenRouter,
-        AdapterOperation::ParseHttpResponse,
+        AdapterOperation::DecodeResponse,
         "upstream failure",
     )
     .with_status_code(429)

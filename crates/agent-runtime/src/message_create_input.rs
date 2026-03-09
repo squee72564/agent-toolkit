@@ -48,6 +48,7 @@ impl MessagesPayload {
 #[derive(Debug, Clone, PartialEq)]
 pub struct MessageCreateInput {
     pub model: Option<String>,
+    pub stream: bool,
     messages: MessagesPayload,
     pub tools: Vec<ToolDefinition>,
     pub tool_choice: ToolChoice,
@@ -67,6 +68,7 @@ impl MessageCreateInput {
     pub fn new_owned(messages: Vec<Message>) -> Self {
         Self {
             model: None,
+            stream: false,
             messages: MessagesPayload::Owned(messages),
             tools: Vec::new(),
             tool_choice: ToolChoice::default(),
@@ -82,6 +84,7 @@ impl MessageCreateInput {
     pub fn new_shared(messages: Arc<Vec<Message>>) -> Self {
         Self {
             model: None,
+            stream: false,
             messages: MessagesPayload::Shared(messages),
             tools: Vec::new(),
             tool_choice: ToolChoice::default(),
@@ -112,6 +115,11 @@ impl MessageCreateInput {
 
     pub fn with_model(mut self, model: impl Into<String>) -> Self {
         self.model = Some(model.into());
+        self
+    }
+
+    pub fn with_stream(mut self, stream: bool) -> Self {
+        self.stream = stream;
         self
     }
 
@@ -166,6 +174,7 @@ impl MessageCreateInput {
     ) -> Result<Request, RuntimeError> {
         let MessageCreateInput {
             model,
+            stream,
             messages,
             tools,
             tool_choice,
@@ -199,6 +208,7 @@ impl MessageCreateInput {
 
         Ok(Request {
             model_id,
+            stream,
             messages,
             tools,
             tool_choice,

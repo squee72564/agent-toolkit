@@ -1,31 +1,24 @@
 use std::time::Duration;
 
-use agent_core::{AdapterContext, AuthCredentials, AuthStyle, PlatformConfig};
-use base64::Engine;
-use bytes::Bytes;
+use agent_core::{AdapterContext, PlatformConfig};
+use bytes::{Bytes, BytesMut};
 use reqwest::{
-    Method, StatusCode,
-    header::{
-        AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue, InvalidHeaderName,
-        InvalidHeaderValue,
-    },
+    Method,
+    header::{CONTENT_TYPE, HeaderValue, InvalidHeaderName, InvalidHeaderValue},
 };
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use thiserror::Error;
 
 use crate::http::builder::HttpTransportBuilder;
+use crate::http::headers::build_header_config;
+use crate::http::request::{
+    HeaderConfig, HttpBytesResponse, HttpJsonResponse, HttpRequestBody, HttpRequestOptions,
+    HttpResponse, HttpResponseHead, HttpResponseMode, HttpSendRequest, RequestExecution,
+};
+use crate::http::response::{build_response_head, content_type_matches};
 use crate::http::retry_policy::RetryPolicy;
-
-const REQUEST_ID_HEADER_KEY: &str = "transport.request_id_header";
-const CUSTOM_HEADER_PREFIX: &str = "transport.header.";
-
-#[derive(Debug, Clone)]
-pub struct HttpJsonResponse {
-    pub status: StatusCode,
-    pub body: Value,
-    pub request_id: Option<String>,
-}
+use crate::http::sse::{HttpSseResponse, HttpSseStream, PendingSseEvent, SseLimits};
 
 #[derive(Debug, Error)]
 pub enum TransportError {
@@ -33,14 +26,68 @@ pub enum TransportError {
     InvalidHeaderName,
     #[error("invalid header value")]
     InvalidHeaderValue,
-    #[error("request error: {0}")]
-    Request(reqwest::Error),
     #[error("serialization error")]
     Serialization,
+    #[error("request timed out during {stage}")]
+    Timeout { stage: TimeoutStage },
+    #[error("unexpected HTTP status {head:?}")]
+    Status {
+        head: Box<crate::http::HttpResponseHead>,
+    },
+    #[error("unexpected response content-type: expected {expected}, got {actual:?}")]
+    ContentTypeMismatch {
+        expected: String,
+        actual: Option<String>,
+        head: Box<crate::http::HttpResponseHead>,
+    },
+    #[error("stream terminated unexpectedly ({reason}): {message}")]
+    StreamTerminated {
+        reason: StreamTerminationReason,
+        message: String,
+        head: Box<crate::http::HttpResponseHead>,
+    },
+    #[error("invalid SSE stream: {0}")]
+    SseParse(String),
+    #[error("{kind} exceeded limit: {size} > {max}")]
+    SseLimit {
+        kind: &'static str,
+        size: usize,
+        max: usize,
+    },
+    #[error("request error: {0}")]
+    Request(reqwest::Error),
+}
+
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+pub enum TimeoutStage {
+    #[error("request")]
+    Request,
+    #[error("stream setup")]
+    StreamSetup,
+    #[error("first byte")]
+    FirstByte,
+    #[error("stream idle")]
+    StreamIdle,
+}
+
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+pub enum StreamTerminationReason {
+    #[error("disconnect")]
+    Disconnect,
+    #[error("idle timeout")]
+    IdleTimeout,
+    #[error("protocol")]
+    Protocol,
 }
 
 impl From<reqwest::Error> for TransportError {
     fn from(err: reqwest::Error) -> Self {
+        if err.is_timeout() {
+            return TransportError::Timeout {
+                stage: TimeoutStage::Request,
+            };
+        }
+
         TransportError::Request(err)
     }
 }
@@ -57,16 +104,13 @@ impl From<InvalidHeaderValue> for TransportError {
     }
 }
 
-pub struct HeaderConfig {
-    pub headers: HeaderMap,            // outbound
-    pub request_id_header: HeaderName, // inbound extraction rule
-}
-
 #[derive(Debug, Clone)]
 pub struct HttpTransport {
-    pub client: reqwest::Client,
-    pub retry_policy: RetryPolicy,
-    pub timeout: Duration,
+    pub(crate) client: reqwest::Client,
+    pub(crate) retry_policy: RetryPolicy,
+    pub(crate) request_timeout: Duration,
+    pub(crate) stream_timeout: Duration,
+    pub(crate) sse_limits: SseLimits,
 }
 
 impl HttpTransport {
@@ -74,7 +118,9 @@ impl HttpTransport {
         HttpTransportBuilder {
             client,
             retry_policy: RetryPolicy::default(),
-            timeout: Duration::from_secs(30),
+            request_timeout: Duration::from_secs(30),
+            stream_timeout: Duration::from_secs(30),
+            sse_limits: SseLimits::default(),
         }
     }
 
@@ -83,33 +129,120 @@ impl HttpTransport {
         platform: &PlatformConfig,
         ctx: &AdapterContext,
     ) -> Result<HeaderConfig, TransportError> {
-        let request_id_header = ctx
-            .metadata
-            .get(REQUEST_ID_HEADER_KEY)
-            .map(|v| parse_header_name(v))
-            .transpose()
-            .map_err(TransportError::from)?
-            .unwrap_or_else(|| platform.request_id_header.clone());
+        build_header_config(platform, ctx)
+    }
 
-        let mut headers = platform.default_headers.clone();
+    pub async fn send(&self, request: HttpSendRequest<'_>) -> Result<HttpResponse, TransportError> {
+        let HttpSendRequest {
+            platform,
+            method,
+            url,
+            body,
+            ctx,
+            options,
+            response_mode,
+        } = request;
+        let (mut response, header_config) = self
+            .send_request_with_retry(RequestExecution {
+                platform,
+                method,
+                url,
+                body: &body,
+                ctx,
+                options: &options,
+                response_mode,
+            })
+            .await?;
 
-        if let Some(credentials) = &ctx.auth_token {
-            apply_auth(&mut headers, &platform.auth_style, credentials)?;
+        let head = build_response_head(&response, &header_config);
+        if !(head.status.is_success()
+            || matches!(response_mode, HttpResponseMode::Json) && options.allow_error_status)
+        {
+            return Err(TransportError::Status {
+                head: Box::new(head),
+            });
         }
 
-        // Custom metadata headers
-        for (key, value) in &ctx.metadata {
-            if let Some(raw_name) = key.strip_prefix(CUSTOM_HEADER_PREFIX) {
-                let header_name = parse_header_name(raw_name)?;
-                let header_value = HeaderValue::from_str(value)?;
-                headers.insert(header_name, header_value);
+        if let Some(expected) = options.expected_content_type.as_deref()
+            && !content_type_matches(&head.headers, expected)
+        {
+            let actual = head
+                .headers
+                .get(CONTENT_TYPE)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string);
+
+            return Err(TransportError::ContentTypeMismatch {
+                expected: expected.to_string(),
+                actual,
+                head: Box::new(head),
+            });
+        }
+
+        match response_mode {
+            HttpResponseMode::Json => {
+                let body = response.json::<Value>().await?;
+                Ok(HttpResponse::Json(HttpJsonResponse { head, body }))
+            }
+            HttpResponseMode::Bytes => {
+                let body = response.bytes().await?;
+                Ok(HttpResponse::Bytes(HttpBytesResponse { head, body }))
+            }
+            HttpResponseMode::Sse => {
+                let mut buffer = BytesMut::new();
+                let idle_timeout = options.stream_idle_timeout;
+                let first_chunk = self
+                    .read_stream_chunk(&mut response, &head, idle_timeout, TimeoutStage::FirstByte)
+                    .await?;
+
+                let received_any_bytes = first_chunk.is_some();
+                if let Some(chunk) = first_chunk {
+                    buffer.extend_from_slice(&chunk);
+                }
+
+                let stream = HttpSseStream {
+                    head: head.clone(),
+                    response,
+                    buffer,
+                    buffer_offset: 0,
+                    state: PendingSseEvent::default(),
+                    limits: options
+                        .sse_limits
+                        .unwrap_or_else(|| self.sse_limits.clone()),
+                    idle_timeout,
+                    received_any_bytes,
+                };
+                stream.enforce_buffer_limit()?;
+
+                Ok(HttpResponse::Sse(Box::new(HttpSseResponse {
+                    head,
+                    stream,
+                })))
             }
         }
+    }
 
-        Ok(HeaderConfig {
-            headers,
-            request_id_header,
-        })
+    pub async fn send_json<TReq, TResp>(
+        &self,
+        platform: &PlatformConfig,
+        method: Method,
+        url: &str,
+        body: &TReq,
+        ctx: &AdapterContext,
+    ) -> Result<TResp, TransportError>
+    where
+        TReq: Serialize + ?Sized,
+        TResp: DeserializeOwned,
+    {
+        let payload = serde_json::to_vec(body).map_err(|_| TransportError::Serialization)?;
+        self.execute_json_request(
+            platform,
+            method,
+            url,
+            HttpRequestBody::Json(payload.into()),
+            ctx,
+        )
+        .await
     }
 
     async fn execute_json_request<TResp>(
@@ -117,60 +250,28 @@ impl HttpTransport {
         platform: &PlatformConfig,
         method: Method,
         url: &str,
-        body: Option<Bytes>,
+        body: HttpRequestBody,
         ctx: &AdapterContext,
     ) -> Result<TResp, TransportError>
     where
         TResp: DeserializeOwned,
     {
-        let header_config = self.build_header_config(platform, ctx)?;
-        let max_attempts = self.retry_policy.max_attempts.max(1);
-        let mut attempt: u8 = 0;
-
-        loop {
-            attempt += 1;
-
-            let mut request_builder = self
-                .client
-                .request(method.clone(), url)
-                .timeout(self.timeout)
-                .headers(header_config.headers.clone());
-
-            if let Some(payload) = &body {
-                request_builder = request_builder
-                    .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
-                    .body(payload.clone());
+        match self
+            .send(HttpSendRequest {
+                platform,
+                method,
+                url,
+                body,
+                ctx,
+                options: HttpRequestOptions::json_defaults(),
+                response_mode: HttpResponseMode::Json,
+            })
+            .await?
+        {
+            HttpResponse::Json(response) => {
+                serde_json::from_value(response.body).map_err(|_| TransportError::Serialization)
             }
-
-            let response = match request_builder.send().await {
-                Ok(resp) => resp,
-                Err(err) => {
-                    if attempt < max_attempts && is_retryable_transport(&err) {
-                        self.sleep_before_retry(attempt).await;
-                        continue;
-                    }
-
-                    return Err(TransportError::Request(err));
-                }
-            };
-
-            let status = response.status();
-            if status.is_success() {
-                let parsed = response.json::<TResp>().await?;
-                return Ok(parsed);
-            }
-
-            if attempt < max_attempts && self.retry_policy.should_retry_status(status) {
-                self.sleep_before_retry(attempt).await;
-                continue;
-            }
-
-            if let Err(error) = response.error_for_status_ref() {
-                return Err(TransportError::Request(error));
-            }
-
-            let parsed = response.json::<TResp>().await?;
-            return Ok(parsed);
+            _ => unreachable!("JSON mode must return JSON response"),
         }
     }
 
@@ -183,7 +284,7 @@ impl HttpTransport {
     where
         TResp: DeserializeOwned,
     {
-        self.execute_json_request(platform, Method::GET, url, None, ctx)
+        self.execute_json_request(platform, Method::GET, url, HttpRequestBody::None, ctx)
             .await
     }
 
@@ -198,9 +299,41 @@ impl HttpTransport {
         TReq: Serialize + ?Sized,
         TResp: DeserializeOwned,
     {
-        let payload = serde_json::to_vec(body).map_err(|_| TransportError::Serialization)?;
-        self.execute_json_request(platform, Method::POST, url, Some(payload.into()), ctx)
-            .await
+        self.send_json(platform, Method::POST, url, body, ctx).await
+    }
+
+    pub async fn send_json_response<TReq>(
+        &self,
+        platform: &PlatformConfig,
+        method: Method,
+        url: &str,
+        body: &TReq,
+        ctx: &AdapterContext,
+    ) -> Result<HttpJsonResponse, TransportError>
+    where
+        TReq: Serialize + ?Sized,
+    {
+        let payload: Bytes = serde_json::to_vec(body)
+            .map_err(|_| TransportError::Serialization)?
+            .into();
+        let request_body = HttpRequestBody::Json(payload);
+        let options = HttpRequestOptions::json_defaults();
+
+        let (response, header_config) = self
+            .send_request_with_retry(RequestExecution {
+                platform,
+                method,
+                url,
+                body: &request_body,
+                ctx,
+                options: &options,
+                response_mode: HttpResponseMode::Json,
+            })
+            .await?;
+        let head = build_response_head(&response, &header_config);
+        let body = response.json::<Value>().await?;
+
+        Ok(HttpJsonResponse { head, body })
     }
 
     pub async fn post_json_value<TReq>(
@@ -213,23 +346,209 @@ impl HttpTransport {
     where
         TReq: Serialize + ?Sized,
     {
+        self.send_json_response(platform, Method::POST, url, body, ctx)
+            .await
+    }
+
+    pub async fn send_bytes_request(
+        &self,
+        platform: &PlatformConfig,
+        method: Method,
+        url: &str,
+        body: HttpRequestBody,
+        ctx: &AdapterContext,
+        options: HttpRequestOptions,
+    ) -> Result<HttpBytesResponse, TransportError> {
+        match self
+            .send(HttpSendRequest {
+                platform,
+                method,
+                url,
+                body,
+                ctx,
+                options,
+                response_mode: HttpResponseMode::Bytes,
+            })
+            .await?
+        {
+            HttpResponse::Bytes(response) => Ok(response),
+            _ => unreachable!("bytes mode must return bytes response"),
+        }
+    }
+
+    pub async fn send_sse_request(
+        &self,
+        platform: &PlatformConfig,
+        method: Method,
+        url: &str,
+        body: HttpRequestBody,
+        ctx: &AdapterContext,
+        mut options: HttpRequestOptions,
+    ) -> Result<HttpSseResponse, TransportError> {
+        if options.accept.is_none() {
+            options.accept = Some(HeaderValue::from_static("text/event-stream"));
+        }
+        if options.expected_content_type.is_none() {
+            options.expected_content_type = Some("text/event-stream".to_string());
+        }
+        if options.stream_idle_timeout.is_none() {
+            options.stream_idle_timeout = Some(self.stream_timeout);
+        }
+
+        match self
+            .send(HttpSendRequest {
+                platform,
+                method,
+                url,
+                body,
+                ctx,
+                options,
+                response_mode: HttpResponseMode::Sse,
+            })
+            .await?
+        {
+            HttpResponse::Sse(response) => Ok(*response),
+            _ => unreachable!("SSE mode must return SSE response"),
+        }
+    }
+
+    pub async fn get_sse(
+        &self,
+        platform: &PlatformConfig,
+        url: &str,
+        ctx: &AdapterContext,
+    ) -> Result<HttpSseResponse, TransportError> {
+        self.send_sse_request(
+            platform,
+            Method::GET,
+            url,
+            HttpRequestBody::None,
+            ctx,
+            HttpRequestOptions::default(),
+        )
+        .await
+    }
+
+    pub async fn send_sse<TReq>(
+        &self,
+        platform: &PlatformConfig,
+        method: Method,
+        url: &str,
+        body: &TReq,
+        ctx: &AdapterContext,
+    ) -> Result<HttpSseResponse, TransportError>
+    where
+        TReq: Serialize + ?Sized,
+    {
         let payload: Bytes = serde_json::to_vec(body)
             .map_err(|_| TransportError::Serialization)?
             .into();
-        let header_config = self.build_header_config(platform, ctx)?;
+
+        self.send_sse_request(
+            platform,
+            method,
+            url,
+            HttpRequestBody::Json(payload),
+            ctx,
+            HttpRequestOptions::sse_defaults(),
+        )
+        .await
+    }
+
+    pub async fn post_sse<TReq>(
+        &self,
+        platform: &PlatformConfig,
+        url: &str,
+        body: &TReq,
+        ctx: &AdapterContext,
+    ) -> Result<HttpSseResponse, TransportError>
+    where
+        TReq: Serialize + ?Sized,
+    {
+        self.send_sse(platform, Method::POST, url, body, ctx).await
+    }
+
+    async fn read_stream_chunk(
+        &self,
+        response: &mut reqwest::Response,
+        head: &HttpResponseHead,
+        idle_timeout: Option<Duration>,
+        timeout_stage: TimeoutStage,
+    ) -> Result<Option<Bytes>, TransportError> {
+        match idle_timeout {
+            Some(idle_timeout) => {
+                match tokio::time::timeout(idle_timeout, response.chunk()).await {
+                    Ok(Ok(chunk)) => Ok(chunk),
+                    Ok(Err(error)) => Err(TransportError::StreamTerminated {
+                        reason: StreamTerminationReason::Disconnect,
+                        message: error.to_string(),
+                        head: Box::new(head.clone()),
+                    }),
+                    Err(_) => Err(TransportError::Timeout {
+                        stage: timeout_stage,
+                    }),
+                }
+            }
+            None => response.chunk().await.map_err(TransportError::from),
+        }
+    }
+
+    pub(crate) async fn sleep_before_retry(&self, attempt: u8) {
+        let retry_index = attempt.saturating_sub(1);
+        let backoff = self.retry_policy.backoff_duration_for_retry(retry_index);
+        tokio::time::sleep(backoff).await;
+    }
+
+    pub(crate) async fn send_request_with_retry(
+        &self,
+        request: RequestExecution<'_>,
+    ) -> Result<(reqwest::Response, HeaderConfig), TransportError> {
+        let header_config = self.build_header_config(request.platform, request.ctx)?;
         let max_attempts = self.retry_policy.max_attempts.max(1);
         let mut attempt: u8 = 0;
+        let uses_stream_timeouts = matches!(request.response_mode, HttpResponseMode::Sse);
 
         loop {
             attempt += 1;
 
-            let request_builder = self
+            let mut request_builder = self
                 .client
-                .request(Method::POST, url)
-                .timeout(self.timeout)
-                .headers(header_config.headers.clone())
-                .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
-                .body(payload.clone());
+                .request(request.method.clone(), request.url)
+                .headers(header_config.headers.clone());
+
+            if uses_stream_timeouts {
+                let setup_timeout = request
+                    .options
+                    .stream_setup_timeout
+                    .unwrap_or(self.stream_timeout);
+                request_builder = request_builder.timeout(setup_timeout);
+            } else {
+                let request_timeout = request
+                    .options
+                    .request_timeout
+                    .unwrap_or(self.request_timeout);
+                request_builder = request_builder.timeout(request_timeout);
+            }
+
+            if let Some(accept) = &request.options.accept {
+                request_builder = request_builder.header(reqwest::header::ACCEPT, accept.clone());
+            }
+
+            match request.body {
+                HttpRequestBody::None => {}
+                HttpRequestBody::Json(payload) => {
+                    request_builder = request_builder
+                        .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
+                        .body(payload.clone());
+                }
+                HttpRequestBody::Bytes { content_type, body } => {
+                    if let Some(content_type) = content_type {
+                        request_builder =
+                            request_builder.header(CONTENT_TYPE, content_type.clone());
+                    }
+                    request_builder = request_builder.body(body.clone());
+                }
+            }
 
             let response = match request_builder.send().await {
                 Ok(resp) => resp,
@@ -239,7 +558,12 @@ impl HttpTransport {
                         continue;
                     }
 
-                    return Err(TransportError::Request(err));
+                    let stage = if uses_stream_timeouts {
+                        TimeoutStage::StreamSetup
+                    } else {
+                        TimeoutStage::Request
+                    };
+                    return Err(map_reqwest_error(err, stage));
                 }
             };
 
@@ -252,58 +576,19 @@ impl HttpTransport {
                 continue;
             }
 
-            let request_id = response
-                .headers()
-                .get(&header_config.request_id_header)
-                .and_then(|value| value.to_str().ok())
-                .map(str::to_string);
-            let body = response.json::<Value>().await?;
-
-            return Ok(HttpJsonResponse {
-                status,
-                body,
-                request_id,
-            });
+            return Ok((response, header_config));
         }
     }
-
-    async fn sleep_before_retry(&self, attempt: u8) {
-        let retry_index = attempt.saturating_sub(1);
-        let backoff = self.retry_policy.backoff_duration_for_retry(retry_index);
-        tokio::time::sleep(backoff).await;
-    }
-}
-
-fn parse_header_name(raw: &str) -> Result<HeaderName, InvalidHeaderName> {
-    HeaderName::from_bytes(raw.as_bytes())
 }
 
 fn is_retryable_transport(error: &reqwest::Error) -> bool {
     error.is_timeout() || error.is_connect() || error.is_request()
 }
 
-fn apply_auth(
-    headers: &mut HeaderMap,
-    style: &AuthStyle,
-    creds: &AuthCredentials,
-) -> Result<(), InvalidHeaderValue> {
-    match (style, creds) {
-        (AuthStyle::None, _) => Ok(()),
-        (AuthStyle::Bearer, AuthCredentials::Token(token)) => {
-            let value = format!("Bearer {token}");
-            headers.insert(AUTHORIZATION, HeaderValue::from_str(&value)?);
-            Ok(())
-        }
-        (AuthStyle::ApiKeyHeader(header_name), AuthCredentials::Token(token)) => {
-            headers.insert(header_name.clone(), HeaderValue::from_str(token)?);
-            Ok(())
-        }
-        (AuthStyle::Basic, AuthCredentials::Token(token)) => {
-            // Here token is assumed to be username:password
-            let encoded = base64::engine::general_purpose::STANDARD.encode(token);
-            let value = format!("Basic {encoded}");
-            headers.insert(AUTHORIZATION, HeaderValue::from_str(&value)?);
-            Ok(())
-        }
+fn map_reqwest_error(error: reqwest::Error, stage: TimeoutStage) -> TransportError {
+    if error.is_timeout() {
+        return TransportError::Timeout { stage };
     }
+
+    TransportError::Request(error)
 }

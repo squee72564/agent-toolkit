@@ -70,13 +70,13 @@ async fn upstream_error_payload_decodes_to_runtime_upstream_kind_openrouter() {
     let body = load_fixture_json(
         FixtureProvider::OpenRouter,
         FixtureScenario::InvalidAuth,
-        "openai.gpt-5-mini.json",
+        "openai.gpt-5.3-codex.json",
     );
     let server = MockServer::spawn(vec![MockResponse::json(401, body)]).await;
     let client = openrouter()
         .api_key("openrouter-key")
         .base_url(server.base_url())
-        .default_model("openai.gpt-5-mini")
+        .default_model("openai.gpt-5.3-codex")
         .build()
         .expect("build openrouter client");
 

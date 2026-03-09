@@ -24,6 +24,8 @@ agent-tools = { path = "../agent-tools" }
 agent-transport = { path = "../agent-transport" }
 
 [dev-dependencies]
+dotenvy.workspace = true
+futures-util = "0.3"
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true

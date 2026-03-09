@@ -4,260 +4,33 @@ Minimal Rust workspace for providing basic agent building primitives.
 
 This is an educational repository and is not intended to be used for production code.
 
-## High-level Usage
+## Examples
 
-### Basic OpenAI request
+Runnable examples live in `crates/agent/examples`.
 
-```rust
-use agent_toolkit::{openai, MessageCreateInput};
+Load credentials from `.env` or your shell environment, then run:
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = openai()
-        .api_key(std::env::var("OPENAI_API_KEY")?)
-        .default_model("gpt-5-mini")
-        .build()?;
-
-    let response = client
-        .messages()
-        .create(MessageCreateInput::user("Write one sentence about Rust."))
-        .await?;
-
-    println!("model: {}", response.model);
-    println!("finish_reason: {:?}", response.finish_reason);
-    Ok(())
-}
+```bash
+cargo run -p agent_toolkit --example basic_openai
 ```
 
-### Using `Conversation` state
+Recommended entry points:
 
-```rust
-use agent_toolkit::{openai, Conversation};
+- `basic_openai.rs`: smallest high-level request using `openai().messages().create(...)`.
+- `conversation.rs`: multi-turn conversation state with `Conversation`.
+- `streaming_text.rs`: high-level text streaming with `streaming().create(...).into_text_stream()`.
+- `tool_calling.rs`: manual tool loop with `ToolRegistry`, typed tools, and a follow-up request.
+- `routed_toolkit.rs`: `AgentToolkit` routing plus rule-based fallback across providers.
+- `explicit_request.rs`: lower-level explicit `Request` construction with `create_request_with_meta(...)`.
+- `kitchen_sink.rs`: observer hooks, envelope streaming, tool-call deltas, and manual tool execution in one example.
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = openai()
-        .api_key(std::env::var("OPENAI_API_KEY")?)
-        .default_model("gpt-5-mini")
-        .build()?;
+API guidance:
 
-    let mut convo = Conversation::with_system_text("You are a helpful assistant.");
-    convo.push_user_text("What is ownership in Rust?");
-    let response = client.messages().create(convo.to_input()).await?;
+- Most ergonomic path: provider builders like `openai()`, then `.messages()` or `.streaming()`.
+- Multi-provider routing path: `AgentToolkit::builder()`, `SendOptions`, `Target`, and `FallbackPolicy`.
+- Lower-level request path: construct an explicit `Request` when you need exact transport payload control.
 
-    // You control history updates in app code.
-    convo.push_assistant_text(format!("{:?}", response.output.content));
-    Ok(())
-}
-```
-
-### Tool-enabled request with `Conversation` and `ToolRegistry`
-
-```rust
-use agent_toolkit::{openai, ContentPart, Conversation, ToolChoice};
-use agent_toolkit::tools::{ToolBuilder, ToolRegistry, ToolOutput};
-use serde_json::json;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = openai()
-        .api_key(std::env::var("OPENAI_API_KEY")?)
-        .default_model("gpt-5-mini")
-        .build()?;
-
-    let mut registry = ToolRegistry::new();
-    let weather_tool = ToolBuilder::new()
-        .name("get_weather")
-        .description("Get current weather by city")
-        .schema(json!({
-            "type": "object",
-            "properties": {
-                "city": { "type": "string" }
-            },
-            "required": ["city"],
-            "additionalProperties": false
-        }))
-        .handler(|args| async move {
-            let city = args["city"].as_str().unwrap_or("unknown");
-            Ok(ToolOutput {
-                content: json!({
-                    "city": city,
-                    "temp_f": 67,
-                    "conditions": "sunny"
-                }),
-            })
-        })
-        .build()?;
-    registry.register_validated(weather_tool)?;
-
-    let mut convo = Conversation::with_system_text("You are a helpful assistant.");
-    convo.push_user_text("What is weather in SF?");
-    let input = convo
-        .to_input()
-        .with_tools(registry.tool_definitions())
-        .with_tool_choice(ToolChoice::Auto);
-
-    let response = client.messages().create(input).await?;
-
-    for part in response.output.content {
-        match part {
-            ContentPart::Text { text } => {
-                println!("assistant: {text}");
-                convo.push_assistant_text(text);
-            }
-            ContentPart::ToolCall { tool_call } => {
-                println!("tool call: {} {}", tool_call.name, tool_call.arguments_json);
-                convo.push_assistant_tool_call(
-                    tool_call.id.clone(),
-                    tool_call.name.clone(),
-                    tool_call.arguments_json.clone(),
-                );
-                let output = registry
-                    .execute_validated(&tool_call.name, tool_call.arguments_json)
-                    .await?;
-                convo.push_tool_result_json(tool_call.id, output.content);
-            }
-            ContentPart::ToolResult { .. } => {}
-        }
-    }
-
-    Ok(())
-}
-```
-
-Typed tool authoring (auto-schema from Rust types) is also supported:
-
-```rust
-use agent_toolkit::tools::{ToolBuilder, ToolError};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct WeatherArgs {
-    city: String,
-}
-
-#[derive(Debug, Serialize)]
-struct WeatherOut {
-    city: String,
-    temp_f: i32,
-    conditions: String,
-}
-
-let tool = ToolBuilder::new()
-    .name("get_weather_typed")
-    .description("Get current weather by city")
-    .typed_handler(|args: WeatherArgs| async move {
-        Ok::<WeatherOut, ToolError>(WeatherOut {
-            city: args.city,
-            temp_f: 67,
-            conditions: "sunny".to_string(),
-        })
-    })
-    .build()?;
-```
-
-Schema precedence for `ToolBuilder`:
-- Default for `.typed_handler(...)`: input schema is derived from the `TArgs` type.
-- Override: if `.schema(...)` is called after `.typed_handler(...)`, the manual schema is used.
-
-Use raw `.handler(|serde_json::Value| ...)` when you need dynamic payload handling or the lowest-overhead local hot path.
-
-### Rule-based routing fallback
-
-```rust
-use agent_toolkit::{
-    AgentToolkit, FallbackMode, FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig,
-    ProviderId, SendOptions, Target,
-};
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let toolkit = AgentToolkit::builder()
-        .with_openai(ProviderConfig::new(std::env::var("OPENAI_API_KEY")?).with_default_model("gpt-5-mini"))
-        .with_openrouter(ProviderConfig::new(std::env::var("OPENROUTER_API_KEY")?))
-        .build()?;
-
-    let fallback_policy = FallbackPolicy::new(vec![Target::new(ProviderId::OpenRouter)])
-        .with_mode(FallbackMode::RulesOnly)
-        .with_rule(FallbackRule::retry_on_status(429))
-        .with_rule(FallbackRule::retry_on_provider_code("rate_limit_exceeded"));
-
-    let response = toolkit
-        .messages()
-        .create(
-            MessageCreateInput::user("Write one sentence about Rust."),
-            SendOptions::for_target(Target::new(ProviderId::OpenAi))
-                .with_fallback_policy(fallback_policy),
-        )
-        .await?;
-
-    println!("model: {}", response.model);
-    Ok(())
-}
-```
-
-### Observability hooks
-
-```rust
-use std::sync::Arc;
-
-use agent_toolkit::{
-    openai, AgentToolkit, MessageCreateInput, ProviderConfig, RequestEndEvent, RequestStartEvent,
-    RuntimeObserver, SendOptions, Target, ProviderId,
-};
-
-#[derive(Debug)]
-struct PrintObserver;
-
-impl RuntimeObserver for PrintObserver {
-    fn on_request_start(&self, event: &RequestStartEvent) {
-        println!("request started: provider={:?} model={:?}", event.provider, event.model);
-    }
-
-    fn on_request_end(&self, event: &RequestEndEvent) {
-        println!(
-            "request ended: status={:?} error_kind={:?}",
-            event.status_code, event.error_kind
-        );
-    }
-}
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let observer: Arc<dyn RuntimeObserver> = Arc::new(PrintObserver);
-
-    let client = openai()
-        .api_key(std::env::var("OPENAI_API_KEY")?)
-        .default_model("gpt-5-mini")
-        .observer(observer.clone())
-        .build()?;
-
-    let _ = client
-        .messages()
-        .create(MessageCreateInput::user("Say hi in five words."))
-        .await?;
-
-    let toolkit = AgentToolkit::builder()
-        .with_openai(
-            ProviderConfig::new(std::env::var("OPENAI_API_KEY")?).with_default_model("gpt-5-mini"),
-        )
-        .observer(observer.clone())
-        .build()?;
-
-    let per_call_observer: Arc<dyn RuntimeObserver> = Arc::new(PrintObserver);
-    let _ = toolkit
-        .messages()
-        .create(
-            MessageCreateInput::user("One sentence about Rust."),
-            SendOptions::for_target(Target::new(ProviderId::OpenAi))
-                .with_observer(per_call_observer),
-        )
-        .await?;
-
-    Ok(())
-}
-```
+Typed tool authoring is supported via `ToolBuilder::typed_handler(...)`, which derives the input schema from Rust types by default. If `.schema(...)` is called after `.typed_handler(...)`, the manual schema wins.
 
 Observer precedence is `SendOptions::with_observer(...)` > `AgentToolkit::builder().observer(...)` > provider-client builder `.observer(...)`. Observer callback panics are isolated and never propagate into request results.
 
@@ -273,6 +46,14 @@ Observer precedence is `SendOptions::with_observer(...)` > `AgentToolkit::builde
 └── crates
     ├── agent
     │   ├── Cargo.toml
+    │   ├── examples
+    │   │   ├── basic_openai.rs
+    │   │   ├── conversation.rs
+    │   │   ├── explicit_request.rs
+    │   │   ├── kitchen_sink.rs
+    │   │   ├── routed_toolkit.rs
+    │   │   ├── streaming_text.rs
+    │   │   └── tool_calling.rs
     │   └── src
     │       └── lib.rs
     ├── agent-core
@@ -359,12 +140,11 @@ Observer precedence is `SendOptions::with_observer(...)` > `AgentToolkit::builde
 - `agent-core`: provider-agnostic domain types and traits shared across crates, including canonical `ProviderId`.
 - `agent-providers`: provider-specific encode/decode/spec logic, static `ProviderAdapter` lookup boundary, and fixture datasets for validation tests.
 - `agent-runtime`: high-level clients (`openai()`, `anthropic()`, `openrouter()`), toolkit routing/fallback orchestration, and unified adapter-driven execution flow.
-- `agent-transport`: HTTP transport implementation with retry support, auth/header handling, and JSON request/response helpers.
+- `agent-transport`: HTTP transport implementation with retry support, auth/header handling, generic request bodies, and JSON/SSE/bytes response helpers.
 - `agent-tools`: lightweight tool trait and registry primitives for tool integration.
 
 ## TODO 
 - built-in tool-execution loop (agent-runner) over Response::ToolCalls.
-- streaming responses API (token/tool-call deltas).
 - preserve and expose reasoning/thinking content instead of dropping it.
 - multimodal input support (images/files in message content)
 

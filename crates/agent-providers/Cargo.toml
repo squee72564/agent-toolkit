@@ -14,6 +14,7 @@ description = "Provider protocol adapters and translations for agent-toolkit."
 
 [dependencies]
 agent-core = { path = "../agent-core" }
+agent-transport = { path = "../agent-transport" }
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

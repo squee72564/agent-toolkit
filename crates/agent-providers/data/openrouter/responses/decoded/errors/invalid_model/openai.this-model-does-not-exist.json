@@ -1,0 +1,53 @@
+{
+  "provider": "openrouter",
+  "scenario": "invalid_model",
+  "captured_at": "2026-03-09T01:01:16.852Z",
+  "request": {
+    "url": "https://openrouter.ai/api/v1/responses",
+    "method": "POST",
+    "model": "openai/this-model-does-not-exist",
+    "headers": {
+      "Authorization": "<redacted>",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "model": "openai/this-model-does-not-exist",
+      "instructions": "You are a helpful assistant.",
+      "input": [
+        {
+          "role": "user",
+          "content": "Ping"
+        }
+      ],
+      "max_output_tokens": 64,
+      "store": false
+    }
+  },
+  "response": {
+    "status": 400,
+    "status_text": "Bad Request",
+    "headers": {
+      "access-control-allow-origin": "*",
+      "cf-ray": "9d9625c5898a69a4-LAX",
+      "connection": "keep-alive",
+      "content-type": "application/json",
+      "date": "Mon, 09 Mar 2026 01:01:17 GMT",
+      "permissions-policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "referrer-policy": "no-referrer, strict-origin-when-cross-origin",
+      "server": "cloudflare",
+      "transfer-encoding": "chunked",
+      "x-content-type-options": "nosniff"
+    },
+    "body": {
+      "error": {
+        "message": "openai/this-model-does-not-exist is not a valid model ID",
+        "code": 400
+      },
+      "user_id": "user_36xUKicUd09o37yU25oy6GgRHVr"
+    }
+  },
+  "normalized_error": {
+    "message": "OpenRouter HTTP 400 Bad Request",
+    "error_class": "OpenRouterHttpError"
+  }
+}

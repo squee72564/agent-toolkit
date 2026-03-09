@@ -24,7 +24,8 @@ pub fn default_platform(auth_style: AuthStyle) -> PlatformConfig {
 pub fn default_transport(retry_policy: RetryPolicy) -> HttpTransport {
     HttpTransport::builder(reqwest::Client::new())
         .retry_policy(retry_policy)
-        .timeout(Duration::from_secs(2))
+        .request_timeout(Duration::from_secs(2))
+        .stream_timeout(Duration::from_secs(2))
         .build()
 }
 

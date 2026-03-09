@@ -3,11 +3,15 @@ use std::{collections::HashMap, sync::Arc};
 use agent_core::{ProviderId, Request, Response};
 
 use crate::base_client_builder::BaseClientBuilder;
+use crate::message_response_stream::{
+    AttemptContext, LiveAttempt, MessageResponseStream, RoutedStreamInit,
+};
 use crate::observer::{RuntimeObserver, resolve_observer_for_request, safe_call_observer};
 use crate::provider_client::ProviderClient;
 use crate::provider_config::ProviderConfig;
-use crate::provider_runtime::ProviderAttemptOutcome;
+use crate::provider_runtime::{ProviderAttemptOutcome, ProviderStreamAttemptOutcome};
 use crate::routed_messages_api::RoutedMessagesApi;
+use crate::routed_streaming_api::RoutedStreamingApi;
 use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
 use crate::send_options::SendOptions;
 use crate::target::Target;
@@ -38,6 +42,10 @@ impl AgentToolkit {
 
     pub fn messages(&self) -> RoutedMessagesApi<'_> {
         RoutedMessagesApi::new(self)
+    }
+
+    pub fn streaming(&self) -> RoutedStreamingApi<'_> {
+        RoutedStreamingApi::new(self)
     }
 
     pub async fn send(
@@ -272,6 +280,160 @@ impl AgentToolkit {
         }
 
         result
+    }
+
+    pub(crate) async fn create_stream(
+        &self,
+        mut input: crate::message_create_input::MessageCreateInput,
+        options: SendOptions,
+    ) -> Result<MessageResponseStream, RuntimeError> {
+        input.stream = true;
+        let request = input.into_request_with_options(None, true)?;
+        self.send_stream(request, options).await
+    }
+
+    pub(crate) async fn send_stream(
+        &self,
+        request: Request,
+        options: SendOptions,
+    ) -> Result<MessageResponseStream, RuntimeError> {
+        if !request.stream {
+            return Err(RuntimeError::configuration(
+                "streaming().create_request(...) requires request.stream = true",
+            ));
+        }
+
+        let request_started_at = std::time::Instant::now();
+        let targets = self.resolve_targets(&options)?;
+        let first_client_observer = targets
+            .first()
+            .and_then(|target| self.clients.get(&target.provider))
+            .and_then(|client| client.runtime.observer.as_ref());
+        let request_observer = resolve_observer_for_request(
+            first_client_observer,
+            self.observer.as_ref(),
+            options.observer.as_ref(),
+        )
+        .cloned();
+        let request_start_event = RequestStartEvent {
+            request_id: None,
+            provider: targets.first().map(|target| target.provider),
+            model: targets
+                .first()
+                .and_then(|target| event_model(target.model.as_deref(), &request.model_id)),
+            target_index: None,
+            attempt_index: None,
+            elapsed: request_started_at.elapsed(),
+            first_target: targets.first().map(|target| target.provider),
+            resolved_target_count: targets.len(),
+        };
+        safe_call_observer(request_observer.as_ref(), |observer| {
+            observer.on_request_start(&request_start_event)
+        });
+
+        let fallback_policy = options.fallback_policy.clone();
+
+        for (index, target) in targets.iter().enumerate() {
+            let Some(client) = self.clients.get(&target.provider) else {
+                return Err(RuntimeError::target_resolution(format!(
+                    "provider {:?} is not registered",
+                    target.provider
+                )));
+            };
+            let observer = resolve_observer_for_request(
+                client.runtime.observer.as_ref(),
+                self.observer.as_ref(),
+                options.observer.as_ref(),
+            )
+            .cloned();
+            let attempt_started_at = std::time::Instant::now();
+            let attempt_start_event = AttemptStartEvent {
+                request_id: None,
+                provider: Some(target.provider),
+                model: event_model(target.model.as_deref(), &request.model_id),
+                target_index: Some(index),
+                attempt_index: Some(index),
+                elapsed: attempt_started_at.elapsed(),
+            };
+            safe_call_observer(observer.as_ref(), |runtime_observer| {
+                runtime_observer.on_attempt_start(&attempt_start_event);
+            });
+
+            match client
+                .runtime
+                .open_stream_attempt(
+                    request.clone(),
+                    target.model.as_deref(),
+                    options.metadata.clone(),
+                )
+                .await
+            {
+                ProviderStreamAttemptOutcome::Opened { stream, meta } => {
+                    return Ok(MessageResponseStream::new_routed(RoutedStreamInit {
+                        request,
+                        toolkit: self,
+                        options,
+                        request_started_at,
+                        request_observer,
+                        targets,
+                        current_attempt: LiveAttempt {
+                            stream: *stream,
+                            context: AttemptContext {
+                                target_index: index,
+                                attempt_index: index,
+                                started_at: attempt_started_at,
+                                observer,
+                                provider: meta.provider,
+                                model: meta.model,
+                                request_id: meta.request_id,
+                                status_code: meta.status_code,
+                            },
+                        },
+                        next_target_index: index + 1,
+                    }));
+                }
+                ProviderStreamAttemptOutcome::Failure { error, meta } => {
+                    let attempt_failure_event = AttemptFailureEvent {
+                        request_id: meta.request_id.clone(),
+                        provider: Some(meta.provider),
+                        model: Some(meta.model.clone()),
+                        target_index: Some(index),
+                        attempt_index: Some(index),
+                        elapsed: attempt_started_at.elapsed(),
+                        error_kind: meta.error_kind,
+                        error_message: meta.error_message.clone(),
+                    };
+                    safe_call_observer(observer.as_ref(), |runtime_observer| {
+                        runtime_observer.on_attempt_failure(&attempt_failure_event);
+                    });
+                    let should_continue = index + 1 < targets.len()
+                        && fallback_policy
+                            .as_ref()
+                            .is_some_and(|policy| policy.should_fallback(&error));
+                    if !should_continue {
+                        let request_end_event = RequestEndEvent {
+                            request_id: error.request_id.clone(),
+                            provider: Some(meta.provider),
+                            model: Some(meta.model),
+                            target_index: Some(index),
+                            attempt_index: Some(index),
+                            elapsed: request_started_at.elapsed(),
+                            status_code: error.status_code,
+                            error_kind: Some(error.kind),
+                            error_message: Some(error.message.clone()),
+                        };
+                        safe_call_observer(request_observer.as_ref(), |observer| {
+                            observer.on_request_end(&request_end_event)
+                        });
+                        return Err(error);
+                    }
+                }
+            }
+        }
+
+        Err(RuntimeError::target_resolution(
+            "no target providers were resolved for this request",
+        ))
     }
 
     pub fn resolve_targets(&self, options: &SendOptions) -> Result<Vec<Target>, RuntimeError> {

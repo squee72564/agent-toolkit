@@ -1,6 +1,6 @@
 use agent_core::ProviderId;
 use agent_providers::error::{AdapterError, AdapterErrorKind};
-use agent_transport::TransportError;
+use agent_transport::{TimeoutStage, TransportError};
 use std::error::Error as StdError;
 use thiserror::Error;
 
@@ -29,6 +29,20 @@ pub struct RuntimeError {
     pub provider_code: Option<String>,
     #[source]
     pub source: Option<Box<dyn StdError + Send + Sync>>,
+}
+
+impl Clone for RuntimeError {
+    fn clone(&self) -> Self {
+        Self {
+            kind: self.kind,
+            message: self.message.clone(),
+            provider: self.provider,
+            status_code: self.status_code,
+            request_id: self.request_id.clone(),
+            provider_code: self.provider_code.clone(),
+            source: None,
+        }
+    }
 }
 
 impl RuntimeError {
@@ -86,13 +100,58 @@ impl RuntimeError {
     }
 
     pub fn from_transport(provider: ProviderId, error: TransportError) -> Self {
-        let (message, status_code) = match &error {
-            TransportError::InvalidHeaderName => ("invalid header name".to_string(), None),
-            TransportError::InvalidHeaderValue => ("invalid header value".to_string(), None),
-            TransportError::Serialization => ("request serialization failed".to_string(), None),
+        let (message, status_code, request_id) = match &error {
+            TransportError::InvalidHeaderName => ("invalid header name".to_string(), None, None),
+            TransportError::InvalidHeaderValue => ("invalid header value".to_string(), None, None),
+            TransportError::Serialization => {
+                ("request serialization failed".to_string(), None, None)
+            }
+            TransportError::Timeout { stage } => (
+                match stage {
+                    TimeoutStage::Request => "request timed out".to_string(),
+                    TimeoutStage::StreamSetup => "stream setup timed out".to_string(),
+                    TimeoutStage::FirstByte => "stream first byte timed out".to_string(),
+                    TimeoutStage::StreamIdle => "stream idle timed out".to_string(),
+                },
+                None,
+                None,
+            ),
+            TransportError::Status { head } => (
+                format!("upstream returned HTTP {}", head.status.as_u16()),
+                Some(head.status.as_u16()),
+                head.request_id.clone(),
+            ),
+            TransportError::ContentTypeMismatch {
+                expected,
+                actual,
+                head,
+            } => (
+                format!(
+                    "unexpected content type: expected {expected}, got {}",
+                    actual.as_deref().unwrap_or("<missing>")
+                ),
+                Some(head.status.as_u16()),
+                head.request_id.clone(),
+            ),
+            TransportError::StreamTerminated {
+                reason,
+                message,
+                head,
+            } => (
+                format!("stream terminated unexpectedly ({reason}): {message}"),
+                Some(head.status.as_u16()),
+                head.request_id.clone(),
+            ),
+            TransportError::SseParse(message) => {
+                (format!("invalid SSE stream: {message}"), None, None)
+            }
+            TransportError::SseLimit { kind, size, max } => {
+                (format!("{kind} exceeded limit: {size} > {max}"), None, None)
+            }
             TransportError::Request(reqwest_error) => (
                 reqwest_error.to_string(),
                 reqwest_error.status().map(|status| status.as_u16()),
+                None,
             ),
         };
 
@@ -101,7 +160,7 @@ impl RuntimeError {
             message,
             provider: Some(provider),
             status_code,
-            request_id: None,
+            request_id,
             provider_code: None,
             source: Some(Box::new(error)),
         }

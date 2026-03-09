@@ -1,0 +1,470 @@
+{
+  "provider": "openrouter",
+  "scenario": "tool_call",
+  "captured_at": "2026-03-09T00:57:54.555Z",
+  "request": {
+    "url": "https://openrouter.ai/api/v1/responses",
+    "method": "POST",
+    "model": "google/gemini-3-flash-preview",
+    "headers": {
+      "Authorization": "<redacted>",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "model": "google/gemini-3-flash-preview",
+      "tools": [
+        {
+          "type": "function",
+          "name": "get_weather",
+          "description": "Get current weather by city",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "city": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "city"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "stream": true,
+      "temperature": 0,
+      "instructions": "You are a helpful assistant.",
+      "input": [
+        {
+          "role": "user",
+          "content": "What is the weather in San Francisco?"
+        }
+      ],
+      "max_output_tokens": 1024,
+      "store": false
+    }
+  },
+  "response": {
+    "status": 200,
+    "status_text": "OK",
+    "headers": {
+      "access-control-allow-origin": "*",
+      "cache-control": "no-cache",
+      "cf-ray": "9d9620cdc8653dc4-LAX",
+      "connection": "keep-alive",
+      "content-type": "text/event-stream",
+      "date": "Mon, 09 Mar 2026 00:57:54 GMT",
+      "permissions-policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "referrer-policy": "no-referrer, strict-origin-when-cross-origin",
+      "server": "cloudflare",
+      "transfer-encoding": "chunked",
+      "x-content-type-options": "nosniff"
+    },
+    "content_type": "text/event-stream"
+  },
+  "stream": {
+    "format": "sse",
+    "chunk_count": 10,
+    "chunks": [
+      ": OPENROUTER PROCESSING\n\n",
+      ": OPENROUTER PROCESSING\n\n",
+      "data: {\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017873-0mza21GUot8HV1yTSpoz\",\"object\":\"response\",\"created_at\":1773017873,\"model\":\"google/gemini-3-flash-preview-20251217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}\n\n",
+      "data: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017873-0mza21GUot8HV1yTSpoz\",\"object\":\"response\",\"created_at\":1773017873,\"model\":\"google/gemini-3-flash-preview-20251217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}\n\n",
+      "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"rs_tmp_8ieg3aiiu8v\",\"type\":\"reasoning\",\"status\":\"in_progress\",\"summary\":[]},\"sequence_number\":2}\n\n",
+      "data: {\"type\":\"response.output_item.added\",\"output_index\":1,\"item\":{\"id\":\"fc_tmp_oov41r23va\",\"type\":\"function_call\",\"status\":\"in_progress\",\"call_id\":\"tool_get_weather_osAn8bIMF1KFZlYBS0fh\",\"name\":\"get_weather\",\"arguments\":\"\"},\"sequence_number\":3}\n\n",
+      "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":1,\"item_id\":\"fc_tmp_oov41r23va\",\"delta\":\"{\\\"city\\\":\\\"San Francisco\\\"}\",\"sequence_number\":4}\n\n",
+      "data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":1,\"item_id\":\"fc_tmp_oov41r23va\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\",\"sequence_number\":5}\n\ndata: {\"type\":\"response.output_item.done\",\"output_index\":1,\"item\":{\"id\":\"fc_tmp_oov41r23va\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"tool_get_weather_osAn8bIMF1KFZlYBS0fh\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"},\"sequence_number\":6}\n\n",
+      "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"rs_tmp_8ieg3aiiu8v\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"CiEBjz1rX2hQb3h0lv75k1Dxl2H+UyQn3mvDNPzjBToQV5s=\",\"format\":\"google-gemini-v1\"},\"sequence_number\":7}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017873-0mza21GUot8HV1yTSpoz\",\"object\":\"response\",\"created_at\":1773017873,\"model\":\"google/gemini-3-flash-preview-20251217\",\"status\":\"completed\",\"completed_at\":1773017874,\"output\":[{\"id\":\"rs_tmp_8ieg3aiiu8v\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"CiEBjz1rX2hQb3h0lv75k1Dxl2H+UyQn3mvDNPzjBToQV5s=\",\"format\":\"google-gemini-v1\"},{\"id\":\"fc_tmp_oov41r23va\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"tool_get_weather_osAn8bIMF1KFZlYBS0fh\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":26,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":10,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":36,\"cost\":0.000043,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.000043,\"upstream_inference_input_cost\":0.000013,\"upstream_inference_output_cost\":0.00003}}},\"sequence_number\":8}\n\n",
+      "data: [DONE]\n\n"
+    ],
+    "raw_text": ": OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017873-0mza21GUot8HV1yTSpoz\",\"object\":\"response\",\"created_at\":1773017873,\"model\":\"google/gemini-3-flash-preview-20251217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}\n\ndata: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017873-0mza21GUot8HV1yTSpoz\",\"object\":\"response\",\"created_at\":1773017873,\"model\":\"google/gemini-3-flash-preview-20251217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}\n\ndata: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"rs_tmp_8ieg3aiiu8v\",\"type\":\"reasoning\",\"status\":\"in_progress\",\"summary\":[]},\"sequence_number\":2}\n\ndata: {\"type\":\"response.output_item.added\",\"output_index\":1,\"item\":{\"id\":\"fc_tmp_oov41r23va\",\"type\":\"function_call\",\"status\":\"in_progress\",\"call_id\":\"tool_get_weather_osAn8bIMF1KFZlYBS0fh\",\"name\":\"get_weather\",\"arguments\":\"\"},\"sequence_number\":3}\n\ndata: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":1,\"item_id\":\"fc_tmp_oov41r23va\",\"delta\":\"{\\\"city\\\":\\\"San Francisco\\\"}\",\"sequence_number\":4}\n\ndata: {\"type\":\"response.function_call_arguments.done\",\"output_index\":1,\"item_id\":\"fc_tmp_oov41r23va\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\",\"sequence_number\":5}\n\ndata: {\"type\":\"response.output_item.done\",\"output_index\":1,\"item\":{\"id\":\"fc_tmp_oov41r23va\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"tool_get_weather_osAn8bIMF1KFZlYBS0fh\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"},\"sequence_number\":6}\n\ndata: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"rs_tmp_8ieg3aiiu8v\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"CiEBjz1rX2hQb3h0lv75k1Dxl2H+UyQn3mvDNPzjBToQV5s=\",\"format\":\"google-gemini-v1\"},\"sequence_number\":7}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017873-0mza21GUot8HV1yTSpoz\",\"object\":\"response\",\"created_at\":1773017873,\"model\":\"google/gemini-3-flash-preview-20251217\",\"status\":\"completed\",\"completed_at\":1773017874,\"output\":[{\"id\":\"rs_tmp_8ieg3aiiu8v\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"CiEBjz1rX2hQb3h0lv75k1Dxl2H+UyQn3mvDNPzjBToQV5s=\",\"format\":\"google-gemini-v1\"},{\"id\":\"fc_tmp_oov41r23va\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"tool_get_weather_osAn8bIMF1KFZlYBS0fh\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":26,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":10,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":36,\"cost\":0.000043,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.000043,\"upstream_inference_input_cost\":0.000013,\"upstream_inference_output_cost\":0.00003}}},\"sequence_number\":8}\n\ndata: [DONE]\n\n",
+    "events": [
+      {
+        "index": 0,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 1,
+        "event": null,
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
+      },
+      {
+        "index": 2,
+        "event": null,
+        "data": "{\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017873-0mza21GUot8HV1yTSpoz\",\"object\":\"response\",\"created_at\":1773017873,\"model\":\"google/gemini-3-flash-preview-20251217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}",
+        "data_lines": [
+          "{\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017873-0mza21GUot8HV1yTSpoz\",\"object\":\"response\",\"created_at\":1773017873,\"model\":\"google/gemini-3-flash-preview-20251217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}"
+        ],
+        "raw": "data: {\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017873-0mza21GUot8HV1yTSpoz\",\"object\":\"response\",\"created_at\":1773017873,\"model\":\"google/gemini-3-flash-preview-20251217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}",
+        "data_json": {
+          "type": "response.created",
+          "response": {
+            "id": "gen-1773017873-0mza21GUot8HV1yTSpoz",
+            "object": "response",
+            "created_at": 1773017873,
+            "model": "google/gemini-3-flash-preview-20251217",
+            "status": "in_progress",
+            "completed_at": null,
+            "output": [],
+            "error": null,
+            "incomplete_details": null,
+            "tools": [
+              {
+                "type": "function",
+                "name": "get_weather",
+                "description": "Get current weather by city",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "city": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "city"
+                  ],
+                  "additionalProperties": false
+                },
+                "strict": null
+              }
+            ],
+            "tool_choice": "auto",
+            "parallel_tool_calls": true,
+            "max_output_tokens": 1024,
+            "temperature": 0,
+            "top_p": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "top_logprobs": 0,
+            "max_tool_calls": null,
+            "metadata": {},
+            "background": false,
+            "previous_response_id": null,
+            "service_tier": "auto",
+            "truncation": "disabled",
+            "store": false,
+            "instructions": "You are a helpful assistant.",
+            "text": {
+              "format": {
+                "type": "text"
+              }
+            },
+            "reasoning": null,
+            "safety_identifier": null,
+            "prompt_cache_key": null,
+            "user": null,
+            "usage": null
+          },
+          "sequence_number": 0
+        }
+      },
+      {
+        "index": 3,
+        "event": null,
+        "data": "{\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017873-0mza21GUot8HV1yTSpoz\",\"object\":\"response\",\"created_at\":1773017873,\"model\":\"google/gemini-3-flash-preview-20251217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}",
+        "data_lines": [
+          "{\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017873-0mza21GUot8HV1yTSpoz\",\"object\":\"response\",\"created_at\":1773017873,\"model\":\"google/gemini-3-flash-preview-20251217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}"
+        ],
+        "raw": "data: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017873-0mza21GUot8HV1yTSpoz\",\"object\":\"response\",\"created_at\":1773017873,\"model\":\"google/gemini-3-flash-preview-20251217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}",
+        "data_json": {
+          "type": "response.in_progress",
+          "response": {
+            "id": "gen-1773017873-0mza21GUot8HV1yTSpoz",
+            "object": "response",
+            "created_at": 1773017873,
+            "model": "google/gemini-3-flash-preview-20251217",
+            "status": "in_progress",
+            "completed_at": null,
+            "output": [],
+            "error": null,
+            "incomplete_details": null,
+            "tools": [
+              {
+                "type": "function",
+                "name": "get_weather",
+                "description": "Get current weather by city",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "city": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "city"
+                  ],
+                  "additionalProperties": false
+                },
+                "strict": null
+              }
+            ],
+            "tool_choice": "auto",
+            "parallel_tool_calls": true,
+            "max_output_tokens": 1024,
+            "temperature": 0,
+            "top_p": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "top_logprobs": 0,
+            "max_tool_calls": null,
+            "metadata": {},
+            "background": false,
+            "previous_response_id": null,
+            "service_tier": "auto",
+            "truncation": "disabled",
+            "store": false,
+            "instructions": "You are a helpful assistant.",
+            "text": {
+              "format": {
+                "type": "text"
+              }
+            },
+            "reasoning": null,
+            "safety_identifier": null,
+            "prompt_cache_key": null,
+            "user": null,
+            "usage": null
+          },
+          "sequence_number": 1
+        }
+      },
+      {
+        "index": 4,
+        "event": null,
+        "data": "{\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"rs_tmp_8ieg3aiiu8v\",\"type\":\"reasoning\",\"status\":\"in_progress\",\"summary\":[]},\"sequence_number\":2}",
+        "data_lines": [
+          "{\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"rs_tmp_8ieg3aiiu8v\",\"type\":\"reasoning\",\"status\":\"in_progress\",\"summary\":[]},\"sequence_number\":2}"
+        ],
+        "raw": "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"rs_tmp_8ieg3aiiu8v\",\"type\":\"reasoning\",\"status\":\"in_progress\",\"summary\":[]},\"sequence_number\":2}",
+        "data_json": {
+          "type": "response.output_item.added",
+          "output_index": 0,
+          "item": {
+            "id": "rs_tmp_8ieg3aiiu8v",
+            "type": "reasoning",
+            "status": "in_progress",
+            "summary": []
+          },
+          "sequence_number": 2
+        }
+      },
+      {
+        "index": 5,
+        "event": null,
+        "data": "{\"type\":\"response.output_item.added\",\"output_index\":1,\"item\":{\"id\":\"fc_tmp_oov41r23va\",\"type\":\"function_call\",\"status\":\"in_progress\",\"call_id\":\"tool_get_weather_osAn8bIMF1KFZlYBS0fh\",\"name\":\"get_weather\",\"arguments\":\"\"},\"sequence_number\":3}",
+        "data_lines": [
+          "{\"type\":\"response.output_item.added\",\"output_index\":1,\"item\":{\"id\":\"fc_tmp_oov41r23va\",\"type\":\"function_call\",\"status\":\"in_progress\",\"call_id\":\"tool_get_weather_osAn8bIMF1KFZlYBS0fh\",\"name\":\"get_weather\",\"arguments\":\"\"},\"sequence_number\":3}"
+        ],
+        "raw": "data: {\"type\":\"response.output_item.added\",\"output_index\":1,\"item\":{\"id\":\"fc_tmp_oov41r23va\",\"type\":\"function_call\",\"status\":\"in_progress\",\"call_id\":\"tool_get_weather_osAn8bIMF1KFZlYBS0fh\",\"name\":\"get_weather\",\"arguments\":\"\"},\"sequence_number\":3}",
+        "data_json": {
+          "type": "response.output_item.added",
+          "output_index": 1,
+          "item": {
+            "id": "fc_tmp_oov41r23va",
+            "type": "function_call",
+            "status": "in_progress",
+            "call_id": "tool_get_weather_osAn8bIMF1KFZlYBS0fh",
+            "name": "get_weather",
+            "arguments": ""
+          },
+          "sequence_number": 3
+        }
+      },
+      {
+        "index": 6,
+        "event": null,
+        "data": "{\"type\":\"response.function_call_arguments.delta\",\"output_index\":1,\"item_id\":\"fc_tmp_oov41r23va\",\"delta\":\"{\\\"city\\\":\\\"San Francisco\\\"}\",\"sequence_number\":4}",
+        "data_lines": [
+          "{\"type\":\"response.function_call_arguments.delta\",\"output_index\":1,\"item_id\":\"fc_tmp_oov41r23va\",\"delta\":\"{\\\"city\\\":\\\"San Francisco\\\"}\",\"sequence_number\":4}"
+        ],
+        "raw": "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":1,\"item_id\":\"fc_tmp_oov41r23va\",\"delta\":\"{\\\"city\\\":\\\"San Francisco\\\"}\",\"sequence_number\":4}",
+        "data_json": {
+          "type": "response.function_call_arguments.delta",
+          "output_index": 1,
+          "item_id": "fc_tmp_oov41r23va",
+          "delta": "{\"city\":\"San Francisco\"}",
+          "sequence_number": 4
+        }
+      },
+      {
+        "index": 7,
+        "event": null,
+        "data": "{\"type\":\"response.function_call_arguments.done\",\"output_index\":1,\"item_id\":\"fc_tmp_oov41r23va\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\",\"sequence_number\":5}",
+        "data_lines": [
+          "{\"type\":\"response.function_call_arguments.done\",\"output_index\":1,\"item_id\":\"fc_tmp_oov41r23va\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\",\"sequence_number\":5}"
+        ],
+        "raw": "data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":1,\"item_id\":\"fc_tmp_oov41r23va\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\",\"sequence_number\":5}",
+        "data_json": {
+          "type": "response.function_call_arguments.done",
+          "output_index": 1,
+          "item_id": "fc_tmp_oov41r23va",
+          "name": "get_weather",
+          "arguments": "{\"city\":\"San Francisco\"}",
+          "sequence_number": 5
+        }
+      },
+      {
+        "index": 8,
+        "event": null,
+        "data": "{\"type\":\"response.output_item.done\",\"output_index\":1,\"item\":{\"id\":\"fc_tmp_oov41r23va\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"tool_get_weather_osAn8bIMF1KFZlYBS0fh\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"},\"sequence_number\":6}",
+        "data_lines": [
+          "{\"type\":\"response.output_item.done\",\"output_index\":1,\"item\":{\"id\":\"fc_tmp_oov41r23va\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"tool_get_weather_osAn8bIMF1KFZlYBS0fh\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"},\"sequence_number\":6}"
+        ],
+        "raw": "data: {\"type\":\"response.output_item.done\",\"output_index\":1,\"item\":{\"id\":\"fc_tmp_oov41r23va\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"tool_get_weather_osAn8bIMF1KFZlYBS0fh\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"},\"sequence_number\":6}",
+        "data_json": {
+          "type": "response.output_item.done",
+          "output_index": 1,
+          "item": {
+            "id": "fc_tmp_oov41r23va",
+            "type": "function_call",
+            "status": "completed",
+            "call_id": "tool_get_weather_osAn8bIMF1KFZlYBS0fh",
+            "name": "get_weather",
+            "arguments": "{\"city\":\"San Francisco\"}"
+          },
+          "sequence_number": 6
+        }
+      },
+      {
+        "index": 9,
+        "event": null,
+        "data": "{\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"rs_tmp_8ieg3aiiu8v\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"CiEBjz1rX2hQb3h0lv75k1Dxl2H+UyQn3mvDNPzjBToQV5s=\",\"format\":\"google-gemini-v1\"},\"sequence_number\":7}",
+        "data_lines": [
+          "{\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"rs_tmp_8ieg3aiiu8v\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"CiEBjz1rX2hQb3h0lv75k1Dxl2H+UyQn3mvDNPzjBToQV5s=\",\"format\":\"google-gemini-v1\"},\"sequence_number\":7}"
+        ],
+        "raw": "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"rs_tmp_8ieg3aiiu8v\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"CiEBjz1rX2hQb3h0lv75k1Dxl2H+UyQn3mvDNPzjBToQV5s=\",\"format\":\"google-gemini-v1\"},\"sequence_number\":7}",
+        "data_json": {
+          "type": "response.output_item.done",
+          "output_index": 0,
+          "item": {
+            "id": "rs_tmp_8ieg3aiiu8v",
+            "type": "reasoning",
+            "status": "completed",
+            "summary": [],
+            "encrypted_content": "CiEBjz1rX2hQb3h0lv75k1Dxl2H+UyQn3mvDNPzjBToQV5s=",
+            "format": "google-gemini-v1"
+          },
+          "sequence_number": 7
+        }
+      },
+      {
+        "index": 10,
+        "event": null,
+        "data": "{\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017873-0mza21GUot8HV1yTSpoz\",\"object\":\"response\",\"created_at\":1773017873,\"model\":\"google/gemini-3-flash-preview-20251217\",\"status\":\"completed\",\"completed_at\":1773017874,\"output\":[{\"id\":\"rs_tmp_8ieg3aiiu8v\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"CiEBjz1rX2hQb3h0lv75k1Dxl2H+UyQn3mvDNPzjBToQV5s=\",\"format\":\"google-gemini-v1\"},{\"id\":\"fc_tmp_oov41r23va\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"tool_get_weather_osAn8bIMF1KFZlYBS0fh\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":26,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":10,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":36,\"cost\":0.000043,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.000043,\"upstream_inference_input_cost\":0.000013,\"upstream_inference_output_cost\":0.00003}}},\"sequence_number\":8}",
+        "data_lines": [
+          "{\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017873-0mza21GUot8HV1yTSpoz\",\"object\":\"response\",\"created_at\":1773017873,\"model\":\"google/gemini-3-flash-preview-20251217\",\"status\":\"completed\",\"completed_at\":1773017874,\"output\":[{\"id\":\"rs_tmp_8ieg3aiiu8v\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"CiEBjz1rX2hQb3h0lv75k1Dxl2H+UyQn3mvDNPzjBToQV5s=\",\"format\":\"google-gemini-v1\"},{\"id\":\"fc_tmp_oov41r23va\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"tool_get_weather_osAn8bIMF1KFZlYBS0fh\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":26,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":10,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":36,\"cost\":0.000043,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.000043,\"upstream_inference_input_cost\":0.000013,\"upstream_inference_output_cost\":0.00003}}},\"sequence_number\":8}"
+        ],
+        "raw": "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017873-0mza21GUot8HV1yTSpoz\",\"object\":\"response\",\"created_at\":1773017873,\"model\":\"google/gemini-3-flash-preview-20251217\",\"status\":\"completed\",\"completed_at\":1773017874,\"output\":[{\"id\":\"rs_tmp_8ieg3aiiu8v\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"CiEBjz1rX2hQb3h0lv75k1Dxl2H+UyQn3mvDNPzjBToQV5s=\",\"format\":\"google-gemini-v1\"},{\"id\":\"fc_tmp_oov41r23va\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"tool_get_weather_osAn8bIMF1KFZlYBS0fh\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"San Francisco\\\"}\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":26,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":10,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":36,\"cost\":0.000043,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.000043,\"upstream_inference_input_cost\":0.000013,\"upstream_inference_output_cost\":0.00003}}},\"sequence_number\":8}",
+        "data_json": {
+          "type": "response.completed",
+          "response": {
+            "id": "gen-1773017873-0mza21GUot8HV1yTSpoz",
+            "object": "response",
+            "created_at": 1773017873,
+            "model": "google/gemini-3-flash-preview-20251217",
+            "status": "completed",
+            "completed_at": 1773017874,
+            "output": [
+              {
+                "id": "rs_tmp_8ieg3aiiu8v",
+                "type": "reasoning",
+                "status": "completed",
+                "summary": [],
+                "encrypted_content": "CiEBjz1rX2hQb3h0lv75k1Dxl2H+UyQn3mvDNPzjBToQV5s=",
+                "format": "google-gemini-v1"
+              },
+              {
+                "id": "fc_tmp_oov41r23va",
+                "type": "function_call",
+                "status": "completed",
+                "call_id": "tool_get_weather_osAn8bIMF1KFZlYBS0fh",
+                "name": "get_weather",
+                "arguments": "{\"city\":\"San Francisco\"}"
+              }
+            ],
+            "error": null,
+            "incomplete_details": null,
+            "tools": [
+              {
+                "type": "function",
+                "name": "get_weather",
+                "description": "Get current weather by city",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "city": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "city"
+                  ],
+                  "additionalProperties": false
+                },
+                "strict": null
+              }
+            ],
+            "tool_choice": "auto",
+            "parallel_tool_calls": true,
+            "max_output_tokens": 1024,
+            "temperature": 0,
+            "top_p": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "top_logprobs": 0,
+            "max_tool_calls": null,
+            "metadata": {},
+            "background": false,
+            "previous_response_id": null,
+            "service_tier": "auto",
+            "truncation": "disabled",
+            "store": false,
+            "instructions": "You are a helpful assistant.",
+            "text": {
+              "format": {
+                "type": "text"
+              }
+            },
+            "reasoning": null,
+            "safety_identifier": null,
+            "prompt_cache_key": null,
+            "user": null,
+            "usage": {
+              "input_tokens": 26,
+              "input_tokens_details": {
+                "cached_tokens": 0
+              },
+              "output_tokens": 10,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 36,
+              "cost": 0.000043,
+              "is_byok": false,
+              "cost_details": {
+                "upstream_inference_cost": 0.000043,
+                "upstream_inference_input_cost": 0.000013,
+                "upstream_inference_output_cost": 0.00003
+              }
+            }
+          },
+          "sequence_number": 8
+        }
+      },
+      {
+        "index": 11,
+        "event": null,
+        "data": "[DONE]",
+        "data_lines": [
+          "[DONE]"
+        ],
+        "raw": "data: [DONE]"
+      }
+    ]
+  }
+}

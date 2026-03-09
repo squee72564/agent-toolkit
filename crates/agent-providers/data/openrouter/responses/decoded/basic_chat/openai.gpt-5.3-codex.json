@@ -1,0 +1,84 @@
+{
+  "id": "gen-1773017827-Xq3qBsUYsytDrgSuaBkk",
+  "object": "response",
+  "created_at": 1773017827,
+  "model": "openai/gpt-5.3-codex-20260224",
+  "status": "completed",
+  "completed_at": 1773017829,
+  "output": [
+    {
+      "id": "rs_tmp_rkwyco4eokl",
+      "type": "reasoning",
+      "status": "completed",
+      "summary": [
+        {
+          "type": "summary_text",
+          "text": "**Crafting concise five-word reply**"
+        }
+      ],
+      "encrypted_content": "gAAAAABprhrl3bCXk5E9pFBzBKSTRni2LWmDUZFStw2P4b8wTTnEYbOwqHxTymU18q4DbgwB0Pdly3IEXkLABcqZYC0n5XzwOsd96JqgnVsHE_tE1WgqikiFhgyouM7Hsbu7k6LepA7AYuvthjuNSamijp4M_sM1jrbq_7SqAqXWCC0gSXXqFnED8gMsIQoyA1wHf2U9E3QrsF4jObq0NuLa1s_BQ29T4dTWs3N9fIHrUhkV2mlsaHW9cLdZtNMWUUBjCWLNyd2yer9Sf0T-2mR8mg5aBgWuw4WsDz8jS2H14tkg--FhaFmZdlNooQF-xQdkh95cdzqI7BX7t_pNx5bYuoiwryihuYWvkS6UFrcu_qp6Y5pLk6WvJ9DXRXSNV0eB0YZmsAiEO_WqBnVoW0aP0PszqP-3B0uzrDAISwrY18NZ6gxxwmFfl17MNRKnC0K8OU7fXeoxaDtQ3sO3qJVzVElba2CrwyrZyLF7ktTRSUH8czwoh1HQQqc8FMveuNqLjI-lVJN0_gvHPk-4o4WTKbNkjznEwExKNjHnZg3K8L73tZ77ulNuOpUETreNw9ByJZD_Cj6I1C2E3IPSspGhjpRoHQwMoVIOGLqwY6eN58IpzwYLACy9OEIvCbWBD9a695ZH-B9vjBOeuiSDMxP_l7F1Ro8c3B2tYlWQsfwL3MyoTR8W2-pNzreYLp9eRcba7UMd8l8Aev8GSHjaBO9_gDRijHIfSjckh3DYFuFF7aYsOD1Bc6KZ-Ls8X0IjkIHc1x-Yvtuyf7JwoSTUMjL6LlCzlO1pqL2oGW8yofGdDBsqi3yk4USJio0yHlveI5esNnPIsGE5L8hh_i-JlPDAstS5BJkN6h1kTxg1xNJu-wWsWvlZfKQH_8p8xVRY2NdzRRikDDrT0cGzHC7o0yY7yz5DgLP3AXiYdI1RwwwJ-0IjcOaY6jtO10mZCWPy2LKmpQ6y3MswWewHgI1gwYQ_KLM-QV9XwLVQ_4suAbNFeMRuJDRELKNgpcQIgvUMmhDmXOG2Bj_R-a3RhGmVQkvmA3aP6zcvuPpI9vSCrMw-T939HeAkMxU5K-YIkyRKmc0F1-FlztM2hATPqXWnHmm9vH5xLIA9xD0wYnnYdTJ7p8wYnXIs52SmJeMc0HdXeYgrjaCL1AyVvpXUbqF519glBoIcRhT0Y6tjpzSJtNI0haG-8cUlPPMCvTub6D1d1ekkP9nV3TndgTua9I-wHQn2oA1Sb-J0SogKqX63HZSA7gXnnGzCXmev_lFD988nPkorsDUnNNIEhwAeNmEowIZpRff654zme_B7lrfgARS8a4Qm05-fqnNx-GtqXuKADuJlLW45NpRJ",
+      "format": "openai-responses-v1"
+    },
+    {
+      "id": "msg_tmp_iqyj12wng2",
+      "type": "message",
+      "role": "assistant",
+      "status": "completed",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Feeling good, ready to assist.",
+          "annotations": [],
+          "logprobs": []
+        }
+      ],
+      "phase": "final_answer"
+    }
+  ],
+  "error": null,
+  "incomplete_details": null,
+  "tools": [],
+  "tool_choice": "auto",
+  "parallel_tool_calls": true,
+  "max_output_tokens": 1024,
+  "temperature": 0,
+  "top_p": 1,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "top_logprobs": 0,
+  "max_tool_calls": null,
+  "metadata": {},
+  "background": false,
+  "previous_response_id": null,
+  "service_tier": "auto",
+  "truncation": "disabled",
+  "store": false,
+  "instructions": "You are a helpful assistant.",
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "reasoning": null,
+  "safety_identifier": null,
+  "prompt_cache_key": null,
+  "user": null,
+  "usage": {
+    "input_tokens": 50,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 124,
+    "output_tokens_details": {
+      "reasoning_tokens": 111
+    },
+    "total_tokens": 174,
+    "cost": 0.0018235,
+    "is_byok": false,
+    "cost_details": {
+      "upstream_inference_cost": 0.0018235,
+      "upstream_inference_input_cost": 0.0000875,
+      "upstream_inference_output_cost": 0.001736
+    }
+  }
+}

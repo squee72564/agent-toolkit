@@ -22,10 +22,11 @@ pub use agent_core::types::*;
 pub use agent_runtime::{
     AgentToolkit, AgentToolkitBuilder, AnthropicClient, AnthropicClientBuilder,
     AttemptFailureEvent, AttemptMeta, AttemptStartEvent, AttemptSuccessEvent, Conversation,
-    DirectMessagesApi, FallbackAction, FallbackMatch, FallbackMode, FallbackPolicy, FallbackRule,
-    MessageCreateInput, OpenAiClient, OpenAiClientBuilder, OpenRouterClient,
-    OpenRouterClientBuilder, ProviderConfig, RequestEndEvent, RequestStartEvent, ResponseMeta,
-    RoutedMessagesApi, RuntimeError, RuntimeErrorKind, RuntimeObserver, SendOptions, Target,
+    DirectMessagesApi, DirectStreamingApi, FallbackAction, FallbackMatch, FallbackMode,
+    FallbackPolicy, FallbackRule, MessageCreateInput, MessageResponseStream, MessageTextStream,
+    OpenAiClient, OpenAiClientBuilder, OpenRouterClient, OpenRouterClientBuilder, ProviderConfig,
+    RequestEndEvent, RequestStartEvent, ResponseMeta, RoutedMessagesApi, RoutedStreamingApi,
+    RuntimeError, RuntimeErrorKind, RuntimeObserver, SendOptions, StreamCompletion, Target,
     anthropic, openai, openrouter,
 };
 pub use agent_transport::{

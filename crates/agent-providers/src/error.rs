@@ -5,10 +5,11 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AdapterOperation {
-    EncodeRequest,
+    PlanRequest,
     DecodeResponse,
     BuildHttpRequest,
-    ParseHttpResponse,
+    ProjectStreamEvent,
+    FinalizeStream,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

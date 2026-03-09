@@ -1,0 +1,90 @@
+{
+  "id": "gen-1773017842-GGxUXape96EfJeGujFtO",
+  "object": "response",
+  "created_at": 1773017842,
+  "model": "openai/gpt-5.3-codex-20260224",
+  "status": "completed",
+  "completed_at": 1773017843,
+  "output": [
+    {
+      "id": "msg_tmp_zzi6mr14o6",
+      "type": "message",
+      "role": "assistant",
+      "status": "completed",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "The weather in **San Francisco** is currently:\n\n- **16°C**\n- **60°F**",
+          "annotations": [],
+          "logprobs": []
+        }
+      ],
+      "phase": "final_answer"
+    }
+  ],
+  "error": null,
+  "incomplete_details": null,
+  "tools": [
+    {
+      "type": "function",
+      "name": "get_weather",
+      "description": "Get current weather by city",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "city"
+        ],
+        "additionalProperties": false
+      },
+      "strict": null
+    }
+  ],
+  "tool_choice": "auto",
+  "parallel_tool_calls": true,
+  "max_output_tokens": 1024,
+  "temperature": 0,
+  "top_p": 1,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "top_logprobs": 0,
+  "max_tool_calls": null,
+  "metadata": {},
+  "background": false,
+  "previous_response_id": null,
+  "service_tier": "auto",
+  "truncation": "disabled",
+  "store": false,
+  "instructions": "You are a helpful assistant.",
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "reasoning": null,
+  "safety_identifier": null,
+  "prompt_cache_key": null,
+  "user": null,
+  "usage": {
+    "input_tokens": 113,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 24,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 137,
+    "cost": 0.00053375,
+    "is_byok": false,
+    "cost_details": {
+      "upstream_inference_cost": 0.00053375,
+      "upstream_inference_input_cost": 0.00019775,
+      "upstream_inference_output_cost": 0.000336
+    }
+  }
+}

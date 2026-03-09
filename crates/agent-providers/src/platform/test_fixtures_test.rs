@@ -6,9 +6,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde_json::json;
 
 use crate::platform::test_fixtures::{
-    choose_valid_success_fixture, list_error_fixture_models, list_fixture_models,
-    load_error_fixture_body, load_success_fixture, resolve_fixture_responses_root_from,
-    validate_error_fixture_shape, validate_error_fixture_wrapper_shape,
+    choose_valid_success_fixture, list_decoded_error_fixture_models, list_decoded_fixture_models,
+    load_decoded_error_fixture_body, load_decoded_success_fixture,
+    resolve_fixture_responses_root_from, validate_decoded_error_fixture_shape,
+    validate_error_fixture_wrapper_shape,
 };
 
 static UNIQUE_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -182,28 +183,32 @@ fn resolve_rejects_invalid_provider_segment() {
 fn fixture_accessors_reject_invalid_scenario_or_model_segments() {
     assert_panics_with_message(
         || {
-            list_fixture_models("openai", "../basic_chat");
+            list_decoded_fixture_models("openai", "../basic_chat");
         },
         "invalid fixture scenario segment",
     );
 
     assert_panics_with_message(
         || {
-            load_success_fixture("openai", "basic_chat", "../gpt-5-mini");
+            load_decoded_success_fixture("openai", "basic_chat", "../gpt-5-mini");
         },
         "invalid fixture model segment",
     );
 
     assert_panics_with_message(
         || {
-            load_error_fixture_body("openai", "invalid_model/..", "this-model-does-not-exist");
+            load_decoded_error_fixture_body(
+                "openai",
+                "invalid_model/..",
+                "this-model-does-not-exist",
+            );
         },
         "invalid fixture scenario segment",
     );
 
     assert_panics_with_message(
         || {
-            list_error_fixture_models("openai", "invalid_model/..");
+            list_decoded_error_fixture_models("openai", "invalid_model/..");
         },
         "invalid fixture scenario segment",
     );
@@ -211,7 +216,7 @@ fn fixture_accessors_reject_invalid_scenario_or_model_segments() {
 
 #[test]
 fn choose_valid_success_fixture_selects_preferred_model() {
-    let models = list_fixture_models("openai", "basic_chat");
+    let models = list_decoded_fixture_models("openai", "basic_chat");
     assert!(
         !models.is_empty(),
         "expected at least one success fixture model"
@@ -235,7 +240,7 @@ fn choose_valid_success_fixture_selects_preferred_model() {
 
 #[test]
 fn choose_valid_success_fixture_swaps_to_fallback_when_preferred_rejected() {
-    let models = list_fixture_models("openai", "basic_chat");
+    let models = list_decoded_fixture_models("openai", "basic_chat");
     assert!(
         models.len() >= 2,
         "expected at least two success fixture models for swap coverage"
@@ -299,7 +304,7 @@ fn choose_valid_success_fixture_rejects_invalid_preferred_model_segment() {
 
 #[test]
 fn list_error_fixture_models_is_sorted() {
-    let models = list_error_fixture_models("openai", "invalid_model");
+    let models = list_decoded_error_fixture_models("openai", "invalid_model");
     assert!(
         !models.is_empty(),
         "expected at least one error fixture model"
@@ -312,13 +317,13 @@ fn list_error_fixture_models_is_sorted() {
 
 #[test]
 fn validate_error_fixture_shape_accepts_known_good_fixture() {
-    let models = list_error_fixture_models("openai", "invalid_model");
+    let models = list_decoded_error_fixture_models("openai", "invalid_model");
     assert!(
         !models.is_empty(),
         "expected at least one error fixture model"
     );
 
-    let result = validate_error_fixture_shape("openai", "invalid_model", &models[0]);
+    let result = validate_decoded_error_fixture_shape("openai", "invalid_model", &models[0]);
     assert!(result.is_ok(), "expected known fixture wrapper to validate");
 }
 

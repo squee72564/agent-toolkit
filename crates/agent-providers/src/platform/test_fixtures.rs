@@ -12,6 +12,12 @@ pub(crate) struct ChosenFixture {
     pub preferred_rejection_reason: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(crate) enum FixtureSet {
+    Decoded,
+    Streaming,
+}
+
 fn fixture_responses_root(provider: &str) -> PathBuf {
     resolve_fixture_responses_root(provider)
 }
@@ -149,72 +155,75 @@ fn read_json(path: &Path) -> Value {
         .unwrap_or_else(|err| panic!("failed to parse fixture JSON at {}: {err}", path.display()))
 }
 
-fn error_fixture_path(provider: &str, scenario: &str, model: &str) -> PathBuf {
+fn fixture_set_root(provider: &str, fixture_set: FixtureSet) -> PathBuf {
+    assert_valid_provider(provider);
+
+    let responses_root = fixture_responses_root(provider);
+    let dir_name = match fixture_set {
+        FixtureSet::Decoded => "decoded",
+        FixtureSet::Streaming => "streaming",
+    };
+    let fixture_root = responses_root.join(dir_name);
+    assert!(
+        fixture_root.is_dir(),
+        "missing fixture set directory for provider='{provider}' set='{dir_name}': {}",
+        fixture_root.display()
+    );
+    canonicalize_if_possible(fixture_root)
+}
+
+fn decoded_fixture_root(provider: &str) -> PathBuf {
+    fixture_set_root(provider, FixtureSet::Decoded)
+}
+
+#[allow(dead_code)]
+pub(crate) fn streaming_fixture_root(provider: &str) -> PathBuf {
+    fixture_set_root(provider, FixtureSet::Streaming)
+}
+
+fn decoded_error_fixture_path(provider: &str, scenario: &str, model: &str) -> PathBuf {
     assert_valid_provider(provider);
     assert_valid_fixture_segment("scenario", scenario);
     assert_valid_fixture_segment("model", model);
 
-    latest_capture_dir(provider)
+    decoded_fixture_root(provider)
         .join("errors")
         .join(scenario)
         .join(format!("{model}.json"))
 }
 
-pub(crate) fn latest_capture_dir(provider: &str) -> PathBuf {
-    assert_valid_provider(provider);
-
-    let responses_root = fixture_responses_root(provider);
-    assert!(
-        responses_root.is_dir(),
-        "missing fixture provider responses directory: {}",
-        responses_root.display()
-    );
-
-    let mut capture_dirs = fs::read_dir(&responses_root)
-        .unwrap_or_else(|err| {
-            panic!(
-                "failed to list fixture provider responses directory {}: {err}",
-                responses_root.display()
-            )
-        })
-        .filter_map(Result::ok)
-        .filter_map(|entry| {
-            let file_type = entry.file_type().ok()?;
-            if !file_type.is_dir() {
-                return None;
-            }
-            Some(entry.file_name().to_string_lossy().to_string())
-        })
-        .collect::<Vec<_>>();
-
-    capture_dirs.sort();
-    let latest = capture_dirs.last().unwrap_or_else(|| {
-        panic!(
-            "no capture directories found under {}",
-            responses_root.display()
-        )
-    });
-
-    responses_root.join(latest)
-}
-
-pub(crate) fn load_success_fixture(provider: &str, scenario: &str, model: &str) -> Value {
+pub(crate) fn load_decoded_success_fixture(provider: &str, scenario: &str, model: &str) -> Value {
     assert_valid_provider(provider);
     assert_valid_fixture_segment("scenario", scenario);
     assert_valid_fixture_segment("model", model);
 
-    let path = latest_capture_dir(provider)
+    let path = decoded_fixture_root(provider)
         .join(scenario)
         .join(format!("{model}.json"));
     read_json(&path)
 }
 
-pub(crate) fn load_error_fixture_body(provider: &str, scenario: &str, model: &str) -> Value {
+pub(crate) fn load_streaming_success_fixture(provider: &str, scenario: &str, model: &str) -> Value {
     assert_valid_provider(provider);
     assert_valid_fixture_segment("scenario", scenario);
     assert_valid_fixture_segment("model", model);
 
-    let path = error_fixture_path(provider, scenario, model);
+    let path = streaming_fixture_root(provider)
+        .join(scenario)
+        .join(format!("{model}.json"));
+    read_json(&path)
+}
+
+pub(crate) fn load_decoded_error_fixture_body(
+    provider: &str,
+    scenario: &str,
+    model: &str,
+) -> Value {
+    assert_valid_provider(provider);
+    assert_valid_fixture_segment("scenario", scenario);
+    assert_valid_fixture_segment("model", model);
+
+    let path = decoded_error_fixture_path(provider, scenario, model);
     let fixture = read_json(&path);
     fixture
         .get("response")
@@ -228,11 +237,11 @@ pub(crate) fn load_error_fixture_body(provider: &str, scenario: &str, model: &st
         })
 }
 
-pub(crate) fn list_fixture_models(provider: &str, scenario: &str) -> Vec<String> {
+pub(crate) fn list_decoded_fixture_models(provider: &str, scenario: &str) -> Vec<String> {
     assert_valid_provider(provider);
     assert_valid_fixture_segment("scenario", scenario);
 
-    let scenario_dir = latest_capture_dir(provider).join(scenario);
+    let scenario_dir = decoded_fixture_root(provider).join(scenario);
     assert!(
         scenario_dir.is_dir(),
         "missing fixture scenario directory: {}",
@@ -265,18 +274,18 @@ pub(crate) fn list_fixture_models(provider: &str, scenario: &str) -> Vec<String>
     models
 }
 
-pub(crate) fn load_success_fixture_candidates(
+pub(crate) fn load_decoded_success_fixture_candidates(
     provider: &str,
     scenario: &str,
 ) -> Vec<(String, Value)> {
     assert_valid_provider(provider);
     assert_valid_fixture_segment("scenario", scenario);
 
-    let models = list_fixture_models(provider, scenario);
+    let models = list_decoded_fixture_models(provider, scenario);
     models
         .into_iter()
         .map(|model| {
-            let body = load_success_fixture(provider, scenario, &model);
+            let body = load_decoded_success_fixture(provider, scenario, &model);
             (model, body)
         })
         .collect()
@@ -295,7 +304,7 @@ where
     assert_valid_fixture_segment("scenario", scenario);
     assert_valid_fixture_segment("preferred model", preferred_model);
 
-    let candidates = load_success_fixture_candidates(provider, scenario);
+    let candidates = load_decoded_success_fixture_candidates(provider, scenario);
     assert!(
         !candidates.is_empty(),
         "no success fixtures found for provider={provider} scenario={scenario}"
@@ -350,11 +359,11 @@ where
     );
 }
 
-pub(crate) fn list_error_fixture_models(provider: &str, scenario: &str) -> Vec<String> {
+pub(crate) fn list_decoded_error_fixture_models(provider: &str, scenario: &str) -> Vec<String> {
     assert_valid_provider(provider);
     assert_valid_fixture_segment("scenario", scenario);
 
-    let scenario_dir = latest_capture_dir(provider).join("errors").join(scenario);
+    let scenario_dir = decoded_fixture_root(provider).join("errors").join(scenario);
     assert!(
         scenario_dir.is_dir(),
         "missing fixture error scenario directory: {}",
@@ -387,10 +396,10 @@ pub(crate) fn list_error_fixture_models(provider: &str, scenario: &str) -> Vec<S
     models
 }
 
-pub(crate) fn list_error_fixture_relpaths(provider: &str) -> Vec<String> {
+pub(crate) fn list_decoded_error_fixture_relpaths(provider: &str) -> Vec<String> {
     assert_valid_provider(provider);
 
-    let errors_dir = latest_capture_dir(provider).join("errors");
+    let errors_dir = decoded_fixture_root(provider).join("errors");
     assert!(
         errors_dir.is_dir(),
         "missing fixture errors directory: {}",
@@ -448,7 +457,7 @@ pub(crate) fn list_error_fixture_relpaths(provider: &str) -> Vec<String> {
     relpaths
 }
 
-pub(crate) fn validate_error_fixture_shape(
+pub(crate) fn validate_decoded_error_fixture_shape(
     provider: &str,
     scenario: &str,
     model: &str,
@@ -457,7 +466,7 @@ pub(crate) fn validate_error_fixture_shape(
     assert_valid_fixture_segment("scenario", scenario);
     assert_valid_fixture_segment("model", model);
 
-    let path = error_fixture_path(provider, scenario, model);
+    let path = decoded_error_fixture_path(provider, scenario, model);
     let fixture = read_json(&path);
     validate_error_fixture_wrapper_shape(&fixture, &path)
 }
