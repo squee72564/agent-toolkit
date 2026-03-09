@@ -77,6 +77,7 @@ dependencies = [
  "agent-runtime",
  "agent-tools",
  "agent-transport",
+ "dotenvy",
  "futures-util",
  "schemars",
  "serde",
