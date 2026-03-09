@@ -4,7 +4,7 @@ use agent_core::types::ToolDefinition;
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use serde_json::{Value, json};
+use serde_json::Value;
 use thiserror::Error;
 
 use crate::schema::{CompiledToolSchema, ToolSchemaError};
@@ -18,6 +18,11 @@ pub enum ToolBuilderError {
     MissingSchema,
     #[error("tool handler is required")]
     MissingHandler,
+    #[error("tool schema could not be generated: {source}")]
+    GeneratedSchema {
+        #[source]
+        source: serde_json::Error,
+    },
     #[error("tool schema is invalid: {source}")]
     InvalidSchema {
         #[source]
@@ -30,6 +35,7 @@ pub struct ToolBuilder {
     name: Option<String>,
     description: Option<String>,
     schema: Option<Value>,
+    generated_schema_error: Option<ToolBuilderError>,
     handler: Option<Arc<ToolHandler>>,
 }
 
@@ -43,6 +49,7 @@ impl ToolBuilder {
             name: Some(definition.name),
             description: definition.description,
             schema: Some(definition.parameters_schema),
+            generated_schema_error: None,
             handler: None,
         }
     }
@@ -59,6 +66,7 @@ impl ToolBuilder {
 
     pub fn schema(mut self, schema: Value) -> Self {
         self.schema = Some(schema);
+        self.generated_schema_error = None;
         self
     }
 
@@ -93,7 +101,16 @@ impl ToolBuilder {
         F: Fn(TArgs) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<TOut, ToolError>> + Send + 'static,
     {
-        self.schema = Some(derived_schema::<TArgs>());
+        match derived_schema::<TArgs>() {
+            Ok(schema) => {
+                self.schema = Some(schema);
+                self.generated_schema_error = None;
+            }
+            Err(error) => {
+                self.schema = None;
+                self.generated_schema_error = Some(error);
+            }
+        }
         let handler = Arc::new(handler);
 
         let wrapped = move |args: Value| -> BoxToolFuture {
@@ -124,6 +141,9 @@ impl ToolBuilder {
         if name.trim().is_empty() {
             return Err(ToolBuilderError::MissingName);
         }
+        if let Some(error) = self.generated_schema_error {
+            return Err(error);
+        }
         let schema = self.schema.ok_or(ToolBuilderError::MissingSchema)?;
         let handler = self.handler.ok_or(ToolBuilderError::MissingHandler)?;
 
@@ -139,15 +159,10 @@ impl ToolBuilder {
     }
 }
 
-fn derived_schema<TArgs>() -> Value
+fn derived_schema<TArgs>() -> Result<Value, ToolBuilderError>
 where
     TArgs: JsonSchema,
 {
-    match serde_json::to_value(schemars::schema_for!(TArgs)) {
-        Ok(schema) => schema,
-        Err(error) => json!({
-            "type": "object",
-            "x-schema-encode-error": error.to_string()
-        }),
-    }
+    serde_json::to_value(schemars::schema_for!(TArgs))
+        .map_err(|source| ToolBuilderError::GeneratedSchema { source })
 }

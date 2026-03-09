@@ -2,7 +2,7 @@ use agent_core::types::ToolDefinition;
 use agent_tools::{Tool, ToolBuilder, ToolBuilderError, ToolError, ToolOutput};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, Serializer};
-use serde_json::json;
+use serde_json::{Value, json};
 
 fn strict_schema() -> serde_json::Value {
     json!({
@@ -23,6 +23,12 @@ struct EchoArgs {
 #[derive(Debug, Serialize)]
 struct EchoOut {
     echo: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct OverrideArgs {
+    #[schemars(skip)]
+    value: std::marker::PhantomData<String>,
 }
 
 #[test]
@@ -225,7 +231,7 @@ fn typed_handler_schema_can_be_overridden_with_manual_schema() {
 
     let tool = ToolBuilder::new()
         .name("echo")
-        .typed_handler(|args: EchoArgs| async move { Ok(EchoOut { echo: args.query }) })
+        .typed_handler(|_args: OverrideArgs| async move { Ok(Value::Null) })
         .schema(manual_schema.clone())
         .build()
         .expect("builder should produce a typed tool with manual schema override");
