@@ -23,12 +23,7 @@ const SMOKE_ERROR_FIXTURES: [(&str, &str); 3] = [
     ("invalid_model", "openai.this-model-does-not-exist"),
     ("invalid_tool_payload", "openai.gpt-5.3-codex"),
 ];
-const WARN_FALLBACK_CHAT_COMPLETIONS: &str = "openrouter.decode.fallback_chat_completions";
-const QUARANTINED_SUCCESS_FIXTURES: [(&str, &str, &str); 1] = [(
-    "tool_call",
-    "openai.o4-mini-high",
-    "scenario is tool_call, but fixture is incomplete length-truncated with no tool_calls",
-)];
+const QUARANTINED_SUCCESS_FIXTURES: [(&str, &str, &str); 0] = [];
 const QUARANTINED_ERROR_FIXTURES: [(&str, &str, &str); 1] = [(
     "invalid_request_schema",
     "openai.gpt-5.3-codex",
@@ -152,6 +147,12 @@ fn fixture_full_openrouter_errors_sweep() -> Result<(), String> {
 
         let body = load_decoded_error_fixture_body(PROVIDER, scenario, model);
         if !has_top_level_error_object(&body) {
+            if let Some(quarantine_reason) = quarantine_error_reason(scenario, model) {
+                eprintln!(
+                    "quarantined error fixture skipped: provider={PROVIDER} scenario={scenario} model={model} reason={quarantine_reason}"
+                );
+                continue;
+            }
             return Err(format!(
                 "error fixture missing top-level error object: {scenario}/{model}"
             ));
@@ -238,7 +239,7 @@ fn validate_success_fixture_body(body: &Value, scenario: &str, _model: &str) -> 
     let response = decode_response_json(payload.body, &payload.requested_response_format)
         .map_err(|err| format!("decode failed: {err}"))?;
     assert_success_invariants(&response, scenario)?;
-    assert_fallback_warning_for_non_openai_shape(body, &response)
+    assert_openai_responses_shape(body)
 }
 
 fn assert_success_invariants(response: &Response, scenario: &str) -> Result<(), String> {
@@ -323,31 +324,17 @@ fn assert_openrouter_upstream_error(
     Ok(())
 }
 
-fn assert_fallback_warning_for_non_openai_shape(
-    body: &Value,
-    response: &Response,
-) -> Result<(), String> {
-    if is_openai_responses_shape(body) {
-        return Ok(());
-    }
-    if response
-        .warnings
-        .iter()
-        .any(|warning| warning.code == WARN_FALLBACK_CHAT_COMPLETIONS)
-    {
-        Ok(())
-    } else {
-        Err(format!(
-            "missing expected warning '{WARN_FALLBACK_CHAT_COMPLETIONS}' for fallback-shaped response"
-        ))
-    }
-}
-
-fn is_openai_responses_shape(body: &Value) -> bool {
+fn assert_openai_responses_shape(body: &Value) -> Result<(), String> {
     let Some(root) = body.as_object() else {
-        return false;
+        return Err("fixture body must be a JSON object".to_string());
     };
-    root.get("status").is_some() && root.get("output").is_some_and(Value::is_array)
+    if root.get("status").is_none() {
+        return Err("fixture body missing responses status field".to_string());
+    }
+    if !root.get("output").is_some_and(Value::is_array) {
+        return Err("fixture body missing responses output array".to_string());
+    }
+    Ok(())
 }
 
 fn has_top_level_error_object(body: &Value) -> bool {
@@ -356,6 +343,13 @@ fn has_top_level_error_object(body: &Value) -> bool {
 
 fn quarantine_success_reason(scenario: &str, model: &str) -> Option<&'static str> {
     QUARANTINED_SUCCESS_FIXTURES
+        .iter()
+        .find(|(s, m, _)| *s == scenario && *m == model)
+        .map(|(_, _, reason)| *reason)
+}
+
+fn quarantine_error_reason(scenario: &str, model: &str) -> Option<&'static str> {
+    QUARANTINED_ERROR_FIXTURES
         .iter()
         .find(|(s, m, _)| *s == scenario && *m == model)
         .map(|(_, _, reason)| *reason)
