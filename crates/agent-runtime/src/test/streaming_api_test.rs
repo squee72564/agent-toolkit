@@ -58,6 +58,42 @@ async fn direct_streaming_yields_envelopes_and_finishes_with_meta() {
 }
 
 #[tokio::test]
+async fn direct_streaming_finish_after_drain_returns_completion() {
+    let base_url = spawn_sse_stub(
+        "text/event-stream",
+        concat!(
+            "event: response.created\n",
+            "data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_1\",\"model\":\"gpt-5-mini\"}}\n\n",
+            "event: response.output_item.added\n",
+            "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"message\",\"id\":\"msg_1\",\"role\":\"assistant\"}}\n\n",
+            "event: response.output_text.delta\n",
+            "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"content_index\":0,\"item_id\":\"msg_1\",\"delta\":\"drained response\"}\n\n",
+            "event: response.output_item.done\n",
+            "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"message\",\"id\":\"msg_1\"}}\n\n",
+            "event: response.completed\n",
+            "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_1\",\"model\":\"gpt-5-mini\",\"output\":[],\"usage\":{\"input_tokens\":1,\"output_tokens\":2,\"total_tokens\":3}}}\n\n"
+        ),
+    )
+    .await;
+    let client = test_streaming_provider_client(ProviderId::OpenAi, &base_url, Some("gpt-5-mini"));
+
+    let mut stream = client
+        .streaming()
+        .create(MessageCreateInput::user("hello"))
+        .await
+        .expect("stream should open");
+
+    while next_stream_item(&mut stream).await.is_some() {}
+
+    let completion = stream.finish().await.expect("finish should succeed");
+    assert_eq!(completion.meta.selected_provider, ProviderId::OpenAi);
+    assert_eq!(
+        completion.response.output.content,
+        vec![agent_core::ContentPart::text("drained response")]
+    );
+}
+
+#[tokio::test]
 async fn direct_streaming_create_request_requires_stream_true() {
     let client = test_provider_client(ProviderId::OpenAi);
 
@@ -459,6 +495,43 @@ async fn text_stream_completion_matches_envelope_stream_completion() {
 
     assert_eq!(text_completion.response, envelope_completion.response);
     assert_eq!(text_completion.meta, envelope_completion.meta);
+}
+
+#[tokio::test]
+async fn text_stream_finish_after_drain_returns_completion() {
+    let base_url = spawn_sse_stub(
+        "text/event-stream",
+        concat!(
+            "event: response.created\n",
+            "data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_1\",\"model\":\"gpt-5-mini\"}}\n\n",
+            "event: response.output_item.added\n",
+            "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"message\",\"id\":\"msg_1\",\"role\":\"assistant\"}}\n\n",
+            "event: response.output_text.delta\n",
+            "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"content_index\":0,\"item_id\":\"msg_1\",\"delta\":\"finish after drain\"}\n\n",
+            "event: response.output_item.done\n",
+            "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"message\",\"id\":\"msg_1\"}}\n\n",
+            "event: response.completed\n",
+            "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_1\",\"model\":\"gpt-5-mini\",\"output\":[],\"usage\":{\"input_tokens\":1,\"output_tokens\":2,\"total_tokens\":3}}}\n\n"
+        ),
+    )
+    .await;
+    let client = test_streaming_provider_client(ProviderId::OpenAi, &base_url, Some("gpt-5-mini"));
+
+    let mut stream = client
+        .streaming()
+        .create(MessageCreateInput::user("hello"))
+        .await
+        .expect("stream should open")
+        .into_text_stream();
+
+    while next_text_stream_item(&mut stream).await.is_some() {}
+
+    let completion = stream.finish().await.expect("finish should succeed");
+    assert_eq!(completion.meta.selected_provider, ProviderId::OpenAi);
+    assert_eq!(
+        completion.response.output.content,
+        vec![agent_core::ContentPart::text("finish after drain")]
+    );
 }
 
 async fn next_stream_item(

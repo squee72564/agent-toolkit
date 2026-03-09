@@ -21,12 +21,22 @@ use crate::types::{
 
 type InFlightFuture = Pin<Box<dyn Future<Output = (StreamDriverState, DriveNextOutcome)> + Send>>;
 
+/// Completion payload returned after a streaming response has been fully finalized.
+///
+/// `MessageResponseStream` iteration yields only stream envelopes or terminal errors. Successful
+/// completion metadata is retrieved explicitly by calling [`MessageResponseStream::finish`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct StreamCompletion {
     pub response: Response,
     pub meta: ResponseMeta,
 }
 
+/// Stream of canonical response envelopes from a provider attempt.
+///
+/// Iteration yields only stream payload items and terminal errors. When iteration returns `None`,
+/// the payload stream is exhausted, but successful completion metadata has not been returned yet.
+/// Call [`MessageResponseStream::finish`] after draining the stream to retrieve the final
+/// [`Response`] and [`ResponseMeta`].
 pub struct MessageResponseStream {
     state: Option<StreamDriverState>,
     in_flight: Option<InFlightFuture>,
@@ -91,6 +101,11 @@ impl MessageResponseStream {
         }
     }
 
+    /// Finalize the stream and return terminal success metadata.
+    ///
+    /// This method must be called to retrieve successful completion details, even if the stream
+    /// has already been fully drained via iteration. If a terminal error was already surfaced
+    /// during iteration, this returns that same error.
     pub async fn finish(mut self) -> Result<StreamCompletion, RuntimeError> {
         let mut state = self.take_state().await?;
 

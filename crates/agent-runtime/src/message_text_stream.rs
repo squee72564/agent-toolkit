@@ -4,9 +4,16 @@ use std::task::{Context, Poll};
 
 use agent_core::{CanonicalStreamEnvelope, CanonicalStreamEvent};
 use futures_core::Stream;
+use futures_util::future::poll_fn;
 
 use crate::{MessageResponseStream, RuntimeError, StreamCompletion};
 
+/// Stream of assistant text deltas extracted from [`MessageResponseStream`].
+///
+/// Iteration yields only text chunks and terminal errors. When iteration returns `None`, callers
+/// must still call [`MessageTextStream::finish`] to retrieve the final response and completion
+/// metadata. `finish()` drains any buffered text state before finalizing the underlying response
+/// stream so partial consumption cannot drop already-extracted text.
 pub struct MessageTextStream {
     inner: MessageResponseStream,
     pending_text: VecDeque<String>,
@@ -26,7 +33,18 @@ impl MessageTextStream {
         }
     }
 
-    pub async fn finish(self) -> Result<StreamCompletion, RuntimeError> {
+    /// Finalize the text stream and return terminal success metadata.
+    ///
+    /// This method must be called to retrieve successful completion details, even after the text
+    /// stream has been fully drained. If a terminal error was already surfaced during iteration,
+    /// this returns that same error.
+    pub async fn finish(mut self) -> Result<StreamCompletion, RuntimeError> {
+        while poll_fn(|cx| Pin::new(&mut self).poll_next(cx))
+            .await
+            .transpose()?
+            .is_some()
+        {}
+
         self.inner.finish().await
     }
 
