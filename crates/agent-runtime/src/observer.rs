@@ -4,6 +4,11 @@ use crate::types::{
     AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, RequestEndEvent, RequestStartEvent,
 };
 
+/// Best-effort runtime lifecycle observer.
+///
+/// Observer callbacks are advisory only. Runtime code intentionally suppresses
+/// observer panics so instrumentation cannot change request control flow or
+/// fail an otherwise successful operation.
 pub trait RuntimeObserver: Send + Sync {
     fn on_request_start(&self, _event: &RequestStartEvent) {}
     fn on_attempt_start(&self, _event: &AttemptStartEvent) {}
@@ -12,6 +17,10 @@ pub trait RuntimeObserver: Send + Sync {
     fn on_request_end(&self, _event: &RequestEndEvent) {}
 }
 
+/// Resolves the observer to use for a request.
+///
+/// Precedence is explicit and stable: send-level observer overrides toolkit-
+/// level observer, which overrides client-level observer.
 pub fn resolve_observer_for_request<'a>(
     client_observer: Option<&'a Arc<dyn RuntimeObserver>>,
     toolkit_observer: Option<&'a Arc<dyn RuntimeObserver>>,
@@ -20,6 +29,10 @@ pub fn resolve_observer_for_request<'a>(
     send_observer.or(toolkit_observer).or(client_observer)
 }
 
+/// Invokes an observer callback while suppressing observer panics.
+///
+/// This is intentional: observer failures must not alter runtime behavior, and
+/// the runtime does not propagate observer panics back to callers.
 pub fn safe_call_observer(
     observer: Option<&Arc<dyn RuntimeObserver>>,
     call: impl FnOnce(&dyn RuntimeObserver),
