@@ -18,6 +18,7 @@ mod conversation_test;
 mod fallback_test;
 mod message_create_input_test;
 mod observer_test;
+mod provider_runtime_test;
 mod provider_stream_runtime_test;
 mod runtime_error_test;
 mod send_options_test;

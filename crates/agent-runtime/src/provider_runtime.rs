@@ -333,7 +333,22 @@ impl ProviderRuntime {
             .map_err(|error| RuntimeError::from_transport(self.provider, error))?
         {
             HttpResponse::Json(response) => response,
-            _ => unreachable!("JSON response mode must return a JSON response"),
+            HttpResponse::Sse(response) => {
+                return Err(response_mode_mismatch_error(
+                    self.provider,
+                    HttpResponseMode::Json,
+                    "SSE",
+                    &response.head,
+                ));
+            }
+            HttpResponse::Bytes(response) => {
+                return Err(response_mode_mismatch_error(
+                    self.provider,
+                    HttpResponseMode::Json,
+                    "bytes",
+                    &response.head,
+                ));
+            }
         };
         let provider_code = extract_provider_code(&provider_response.body);
         let response_body = std::mem::replace(&mut provider_response.body, serde_json::Value::Null);
@@ -422,7 +437,22 @@ impl ProviderRuntime {
             .map_err(|error| RuntimeError::from_transport(self.provider, error))?
         {
             HttpResponse::Sse(response) => *response,
-            _ => unreachable!("SSE response mode must return an SSE response"),
+            HttpResponse::Json(response) => {
+                return Err(response_mode_mismatch_error(
+                    self.provider,
+                    HttpResponseMode::Sse,
+                    "JSON",
+                    &response.head,
+                ));
+            }
+            HttpResponse::Bytes(response) => {
+                return Err(response_mode_mismatch_error(
+                    self.provider,
+                    HttpResponseMode::Sse,
+                    "bytes",
+                    &response.head,
+                ));
+            }
         };
 
         Ok(OpenedProviderStream {
@@ -485,6 +515,34 @@ fn map_stream_runtime_error(provider: ProviderId, error: StreamRuntimeError) -> 
             }
             RuntimeError::from_adapter(error)
         }
+    }
+}
+
+pub(crate) fn response_mode_mismatch_error(
+    provider: ProviderId,
+    expected_mode: HttpResponseMode,
+    actual_response_kind: &'static str,
+    head: &agent_transport::HttpResponseHead,
+) -> RuntimeError {
+    RuntimeError {
+        kind: crate::RuntimeErrorKind::ProtocolViolation,
+        message: format!(
+            "transport contract violated for {provider:?}: expected {} response, got {actual_response_kind}",
+            expected_response_kind_label(expected_mode)
+        ),
+        provider: Some(provider),
+        status_code: Some(head.status.as_u16()),
+        request_id: head.request_id.clone(),
+        provider_code: None,
+        source: None,
+    }
+}
+
+fn expected_response_kind_label(mode: HttpResponseMode) -> &'static str {
+    match mode {
+        HttpResponseMode::Json => "JSON",
+        HttpResponseMode::Sse => "SSE",
+        HttpResponseMode::Bytes => "bytes",
     }
 }
 
