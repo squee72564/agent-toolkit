@@ -1,4 +1,5 @@
 use std::env;
+use std::io::{self, Write};
 
 use agent_toolkit::{MessageCreateInput, openai};
 use futures_util::StreamExt;
@@ -22,6 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     while let Some(chunk) = stream.next().await {
         print!("{}", chunk?);
+        io::stdout().flush()?;
     }
     println!();
 

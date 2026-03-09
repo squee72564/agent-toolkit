@@ -1,4 +1,5 @@
 use std::env;
+use std::io::{self, Write};
 use std::sync::Arc;
 
 use agent_toolkit::core::{CanonicalStreamEvent, StreamOutputItemEnd, StreamOutputItemStart};
@@ -164,6 +165,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
                 CanonicalStreamEvent::TextDelta { delta, .. } => {
                     print!("{delta}");
+                    io::stdout().flush()?;
                 }
                 CanonicalStreamEvent::ToolCallArgumentsDelta {
                     tool_name, delta, ..
