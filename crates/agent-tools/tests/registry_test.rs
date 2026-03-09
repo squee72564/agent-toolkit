@@ -50,18 +50,18 @@ fn build_tool(
 }
 
 #[test]
-fn register_and_get_behavior_is_unchanged() {
+fn register_and_get_behavior_is_validated() {
     let mut registry = ToolRegistry::new();
     let input_calls = Arc::new(AtomicUsize::new(0));
     let execute_calls = Arc::new(AtomicUsize::new(0));
     let tool = build_tool(
         "legacy",
-        json!({"type": "string"}),
+        json!({"type": "object"}),
         input_calls,
         execute_calls,
     );
 
-    registry.register(tool);
+    registry.register(tool).expect("schema should be validated");
 
     assert_eq!(registry.len(), 1);
     assert!(!registry.is_empty());
@@ -96,24 +96,62 @@ fn register_validated_rejects_invalid_schema_without_registering_tool() {
 }
 
 #[test]
+fn register_rejects_duplicate_names_without_overwriting() {
+    let mut registry = ToolRegistry::new();
+    let first_input_calls = Arc::new(AtomicUsize::new(0));
+    let first_execute_calls = Arc::new(AtomicUsize::new(0));
+    registry
+        .register(build_tool(
+            "search",
+            json!({"type": "object"}),
+            first_input_calls.clone(),
+            first_execute_calls,
+        ))
+        .expect("first registration should succeed");
+
+    let second_input_calls = Arc::new(AtomicUsize::new(0));
+    let second_execute_calls = Arc::new(AtomicUsize::new(0));
+    let error = registry
+        .register(build_tool(
+            "search",
+            json!({"type": "object"}),
+            second_input_calls.clone(),
+            second_execute_calls,
+        ))
+        .expect_err("duplicate registration should fail");
+
+    assert!(matches!(
+        error,
+        ToolRegistryError::DuplicateName { name } if name == "search"
+    ));
+    assert_eq!(registry.len(), 1);
+    assert_eq!(first_input_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(second_input_calls.load(Ordering::SeqCst), 0);
+}
+
+#[test]
 fn tool_definitions_returns_sorted_provider_ready_definitions() {
     let mut registry = ToolRegistry::new();
     let first_input_calls = Arc::new(AtomicUsize::new(0));
     let first_execute_calls = Arc::new(AtomicUsize::new(0));
-    registry.register(build_tool(
-        "zeta",
-        json!({"type": "object"}),
-        first_input_calls.clone(),
-        first_execute_calls,
-    ));
+    registry
+        .register(build_tool(
+            "zeta",
+            json!({"type": "object"}),
+            first_input_calls.clone(),
+            first_execute_calls,
+        ))
+        .expect("registration should succeed");
     let second_input_calls = Arc::new(AtomicUsize::new(0));
     let second_execute_calls = Arc::new(AtomicUsize::new(0));
-    registry.register(build_tool(
-        "alpha",
-        json!({"type": "object"}),
-        second_input_calls.clone(),
-        second_execute_calls,
-    ));
+    registry
+        .register(build_tool(
+            "alpha",
+            json!({"type": "object"}),
+            second_input_calls.clone(),
+            second_execute_calls,
+        ))
+        .expect("registration should succeed");
 
     let definitions = registry.tool_definitions();
 

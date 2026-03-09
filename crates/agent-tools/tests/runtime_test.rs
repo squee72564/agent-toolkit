@@ -123,7 +123,7 @@ fn validation_uses_registered_schema() {
         .validate_call("search", &json!({"query": "rust"}))
         .expect("validation should pass");
 
-    assert_eq!(input_calls.load(Ordering::SeqCst), 2);
+    assert_eq!(input_calls.load(Ordering::SeqCst), 1);
 }
 
 #[test]
@@ -244,41 +244,18 @@ async fn execute_wraps_tool_execution_errors() {
 }
 
 #[test]
-fn validate_call_surfaces_invalid_schema_for_non_validated_registration() {
-    let mut registry = ToolRegistry::new();
-    let tool = build_tool(
-        "search",
-        json!({
-            "type": "object",
-            "properties": 12
-        }),
-        Arc::new(AtomicUsize::new(0)),
-        Arc::new(AtomicUsize::new(0)),
-    );
-    registry.register(tool);
-    let runtime = ToolRuntime::new(&registry);
-
-    let error = runtime
-        .validate_call("search", &json!({}))
-        .expect_err("invalid schema should fail validation");
-
-    assert!(matches!(
-        error,
-        ToolRuntimeError::InvalidSchema { name, .. } if name == "search"
-    ));
-}
-
-#[test]
-fn validation_recompiles_schema_on_each_call() {
+fn validation_uses_cached_schema_on_each_call() {
     let mut registry = ToolRegistry::new();
     let input_calls = Arc::new(AtomicUsize::new(0));
     let execute_calls = Arc::new(AtomicUsize::new(0));
-    registry.register(build_tool(
-        "search",
-        strict_schema("query"),
-        input_calls.clone(),
-        execute_calls,
-    ));
+    registry
+        .register(build_tool(
+            "search",
+            strict_schema("query"),
+            input_calls.clone(),
+            execute_calls,
+        ))
+        .expect("registration should compile schema once");
     let runtime = ToolRuntime::new(&registry);
 
     runtime
@@ -288,11 +265,11 @@ fn validation_recompiles_schema_on_each_call() {
         .validate_call("search", &json!({ "query": 2 }))
         .expect("second call should compile schema and pass validation");
 
-    assert_eq!(input_calls.load(Ordering::SeqCst), 2);
+    assert_eq!(input_calls.load(Ordering::SeqCst), 1);
 }
 
 #[test]
-fn validation_uses_latest_registration_for_overwrites() {
+fn register_rejects_duplicate_names_before_runtime_validation() {
     let mut registry = ToolRegistry::new();
     let old_input_calls = Arc::new(AtomicUsize::new(0));
     let old_execute_calls = Arc::new(AtomicUsize::new(0));
@@ -314,51 +291,19 @@ fn validation_uses_latest_registration_for_overwrites() {
         new_input_calls.clone(),
         new_execute_calls,
     );
-    registry.register(new_tool);
+    let error = registry
+        .register(new_tool)
+        .expect_err("duplicate registration should fail");
+
+    assert!(matches!(
+        error,
+        agent_tools::ToolRegistryError::DuplicateName { name } if name == "search"
+    ));
     let runtime = ToolRuntime::new(&registry);
-
     runtime
-        .validate_call("search", &json!({"b": 1}))
-        .expect("new schema should be used");
-    assert_eq!(new_input_calls.load(Ordering::SeqCst), 1);
-}
-
-#[test]
-fn validated_overwrite_updates_runtime_behavior() {
-    let mut registry = ToolRegistry::new();
-    let first_input_calls = Arc::new(AtomicUsize::new(0));
-    let first_execute_calls = Arc::new(AtomicUsize::new(0));
-    let first_tool = build_tool(
-        "search",
-        strict_schema("a"),
-        first_input_calls,
-        first_execute_calls,
-    );
-    registry
-        .register_validated(first_tool)
-        .expect("first schema should compile");
-
-    let second_input_calls = Arc::new(AtomicUsize::new(0));
-    let second_execute_calls = Arc::new(AtomicUsize::new(0));
-    let second_tool = build_tool(
-        "search",
-        strict_schema("b"),
-        second_input_calls,
-        second_execute_calls,
-    );
-    registry
-        .register_validated(second_tool)
-        .expect("second schema should compile");
-    let runtime = ToolRuntime::new(&registry);
-
-    runtime
-        .validate_call("search", &json!({"b": 1}))
-        .expect("second schema should be active");
-    let error = runtime
         .validate_call("search", &json!({"a": 1}))
-        .expect_err("old schema should no longer be active");
-
-    assert!(matches!(error, ToolRuntimeError::InvalidArgs { .. }));
+        .expect("first schema should remain active");
+    assert_eq!(new_input_calls.load(Ordering::SeqCst), 0);
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -526,6 +471,14 @@ async fn execute_maps_typed_input_decode_failures_to_invalid_args() {
                     .to_string()
                     .starts_with("tool 'search' input decode failed:")
             );
+            match source {
+                agent_tools::ToolArgsValidationError::ValidationFailed { issues, .. } => {
+                    assert_eq!(issues.len(), 1);
+                    assert_eq!(issues[0].instance_path, "$");
+                    assert!(issues[0].message.contains("query must not be empty"));
+                }
+                other => panic!("expected validation failure details, got {other}"),
+            }
         }
         other => panic!("expected invalid args error, got {other}"),
     }

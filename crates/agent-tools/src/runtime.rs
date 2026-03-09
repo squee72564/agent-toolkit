@@ -1,10 +1,9 @@
-use agent_core::types::ToolDefinition;
 use serde_json::Value;
 use thiserror::Error;
 
-use crate::registry::ToolRegistry;
-use crate::schema::{CompiledToolSchema, ToolArgsValidationError, ToolSchemaError};
-use crate::tool::{Tool, ToolError, ToolOutput};
+use crate::registry::{RegisteredTool, ToolRegistry};
+use crate::schema::{ToolArgsValidationError, ToolSchemaError};
+use crate::tool::{ToolError, ToolOutput};
 
 #[derive(Debug, Error)]
 pub enum ToolRuntimeError {
@@ -40,50 +39,39 @@ impl<'a> ToolRuntime<'a> {
     }
 
     pub fn validate_call(&self, name: &str, args: &Value) -> Result<(), ToolRuntimeError> {
-        let tool = self.lookup_tool(name)?;
-        let definition = tool_definition_from_tool(tool);
-        let compiled_schema = CompiledToolSchema::from_definition(&definition)
-            .map_err(|source| Self::invalid_schema(name, source))?;
-
-        compiled_schema
+        let entry = self.lookup_tool(name)?;
+        entry
+            .compiled_schema()
             .validate_args(args)
             .map_err(|source| Self::invalid_args(name, source))
     }
 
     pub async fn execute(&self, name: &str, args: Value) -> Result<ToolOutput, ToolRuntimeError> {
-        self.validate_call(name, &args)?;
+        let entry = self.lookup_tool(name)?;
+        entry
+            .compiled_schema()
+            .validate_args(&args)
+            .map_err(|source| Self::invalid_args(name, source))?;
 
-        let tool = self.lookup_tool(name)?;
-
-        match tool.execute(args).await {
+        match entry.tool().execute(args).await {
             Ok(output) => Ok(output),
             Err(ToolError::InvalidInputDecode(message)) => Err(Self::invalid_args(
                 name,
-                ToolArgsValidationError::ValidationFailed {
-                    message: format!("tool '{name}' input decode failed: {message}"),
-                    issues: Vec::new(),
-                },
+                ToolArgsValidationError::decode_failure(name, message),
             )),
             Err(source) => Err(Self::execution(name, source)),
         }
     }
 
-    fn lookup_tool(&self, name: &str) -> Result<&dyn Tool, ToolRuntimeError> {
+    fn lookup_tool(&self, name: &str) -> Result<&RegisteredTool, ToolRuntimeError> {
         self.registry
-            .get(name)
+            .get_registered(name)
             .ok_or_else(|| Self::unknown_tool(name))
     }
 
     fn unknown_tool(name: &str) -> ToolRuntimeError {
         ToolRuntimeError::UnknownTool {
             name: name.to_string(),
-        }
-    }
-
-    fn invalid_schema(name: &str, source: ToolSchemaError) -> ToolRuntimeError {
-        ToolRuntimeError::InvalidSchema {
-            name: name.to_string(),
-            source,
         }
     }
 
@@ -99,13 +87,5 @@ impl<'a> ToolRuntime<'a> {
             name: name.to_string(),
             source,
         }
-    }
-}
-
-fn tool_definition_from_tool(tool: &dyn Tool) -> ToolDefinition {
-    ToolDefinition {
-        name: tool.name().to_string(),
-        description: tool.description().map(ToString::to_string),
-        parameters_schema: tool.input_schema(),
     }
 }
