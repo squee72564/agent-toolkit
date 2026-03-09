@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc, time::Instant};
 
 use agent_core::{Request, Response};
 
@@ -19,6 +19,22 @@ use crate::types::{
 #[derive(Debug, Clone)]
 pub(crate) struct ProviderClient {
     pub(crate) runtime: Arc<ProviderRuntime>,
+}
+
+struct DirectRequestContext<'a> {
+    request_started_at: Instant,
+    attempt_started_at: Instant,
+    observer: Option<&'a Arc<dyn crate::observer::RuntimeObserver>>,
+    request_model: Option<String>,
+}
+
+struct DirectFailureContext {
+    request_id: Option<String>,
+    provider: Option<agent_core::ProviderId>,
+    model: Option<String>,
+    status_code: Option<u16>,
+    error_kind: RuntimeErrorKind,
+    error_message: String,
 }
 
 impl ProviderClient {
@@ -71,41 +87,7 @@ impl ProviderClient {
                 "stream=true is not supported by the current messages/send response API yet",
             ));
         }
-        let request_started_at = std::time::Instant::now();
-        let observer = resolve_observer_for_request(self.runtime.observer.as_ref(), None, None);
-        let request_start_event = RequestStartEvent {
-            request_id: None,
-            provider: Some(self.runtime.provider),
-            model: if request.model_id.is_empty() {
-                None
-            } else {
-                Some(request.model_id.clone())
-            },
-            target_index: None,
-            attempt_index: None,
-            elapsed: request_started_at.elapsed(),
-            first_target: Some(self.runtime.provider),
-            resolved_target_count: 1,
-        };
-        safe_call_observer(observer, |runtime_observer| {
-            runtime_observer.on_request_start(&request_start_event);
-        });
-        let attempt_started_at = std::time::Instant::now();
-        let attempt_start_event = AttemptStartEvent {
-            request_id: None,
-            provider: Some(self.runtime.provider),
-            model: if request.model_id.is_empty() {
-                None
-            } else {
-                Some(request.model_id.clone())
-            },
-            target_index: Some(0),
-            attempt_index: Some(0),
-            elapsed: attempt_started_at.elapsed(),
-        };
-        safe_call_observer(observer, |runtime_observer| {
-            runtime_observer.on_attempt_start(&attempt_start_event);
-        });
+        let context = self.begin_direct_request(&request);
 
         let attempt = self
             .runtime
@@ -114,18 +96,7 @@ impl ProviderClient {
 
         match attempt {
             ProviderAttemptOutcome::Success { response, meta } => {
-                let attempt_success_event = AttemptSuccessEvent {
-                    request_id: meta.request_id.clone(),
-                    provider: Some(meta.provider),
-                    model: Some(meta.model.clone()),
-                    target_index: Some(0),
-                    attempt_index: Some(0),
-                    elapsed: attempt_started_at.elapsed(),
-                    status_code: meta.status_code,
-                };
-                safe_call_observer(observer, |runtime_observer| {
-                    runtime_observer.on_attempt_success(&attempt_success_event);
-                });
+                self.emit_attempt_success(&context, &meta);
                 let response_meta = ResponseMeta {
                     selected_provider: meta.provider,
                     selected_model: meta.model.clone(),
@@ -133,53 +104,24 @@ impl ProviderClient {
                     request_id: meta.request_id.clone(),
                     attempts: vec![meta],
                 };
-                let request_end_event = RequestEndEvent {
-                    request_id: response_meta.request_id.clone(),
-                    provider: Some(response_meta.selected_provider),
-                    model: Some(response_meta.selected_model.clone()),
-                    target_index: Some(0),
-                    attempt_index: Some(0),
-                    elapsed: request_started_at.elapsed(),
-                    status_code: response_meta.status_code,
-                    error_kind: None,
-                    error_message: None,
-                };
-                safe_call_observer(observer, |runtime_observer| {
-                    runtime_observer.on_request_end(&request_end_event);
-                });
+                self.emit_request_end_success(&context, &response_meta);
 
                 Ok((response, response_meta))
             }
             ProviderAttemptOutcome::Failure { error, meta } => {
-                let attempt_failure_event = AttemptFailureEvent {
-                    request_id: meta.request_id.clone(),
-                    provider: Some(meta.provider),
-                    model: Some(meta.model.clone()),
-                    target_index: Some(0),
-                    attempt_index: Some(0),
-                    elapsed: attempt_started_at.elapsed(),
-                    error_kind: meta.error_kind,
-                    error_message: meta.error_message,
-                };
-                safe_call_observer(observer, |runtime_observer| {
-                    runtime_observer.on_attempt_failure(&attempt_failure_event);
-                });
-
+                self.emit_attempt_failure(&context, &meta);
                 let terminal_error = terminal_failure_error(&error);
-                let request_end_event = RequestEndEvent {
-                    request_id: terminal_error.request_id.clone(),
-                    provider: terminal_error.provider,
-                    model: Some(meta.model),
-                    target_index: Some(0),
-                    attempt_index: Some(0),
-                    elapsed: request_started_at.elapsed(),
-                    status_code: terminal_error.status_code,
-                    error_kind: Some(terminal_error.kind),
-                    error_message: Some(terminal_error.message.clone()),
-                };
-                safe_call_observer(observer, |runtime_observer| {
-                    runtime_observer.on_request_end(&request_end_event);
-                });
+                self.emit_request_end_failure(
+                    &context,
+                    DirectFailureContext {
+                        request_id: terminal_error.request_id.clone(),
+                        provider: terminal_error.provider,
+                        model: Some(meta.model),
+                        status_code: terminal_error.status_code,
+                        error_kind: terminal_error.kind,
+                        error_message: terminal_error.message.clone(),
+                    },
+                );
 
                 Err(error)
             }
@@ -206,42 +148,8 @@ impl ProviderClient {
             ));
         }
 
-        let request_started_at = std::time::Instant::now();
-        let observer =
-            resolve_observer_for_request(self.runtime.observer.as_ref(), None, None).cloned();
-        let request_start_event = RequestStartEvent {
-            request_id: None,
-            provider: Some(self.runtime.provider),
-            model: if request.model_id.is_empty() {
-                None
-            } else {
-                Some(request.model_id.clone())
-            },
-            target_index: None,
-            attempt_index: None,
-            elapsed: request_started_at.elapsed(),
-            first_target: Some(self.runtime.provider),
-            resolved_target_count: 1,
-        };
-        safe_call_observer(observer.as_ref(), |runtime_observer| {
-            runtime_observer.on_request_start(&request_start_event);
-        });
-        let attempt_started_at = std::time::Instant::now();
-        let attempt_start_event = AttemptStartEvent {
-            request_id: None,
-            provider: Some(self.runtime.provider),
-            model: if request.model_id.is_empty() {
-                None
-            } else {
-                Some(request.model_id.clone())
-            },
-            target_index: Some(0),
-            attempt_index: Some(0),
-            elapsed: attempt_started_at.elapsed(),
-        };
-        safe_call_observer(observer.as_ref(), |runtime_observer| {
-            runtime_observer.on_attempt_start(&attempt_start_event);
-        });
+        let context = self.begin_direct_request(&request);
+        let stream_observer = context.cloned_observer();
 
         match self
             .runtime
@@ -251,15 +159,15 @@ impl ProviderClient {
             ProviderStreamAttemptOutcome::Opened { stream, meta } => {
                 Ok(MessageResponseStream::new_direct(
                     request,
-                    request_started_at,
-                    observer.clone(),
+                    context.request_started_at,
+                    stream_observer,
                     LiveAttempt {
                         stream: *stream,
                         context: crate::message_response_stream::AttemptContext {
                             target_index: 0,
                             attempt_index: 0,
-                            started_at: attempt_started_at,
-                            observer,
+                            started_at: context.attempt_started_at,
+                            observer: context.cloned_observer(),
                             provider: meta.provider,
                             model: meta.model,
                             request_id: meta.request_id,
@@ -269,36 +177,141 @@ impl ProviderClient {
                 ))
             }
             ProviderStreamAttemptOutcome::Failure { error, meta } => {
-                let attempt_failure_event = AttemptFailureEvent {
-                    request_id: meta.request_id.clone(),
-                    provider: Some(meta.provider),
-                    model: Some(meta.model.clone()),
-                    target_index: Some(0),
-                    attempt_index: Some(0),
-                    elapsed: attempt_started_at.elapsed(),
-                    error_kind: meta.error_kind,
-                    error_message: meta.error_message.clone(),
-                };
-                safe_call_observer(observer.as_ref(), |runtime_observer| {
-                    runtime_observer.on_attempt_failure(&attempt_failure_event);
-                });
-                let request_end_event = RequestEndEvent {
-                    request_id: error.request_id.clone(),
-                    provider: Some(meta.provider),
-                    model: Some(meta.model),
-                    target_index: Some(0),
-                    attempt_index: Some(0),
-                    elapsed: request_started_at.elapsed(),
-                    status_code: error.status_code,
-                    error_kind: Some(error.kind),
-                    error_message: Some(error.message.clone()),
-                };
-                safe_call_observer(observer.as_ref(), |runtime_observer| {
-                    runtime_observer.on_request_end(&request_end_event);
-                });
+                self.emit_attempt_failure(&context, &meta);
+                self.emit_request_end_failure(
+                    &context,
+                    DirectFailureContext {
+                        request_id: error.request_id.clone(),
+                        provider: Some(meta.provider),
+                        model: Some(meta.model),
+                        status_code: error.status_code,
+                        error_kind: error.kind,
+                        error_message: error.message.clone(),
+                    },
+                );
                 Err(error)
             }
         }
+    }
+
+    fn begin_direct_request<'a>(&'a self, request: &Request) -> DirectRequestContext<'a> {
+        let request_started_at = Instant::now();
+        let observer = resolve_observer_for_request(self.runtime.observer.as_ref(), None, None);
+        let request_model = request_model(&request.model_id);
+        let request_start_event = RequestStartEvent {
+            request_id: None,
+            provider: Some(self.runtime.provider),
+            model: request_model.clone(),
+            target_index: None,
+            attempt_index: None,
+            elapsed: request_started_at.elapsed(),
+            first_target: Some(self.runtime.provider),
+            resolved_target_count: 1,
+        };
+        safe_call_observer(observer, |runtime_observer| {
+            runtime_observer.on_request_start(&request_start_event);
+        });
+
+        let attempt_started_at = Instant::now();
+        let attempt_start_event = AttemptStartEvent {
+            request_id: None,
+            provider: Some(self.runtime.provider),
+            model: request_model.clone(),
+            target_index: Some(0),
+            attempt_index: Some(0),
+            elapsed: attempt_started_at.elapsed(),
+        };
+        safe_call_observer(observer, |runtime_observer| {
+            runtime_observer.on_attempt_start(&attempt_start_event);
+        });
+
+        DirectRequestContext {
+            request_started_at,
+            attempt_started_at,
+            observer,
+            request_model,
+        }
+    }
+
+    fn emit_attempt_success(
+        &self,
+        context: &DirectRequestContext<'_>,
+        meta: &crate::types::AttemptMeta,
+    ) {
+        let event = AttemptSuccessEvent {
+            request_id: meta.request_id.clone(),
+            provider: Some(meta.provider),
+            model: Some(meta.model.clone()),
+            target_index: Some(0),
+            attempt_index: Some(0),
+            elapsed: context.attempt_started_at.elapsed(),
+            status_code: meta.status_code,
+        };
+        safe_call_observer(context.observer, |runtime_observer| {
+            runtime_observer.on_attempt_success(&event);
+        });
+    }
+
+    fn emit_attempt_failure(
+        &self,
+        context: &DirectRequestContext<'_>,
+        meta: &crate::types::AttemptMeta,
+    ) {
+        let event = AttemptFailureEvent {
+            request_id: meta.request_id.clone(),
+            provider: Some(meta.provider),
+            model: Some(meta.model.clone()),
+            target_index: Some(0),
+            attempt_index: Some(0),
+            elapsed: context.attempt_started_at.elapsed(),
+            error_kind: meta.error_kind,
+            error_message: meta.error_message.clone(),
+        };
+        safe_call_observer(context.observer, |runtime_observer| {
+            runtime_observer.on_attempt_failure(&event);
+        });
+    }
+
+    fn emit_request_end_success(
+        &self,
+        context: &DirectRequestContext<'_>,
+        response_meta: &ResponseMeta,
+    ) {
+        let event = RequestEndEvent {
+            request_id: response_meta.request_id.clone(),
+            provider: Some(response_meta.selected_provider),
+            model: Some(response_meta.selected_model.clone()),
+            target_index: Some(0),
+            attempt_index: Some(0),
+            elapsed: context.request_started_at.elapsed(),
+            status_code: response_meta.status_code,
+            error_kind: None,
+            error_message: None,
+        };
+        safe_call_observer(context.observer, |runtime_observer| {
+            runtime_observer.on_request_end(&event);
+        });
+    }
+
+    fn emit_request_end_failure(
+        &self,
+        context: &DirectRequestContext<'_>,
+        failure: DirectFailureContext,
+    ) {
+        let event = RequestEndEvent {
+            request_id: failure.request_id,
+            provider: failure.provider,
+            model: failure.model.or_else(|| context.request_model.clone()),
+            target_index: Some(0),
+            attempt_index: Some(0),
+            elapsed: context.request_started_at.elapsed(),
+            status_code: failure.status_code,
+            error_kind: Some(failure.error_kind),
+            error_message: Some(failure.error_message),
+        };
+        safe_call_observer(context.observer, |runtime_observer| {
+            runtime_observer.on_request_end(&event);
+        });
     }
 }
 
@@ -310,4 +323,14 @@ fn terminal_failure_error(error: &RuntimeError) -> &RuntimeError {
         return terminal_error;
     }
     error
+}
+
+impl DirectRequestContext<'_> {
+    fn cloned_observer(&self) -> Option<Arc<dyn crate::observer::RuntimeObserver>> {
+        self.observer.cloned()
+    }
+}
+
+fn request_model(model_id: &str) -> Option<String> {
+    (!model_id.is_empty()).then(|| model_id.to_string())
 }
