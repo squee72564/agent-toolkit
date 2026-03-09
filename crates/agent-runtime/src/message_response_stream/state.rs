@@ -1,0 +1,138 @@
+use std::sync::Arc;
+use std::time::Instant;
+
+use agent_core::{Request, Response};
+
+use crate::AgentToolkit;
+use crate::observer::RuntimeObserver;
+use crate::provider_runtime::OpenedProviderStream;
+use crate::runtime_error::RuntimeError;
+use crate::send_options::SendOptions;
+use crate::target::Target;
+use crate::types::{AttemptMeta, ResponseMeta};
+
+pub(super) struct StreamDriverState {
+    pub(super) request_started_at: Instant,
+    pub(super) request_observer: Option<Arc<dyn RuntimeObserver>>,
+    pub(super) request_model_id: String,
+    pub(super) attempts: Vec<AttemptMeta>,
+    pub(super) current_attempt: Option<LiveAttempt>,
+    pub(super) routing: RoutingState,
+    pub(super) first_envelope_emitted: bool,
+    pub(super) pending_completion: Option<PendingCompletion>,
+    pub(super) terminal_error: Option<RuntimeError>,
+    pub(super) terminal_error_delivered: bool,
+}
+
+impl StreamDriverState {
+    pub(super) fn new_direct(
+        request: Request,
+        request_started_at: Instant,
+        request_observer: Option<Arc<dyn RuntimeObserver>>,
+        attempt: LiveAttempt,
+    ) -> Self {
+        Self {
+            request_started_at,
+            request_observer,
+            request_model_id: request.model_id,
+            attempts: Vec::new(),
+            current_attempt: Some(attempt),
+            routing: RoutingState::Direct,
+            first_envelope_emitted: false,
+            pending_completion: None,
+            terminal_error: None,
+            terminal_error_delivered: false,
+        }
+    }
+
+    pub(super) fn new_routed(init: RoutedStreamInit<'_>) -> Self {
+        Self {
+            request_started_at: init.request_started_at,
+            request_observer: init.request_observer,
+            request_model_id: init.request.model_id.clone(),
+            attempts: Vec::new(),
+            current_attempt: Some(init.current_attempt),
+            routing: RoutingState::Routed(Box::new(RoutedState {
+                toolkit: init.toolkit.clone(),
+                request: init.request,
+                options: init.options,
+                targets: init.targets,
+                next_target_index: init.next_target_index,
+            })),
+            first_envelope_emitted: false,
+            pending_completion: None,
+            terminal_error: None,
+            terminal_error_delivered: false,
+        }
+    }
+}
+
+pub(super) enum RoutingState {
+    Direct,
+    Routed(Box<RoutedState>),
+}
+
+pub(super) struct RoutedState {
+    pub(super) toolkit: AgentToolkit,
+    pub(super) request: Request,
+    pub(super) options: SendOptions,
+    pub(super) targets: Vec<Target>,
+    pub(super) next_target_index: usize,
+}
+
+pub(crate) struct RoutedStreamInit<'a> {
+    pub(crate) request: Request,
+    pub(crate) toolkit: &'a AgentToolkit,
+    pub(crate) options: SendOptions,
+    pub(crate) request_started_at: Instant,
+    pub(crate) request_observer: Option<Arc<dyn RuntimeObserver>>,
+    pub(crate) targets: Vec<Target>,
+    pub(crate) current_attempt: LiveAttempt,
+    pub(crate) next_target_index: usize,
+}
+
+pub(super) struct PendingCompletion {
+    pub(super) response: Response,
+    pub(super) attempt: CompletedAttemptContext,
+    pub(super) selected_provider: agent_core::ProviderId,
+    pub(super) selected_model: String,
+    pub(super) status_code: Option<u16>,
+    pub(super) request_id: Option<String>,
+}
+
+impl PendingCompletion {
+    pub(super) fn meta(self, mut attempts: Vec<AttemptMeta>) -> ResponseMeta {
+        attempts.push(self.attempt.meta.clone());
+        ResponseMeta {
+            selected_provider: self.selected_provider,
+            selected_model: self.selected_model,
+            status_code: self.status_code,
+            request_id: self.request_id,
+            attempts,
+        }
+    }
+}
+
+pub(crate) struct LiveAttempt {
+    pub(crate) stream: OpenedProviderStream,
+    pub(crate) context: AttemptContext,
+}
+
+pub(crate) struct AttemptContext {
+    pub(crate) target_index: usize,
+    pub(crate) attempt_index: usize,
+    pub(crate) started_at: Instant,
+    pub(crate) observer: Option<Arc<dyn RuntimeObserver>>,
+    pub(crate) provider: agent_core::ProviderId,
+    pub(crate) model: String,
+    pub(crate) request_id: Option<String>,
+    pub(crate) status_code: Option<u16>,
+}
+
+pub(super) struct CompletedAttemptContext {
+    pub(super) target_index: usize,
+    pub(super) attempt_index: usize,
+    pub(super) started_at: Instant,
+    pub(super) observer: Option<Arc<dyn RuntimeObserver>>,
+    pub(super) meta: AttemptMeta,
+}
