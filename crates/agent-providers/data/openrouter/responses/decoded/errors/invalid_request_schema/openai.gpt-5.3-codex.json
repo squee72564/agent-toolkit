@@ -1,0 +1,112 @@
+{
+  "provider": "openrouter",
+  "scenario": "invalid_request_schema",
+  "captured_at": "2026-03-09T01:01:16.852Z",
+  "request": {
+    "url": "https://openrouter.ai/api/v1/responses",
+    "method": "POST",
+    "model": "openai/gpt-5.3-codex",
+    "headers": {
+      "Authorization": "<redacted>",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "messages": "this-should-be-an-array",
+      "max_tokens": 64,
+      "model": "openai/gpt-5.3-codex"
+    }
+  },
+  "response": {
+    "status": 200,
+    "status_text": "OK",
+    "headers": {},
+    "body": {
+      "id": "gen-1773018077-OqDpKNJDFzpMG3oi0hg2",
+      "object": "response",
+      "created_at": 1773018077,
+      "model": "openai/gpt-5.3-codex-20260224",
+      "status": "completed",
+      "completed_at": 1773018078,
+      "output": [
+        {
+          "id": "rs_tmp_h77301kmsag",
+          "type": "reasoning",
+          "status": "completed",
+          "summary": [
+            {
+              "type": "summary_text",
+              "text": "**Suggesting string-to-array conversion**"
+            }
+          ],
+          "encrypted_content": "gAAAAABprhveKLe1I_oWVkfSzAwzhVP-kFk7BSOWeb8bviWLfCRe_SL2cvkKJWKc_ktetGZLgMyzubmQi0lHoVacUc5SN7WndBtR0SrWzPyIGPsYC0RHk6Vnz1Rx9nmUdp00CbFgqSTKwqg7n5xRaoCIc8FOIi5aZOjSXTFfJgNib_Per8PhAl69jYTUf3lYg8SnMJLGYj9431L9yNMdkP6vXpPEk_iAdvs-20yn8-fuxnjZVBugMWBdfMPFHldR5PykrPsGFdTO85RVjFqDe5TTH_N4vQIJqb2AVI4o-of7luUG79WhL5a9RYK9-7wvZk78v1Ux4Bq-JpJAfgCC5JgPjvDMhPG3AkqN3fuJwTqEyWtT6M6UM1tWjKOEDt84RwwMLVXC-zWWIIhuaet9fUey-zu1yT2W8F4DN4NMDIqvEbnLPYBI-Gi1B1KCUmUdMcGzLk4nSYcFAXV-lgD8qzOFChbOrUPaMjejdLtPiU0NlH9OBfLpo3ZVqDPuWC6h74arH4UmesrxtKJlVf2aSwnStmyrgh6ltvoaoidax51iAATRKV8xbv95tXtxM3BjYj0ISP8lEK0HMreGhfdbsYF8FIgp85zh83a82SqnmXuE-YQoerEImyPhs3A79yEwglGqaEZ_ROdHPvt03Yv0NcmwZaBQGNNIEhRd-NgRAE4Y-P_qD2-C5xnKijg13ZCqGERkomi9pN5Wt0LC0UhagQWnrwnhPH-FivJtXGBB5aNKXMNyMuW_GfvnhVw2RuHdEti0eaeJOGrZv3PlLFl0AoeaGUExc8If1Gg0u5YECshUh_YBHEawzDJvdOc-hPTbtj3Rvjx4pMgJmpbJMUK4opDyW6p8vf0EEtlzQhRbmj7hvGTl7sNYzC8tRFJUaYucMhyTl9J9vnpmjCK4mCZyexTJCWybAGuD4dKFs7yrAd2nIylAfuJBrInckchw3fya6uEbQSXIIaC1L-J-EoEHciXh44o87x6OaPZECwpjr9jg2KlDOiL1h7y9oHcEL2l7hNGXU-Z-bZqhlWbeOq-gpgu6XeENS84lANCaSeGAr3z5iNpFZv6n8AiV0rTra7Luman531iLg419hKQpCD8RFCWoH3G3qOp4KU5J8iwo4hmPao0NfBZmQrQ=",
+          "format": "openai-responses-v1"
+        },
+        {
+          "id": "msg_tmp_dt4ml4g5r6w",
+          "type": "message",
+          "role": "assistant",
+          "status": "completed",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "```json\n[\"this-should-be-an-array",
+              "annotations": [],
+              "logprobs": []
+            }
+          ],
+          "phase": "final_answer"
+        }
+      ],
+      "error": null,
+      "incomplete_details": null,
+      "tools": [],
+      "tool_choice": "auto",
+      "parallel_tool_calls": true,
+      "max_output_tokens": 64,
+      "temperature": 1,
+      "top_p": 1,
+      "presence_penalty": 0,
+      "frequency_penalty": 0,
+      "top_logprobs": 0,
+      "max_tool_calls": null,
+      "metadata": {},
+      "background": false,
+      "previous_response_id": null,
+      "service_tier": "auto",
+      "truncation": "disabled",
+      "store": false,
+      "instructions": null,
+      "text": {
+        "format": {
+          "type": "text"
+        }
+      },
+      "reasoning": null,
+      "safety_identifier": null,
+      "prompt_cache_key": null,
+      "user": null,
+      "usage": {
+        "input_tokens": 12,
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens": 64,
+        "output_tokens_details": {
+          "reasoning_tokens": 49
+        },
+        "total_tokens": 76,
+        "cost": 0.000917,
+        "is_byok": false,
+        "cost_details": {
+          "upstream_inference_cost": 0.000917,
+          "upstream_inference_input_cost": 0.000021,
+          "upstream_inference_output_cost": 0.000896
+        }
+      }
+    }
+  },
+  "normalized_error": {
+    "message": "unexpected success: request did not fail",
+    "error_class": "UnexpectedSuccess"
+  }
+}

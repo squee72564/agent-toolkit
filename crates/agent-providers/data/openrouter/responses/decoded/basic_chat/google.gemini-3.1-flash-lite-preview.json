@@ -1,13 +1,13 @@
 {
-  "id": "gen-1773017833-ewHof9ESfcKYCmqDiwFV",
+  "id": "gen-1773017832-yQl0SMUchhJ1c7s2b8WW",
   "object": "response",
-  "created_at": 1773017833,
-  "model": "google/gemini-3-flash-preview-20251217",
+  "created_at": 1773017832,
+  "model": "google/gemini-3.1-flash-lite-preview-20260303",
   "status": "completed",
-  "completed_at": 1773017834,
+  "completed_at": 1773017833,
   "output": [
     {
-      "id": "msg_tmp_w3mum1hd2o9",
+      "id": "msg_tmp_ivppqi2vdf",
       "type": "message",
       "role": "assistant",
       "status": "completed",
@@ -21,11 +21,11 @@
       ]
     },
     {
-      "id": "rs_tmp_592xc8x4e5m",
+      "id": "rs_tmp_19yyll0tiz6",
       "type": "reasoning",
       "status": "completed",
       "summary": [],
-      "encrypted_content": "CiEBjz1rX93lOf0IZ20odEO1sVDIFwkarssOg5O++DEVtk4=",
+      "encrypted_content": "AY89a1/aHmt7jqnYdIXrS+OE1oKuFqxvTaIiC+szChxxIHub8xqwfuBKYclg1kjOAKM=",
       "format": "google-gemini-v1"
     }
   ],
@@ -67,12 +67,12 @@
       "reasoning_tokens": 0
     },
     "total_tokens": 36,
-    "cost": 0.000033,
+    "cost": 0.0000165,
     "is_byok": false,
     "cost_details": {
-      "upstream_inference_cost": 0.000033,
-      "upstream_inference_input_cost": 0.000015,
-      "upstream_inference_output_cost": 0.000018
+      "upstream_inference_cost": 0.0000165,
+      "upstream_inference_input_cost": 0.0000075,
+      "upstream_inference_output_cost": 0.000009
     }
   }
 }

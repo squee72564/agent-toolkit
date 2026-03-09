@@ -14,21 +14,25 @@ use super::response::decode_response_json;
 const PROVIDER: &str = "openrouter";
 const SUCCESS_SCENARIOS: [&str; 3] = ["basic_chat", "tool_call", "tool_call_reasoning"];
 const SMOKE_MODELS_OPENROUTER: [&str; 3] = [
-    "openai.gpt-5-mini",
+    "openai.gpt-5.4",
     "anthropic.claude-sonnet-4.6",
-    "google.gemini-2.5-pro",
+    "google.gemini-3.1-flash-lite-preview",
 ];
-const SMOKE_ERROR_FIXTURES: [(&str, &str); 4] = [
-    ("invalid_auth", "openai.gpt-5-mini"),
+const SMOKE_ERROR_FIXTURES: [(&str, &str); 3] = [
+    ("invalid_auth", "openai.gpt-5.3-codex"),
     ("invalid_model", "openai.this-model-does-not-exist"),
-    ("invalid_request_schema", "openai.gpt-5-mini"),
-    ("invalid_tool_payload", "openai.gpt-5-mini"),
+    ("invalid_tool_payload", "openai.gpt-5.3-codex"),
 ];
 const WARN_FALLBACK_CHAT_COMPLETIONS: &str = "openrouter.decode.fallback_chat_completions";
 const QUARANTINED_SUCCESS_FIXTURES: [(&str, &str, &str); 1] = [(
     "tool_call",
     "openai.o4-mini-high",
     "scenario is tool_call, but fixture is incomplete length-truncated with no tool_calls",
+)];
+const QUARANTINED_ERROR_FIXTURES: [(&str, &str, &str); 1] = [(
+    "invalid_request_schema",
+    "openai.gpt-5.3-codex",
+    "fixture captured an unexpected success response instead of a top-level upstream error object",
 )];
 
 #[test]
@@ -59,6 +63,38 @@ fn fixture_smoke_openrouter_errors() -> Result<(), String> {
         let error = decode_response_json(payload.body, &payload.requested_response_format)
             .expect_err("expected upstream decode error for error fixture");
         assert_openrouter_upstream_error(error, scenario, &chosen_model)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn quarantined_openrouter_error_fixtures_are_still_invalid_upstream_errors() -> Result<(), String> {
+    for (scenario, model, expected_reason) in QUARANTINED_ERROR_FIXTURES {
+        let body = load_decoded_error_fixture_body(PROVIDER, scenario, model);
+        if has_top_level_error_object(&body) {
+            return Err(format!(
+                "quarantined OpenRouter error fixture unexpectedly became valid: {scenario}/{model}"
+            ));
+        }
+
+        let payload = OpenAiDecodeEnvelope {
+            body,
+            requested_response_format: ResponseFormat::Text,
+        };
+        let response = decode_response_json(payload.body, &payload.requested_response_format)
+            .map_err(|err| {
+                format!(
+                    "quarantined OpenRouter fixture {scenario}/{model} unexpectedly failed decode: {err}"
+                )
+            })?;
+        assert_eq!(
+            expected_reason,
+            "fixture captured an unexpected success response instead of a top-level upstream error object"
+        );
+        assert!(
+            !response.output.content.is_empty(),
+            "quarantined OpenRouter fixture should continue decoding as a success payload: {scenario}/{model}"
+        );
     }
     Ok(())
 }
@@ -357,8 +393,8 @@ fn parse_error_relpath(relpath: &str) -> Result<(&str, &str), String> {
 
 #[test]
 fn parse_error_relpath_accepts_valid_relpath() {
-    let parsed = parse_error_relpath("errors/invalid_auth/openai.gpt-5-mini.json");
-    assert_eq!(parsed, Ok(("invalid_auth", "openai.gpt-5-mini")));
+    let parsed = parse_error_relpath("errors/invalid_auth/openai.gpt-5.3-codex.json");
+    assert_eq!(parsed, Ok(("invalid_auth", "openai.gpt-5.3-codex")));
 }
 
 #[test]

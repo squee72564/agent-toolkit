@@ -1,9 +1,9 @@
 {
   "provider": "openrouter",
   "scenario": "tool_call",
-  "captured_at": "2026-03-08T20:18:53.504Z",
+  "captured_at": "2026-03-09T00:57:50.331Z",
   "request": {
-    "url": "https://openrouter.ai/api/v1/chat/completions",
+    "url": "https://openrouter.ai/api/v1/responses",
     "method": "POST",
     "model": "anthropic/claude-sonnet-4.6",
     "headers": {
@@ -12,40 +12,36 @@
     },
     "body": {
       "model": "anthropic/claude-sonnet-4.6",
-      "messages": [
-        {
-          "role": "system",
-          "content": "You are a helpful assistant."
-        },
-        {
-          "role": "user",
-          "content": "What is the weather in San Francisco?"
-        }
-      ],
       "tools": [
         {
           "type": "function",
-          "function": {
-            "name": "get_weather",
-            "description": "Get current weather by city",
-            "parameters": {
-              "type": "object",
-              "properties": {
-                "city": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "city"
-              ],
-              "additionalProperties": false
-            }
+          "name": "get_weather",
+          "description": "Get current weather by city",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "city": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "city"
+            ],
+            "additionalProperties": false
           }
         }
       ],
       "stream": true,
       "temperature": 0,
-      "max_tokens": 1024
+      "instructions": "You are a helpful assistant.",
+      "input": [
+        {
+          "role": "user",
+          "content": "What is the weather in San Francisco?"
+        }
+      ],
+      "max_output_tokens": 1024,
+      "store": false
     }
   },
   "response": {
@@ -54,10 +50,10 @@
     "headers": {
       "access-control-allow-origin": "*",
       "cache-control": "no-cache",
-      "cf-ray": "9d94880dfd9ddb66-LAX",
+      "cf-ray": "9d9620b058a23dc4-LAX",
       "connection": "keep-alive",
       "content-type": "text/event-stream",
-      "date": "Sun, 08 Mar 2026 20:18:53 GMT",
+      "date": "Mon, 09 Mar 2026 00:57:50 GMT",
       "permissions-policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
       "referrer-policy": "no-referrer, strict-origin-when-cross-origin",
       "server": "cloudflare",
@@ -68,20 +64,23 @@
   },
   "stream": {
     "format": "sse",
-    "chunk_count": 10,
+    "chunk_count": 13,
     "chunks": [
-      ": OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n",
-      ": OPENROUTER PROCESSING\n\n",
-      "data: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"toolu_bdrk_01Aijs3nQbDJtDc1a8J1uVUq\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\": \\\"San\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\" Francisco\\\"}\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"tool_calls\"}]}\n\ndata: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[],\"usage\":{\"prompt_tokens\":579,\"completion_tokens\":55,\"total_tokens\":634,\"cost\":0.002562,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.002562,\"upstream_inference_prompt_cost\":0.001737,\"upstream_inference_completions_cost\":0.000825},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}\n\n",
+      ": OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n",
+      "data: {\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017868-PpjTsBQxTjAJfWRd19YU\",\"object\":\"response\",\"created_at\":1773017868,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}\n\n",
+      "data: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017868-PpjTsBQxTjAJfWRd19YU\",\"object\":\"response\",\"created_at\":1773017868,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}\n\n",
+      "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"fc_tmp_h09g2q3mydf\",\"type\":\"function_call\",\"status\":\"in_progress\",\"call_id\":\"toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr\",\"name\":\"get_weather\",\"arguments\":\"\"},\"sequence_number\":2}\n\n",
+      "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"{\\\"\",\"sequence_number\":3}\n\n",
+      "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"city\\\": \\\"S\",\"sequence_number\":4}\n\n",
+      "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"an Fr\",\"sequence_number\":5}\n\n",
+      "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"an\",\"sequence_number\":6}\n\n",
+      "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"cisco\\\"}\",\"sequence_number\":7}\n\n",
+      "data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\": \\\"San Francisco\\\"}\",\"sequence_number\":8}\n\n",
+      "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"fc_tmp_h09g2q3mydf\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\": \\\"San Francisco\\\"}\"},\"sequence_number\":9}\n\n",
+      "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017868-PpjTsBQxTjAJfWRd19YU\",\"object\":\"response\",\"created_at\":1773017868,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"status\":\"completed\",\"completed_at\":1773017870,\"output\":[{\"id\":\"fc_tmp_h09g2q3mydf\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\": \\\"San Francisco\\\"}\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":579,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":55,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":634,\"cost\":0.002562,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.002562,\"upstream_inference_input_cost\":0.001737,\"upstream_inference_output_cost\":0.000825}}},\"sequence_number\":10}\n\n",
       "data: [DONE]\n\n"
     ],
-    "raw_text": ": OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\ndata: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"toolu_bdrk_01Aijs3nQbDJtDc1a8J1uVUq\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\": \\\"San\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\" Francisco\\\"}\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"tool_calls\"}]}\n\ndata: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[],\"usage\":{\"prompt_tokens\":579,\"completion_tokens\":55,\"total_tokens\":634,\"cost\":0.002562,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.002562,\"upstream_inference_prompt_cost\":0.001737,\"upstream_inference_completions_cost\":0.000825},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}\n\ndata: [DONE]\n\n",
+    "raw_text": ": OPENROUTER PROCESSING\n\n: OPENROUTER PROCESSING\n\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017868-PpjTsBQxTjAJfWRd19YU\",\"object\":\"response\",\"created_at\":1773017868,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}\n\ndata: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017868-PpjTsBQxTjAJfWRd19YU\",\"object\":\"response\",\"created_at\":1773017868,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}\n\ndata: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"fc_tmp_h09g2q3mydf\",\"type\":\"function_call\",\"status\":\"in_progress\",\"call_id\":\"toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr\",\"name\":\"get_weather\",\"arguments\":\"\"},\"sequence_number\":2}\n\ndata: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"{\\\"\",\"sequence_number\":3}\n\ndata: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"city\\\": \\\"S\",\"sequence_number\":4}\n\ndata: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"an Fr\",\"sequence_number\":5}\n\ndata: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"an\",\"sequence_number\":6}\n\ndata: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"cisco\\\"}\",\"sequence_number\":7}\n\ndata: {\"type\":\"response.function_call_arguments.done\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\": \\\"San Francisco\\\"}\",\"sequence_number\":8}\n\ndata: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"fc_tmp_h09g2q3mydf\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\": \\\"San Francisco\\\"}\"},\"sequence_number\":9}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017868-PpjTsBQxTjAJfWRd19YU\",\"object\":\"response\",\"created_at\":1773017868,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"status\":\"completed\",\"completed_at\":1773017870,\"output\":[{\"id\":\"fc_tmp_h09g2q3mydf\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\": \\\"San Francisco\\\"}\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":579,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":55,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":634,\"cost\":0.002562,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.002562,\"upstream_inference_input_cost\":0.001737,\"upstream_inference_output_cost\":0.000825}}},\"sequence_number\":10}\n\ndata: [DONE]\n\n",
     "events": [
       {
         "index": 0,
@@ -100,299 +99,382 @@
       {
         "index": 2,
         "event": null,
-        "data": "",
-        "data_lines": [],
-        "raw": ": OPENROUTER PROCESSING"
+        "data": "{\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017868-PpjTsBQxTjAJfWRd19YU\",\"object\":\"response\",\"created_at\":1773017868,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}",
+        "data_lines": [
+          "{\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017868-PpjTsBQxTjAJfWRd19YU\",\"object\":\"response\",\"created_at\":1773017868,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}"
+        ],
+        "raw": "data: {\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017868-PpjTsBQxTjAJfWRd19YU\",\"object\":\"response\",\"created_at\":1773017868,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}",
+        "data_json": {
+          "type": "response.created",
+          "response": {
+            "id": "gen-1773017868-PpjTsBQxTjAJfWRd19YU",
+            "object": "response",
+            "created_at": 1773017868,
+            "model": "anthropic/claude-4.6-sonnet-20260217",
+            "status": "in_progress",
+            "completed_at": null,
+            "output": [],
+            "error": null,
+            "incomplete_details": null,
+            "tools": [
+              {
+                "type": "function",
+                "name": "get_weather",
+                "description": "Get current weather by city",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "city": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "city"
+                  ],
+                  "additionalProperties": false
+                },
+                "strict": null
+              }
+            ],
+            "tool_choice": "auto",
+            "parallel_tool_calls": true,
+            "max_output_tokens": 1024,
+            "temperature": 0,
+            "top_p": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "top_logprobs": 0,
+            "max_tool_calls": null,
+            "metadata": {},
+            "background": false,
+            "previous_response_id": null,
+            "service_tier": "auto",
+            "truncation": "disabled",
+            "store": false,
+            "instructions": "You are a helpful assistant.",
+            "text": {
+              "format": {
+                "type": "text"
+              }
+            },
+            "reasoning": null,
+            "safety_identifier": null,
+            "prompt_cache_key": null,
+            "user": null,
+            "usage": null
+          },
+          "sequence_number": 0
+        }
       },
       {
         "index": 3,
         "event": null,
-        "data": "",
-        "data_lines": [],
-        "raw": ": OPENROUTER PROCESSING"
+        "data": "{\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017868-PpjTsBQxTjAJfWRd19YU\",\"object\":\"response\",\"created_at\":1773017868,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}",
+        "data_lines": [
+          "{\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017868-PpjTsBQxTjAJfWRd19YU\",\"object\":\"response\",\"created_at\":1773017868,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}"
+        ],
+        "raw": "data: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017868-PpjTsBQxTjAJfWRd19YU\",\"object\":\"response\",\"created_at\":1773017868,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}",
+        "data_json": {
+          "type": "response.in_progress",
+          "response": {
+            "id": "gen-1773017868-PpjTsBQxTjAJfWRd19YU",
+            "object": "response",
+            "created_at": 1773017868,
+            "model": "anthropic/claude-4.6-sonnet-20260217",
+            "status": "in_progress",
+            "completed_at": null,
+            "output": [],
+            "error": null,
+            "incomplete_details": null,
+            "tools": [
+              {
+                "type": "function",
+                "name": "get_weather",
+                "description": "Get current weather by city",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "city": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "city"
+                  ],
+                  "additionalProperties": false
+                },
+                "strict": null
+              }
+            ],
+            "tool_choice": "auto",
+            "parallel_tool_calls": true,
+            "max_output_tokens": 1024,
+            "temperature": 0,
+            "top_p": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "top_logprobs": 0,
+            "max_tool_calls": null,
+            "metadata": {},
+            "background": false,
+            "previous_response_id": null,
+            "service_tier": "auto",
+            "truncation": "disabled",
+            "store": false,
+            "instructions": "You are a helpful assistant.",
+            "text": {
+              "format": {
+                "type": "text"
+              }
+            },
+            "reasoning": null,
+            "safety_identifier": null,
+            "prompt_cache_key": null,
+            "user": null,
+            "usage": null
+          },
+          "sequence_number": 1
+        }
       },
       {
         "index": 4,
         "event": null,
-        "data": "{\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"toolu_bdrk_01Aijs3nQbDJtDc1a8J1uVUq\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"fc_tmp_h09g2q3mydf\",\"type\":\"function_call\",\"status\":\"in_progress\",\"call_id\":\"toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr\",\"name\":\"get_weather\",\"arguments\":\"\"},\"sequence_number\":2}",
         "data_lines": [
-          "{\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"toolu_bdrk_01Aijs3nQbDJtDc1a8J1uVUq\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"fc_tmp_h09g2q3mydf\",\"type\":\"function_call\",\"status\":\"in_progress\",\"call_id\":\"toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr\",\"name\":\"get_weather\",\"arguments\":\"\"},\"sequence_number\":2}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"toolu_bdrk_01Aijs3nQbDJtDc1a8J1uVUq\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"fc_tmp_h09g2q3mydf\",\"type\":\"function_call\",\"status\":\"in_progress\",\"call_id\":\"toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr\",\"name\":\"get_weather\",\"arguments\":\"\"},\"sequence_number\":2}",
         "data_json": {
-          "id": "gen-1773001131-0jiByPdxogffwg68sXSv",
-          "object": "chat.completion.chunk",
-          "created": 1773001131,
-          "model": "anthropic/claude-4.6-sonnet-20260217",
-          "provider": "Amazon Bedrock",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": null,
-                "role": "assistant",
-                "tool_calls": [
-                  {
-                    "index": 0,
-                    "id": "toolu_bdrk_01Aijs3nQbDJtDc1a8J1uVUq",
-                    "type": "function",
-                    "function": {
-                      "name": "get_weather",
-                      "arguments": ""
-                    }
-                  }
-                ]
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.output_item.added",
+          "output_index": 0,
+          "item": {
+            "id": "fc_tmp_h09g2q3mydf",
+            "type": "function_call",
+            "status": "in_progress",
+            "call_id": "toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr",
+            "name": "get_weather",
+            "arguments": ""
+          },
+          "sequence_number": 2
         }
       },
       {
         "index": 5,
         "event": null,
-        "data": "{\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"{\\\"\",\"sequence_number\":3}",
         "data_lines": [
-          "{\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"{\\\"\",\"sequence_number\":3}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"{\\\"\",\"sequence_number\":3}",
         "data_json": {
-          "id": "gen-1773001131-0jiByPdxogffwg68sXSv",
-          "object": "chat.completion.chunk",
-          "created": 1773001131,
-          "model": "anthropic/claude-4.6-sonnet-20260217",
-          "provider": "Amazon Bedrock",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": null,
-                "role": "assistant",
-                "tool_calls": [
-                  {
-                    "index": 0,
-                    "function": {
-                      "arguments": ""
-                    }
-                  }
-                ]
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.function_call_arguments.delta",
+          "output_index": 0,
+          "item_id": "fc_tmp_h09g2q3mydf",
+          "delta": "{\"",
+          "sequence_number": 3
         }
       },
       {
         "index": 6,
         "event": null,
-        "data": "{\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"city\\\": \\\"S\",\"sequence_number\":4}",
         "data_lines": [
-          "{\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"city\\\": \\\"S\",\"sequence_number\":4}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"city\\\": \\\"S\",\"sequence_number\":4}",
         "data_json": {
-          "id": "gen-1773001131-0jiByPdxogffwg68sXSv",
-          "object": "chat.completion.chunk",
-          "created": 1773001131,
-          "model": "anthropic/claude-4.6-sonnet-20260217",
-          "provider": "Amazon Bedrock",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": null,
-                "role": "assistant",
-                "tool_calls": [
-                  {
-                    "index": 0,
-                    "function": {
-                      "arguments": ""
-                    }
-                  }
-                ]
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.function_call_arguments.delta",
+          "output_index": 0,
+          "item_id": "fc_tmp_h09g2q3mydf",
+          "delta": "city\": \"S",
+          "sequence_number": 4
         }
       },
       {
         "index": 7,
         "event": null,
-        "data": "{\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"an Fr\",\"sequence_number\":5}",
         "data_lines": [
-          "{\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"an Fr\",\"sequence_number\":5}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"city\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"an Fr\",\"sequence_number\":5}",
         "data_json": {
-          "id": "gen-1773001131-0jiByPdxogffwg68sXSv",
-          "object": "chat.completion.chunk",
-          "created": 1773001131,
-          "model": "anthropic/claude-4.6-sonnet-20260217",
-          "provider": "Amazon Bedrock",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": null,
-                "role": "assistant",
-                "tool_calls": [
-                  {
-                    "index": 0,
-                    "function": {
-                      "arguments": "{\"city"
-                    }
-                  }
-                ]
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.function_call_arguments.delta",
+          "output_index": 0,
+          "item_id": "fc_tmp_h09g2q3mydf",
+          "delta": "an Fr",
+          "sequence_number": 5
         }
       },
       {
         "index": 8,
         "event": null,
-        "data": "{\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\": \\\"San\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"an\",\"sequence_number\":6}",
         "data_lines": [
-          "{\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\": \\\"San\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"an\",\"sequence_number\":6}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\": \\\"San\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"an\",\"sequence_number\":6}",
         "data_json": {
-          "id": "gen-1773001131-0jiByPdxogffwg68sXSv",
-          "object": "chat.completion.chunk",
-          "created": 1773001131,
-          "model": "anthropic/claude-4.6-sonnet-20260217",
-          "provider": "Amazon Bedrock",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": null,
-                "role": "assistant",
-                "tool_calls": [
-                  {
-                    "index": 0,
-                    "function": {
-                      "arguments": "\": \"San"
-                    }
-                  }
-                ]
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.function_call_arguments.delta",
+          "output_index": 0,
+          "item_id": "fc_tmp_h09g2q3mydf",
+          "delta": "an",
+          "sequence_number": 6
         }
       },
       {
         "index": 9,
         "event": null,
-        "data": "{\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\" Francisco\\\"}\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"cisco\\\"}\",\"sequence_number\":7}",
         "data_lines": [
-          "{\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\" Francisco\\\"}\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"cisco\\\"}\",\"sequence_number\":7}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":null,\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\" Francisco\\\"}\"}}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"delta\":\"cisco\\\"}\",\"sequence_number\":7}",
         "data_json": {
-          "id": "gen-1773001131-0jiByPdxogffwg68sXSv",
-          "object": "chat.completion.chunk",
-          "created": 1773001131,
-          "model": "anthropic/claude-4.6-sonnet-20260217",
-          "provider": "Amazon Bedrock",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": null,
-                "role": "assistant",
-                "tool_calls": [
-                  {
-                    "index": 0,
-                    "function": {
-                      "arguments": " Francisco\"}"
-                    }
-                  }
-                ]
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.function_call_arguments.delta",
+          "output_index": 0,
+          "item_id": "fc_tmp_h09g2q3mydf",
+          "delta": "cisco\"}",
+          "sequence_number": 7
         }
       },
       {
         "index": 10,
         "event": null,
-        "data": "{\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"tool_calls\"}]}",
+        "data": "{\"type\":\"response.function_call_arguments.done\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\": \\\"San Francisco\\\"}\",\"sequence_number\":8}",
         "data_lines": [
-          "{\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"tool_calls\"}]}"
+          "{\"type\":\"response.function_call_arguments.done\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\": \\\"San Francisco\\\"}\",\"sequence_number\":8}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"tool_calls\"}]}",
+        "raw": "data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":0,\"item_id\":\"fc_tmp_h09g2q3mydf\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\": \\\"San Francisco\\\"}\",\"sequence_number\":8}",
         "data_json": {
-          "id": "gen-1773001131-0jiByPdxogffwg68sXSv",
-          "object": "chat.completion.chunk",
-          "created": 1773001131,
-          "model": "anthropic/claude-4.6-sonnet-20260217",
-          "provider": "Amazon Bedrock",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": "",
-                "role": "assistant"
-              },
-              "finish_reason": "tool_calls",
-              "native_finish_reason": "tool_calls"
-            }
-          ]
+          "type": "response.function_call_arguments.done",
+          "output_index": 0,
+          "item_id": "fc_tmp_h09g2q3mydf",
+          "name": "get_weather",
+          "arguments": "{\"city\": \"San Francisco\"}",
+          "sequence_number": 8
         }
       },
       {
         "index": 11,
         "event": null,
-        "data": "{\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[],\"usage\":{\"prompt_tokens\":579,\"completion_tokens\":55,\"total_tokens\":634,\"cost\":0.002562,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.002562,\"upstream_inference_prompt_cost\":0.001737,\"upstream_inference_completions_cost\":0.000825},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data": "{\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"fc_tmp_h09g2q3mydf\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\": \\\"San Francisco\\\"}\"},\"sequence_number\":9}",
         "data_lines": [
-          "{\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[],\"usage\":{\"prompt_tokens\":579,\"completion_tokens\":55,\"total_tokens\":634,\"cost\":0.002562,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.002562,\"upstream_inference_prompt_cost\":0.001737,\"upstream_inference_completions_cost\":0.000825},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}"
+          "{\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"fc_tmp_h09g2q3mydf\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\": \\\"San Francisco\\\"}\"},\"sequence_number\":9}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001131-0jiByPdxogffwg68sXSv\",\"object\":\"chat.completion.chunk\",\"created\":1773001131,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"provider\":\"Amazon Bedrock\",\"choices\":[],\"usage\":{\"prompt_tokens\":579,\"completion_tokens\":55,\"total_tokens\":634,\"cost\":0.002562,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.002562,\"upstream_inference_prompt_cost\":0.001737,\"upstream_inference_completions_cost\":0.000825},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "raw": "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"fc_tmp_h09g2q3mydf\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\": \\\"San Francisco\\\"}\"},\"sequence_number\":9}",
         "data_json": {
-          "id": "gen-1773001131-0jiByPdxogffwg68sXSv",
-          "object": "chat.completion.chunk",
-          "created": 1773001131,
-          "model": "anthropic/claude-4.6-sonnet-20260217",
-          "provider": "Amazon Bedrock",
-          "choices": [],
-          "usage": {
-            "prompt_tokens": 579,
-            "completion_tokens": 55,
-            "total_tokens": 634,
-            "cost": 0.002562,
-            "is_byok": false,
-            "prompt_tokens_details": {
-              "cached_tokens": 0,
-              "cache_write_tokens": 0,
-              "audio_tokens": 0,
-              "video_tokens": 0
-            },
-            "cost_details": {
-              "upstream_inference_cost": 0.002562,
-              "upstream_inference_prompt_cost": 0.001737,
-              "upstream_inference_completions_cost": 0.000825
-            },
-            "completion_tokens_details": {
-              "reasoning_tokens": 0,
-              "image_tokens": 0,
-              "audio_tokens": 0
-            }
-          }
+          "type": "response.output_item.done",
+          "output_index": 0,
+          "item": {
+            "id": "fc_tmp_h09g2q3mydf",
+            "type": "function_call",
+            "status": "completed",
+            "call_id": "toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr",
+            "name": "get_weather",
+            "arguments": "{\"city\": \"San Francisco\"}"
+          },
+          "sequence_number": 9
         }
       },
       {
         "index": 12,
+        "event": null,
+        "data": "{\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017868-PpjTsBQxTjAJfWRd19YU\",\"object\":\"response\",\"created_at\":1773017868,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"status\":\"completed\",\"completed_at\":1773017870,\"output\":[{\"id\":\"fc_tmp_h09g2q3mydf\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\": \\\"San Francisco\\\"}\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":579,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":55,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":634,\"cost\":0.002562,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.002562,\"upstream_inference_input_cost\":0.001737,\"upstream_inference_output_cost\":0.000825}}},\"sequence_number\":10}",
+        "data_lines": [
+          "{\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017868-PpjTsBQxTjAJfWRd19YU\",\"object\":\"response\",\"created_at\":1773017868,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"status\":\"completed\",\"completed_at\":1773017870,\"output\":[{\"id\":\"fc_tmp_h09g2q3mydf\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\": \\\"San Francisco\\\"}\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":579,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":55,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":634,\"cost\":0.002562,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.002562,\"upstream_inference_input_cost\":0.001737,\"upstream_inference_output_cost\":0.000825}}},\"sequence_number\":10}"
+        ],
+        "raw": "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017868-PpjTsBQxTjAJfWRd19YU\",\"object\":\"response\",\"created_at\":1773017868,\"model\":\"anthropic/claude-4.6-sonnet-20260217\",\"status\":\"completed\",\"completed_at\":1773017870,\"output\":[{\"id\":\"fc_tmp_h09g2q3mydf\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\": \\\"San Francisco\\\"}\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":579,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":55,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":634,\"cost\":0.002562,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.002562,\"upstream_inference_input_cost\":0.001737,\"upstream_inference_output_cost\":0.000825}}},\"sequence_number\":10}",
+        "data_json": {
+          "type": "response.completed",
+          "response": {
+            "id": "gen-1773017868-PpjTsBQxTjAJfWRd19YU",
+            "object": "response",
+            "created_at": 1773017868,
+            "model": "anthropic/claude-4.6-sonnet-20260217",
+            "status": "completed",
+            "completed_at": 1773017870,
+            "output": [
+              {
+                "id": "fc_tmp_h09g2q3mydf",
+                "type": "function_call",
+                "status": "completed",
+                "call_id": "toolu_bdrk_01HN1LQuoqKBP32k1Kw32tWr",
+                "name": "get_weather",
+                "arguments": "{\"city\": \"San Francisco\"}"
+              }
+            ],
+            "error": null,
+            "incomplete_details": null,
+            "tools": [
+              {
+                "type": "function",
+                "name": "get_weather",
+                "description": "Get current weather by city",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "city": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "city"
+                  ],
+                  "additionalProperties": false
+                },
+                "strict": null
+              }
+            ],
+            "tool_choice": "auto",
+            "parallel_tool_calls": true,
+            "max_output_tokens": 1024,
+            "temperature": 0,
+            "top_p": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "top_logprobs": 0,
+            "max_tool_calls": null,
+            "metadata": {},
+            "background": false,
+            "previous_response_id": null,
+            "service_tier": "auto",
+            "truncation": "disabled",
+            "store": false,
+            "instructions": "You are a helpful assistant.",
+            "text": {
+              "format": {
+                "type": "text"
+              }
+            },
+            "reasoning": null,
+            "safety_identifier": null,
+            "prompt_cache_key": null,
+            "user": null,
+            "usage": {
+              "input_tokens": 579,
+              "input_tokens_details": {
+                "cached_tokens": 0
+              },
+              "output_tokens": 55,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 634,
+              "cost": 0.002562,
+              "is_byok": false,
+              "cost_details": {
+                "upstream_inference_cost": 0.002562,
+                "upstream_inference_input_cost": 0.001737,
+                "upstream_inference_output_cost": 0.000825
+              }
+            }
+          },
+          "sequence_number": 10
+        }
+      },
+      {
+        "index": 13,
         "event": null,
         "data": "[DONE]",
         "data_lines": [

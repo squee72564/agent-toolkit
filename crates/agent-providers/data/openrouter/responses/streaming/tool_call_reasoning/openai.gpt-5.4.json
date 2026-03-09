@@ -1,9 +1,9 @@
 {
   "provider": "openrouter",
   "scenario": "tool_call_reasoning",
-  "captured_at": "2026-03-08T20:20:00.217Z",
+  "captured_at": "2026-03-09T00:57:55.299Z",
   "request": {
-    "url": "https://openrouter.ai/api/v1/chat/completions",
+    "url": "https://openrouter.ai/api/v1/responses",
     "method": "POST",
     "model": "openai/gpt-5.4",
     "headers": {
@@ -12,60 +12,47 @@
     },
     "body": {
       "model": "openai/gpt-5.4",
-      "messages": [
-        {
-          "role": "system",
-          "content": "You are a helpful assistant."
-        },
-        {
-          "role": "user",
-          "content": "What is the weather in San Francisco?"
-        },
-        {
-          "role": "assistant",
-          "content": "",
-          "tool_calls": [
-            {
-              "type": "function",
-              "index": 0,
-              "id": "call_34db77af73cb494b982ee291",
-              "function": {
-                "name": "get_weather",
-                "arguments": "{\"city\": \"San Francisco\"}"
-              }
-            }
-          ]
-        },
-        {
-          "role": "tool",
-          "tool_call_id": "call_34db77af73cb494b982ee291",
-          "content": "{ \"city\": \"San Francisco\", \"celcius\": 16, \"farhenheit\": 60}"
-        }
-      ],
       "tools": [
         {
           "type": "function",
-          "function": {
-            "name": "get_weather",
-            "description": "Get current weather by city",
-            "parameters": {
-              "type": "object",
-              "properties": {
-                "city": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "city"
-              ],
-              "additionalProperties": false
-            }
+          "name": "get_weather",
+          "description": "Get current weather by city",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "city": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "city"
+            ],
+            "additionalProperties": false
           }
         }
       ],
       "stream": true,
       "temperature": 0,
-      "max_tokens": 1024
+      "instructions": "You are a helpful assistant.",
+      "input": [
+        {
+          "role": "user",
+          "content": "What is the weather in San Francisco?"
+        },
+        {
+          "type": "function_call",
+          "call_id": "call_34db77af73cb494b982ee291",
+          "name": "get_weather",
+          "arguments": "{\"city\": \"San Francisco\"}"
+        },
+        {
+          "type": "function_call_output",
+          "call_id": "call_34db77af73cb494b982ee291",
+          "output": "{ \"city\": \"San Francisco\", \"celcius\": 16, \"farhenheit\": 60}"
+        }
+      ],
+      "max_output_tokens": 1024,
+      "store": false
     }
   },
   "response": {
@@ -74,10 +61,10 @@
     "headers": {
       "access-control-allow-origin": "*",
       "cache-control": "no-cache",
-      "cf-ray": "9d9489b99e83db66-LAX",
+      "cf-ray": "9d9620d439b83dc4-LAX",
       "connection": "keep-alive",
       "content-type": "text/event-stream",
-      "date": "Sun, 08 Mar 2026 20:19:59 GMT",
+      "date": "Mon, 09 Mar 2026 00:57:54 GMT",
       "permissions-policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
       "referrer-policy": "no-referrer, strict-origin-when-cross-origin",
       "server": "cloudflare",
@@ -88,388 +75,590 @@
   },
   "stream": {
     "format": "sse",
-    "chunk_count": 11,
+    "chunk_count": 16,
     "chunks": [
-      "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"San\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" Francisco\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" is\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" currently\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" \",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"16\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"°C\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" (\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"60\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"°F\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\").\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"stop\",\"native_finish_reason\":\"completed\"}]}\n\ndata: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[],\"usage\":{\"prompt_tokens\":113,\"completion_tokens\":15,\"total_tokens\":128,\"cost\":0.0005075,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0005075,\"upstream_inference_prompt_cost\":0.0002825,\"upstream_inference_completions_cost\":0.000225},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}\n\ndata: [DONE]\n\n"
+      ": OPENROUTER PROCESSING\n\n",
+      "data: {\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017874-1EF7BYG5n0mU4R3C7H1x\",\"object\":\"response\",\"created_at\":1773017874,\"model\":\"openai/gpt-5.4-20260305\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}\n\n",
+      "data: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017874-1EF7BYG5n0mU4R3C7H1x\",\"object\":\"response\",\"created_at\":1773017874,\"model\":\"openai/gpt-5.4-20260305\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}\n\n",
+      "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_n635lr4apk\",\"type\":\"message\",\"status\":\"in_progress\",\"role\":\"assistant\",\"content\":[],\"phase\":\"final_answer\"},\"sequence_number\":2}\n\n",
+      "data: {\"type\":\"response.content_part.added\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":3}\n\n",
+      "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"San\",\"logprobs\":[],\"sequence_number\":4}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" Francisco\",\"logprobs\":[],\"sequence_number\":5}\n\n",
+      "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" is\",\"logprobs\":[],\"sequence_number\":6}\n\n",
+      "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" currently\",\"logprobs\":[],\"sequence_number\":7}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" \",\"logprobs\":[],\"sequence_number\":8}\n\n",
+      "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"16\",\"logprobs\":[],\"sequence_number\":9}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"°C\",\"logprobs\":[],\"sequence_number\":10}\n\n",
+      "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" (\",\"logprobs\":[],\"sequence_number\":11}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"60\",\"logprobs\":[],\"sequence_number\":12}\n\n",
+      "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"°F\",\"logprobs\":[],\"sequence_number\":13}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\").\",\"logprobs\":[],\"sequence_number\":14}\n\n",
+      "data: {\"type\":\"response.output_text.done\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"text\":\"San Francisco is currently 16°C (60°F).\",\"logprobs\":[],\"sequence_number\":15}\n\n",
+      "data: {\"type\":\"response.content_part.done\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"San Francisco is currently 16°C (60°F).\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":16}\n\n",
+      "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_n635lr4apk\",\"type\":\"message\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"San Francisco is currently 16°C (60°F).\",\"annotations\":[],\"logprobs\":[]}],\"phase\":\"final_answer\"},\"sequence_number\":17}\n\n",
+      "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017874-1EF7BYG5n0mU4R3C7H1x\",\"object\":\"response\",\"created_at\":1773017874,\"model\":\"openai/gpt-5.4-20260305\",\"status\":\"completed\",\"completed_at\":1773017875,\"output\":[{\"id\":\"msg_tmp_n635lr4apk\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"San Francisco is currently 16°C (60°F).\",\"annotations\":[],\"logprobs\":[]}],\"phase\":\"final_answer\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":113,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":15,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":128,\"cost\":0.0005075,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.0005075,\"upstream_inference_input_cost\":0.0002825,\"upstream_inference_output_cost\":0.000225}}},\"sequence_number\":18}\n\n",
+      "data: [DONE]\n\n"
     ],
-    "raw_text": "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"San\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" Francisco\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" is\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" currently\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" \",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"16\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"°C\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" (\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"60\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"°F\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\").\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"stop\",\"native_finish_reason\":\"completed\"}]}\n\ndata: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[],\"usage\":{\"prompt_tokens\":113,\"completion_tokens\":15,\"total_tokens\":128,\"cost\":0.0005075,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0005075,\"upstream_inference_prompt_cost\":0.0002825,\"upstream_inference_completions_cost\":0.000225},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}\n\ndata: [DONE]\n\n",
+    "raw_text": ": OPENROUTER PROCESSING\n\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017874-1EF7BYG5n0mU4R3C7H1x\",\"object\":\"response\",\"created_at\":1773017874,\"model\":\"openai/gpt-5.4-20260305\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}\n\ndata: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017874-1EF7BYG5n0mU4R3C7H1x\",\"object\":\"response\",\"created_at\":1773017874,\"model\":\"openai/gpt-5.4-20260305\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}\n\ndata: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_n635lr4apk\",\"type\":\"message\",\"status\":\"in_progress\",\"role\":\"assistant\",\"content\":[],\"phase\":\"final_answer\"},\"sequence_number\":2}\n\ndata: {\"type\":\"response.content_part.added\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":3}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"San\",\"logprobs\":[],\"sequence_number\":4}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" Francisco\",\"logprobs\":[],\"sequence_number\":5}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" is\",\"logprobs\":[],\"sequence_number\":6}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" currently\",\"logprobs\":[],\"sequence_number\":7}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" \",\"logprobs\":[],\"sequence_number\":8}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"16\",\"logprobs\":[],\"sequence_number\":9}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"°C\",\"logprobs\":[],\"sequence_number\":10}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" (\",\"logprobs\":[],\"sequence_number\":11}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"60\",\"logprobs\":[],\"sequence_number\":12}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"°F\",\"logprobs\":[],\"sequence_number\":13}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\").\",\"logprobs\":[],\"sequence_number\":14}\n\ndata: {\"type\":\"response.output_text.done\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"text\":\"San Francisco is currently 16°C (60°F).\",\"logprobs\":[],\"sequence_number\":15}\n\ndata: {\"type\":\"response.content_part.done\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"San Francisco is currently 16°C (60°F).\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":16}\n\ndata: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_n635lr4apk\",\"type\":\"message\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"San Francisco is currently 16°C (60°F).\",\"annotations\":[],\"logprobs\":[]}],\"phase\":\"final_answer\"},\"sequence_number\":17}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017874-1EF7BYG5n0mU4R3C7H1x\",\"object\":\"response\",\"created_at\":1773017874,\"model\":\"openai/gpt-5.4-20260305\",\"status\":\"completed\",\"completed_at\":1773017875,\"output\":[{\"id\":\"msg_tmp_n635lr4apk\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"San Francisco is currently 16°C (60°F).\",\"annotations\":[],\"logprobs\":[]}],\"phase\":\"final_answer\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":113,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":15,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":128,\"cost\":0.0005075,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.0005075,\"upstream_inference_input_cost\":0.0002825,\"upstream_inference_output_cost\":0.000225}}},\"sequence_number\":18}\n\ndata: [DONE]\n\n",
     "events": [
       {
         "index": 0,
         "event": null,
-        "data": "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"San\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
-        "data_lines": [
-          "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"San\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
-        ],
-        "raw": "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"San\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
-        "data_json": {
-          "id": "gen-1773001199-vpawS44HfslazLR4vas0",
-          "object": "chat.completion.chunk",
-          "created": 1773001199,
-          "model": "openai/gpt-5.4-20260305",
-          "provider": "OpenAI",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": "San",
-                "role": "assistant"
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
-        }
+        "data": "",
+        "data_lines": [],
+        "raw": ": OPENROUTER PROCESSING"
       },
       {
         "index": 1,
         "event": null,
-        "data": "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" Francisco\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017874-1EF7BYG5n0mU4R3C7H1x\",\"object\":\"response\",\"created_at\":1773017874,\"model\":\"openai/gpt-5.4-20260305\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}",
         "data_lines": [
-          "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" Francisco\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017874-1EF7BYG5n0mU4R3C7H1x\",\"object\":\"response\",\"created_at\":1773017874,\"model\":\"openai/gpt-5.4-20260305\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" Francisco\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017874-1EF7BYG5n0mU4R3C7H1x\",\"object\":\"response\",\"created_at\":1773017874,\"model\":\"openai/gpt-5.4-20260305\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}",
         "data_json": {
-          "id": "gen-1773001199-vpawS44HfslazLR4vas0",
-          "object": "chat.completion.chunk",
-          "created": 1773001199,
-          "model": "openai/gpt-5.4-20260305",
-          "provider": "OpenAI",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": " Francisco",
-                "role": "assistant"
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.created",
+          "response": {
+            "id": "gen-1773017874-1EF7BYG5n0mU4R3C7H1x",
+            "object": "response",
+            "created_at": 1773017874,
+            "model": "openai/gpt-5.4-20260305",
+            "status": "in_progress",
+            "completed_at": null,
+            "output": [],
+            "error": null,
+            "incomplete_details": null,
+            "tools": [
+              {
+                "type": "function",
+                "name": "get_weather",
+                "description": "Get current weather by city",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "city": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "city"
+                  ],
+                  "additionalProperties": false
+                },
+                "strict": null
+              }
+            ],
+            "tool_choice": "auto",
+            "parallel_tool_calls": true,
+            "max_output_tokens": 1024,
+            "temperature": 0,
+            "top_p": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "top_logprobs": 0,
+            "max_tool_calls": null,
+            "metadata": {},
+            "background": false,
+            "previous_response_id": null,
+            "service_tier": "auto",
+            "truncation": "disabled",
+            "store": false,
+            "instructions": "You are a helpful assistant.",
+            "text": {
+              "format": {
+                "type": "text"
+              }
+            },
+            "reasoning": null,
+            "safety_identifier": null,
+            "prompt_cache_key": null,
+            "user": null,
+            "usage": null
+          },
+          "sequence_number": 0
         }
       },
       {
         "index": 2,
         "event": null,
-        "data": "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" is\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017874-1EF7BYG5n0mU4R3C7H1x\",\"object\":\"response\",\"created_at\":1773017874,\"model\":\"openai/gpt-5.4-20260305\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}",
         "data_lines": [
-          "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" is\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017874-1EF7BYG5n0mU4R3C7H1x\",\"object\":\"response\",\"created_at\":1773017874,\"model\":\"openai/gpt-5.4-20260305\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" is\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017874-1EF7BYG5n0mU4R3C7H1x\",\"object\":\"response\",\"created_at\":1773017874,\"model\":\"openai/gpt-5.4-20260305\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}",
         "data_json": {
-          "id": "gen-1773001199-vpawS44HfslazLR4vas0",
-          "object": "chat.completion.chunk",
-          "created": 1773001199,
-          "model": "openai/gpt-5.4-20260305",
-          "provider": "OpenAI",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": " is",
-                "role": "assistant"
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.in_progress",
+          "response": {
+            "id": "gen-1773017874-1EF7BYG5n0mU4R3C7H1x",
+            "object": "response",
+            "created_at": 1773017874,
+            "model": "openai/gpt-5.4-20260305",
+            "status": "in_progress",
+            "completed_at": null,
+            "output": [],
+            "error": null,
+            "incomplete_details": null,
+            "tools": [
+              {
+                "type": "function",
+                "name": "get_weather",
+                "description": "Get current weather by city",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "city": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "city"
+                  ],
+                  "additionalProperties": false
+                },
+                "strict": null
+              }
+            ],
+            "tool_choice": "auto",
+            "parallel_tool_calls": true,
+            "max_output_tokens": 1024,
+            "temperature": 0,
+            "top_p": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "top_logprobs": 0,
+            "max_tool_calls": null,
+            "metadata": {},
+            "background": false,
+            "previous_response_id": null,
+            "service_tier": "auto",
+            "truncation": "disabled",
+            "store": false,
+            "instructions": "You are a helpful assistant.",
+            "text": {
+              "format": {
+                "type": "text"
+              }
+            },
+            "reasoning": null,
+            "safety_identifier": null,
+            "prompt_cache_key": null,
+            "user": null,
+            "usage": null
+          },
+          "sequence_number": 1
         }
       },
       {
         "index": 3,
         "event": null,
-        "data": "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" currently\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_n635lr4apk\",\"type\":\"message\",\"status\":\"in_progress\",\"role\":\"assistant\",\"content\":[],\"phase\":\"final_answer\"},\"sequence_number\":2}",
         "data_lines": [
-          "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" currently\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_n635lr4apk\",\"type\":\"message\",\"status\":\"in_progress\",\"role\":\"assistant\",\"content\":[],\"phase\":\"final_answer\"},\"sequence_number\":2}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" currently\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_n635lr4apk\",\"type\":\"message\",\"status\":\"in_progress\",\"role\":\"assistant\",\"content\":[],\"phase\":\"final_answer\"},\"sequence_number\":2}",
         "data_json": {
-          "id": "gen-1773001199-vpawS44HfslazLR4vas0",
-          "object": "chat.completion.chunk",
-          "created": 1773001199,
-          "model": "openai/gpt-5.4-20260305",
-          "provider": "OpenAI",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": " currently",
-                "role": "assistant"
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.output_item.added",
+          "output_index": 0,
+          "item": {
+            "id": "msg_tmp_n635lr4apk",
+            "type": "message",
+            "status": "in_progress",
+            "role": "assistant",
+            "content": [],
+            "phase": "final_answer"
+          },
+          "sequence_number": 2
         }
       },
       {
         "index": 4,
         "event": null,
-        "data": "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" \",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.content_part.added\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":3}",
         "data_lines": [
-          "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" \",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.content_part.added\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":3}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" \",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.content_part.added\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":3}",
         "data_json": {
-          "id": "gen-1773001199-vpawS44HfslazLR4vas0",
-          "object": "chat.completion.chunk",
-          "created": 1773001199,
-          "model": "openai/gpt-5.4-20260305",
-          "provider": "OpenAI",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": " ",
-                "role": "assistant"
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.content_part.added",
+          "output_index": 0,
+          "item_id": "msg_tmp_n635lr4apk",
+          "content_index": 0,
+          "part": {
+            "type": "output_text",
+            "text": "",
+            "annotations": [],
+            "logprobs": []
+          },
+          "sequence_number": 3
         }
       },
       {
         "index": 5,
         "event": null,
-        "data": "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"16\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"San\",\"logprobs\":[],\"sequence_number\":4}",
         "data_lines": [
-          "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"16\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"San\",\"logprobs\":[],\"sequence_number\":4}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"16\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"San\",\"logprobs\":[],\"sequence_number\":4}",
         "data_json": {
-          "id": "gen-1773001199-vpawS44HfslazLR4vas0",
-          "object": "chat.completion.chunk",
-          "created": 1773001199,
-          "model": "openai/gpt-5.4-20260305",
-          "provider": "OpenAI",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": "16",
-                "role": "assistant"
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.output_text.delta",
+          "output_index": 0,
+          "item_id": "msg_tmp_n635lr4apk",
+          "content_index": 0,
+          "delta": "San",
+          "logprobs": [],
+          "sequence_number": 4
         }
       },
       {
         "index": 6,
         "event": null,
-        "data": "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"°C\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" Francisco\",\"logprobs\":[],\"sequence_number\":5}",
         "data_lines": [
-          "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"°C\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" Francisco\",\"logprobs\":[],\"sequence_number\":5}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"°C\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" Francisco\",\"logprobs\":[],\"sequence_number\":5}",
         "data_json": {
-          "id": "gen-1773001199-vpawS44HfslazLR4vas0",
-          "object": "chat.completion.chunk",
-          "created": 1773001199,
-          "model": "openai/gpt-5.4-20260305",
-          "provider": "OpenAI",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": "°C",
-                "role": "assistant"
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.output_text.delta",
+          "output_index": 0,
+          "item_id": "msg_tmp_n635lr4apk",
+          "content_index": 0,
+          "delta": " Francisco",
+          "logprobs": [],
+          "sequence_number": 5
         }
       },
       {
         "index": 7,
         "event": null,
-        "data": "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" (\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" is\",\"logprobs\":[],\"sequence_number\":6}",
         "data_lines": [
-          "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" (\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" is\",\"logprobs\":[],\"sequence_number\":6}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" (\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" is\",\"logprobs\":[],\"sequence_number\":6}",
         "data_json": {
-          "id": "gen-1773001199-vpawS44HfslazLR4vas0",
-          "object": "chat.completion.chunk",
-          "created": 1773001199,
-          "model": "openai/gpt-5.4-20260305",
-          "provider": "OpenAI",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": " (",
-                "role": "assistant"
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.output_text.delta",
+          "output_index": 0,
+          "item_id": "msg_tmp_n635lr4apk",
+          "content_index": 0,
+          "delta": " is",
+          "logprobs": [],
+          "sequence_number": 6
         }
       },
       {
         "index": 8,
         "event": null,
-        "data": "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"60\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" currently\",\"logprobs\":[],\"sequence_number\":7}",
         "data_lines": [
-          "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"60\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" currently\",\"logprobs\":[],\"sequence_number\":7}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"60\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" currently\",\"logprobs\":[],\"sequence_number\":7}",
         "data_json": {
-          "id": "gen-1773001199-vpawS44HfslazLR4vas0",
-          "object": "chat.completion.chunk",
-          "created": 1773001199,
-          "model": "openai/gpt-5.4-20260305",
-          "provider": "OpenAI",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": "60",
-                "role": "assistant"
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.output_text.delta",
+          "output_index": 0,
+          "item_id": "msg_tmp_n635lr4apk",
+          "content_index": 0,
+          "delta": " currently",
+          "logprobs": [],
+          "sequence_number": 7
         }
       },
       {
         "index": 9,
         "event": null,
-        "data": "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"°F\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" \",\"logprobs\":[],\"sequence_number\":8}",
         "data_lines": [
-          "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"°F\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" \",\"logprobs\":[],\"sequence_number\":8}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"°F\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" \",\"logprobs\":[],\"sequence_number\":8}",
         "data_json": {
-          "id": "gen-1773001199-vpawS44HfslazLR4vas0",
-          "object": "chat.completion.chunk",
-          "created": 1773001199,
-          "model": "openai/gpt-5.4-20260305",
-          "provider": "OpenAI",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": "°F",
-                "role": "assistant"
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.output_text.delta",
+          "output_index": 0,
+          "item_id": "msg_tmp_n635lr4apk",
+          "content_index": 0,
+          "delta": " ",
+          "logprobs": [],
+          "sequence_number": 8
         }
       },
       {
         "index": 10,
         "event": null,
-        "data": "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\").\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"16\",\"logprobs\":[],\"sequence_number\":9}",
         "data_lines": [
-          "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\").\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"16\",\"logprobs\":[],\"sequence_number\":9}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\").\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"16\",\"logprobs\":[],\"sequence_number\":9}",
         "data_json": {
-          "id": "gen-1773001199-vpawS44HfslazLR4vas0",
-          "object": "chat.completion.chunk",
-          "created": 1773001199,
-          "model": "openai/gpt-5.4-20260305",
-          "provider": "OpenAI",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": ").",
-                "role": "assistant"
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.output_text.delta",
+          "output_index": 0,
+          "item_id": "msg_tmp_n635lr4apk",
+          "content_index": 0,
+          "delta": "16",
+          "logprobs": [],
+          "sequence_number": 9
         }
       },
       {
         "index": 11,
         "event": null,
-        "data": "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"stop\",\"native_finish_reason\":\"completed\"}]}",
+        "data": "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"°C\",\"logprobs\":[],\"sequence_number\":10}",
         "data_lines": [
-          "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"stop\",\"native_finish_reason\":\"completed\"}]}"
+          "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"°C\",\"logprobs\":[],\"sequence_number\":10}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"stop\",\"native_finish_reason\":\"completed\"}]}",
+        "raw": "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"°C\",\"logprobs\":[],\"sequence_number\":10}",
         "data_json": {
-          "id": "gen-1773001199-vpawS44HfslazLR4vas0",
-          "object": "chat.completion.chunk",
-          "created": 1773001199,
-          "model": "openai/gpt-5.4-20260305",
-          "provider": "OpenAI",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": "",
-                "role": "assistant"
-              },
-              "finish_reason": "stop",
-              "native_finish_reason": "completed"
-            }
-          ]
+          "type": "response.output_text.delta",
+          "output_index": 0,
+          "item_id": "msg_tmp_n635lr4apk",
+          "content_index": 0,
+          "delta": "°C",
+          "logprobs": [],
+          "sequence_number": 10
         }
       },
       {
         "index": 12,
         "event": null,
-        "data": "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[],\"usage\":{\"prompt_tokens\":113,\"completion_tokens\":15,\"total_tokens\":128,\"cost\":0.0005075,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0005075,\"upstream_inference_prompt_cost\":0.0002825,\"upstream_inference_completions_cost\":0.000225},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data": "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" (\",\"logprobs\":[],\"sequence_number\":11}",
         "data_lines": [
-          "{\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[],\"usage\":{\"prompt_tokens\":113,\"completion_tokens\":15,\"total_tokens\":128,\"cost\":0.0005075,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0005075,\"upstream_inference_prompt_cost\":0.0002825,\"upstream_inference_completions_cost\":0.000225},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}"
+          "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" (\",\"logprobs\":[],\"sequence_number\":11}"
         ],
-        "raw": "data: {\"id\":\"gen-1773001199-vpawS44HfslazLR4vas0\",\"object\":\"chat.completion.chunk\",\"created\":1773001199,\"model\":\"openai/gpt-5.4-20260305\",\"provider\":\"OpenAI\",\"choices\":[],\"usage\":{\"prompt_tokens\":113,\"completion_tokens\":15,\"total_tokens\":128,\"cost\":0.0005075,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0005075,\"upstream_inference_prompt_cost\":0.0002825,\"upstream_inference_completions_cost\":0.000225},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "raw": "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\" (\",\"logprobs\":[],\"sequence_number\":11}",
         "data_json": {
-          "id": "gen-1773001199-vpawS44HfslazLR4vas0",
-          "object": "chat.completion.chunk",
-          "created": 1773001199,
-          "model": "openai/gpt-5.4-20260305",
-          "provider": "OpenAI",
-          "choices": [],
-          "usage": {
-            "prompt_tokens": 113,
-            "completion_tokens": 15,
-            "total_tokens": 128,
-            "cost": 0.0005075,
-            "is_byok": false,
-            "prompt_tokens_details": {
-              "cached_tokens": 0,
-              "cache_write_tokens": 0,
-              "audio_tokens": 0,
-              "video_tokens": 0
-            },
-            "cost_details": {
-              "upstream_inference_cost": 0.0005075,
-              "upstream_inference_prompt_cost": 0.0002825,
-              "upstream_inference_completions_cost": 0.000225
-            },
-            "completion_tokens_details": {
-              "reasoning_tokens": 0,
-              "image_tokens": 0,
-              "audio_tokens": 0
-            }
-          }
+          "type": "response.output_text.delta",
+          "output_index": 0,
+          "item_id": "msg_tmp_n635lr4apk",
+          "content_index": 0,
+          "delta": " (",
+          "logprobs": [],
+          "sequence_number": 11
         }
       },
       {
         "index": 13,
+        "event": null,
+        "data": "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"60\",\"logprobs\":[],\"sequence_number\":12}",
+        "data_lines": [
+          "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"60\",\"logprobs\":[],\"sequence_number\":12}"
+        ],
+        "raw": "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"60\",\"logprobs\":[],\"sequence_number\":12}",
+        "data_json": {
+          "type": "response.output_text.delta",
+          "output_index": 0,
+          "item_id": "msg_tmp_n635lr4apk",
+          "content_index": 0,
+          "delta": "60",
+          "logprobs": [],
+          "sequence_number": 12
+        }
+      },
+      {
+        "index": 14,
+        "event": null,
+        "data": "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"°F\",\"logprobs\":[],\"sequence_number\":13}",
+        "data_lines": [
+          "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"°F\",\"logprobs\":[],\"sequence_number\":13}"
+        ],
+        "raw": "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\"°F\",\"logprobs\":[],\"sequence_number\":13}",
+        "data_json": {
+          "type": "response.output_text.delta",
+          "output_index": 0,
+          "item_id": "msg_tmp_n635lr4apk",
+          "content_index": 0,
+          "delta": "°F",
+          "logprobs": [],
+          "sequence_number": 13
+        }
+      },
+      {
+        "index": 15,
+        "event": null,
+        "data": "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\").\",\"logprobs\":[],\"sequence_number\":14}",
+        "data_lines": [
+          "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\").\",\"logprobs\":[],\"sequence_number\":14}"
+        ],
+        "raw": "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"delta\":\").\",\"logprobs\":[],\"sequence_number\":14}",
+        "data_json": {
+          "type": "response.output_text.delta",
+          "output_index": 0,
+          "item_id": "msg_tmp_n635lr4apk",
+          "content_index": 0,
+          "delta": ").",
+          "logprobs": [],
+          "sequence_number": 14
+        }
+      },
+      {
+        "index": 16,
+        "event": null,
+        "data": "{\"type\":\"response.output_text.done\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"text\":\"San Francisco is currently 16°C (60°F).\",\"logprobs\":[],\"sequence_number\":15}",
+        "data_lines": [
+          "{\"type\":\"response.output_text.done\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"text\":\"San Francisco is currently 16°C (60°F).\",\"logprobs\":[],\"sequence_number\":15}"
+        ],
+        "raw": "data: {\"type\":\"response.output_text.done\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"text\":\"San Francisco is currently 16°C (60°F).\",\"logprobs\":[],\"sequence_number\":15}",
+        "data_json": {
+          "type": "response.output_text.done",
+          "output_index": 0,
+          "item_id": "msg_tmp_n635lr4apk",
+          "content_index": 0,
+          "text": "San Francisco is currently 16°C (60°F).",
+          "logprobs": [],
+          "sequence_number": 15
+        }
+      },
+      {
+        "index": 17,
+        "event": null,
+        "data": "{\"type\":\"response.content_part.done\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"San Francisco is currently 16°C (60°F).\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":16}",
+        "data_lines": [
+          "{\"type\":\"response.content_part.done\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"San Francisco is currently 16°C (60°F).\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":16}"
+        ],
+        "raw": "data: {\"type\":\"response.content_part.done\",\"output_index\":0,\"item_id\":\"msg_tmp_n635lr4apk\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"San Francisco is currently 16°C (60°F).\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":16}",
+        "data_json": {
+          "type": "response.content_part.done",
+          "output_index": 0,
+          "item_id": "msg_tmp_n635lr4apk",
+          "content_index": 0,
+          "part": {
+            "type": "output_text",
+            "text": "San Francisco is currently 16°C (60°F).",
+            "annotations": [],
+            "logprobs": []
+          },
+          "sequence_number": 16
+        }
+      },
+      {
+        "index": 18,
+        "event": null,
+        "data": "{\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_n635lr4apk\",\"type\":\"message\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"San Francisco is currently 16°C (60°F).\",\"annotations\":[],\"logprobs\":[]}],\"phase\":\"final_answer\"},\"sequence_number\":17}",
+        "data_lines": [
+          "{\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_n635lr4apk\",\"type\":\"message\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"San Francisco is currently 16°C (60°F).\",\"annotations\":[],\"logprobs\":[]}],\"phase\":\"final_answer\"},\"sequence_number\":17}"
+        ],
+        "raw": "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_n635lr4apk\",\"type\":\"message\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"San Francisco is currently 16°C (60°F).\",\"annotations\":[],\"logprobs\":[]}],\"phase\":\"final_answer\"},\"sequence_number\":17}",
+        "data_json": {
+          "type": "response.output_item.done",
+          "output_index": 0,
+          "item": {
+            "id": "msg_tmp_n635lr4apk",
+            "type": "message",
+            "status": "completed",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "San Francisco is currently 16°C (60°F).",
+                "annotations": [],
+                "logprobs": []
+              }
+            ],
+            "phase": "final_answer"
+          },
+          "sequence_number": 17
+        }
+      },
+      {
+        "index": 19,
+        "event": null,
+        "data": "{\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017874-1EF7BYG5n0mU4R3C7H1x\",\"object\":\"response\",\"created_at\":1773017874,\"model\":\"openai/gpt-5.4-20260305\",\"status\":\"completed\",\"completed_at\":1773017875,\"output\":[{\"id\":\"msg_tmp_n635lr4apk\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"San Francisco is currently 16°C (60°F).\",\"annotations\":[],\"logprobs\":[]}],\"phase\":\"final_answer\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":113,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":15,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":128,\"cost\":0.0005075,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.0005075,\"upstream_inference_input_cost\":0.0002825,\"upstream_inference_output_cost\":0.000225}}},\"sequence_number\":18}",
+        "data_lines": [
+          "{\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017874-1EF7BYG5n0mU4R3C7H1x\",\"object\":\"response\",\"created_at\":1773017874,\"model\":\"openai/gpt-5.4-20260305\",\"status\":\"completed\",\"completed_at\":1773017875,\"output\":[{\"id\":\"msg_tmp_n635lr4apk\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"San Francisco is currently 16°C (60°F).\",\"annotations\":[],\"logprobs\":[]}],\"phase\":\"final_answer\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":113,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":15,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":128,\"cost\":0.0005075,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.0005075,\"upstream_inference_input_cost\":0.0002825,\"upstream_inference_output_cost\":0.000225}}},\"sequence_number\":18}"
+        ],
+        "raw": "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017874-1EF7BYG5n0mU4R3C7H1x\",\"object\":\"response\",\"created_at\":1773017874,\"model\":\"openai/gpt-5.4-20260305\",\"status\":\"completed\",\"completed_at\":1773017875,\"output\":[{\"id\":\"msg_tmp_n635lr4apk\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"San Francisco is currently 16°C (60°F).\",\"annotations\":[],\"logprobs\":[]}],\"phase\":\"final_answer\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Get current weather by city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"],\"additionalProperties\":false},\"strict\":null}],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":113,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":15,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":128,\"cost\":0.0005075,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.0005075,\"upstream_inference_input_cost\":0.0002825,\"upstream_inference_output_cost\":0.000225}}},\"sequence_number\":18}",
+        "data_json": {
+          "type": "response.completed",
+          "response": {
+            "id": "gen-1773017874-1EF7BYG5n0mU4R3C7H1x",
+            "object": "response",
+            "created_at": 1773017874,
+            "model": "openai/gpt-5.4-20260305",
+            "status": "completed",
+            "completed_at": 1773017875,
+            "output": [
+              {
+                "id": "msg_tmp_n635lr4apk",
+                "type": "message",
+                "role": "assistant",
+                "status": "completed",
+                "content": [
+                  {
+                    "type": "output_text",
+                    "text": "San Francisco is currently 16°C (60°F).",
+                    "annotations": [],
+                    "logprobs": []
+                  }
+                ],
+                "phase": "final_answer"
+              }
+            ],
+            "error": null,
+            "incomplete_details": null,
+            "tools": [
+              {
+                "type": "function",
+                "name": "get_weather",
+                "description": "Get current weather by city",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "city": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "city"
+                  ],
+                  "additionalProperties": false
+                },
+                "strict": null
+              }
+            ],
+            "tool_choice": "auto",
+            "parallel_tool_calls": true,
+            "max_output_tokens": 1024,
+            "temperature": 0,
+            "top_p": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "top_logprobs": 0,
+            "max_tool_calls": null,
+            "metadata": {},
+            "background": false,
+            "previous_response_id": null,
+            "service_tier": "auto",
+            "truncation": "disabled",
+            "store": false,
+            "instructions": "You are a helpful assistant.",
+            "text": {
+              "format": {
+                "type": "text"
+              }
+            },
+            "reasoning": null,
+            "safety_identifier": null,
+            "prompt_cache_key": null,
+            "user": null,
+            "usage": {
+              "input_tokens": 113,
+              "input_tokens_details": {
+                "cached_tokens": 0
+              },
+              "output_tokens": 15,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 128,
+              "cost": 0.0005075,
+              "is_byok": false,
+              "cost_details": {
+                "upstream_inference_cost": 0.0005075,
+                "upstream_inference_input_cost": 0.0002825,
+                "upstream_inference_output_cost": 0.000225
+              }
+            }
+          },
+          "sequence_number": 18
+        }
+      },
+      {
+        "index": 20,
         "event": null,
         "data": "[DONE]",
         "data_lines": [

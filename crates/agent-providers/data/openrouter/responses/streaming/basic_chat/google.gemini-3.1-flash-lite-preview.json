@@ -1,9 +1,9 @@
 {
   "provider": "openrouter",
   "scenario": "basic_chat",
-  "captured_at": "2026-03-08T20:14:06.820Z",
+  "captured_at": "2026-03-09T00:57:45.544Z",
   "request": {
-    "url": "https://openrouter.ai/api/v1/chat/completions",
+    "url": "https://openrouter.ai/api/v1/responses",
     "method": "POST",
     "model": "google/gemini-3.1-flash-lite-preview",
     "headers": {
@@ -12,11 +12,10 @@
     },
     "body": {
       "model": "google/gemini-3.1-flash-lite-preview",
-      "messages": [
-        {
-          "role": "system",
-          "content": "You are a helpful assistant."
-        },
+      "stream": true,
+      "temperature": 0,
+      "instructions": "You are a helpful assistant.",
+      "input": [
         {
           "role": "user",
           "content": "Hello World!"
@@ -30,9 +29,8 @@
           "content": "tell me how you are doing today in 5 words."
         }
       ],
-      "stream": true,
-      "temperature": 0,
-      "max_tokens": 1024
+      "max_output_tokens": 1024,
+      "store": false
     }
   },
   "response": {
@@ -41,10 +39,10 @@
     "headers": {
       "access-control-allow-origin": "*",
       "cache-control": "no-cache",
-      "cf-ray": "9d9481178caddb66-LAX",
+      "cf-ray": "9d962095fbfe3dc4-LAX",
       "connection": "keep-alive",
       "content-type": "text/event-stream",
-      "date": "Sun, 08 Mar 2026 20:14:06 GMT",
+      "date": "Mon, 09 Mar 2026 00:57:45 GMT",
       "permissions-policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
       "referrer-policy": "no-referrer, strict-origin-when-cross-origin",
       "server": "cloudflare",
@@ -55,17 +53,23 @@
   },
   "stream": {
     "format": "sse",
-    "chunk_count": 7,
+    "chunk_count": 13,
     "chunks": [
       ": OPENROUTER PROCESSING\n\n",
-      "data: {\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I am\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" doing very well.\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"EjQKMgG+Pvb7WTzy1dmp9amh6VRhb4jrTDMXRHtxKwuF+tL9g4pMSwLVmxxp2iL0raOzWAcl\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\n",
-      "data: {\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}\n\n",
-      "data: {\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[],\"usage\":{\"prompt_tokens\":34,\"completion_tokens\":6,\"total_tokens\":40,\"cost\":0.0000175,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0000175,\"upstream_inference_prompt_cost\":0.0000085,\"upstream_inference_completions_cost\":0.000009},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}\n\n",
+      "data: {\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017864-jHE6zye0USWC4FUbrMO5\",\"object\":\"response\",\"created_at\":1773017864,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}\n\n",
+      "data: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017864-jHE6zye0USWC4FUbrMO5\",\"object\":\"response\",\"created_at\":1773017864,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}\n\n",
+      "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_vufvs3pj94m\",\"type\":\"message\",\"status\":\"in_progress\",\"role\":\"assistant\",\"content\":[]},\"sequence_number\":2}\n\n",
+      "data: {\"type\":\"response.content_part.added\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":3}\n\n",
+      "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"delta\":\"I am\",\"logprobs\":[],\"sequence_number\":4}\n\n",
+      "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"delta\":\" doing very well.\",\"logprobs\":[],\"sequence_number\":5}\n\n",
+      "data: {\"type\":\"response.output_item.added\",\"output_index\":1,\"item\":{\"id\":\"rs_tmp_pt49osr4l2\",\"type\":\"reasoning\",\"status\":\"in_progress\",\"summary\":[]},\"sequence_number\":6}\n\n",
+      "data: {\"type\":\"response.output_text.done\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"text\":\"I am doing very well.\",\"logprobs\":[],\"sequence_number\":7}\n\n",
+      "data: {\"type\":\"response.content_part.done\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"I am doing very well.\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":8}\n\n",
+      "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_vufvs3pj94m\",\"type\":\"message\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"I am doing very well.\",\"annotations\":[],\"logprobs\":[]}]},\"sequence_number\":9}\n\ndata: {\"type\":\"response.output_item.done\",\"output_index\":1,\"item\":{\"id\":\"rs_tmp_pt49osr4l2\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"EjQKMgG+Pvb7jdNLPeInlKuZJgjNlgqZBQMlFRP1VkBXW6UeHhi8+Ho6bxsMV2LdWz0WnM1D\",\"format\":\"google-gemini-v1\"},\"sequence_number\":10}\n\n",
+      "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017864-jHE6zye0USWC4FUbrMO5\",\"object\":\"response\",\"created_at\":1773017864,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"status\":\"completed\",\"completed_at\":1773017865,\"output\":[{\"id\":\"msg_tmp_vufvs3pj94m\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"I am doing very well.\",\"annotations\":[],\"logprobs\":[]}]},{\"id\":\"rs_tmp_pt49osr4l2\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"EjQKMgG+Pvb7jdNLPeInlKuZJgjNlgqZBQMlFRP1VkBXW6UeHhi8+Ho6bxsMV2LdWz0WnM1D\",\"format\":\"google-gemini-v1\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":34,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":6,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":40,\"cost\":0.0000175,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.0000175,\"upstream_inference_input_cost\":0.0000085,\"upstream_inference_output_cost\":0.000009}}},\"sequence_number\":11}\n\n",
       "data: [DONE]\n\n"
     ],
-    "raw_text": ": OPENROUTER PROCESSING\n\ndata: {\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I am\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" doing very well.\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"EjQKMgG+Pvb7WTzy1dmp9amh6VRhb4jrTDMXRHtxKwuF+tL9g4pMSwLVmxxp2iL0raOzWAcl\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}\n\ndata: {\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}\n\ndata: {\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[],\"usage\":{\"prompt_tokens\":34,\"completion_tokens\":6,\"total_tokens\":40,\"cost\":0.0000175,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0000175,\"upstream_inference_prompt_cost\":0.0000085,\"upstream_inference_completions_cost\":0.000009},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}\n\ndata: [DONE]\n\n",
+    "raw_text": ": OPENROUTER PROCESSING\n\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017864-jHE6zye0USWC4FUbrMO5\",\"object\":\"response\",\"created_at\":1773017864,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}\n\ndata: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017864-jHE6zye0USWC4FUbrMO5\",\"object\":\"response\",\"created_at\":1773017864,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}\n\ndata: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_vufvs3pj94m\",\"type\":\"message\",\"status\":\"in_progress\",\"role\":\"assistant\",\"content\":[]},\"sequence_number\":2}\n\ndata: {\"type\":\"response.content_part.added\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":3}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"delta\":\"I am\",\"logprobs\":[],\"sequence_number\":4}\n\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"delta\":\" doing very well.\",\"logprobs\":[],\"sequence_number\":5}\n\ndata: {\"type\":\"response.output_item.added\",\"output_index\":1,\"item\":{\"id\":\"rs_tmp_pt49osr4l2\",\"type\":\"reasoning\",\"status\":\"in_progress\",\"summary\":[]},\"sequence_number\":6}\n\ndata: {\"type\":\"response.output_text.done\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"text\":\"I am doing very well.\",\"logprobs\":[],\"sequence_number\":7}\n\ndata: {\"type\":\"response.content_part.done\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"I am doing very well.\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":8}\n\ndata: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_vufvs3pj94m\",\"type\":\"message\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"I am doing very well.\",\"annotations\":[],\"logprobs\":[]}]},\"sequence_number\":9}\n\ndata: {\"type\":\"response.output_item.done\",\"output_index\":1,\"item\":{\"id\":\"rs_tmp_pt49osr4l2\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"EjQKMgG+Pvb7jdNLPeInlKuZJgjNlgqZBQMlFRP1VkBXW6UeHhi8+Ho6bxsMV2LdWz0WnM1D\",\"format\":\"google-gemini-v1\"},\"sequence_number\":10}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017864-jHE6zye0USWC4FUbrMO5\",\"object\":\"response\",\"created_at\":1773017864,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"status\":\"completed\",\"completed_at\":1773017865,\"output\":[{\"id\":\"msg_tmp_vufvs3pj94m\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"I am doing very well.\",\"annotations\":[],\"logprobs\":[]}]},{\"id\":\"rs_tmp_pt49osr4l2\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"EjQKMgG+Pvb7jdNLPeInlKuZJgjNlgqZBQMlFRP1VkBXW6UeHhi8+Ho6bxsMV2LdWz0WnM1D\",\"format\":\"google-gemini-v1\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":34,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":6,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":40,\"cost\":0.0000175,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.0000175,\"upstream_inference_input_cost\":0.0000085,\"upstream_inference_output_cost\":0.000009}}},\"sequence_number\":11}\n\ndata: [DONE]\n\n",
     "events": [
       {
         "index": 0,
@@ -77,163 +81,387 @@
       {
         "index": 1,
         "event": null,
-        "data": "{\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I am\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017864-jHE6zye0USWC4FUbrMO5\",\"object\":\"response\",\"created_at\":1773017864,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}",
         "data_lines": [
-          "{\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I am\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017864-jHE6zye0USWC4FUbrMO5\",\"object\":\"response\",\"created_at\":1773017864,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}"
         ],
-        "raw": "data: {\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"I am\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.created\",\"response\":{\"id\":\"gen-1773017864-jHE6zye0USWC4FUbrMO5\",\"object\":\"response\",\"created_at\":1773017864,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":0}",
         "data_json": {
-          "id": "gen-1773000846-pIWdkV38hmcer60OVupr",
-          "object": "chat.completion.chunk",
-          "created": 1773000846,
-          "model": "google/gemini-3.1-flash-lite-preview-20260303",
-          "provider": "Google AI Studio",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": "I am",
-                "role": "assistant"
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.created",
+          "response": {
+            "id": "gen-1773017864-jHE6zye0USWC4FUbrMO5",
+            "object": "response",
+            "created_at": 1773017864,
+            "model": "google/gemini-3.1-flash-lite-preview-20260303",
+            "status": "in_progress",
+            "completed_at": null,
+            "output": [],
+            "error": null,
+            "incomplete_details": null,
+            "tools": [],
+            "tool_choice": "auto",
+            "parallel_tool_calls": true,
+            "max_output_tokens": 1024,
+            "temperature": 0,
+            "top_p": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "top_logprobs": 0,
+            "max_tool_calls": null,
+            "metadata": {},
+            "background": false,
+            "previous_response_id": null,
+            "service_tier": "auto",
+            "truncation": "disabled",
+            "store": false,
+            "instructions": "You are a helpful assistant.",
+            "text": {
+              "format": {
+                "type": "text"
+              }
+            },
+            "reasoning": null,
+            "safety_identifier": null,
+            "prompt_cache_key": null,
+            "user": null,
+            "usage": null
+          },
+          "sequence_number": 0
         }
       },
       {
         "index": 2,
         "event": null,
-        "data": "{\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" doing very well.\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017864-jHE6zye0USWC4FUbrMO5\",\"object\":\"response\",\"created_at\":1773017864,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}",
         "data_lines": [
-          "{\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" doing very well.\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017864-jHE6zye0USWC4FUbrMO5\",\"object\":\"response\",\"created_at\":1773017864,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}"
         ],
-        "raw": "data: {\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" doing very well.\",\"role\":\"assistant\"},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"gen-1773017864-jHE6zye0USWC4FUbrMO5\",\"object\":\"response\",\"created_at\":1773017864,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"status\":\"in_progress\",\"completed_at\":null,\"output\":[],\"error\":null,\"incomplete_details\":null,\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":null},\"sequence_number\":1}",
         "data_json": {
-          "id": "gen-1773000846-pIWdkV38hmcer60OVupr",
-          "object": "chat.completion.chunk",
-          "created": 1773000846,
-          "model": "google/gemini-3.1-flash-lite-preview-20260303",
-          "provider": "Google AI Studio",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": " doing very well.",
-                "role": "assistant"
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.in_progress",
+          "response": {
+            "id": "gen-1773017864-jHE6zye0USWC4FUbrMO5",
+            "object": "response",
+            "created_at": 1773017864,
+            "model": "google/gemini-3.1-flash-lite-preview-20260303",
+            "status": "in_progress",
+            "completed_at": null,
+            "output": [],
+            "error": null,
+            "incomplete_details": null,
+            "tools": [],
+            "tool_choice": "auto",
+            "parallel_tool_calls": true,
+            "max_output_tokens": 1024,
+            "temperature": 0,
+            "top_p": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "top_logprobs": 0,
+            "max_tool_calls": null,
+            "metadata": {},
+            "background": false,
+            "previous_response_id": null,
+            "service_tier": "auto",
+            "truncation": "disabled",
+            "store": false,
+            "instructions": "You are a helpful assistant.",
+            "text": {
+              "format": {
+                "type": "text"
+              }
+            },
+            "reasoning": null,
+            "safety_identifier": null,
+            "prompt_cache_key": null,
+            "user": null,
+            "usage": null
+          },
+          "sequence_number": 1
         }
       },
       {
         "index": 3,
         "event": null,
-        "data": "{\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"EjQKMgG+Pvb7WTzy1dmp9amh6VRhb4jrTDMXRHtxKwuF+tL9g4pMSwLVmxxp2iL0raOzWAcl\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "data": "{\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_vufvs3pj94m\",\"type\":\"message\",\"status\":\"in_progress\",\"role\":\"assistant\",\"content\":[]},\"sequence_number\":2}",
         "data_lines": [
-          "{\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"EjQKMgG+Pvb7WTzy1dmp9amh6VRhb4jrTDMXRHtxKwuF+tL9g4pMSwLVmxxp2iL0raOzWAcl\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}"
+          "{\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_vufvs3pj94m\",\"type\":\"message\",\"status\":\"in_progress\",\"role\":\"assistant\",\"content\":[]},\"sequence_number\":2}"
         ],
-        "raw": "data: {\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null,\"reasoning_details\":[{\"type\":\"reasoning.encrypted\",\"data\":\"EjQKMgG+Pvb7WTzy1dmp9amh6VRhb4jrTDMXRHtxKwuF+tL9g4pMSwLVmxxp2iL0raOzWAcl\",\"format\":\"google-gemini-v1\",\"index\":0}]},\"finish_reason\":null,\"native_finish_reason\":null}]}",
+        "raw": "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_vufvs3pj94m\",\"type\":\"message\",\"status\":\"in_progress\",\"role\":\"assistant\",\"content\":[]},\"sequence_number\":2}",
         "data_json": {
-          "id": "gen-1773000846-pIWdkV38hmcer60OVupr",
-          "object": "chat.completion.chunk",
-          "created": 1773000846,
-          "model": "google/gemini-3.1-flash-lite-preview-20260303",
-          "provider": "Google AI Studio",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": "",
-                "role": "assistant",
-                "reasoning": null,
-                "reasoning_details": [
-                  {
-                    "type": "reasoning.encrypted",
-                    "data": "EjQKMgG+Pvb7WTzy1dmp9amh6VRhb4jrTDMXRHtxKwuF+tL9g4pMSwLVmxxp2iL0raOzWAcl",
-                    "format": "google-gemini-v1",
-                    "index": 0
-                  }
-                ]
-              },
-              "finish_reason": null,
-              "native_finish_reason": null
-            }
-          ]
+          "type": "response.output_item.added",
+          "output_index": 0,
+          "item": {
+            "id": "msg_tmp_vufvs3pj94m",
+            "type": "message",
+            "status": "in_progress",
+            "role": "assistant",
+            "content": []
+          },
+          "sequence_number": 2
         }
       },
       {
         "index": 4,
         "event": null,
-        "data": "{\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}",
+        "data": "{\"type\":\"response.content_part.added\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":3}",
         "data_lines": [
-          "{\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}"
+          "{\"type\":\"response.content_part.added\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":3}"
         ],
-        "raw": "data: {\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"role\":\"assistant\",\"reasoning\":null},\"finish_reason\":\"stop\",\"native_finish_reason\":\"STOP\"}]}",
+        "raw": "data: {\"type\":\"response.content_part.added\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":3}",
         "data_json": {
-          "id": "gen-1773000846-pIWdkV38hmcer60OVupr",
-          "object": "chat.completion.chunk",
-          "created": 1773000846,
-          "model": "google/gemini-3.1-flash-lite-preview-20260303",
-          "provider": "Google AI Studio",
-          "choices": [
-            {
-              "index": 0,
-              "delta": {
-                "content": "",
-                "role": "assistant",
-                "reasoning": null
-              },
-              "finish_reason": "stop",
-              "native_finish_reason": "STOP"
-            }
-          ]
+          "type": "response.content_part.added",
+          "output_index": 0,
+          "item_id": "msg_tmp_vufvs3pj94m",
+          "content_index": 0,
+          "part": {
+            "type": "output_text",
+            "text": "",
+            "annotations": [],
+            "logprobs": []
+          },
+          "sequence_number": 3
         }
       },
       {
         "index": 5,
         "event": null,
-        "data": "{\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[],\"usage\":{\"prompt_tokens\":34,\"completion_tokens\":6,\"total_tokens\":40,\"cost\":0.0000175,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0000175,\"upstream_inference_prompt_cost\":0.0000085,\"upstream_inference_completions_cost\":0.000009},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "data": "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"delta\":\"I am\",\"logprobs\":[],\"sequence_number\":4}",
         "data_lines": [
-          "{\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[],\"usage\":{\"prompt_tokens\":34,\"completion_tokens\":6,\"total_tokens\":40,\"cost\":0.0000175,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0000175,\"upstream_inference_prompt_cost\":0.0000085,\"upstream_inference_completions_cost\":0.000009},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}"
+          "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"delta\":\"I am\",\"logprobs\":[],\"sequence_number\":4}"
         ],
-        "raw": "data: {\"id\":\"gen-1773000846-pIWdkV38hmcer60OVupr\",\"object\":\"chat.completion.chunk\",\"created\":1773000846,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"provider\":\"Google AI Studio\",\"choices\":[],\"usage\":{\"prompt_tokens\":34,\"completion_tokens\":6,\"total_tokens\":40,\"cost\":0.0000175,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.0000175,\"upstream_inference_prompt_cost\":0.0000085,\"upstream_inference_completions_cost\":0.000009},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}",
+        "raw": "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"delta\":\"I am\",\"logprobs\":[],\"sequence_number\":4}",
         "data_json": {
-          "id": "gen-1773000846-pIWdkV38hmcer60OVupr",
-          "object": "chat.completion.chunk",
-          "created": 1773000846,
-          "model": "google/gemini-3.1-flash-lite-preview-20260303",
-          "provider": "Google AI Studio",
-          "choices": [],
-          "usage": {
-            "prompt_tokens": 34,
-            "completion_tokens": 6,
-            "total_tokens": 40,
-            "cost": 0.0000175,
-            "is_byok": false,
-            "prompt_tokens_details": {
-              "cached_tokens": 0,
-              "cache_write_tokens": 0,
-              "audio_tokens": 0,
-              "video_tokens": 0
-            },
-            "cost_details": {
-              "upstream_inference_cost": 0.0000175,
-              "upstream_inference_prompt_cost": 0.0000085,
-              "upstream_inference_completions_cost": 0.000009
-            },
-            "completion_tokens_details": {
-              "reasoning_tokens": 0,
-              "image_tokens": 0,
-              "audio_tokens": 0
-            }
-          }
+          "type": "response.output_text.delta",
+          "output_index": 0,
+          "item_id": "msg_tmp_vufvs3pj94m",
+          "content_index": 0,
+          "delta": "I am",
+          "logprobs": [],
+          "sequence_number": 4
         }
       },
       {
         "index": 6,
+        "event": null,
+        "data": "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"delta\":\" doing very well.\",\"logprobs\":[],\"sequence_number\":5}",
+        "data_lines": [
+          "{\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"delta\":\" doing very well.\",\"logprobs\":[],\"sequence_number\":5}"
+        ],
+        "raw": "data: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"delta\":\" doing very well.\",\"logprobs\":[],\"sequence_number\":5}",
+        "data_json": {
+          "type": "response.output_text.delta",
+          "output_index": 0,
+          "item_id": "msg_tmp_vufvs3pj94m",
+          "content_index": 0,
+          "delta": " doing very well.",
+          "logprobs": [],
+          "sequence_number": 5
+        }
+      },
+      {
+        "index": 7,
+        "event": null,
+        "data": "{\"type\":\"response.output_item.added\",\"output_index\":1,\"item\":{\"id\":\"rs_tmp_pt49osr4l2\",\"type\":\"reasoning\",\"status\":\"in_progress\",\"summary\":[]},\"sequence_number\":6}",
+        "data_lines": [
+          "{\"type\":\"response.output_item.added\",\"output_index\":1,\"item\":{\"id\":\"rs_tmp_pt49osr4l2\",\"type\":\"reasoning\",\"status\":\"in_progress\",\"summary\":[]},\"sequence_number\":6}"
+        ],
+        "raw": "data: {\"type\":\"response.output_item.added\",\"output_index\":1,\"item\":{\"id\":\"rs_tmp_pt49osr4l2\",\"type\":\"reasoning\",\"status\":\"in_progress\",\"summary\":[]},\"sequence_number\":6}",
+        "data_json": {
+          "type": "response.output_item.added",
+          "output_index": 1,
+          "item": {
+            "id": "rs_tmp_pt49osr4l2",
+            "type": "reasoning",
+            "status": "in_progress",
+            "summary": []
+          },
+          "sequence_number": 6
+        }
+      },
+      {
+        "index": 8,
+        "event": null,
+        "data": "{\"type\":\"response.output_text.done\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"text\":\"I am doing very well.\",\"logprobs\":[],\"sequence_number\":7}",
+        "data_lines": [
+          "{\"type\":\"response.output_text.done\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"text\":\"I am doing very well.\",\"logprobs\":[],\"sequence_number\":7}"
+        ],
+        "raw": "data: {\"type\":\"response.output_text.done\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"text\":\"I am doing very well.\",\"logprobs\":[],\"sequence_number\":7}",
+        "data_json": {
+          "type": "response.output_text.done",
+          "output_index": 0,
+          "item_id": "msg_tmp_vufvs3pj94m",
+          "content_index": 0,
+          "text": "I am doing very well.",
+          "logprobs": [],
+          "sequence_number": 7
+        }
+      },
+      {
+        "index": 9,
+        "event": null,
+        "data": "{\"type\":\"response.content_part.done\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"I am doing very well.\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":8}",
+        "data_lines": [
+          "{\"type\":\"response.content_part.done\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"I am doing very well.\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":8}"
+        ],
+        "raw": "data: {\"type\":\"response.content_part.done\",\"output_index\":0,\"item_id\":\"msg_tmp_vufvs3pj94m\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"I am doing very well.\",\"annotations\":[],\"logprobs\":[]},\"sequence_number\":8}",
+        "data_json": {
+          "type": "response.content_part.done",
+          "output_index": 0,
+          "item_id": "msg_tmp_vufvs3pj94m",
+          "content_index": 0,
+          "part": {
+            "type": "output_text",
+            "text": "I am doing very well.",
+            "annotations": [],
+            "logprobs": []
+          },
+          "sequence_number": 8
+        }
+      },
+      {
+        "index": 10,
+        "event": null,
+        "data": "{\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_vufvs3pj94m\",\"type\":\"message\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"I am doing very well.\",\"annotations\":[],\"logprobs\":[]}]},\"sequence_number\":9}",
+        "data_lines": [
+          "{\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_vufvs3pj94m\",\"type\":\"message\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"I am doing very well.\",\"annotations\":[],\"logprobs\":[]}]},\"sequence_number\":9}"
+        ],
+        "raw": "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"msg_tmp_vufvs3pj94m\",\"type\":\"message\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"I am doing very well.\",\"annotations\":[],\"logprobs\":[]}]},\"sequence_number\":9}",
+        "data_json": {
+          "type": "response.output_item.done",
+          "output_index": 0,
+          "item": {
+            "id": "msg_tmp_vufvs3pj94m",
+            "type": "message",
+            "status": "completed",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "I am doing very well.",
+                "annotations": [],
+                "logprobs": []
+              }
+            ]
+          },
+          "sequence_number": 9
+        }
+      },
+      {
+        "index": 11,
+        "event": null,
+        "data": "{\"type\":\"response.output_item.done\",\"output_index\":1,\"item\":{\"id\":\"rs_tmp_pt49osr4l2\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"EjQKMgG+Pvb7jdNLPeInlKuZJgjNlgqZBQMlFRP1VkBXW6UeHhi8+Ho6bxsMV2LdWz0WnM1D\",\"format\":\"google-gemini-v1\"},\"sequence_number\":10}",
+        "data_lines": [
+          "{\"type\":\"response.output_item.done\",\"output_index\":1,\"item\":{\"id\":\"rs_tmp_pt49osr4l2\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"EjQKMgG+Pvb7jdNLPeInlKuZJgjNlgqZBQMlFRP1VkBXW6UeHhi8+Ho6bxsMV2LdWz0WnM1D\",\"format\":\"google-gemini-v1\"},\"sequence_number\":10}"
+        ],
+        "raw": "data: {\"type\":\"response.output_item.done\",\"output_index\":1,\"item\":{\"id\":\"rs_tmp_pt49osr4l2\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"EjQKMgG+Pvb7jdNLPeInlKuZJgjNlgqZBQMlFRP1VkBXW6UeHhi8+Ho6bxsMV2LdWz0WnM1D\",\"format\":\"google-gemini-v1\"},\"sequence_number\":10}",
+        "data_json": {
+          "type": "response.output_item.done",
+          "output_index": 1,
+          "item": {
+            "id": "rs_tmp_pt49osr4l2",
+            "type": "reasoning",
+            "status": "completed",
+            "summary": [],
+            "encrypted_content": "EjQKMgG+Pvb7jdNLPeInlKuZJgjNlgqZBQMlFRP1VkBXW6UeHhi8+Ho6bxsMV2LdWz0WnM1D",
+            "format": "google-gemini-v1"
+          },
+          "sequence_number": 10
+        }
+      },
+      {
+        "index": 12,
+        "event": null,
+        "data": "{\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017864-jHE6zye0USWC4FUbrMO5\",\"object\":\"response\",\"created_at\":1773017864,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"status\":\"completed\",\"completed_at\":1773017865,\"output\":[{\"id\":\"msg_tmp_vufvs3pj94m\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"I am doing very well.\",\"annotations\":[],\"logprobs\":[]}]},{\"id\":\"rs_tmp_pt49osr4l2\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"EjQKMgG+Pvb7jdNLPeInlKuZJgjNlgqZBQMlFRP1VkBXW6UeHhi8+Ho6bxsMV2LdWz0WnM1D\",\"format\":\"google-gemini-v1\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":34,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":6,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":40,\"cost\":0.0000175,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.0000175,\"upstream_inference_input_cost\":0.0000085,\"upstream_inference_output_cost\":0.000009}}},\"sequence_number\":11}",
+        "data_lines": [
+          "{\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017864-jHE6zye0USWC4FUbrMO5\",\"object\":\"response\",\"created_at\":1773017864,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"status\":\"completed\",\"completed_at\":1773017865,\"output\":[{\"id\":\"msg_tmp_vufvs3pj94m\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"I am doing very well.\",\"annotations\":[],\"logprobs\":[]}]},{\"id\":\"rs_tmp_pt49osr4l2\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"EjQKMgG+Pvb7jdNLPeInlKuZJgjNlgqZBQMlFRP1VkBXW6UeHhi8+Ho6bxsMV2LdWz0WnM1D\",\"format\":\"google-gemini-v1\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":34,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":6,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":40,\"cost\":0.0000175,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.0000175,\"upstream_inference_input_cost\":0.0000085,\"upstream_inference_output_cost\":0.000009}}},\"sequence_number\":11}"
+        ],
+        "raw": "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"gen-1773017864-jHE6zye0USWC4FUbrMO5\",\"object\":\"response\",\"created_at\":1773017864,\"model\":\"google/gemini-3.1-flash-lite-preview-20260303\",\"status\":\"completed\",\"completed_at\":1773017865,\"output\":[{\"id\":\"msg_tmp_vufvs3pj94m\",\"type\":\"message\",\"role\":\"assistant\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"text\":\"I am doing very well.\",\"annotations\":[],\"logprobs\":[]}]},{\"id\":\"rs_tmp_pt49osr4l2\",\"type\":\"reasoning\",\"status\":\"completed\",\"summary\":[],\"encrypted_content\":\"EjQKMgG+Pvb7jdNLPeInlKuZJgjNlgqZBQMlFRP1VkBXW6UeHhi8+Ho6bxsMV2LdWz0WnM1D\",\"format\":\"google-gemini-v1\"}],\"error\":null,\"incomplete_details\":null,\"tools\":[],\"tool_choice\":\"auto\",\"parallel_tool_calls\":true,\"max_output_tokens\":1024,\"temperature\":0,\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"max_tool_calls\":null,\"metadata\":{},\"background\":false,\"previous_response_id\":null,\"service_tier\":\"auto\",\"truncation\":\"disabled\",\"store\":false,\"instructions\":\"You are a helpful assistant.\",\"text\":{\"format\":{\"type\":\"text\"}},\"reasoning\":null,\"safety_identifier\":null,\"prompt_cache_key\":null,\"user\":null,\"usage\":{\"input_tokens\":34,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":6,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":40,\"cost\":0.0000175,\"is_byok\":false,\"cost_details\":{\"upstream_inference_cost\":0.0000175,\"upstream_inference_input_cost\":0.0000085,\"upstream_inference_output_cost\":0.000009}}},\"sequence_number\":11}",
+        "data_json": {
+          "type": "response.completed",
+          "response": {
+            "id": "gen-1773017864-jHE6zye0USWC4FUbrMO5",
+            "object": "response",
+            "created_at": 1773017864,
+            "model": "google/gemini-3.1-flash-lite-preview-20260303",
+            "status": "completed",
+            "completed_at": 1773017865,
+            "output": [
+              {
+                "id": "msg_tmp_vufvs3pj94m",
+                "type": "message",
+                "role": "assistant",
+                "status": "completed",
+                "content": [
+                  {
+                    "type": "output_text",
+                    "text": "I am doing very well.",
+                    "annotations": [],
+                    "logprobs": []
+                  }
+                ]
+              },
+              {
+                "id": "rs_tmp_pt49osr4l2",
+                "type": "reasoning",
+                "status": "completed",
+                "summary": [],
+                "encrypted_content": "EjQKMgG+Pvb7jdNLPeInlKuZJgjNlgqZBQMlFRP1VkBXW6UeHhi8+Ho6bxsMV2LdWz0WnM1D",
+                "format": "google-gemini-v1"
+              }
+            ],
+            "error": null,
+            "incomplete_details": null,
+            "tools": [],
+            "tool_choice": "auto",
+            "parallel_tool_calls": true,
+            "max_output_tokens": 1024,
+            "temperature": 0,
+            "top_p": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "top_logprobs": 0,
+            "max_tool_calls": null,
+            "metadata": {},
+            "background": false,
+            "previous_response_id": null,
+            "service_tier": "auto",
+            "truncation": "disabled",
+            "store": false,
+            "instructions": "You are a helpful assistant.",
+            "text": {
+              "format": {
+                "type": "text"
+              }
+            },
+            "reasoning": null,
+            "safety_identifier": null,
+            "prompt_cache_key": null,
+            "user": null,
+            "usage": {
+              "input_tokens": 34,
+              "input_tokens_details": {
+                "cached_tokens": 0
+              },
+              "output_tokens": 6,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 40,
+              "cost": 0.0000175,
+              "is_byok": false,
+              "cost_details": {
+                "upstream_inference_cost": 0.0000175,
+                "upstream_inference_input_cost": 0.0000085,
+                "upstream_inference_output_cost": 0.000009
+              }
+            }
+          },
+          "sequence_number": 11
+        }
+      },
+      {
+        "index": 13,
         "event": null,
         "data": "[DONE]",
         "data_lines": [

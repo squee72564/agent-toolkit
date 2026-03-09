@@ -1,51 +1,83 @@
 {
-  "id": "gen-1772160261-RIF5SP9kpAa7R9es0l4V",
-  "provider": "Anthropic",
-  "model": "anthropic/claude-sonnet-4.6",
-  "object": "chat.completion",
-  "created": 1772160261,
-  "choices": [
+  "id": "gen-1773017836-i1rphFKtAQytSjdwj3R7",
+  "object": "response",
+  "created_at": 1773017836,
+  "model": "anthropic/claude-4.6-sonnet-20260217",
+  "status": "completed",
+  "completed_at": 1773017838,
+  "output": [
     {
-      "logprobs": null,
-      "finish_reason": "tool_calls",
-      "native_finish_reason": "tool_calls",
-      "index": 0,
-      "message": {
-        "role": "assistant",
-        "content": "",
-        "refusal": null,
-        "reasoning": null,
-        "tool_calls": [
-          {
-            "type": "function",
-            "index": 0,
-            "id": "toolu_01JQChDfohzq8qiLgNGaryCG",
-            "function": {
-              "name": "get_weather",
-              "arguments": "{\"city\": \"San Francisco\"}"
-            }
-          }
-        ]
-      }
+      "id": "fc_tmp_nex2xqkb2p",
+      "type": "function_call",
+      "status": "completed",
+      "call_id": "toolu_bdrk_014yu3mzxTMEGM8TfXtP3GmD",
+      "name": "get_weather",
+      "arguments": "{\"city\": \"San Francisco\"}"
     }
   ],
+  "error": null,
+  "incomplete_details": null,
+  "tools": [
+    {
+      "type": "function",
+      "name": "get_weather",
+      "description": "Get current weather by city",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "city"
+        ],
+        "additionalProperties": false
+      },
+      "strict": null
+    }
+  ],
+  "tool_choice": "auto",
+  "parallel_tool_calls": true,
+  "max_output_tokens": 1024,
+  "temperature": 0,
+  "top_p": 1,
+  "presence_penalty": 0,
+  "frequency_penalty": 0,
+  "top_logprobs": 0,
+  "max_tool_calls": null,
+  "metadata": {},
+  "background": false,
+  "previous_response_id": null,
+  "service_tier": "auto",
+  "truncation": "disabled",
+  "store": false,
+  "instructions": "You are a helpful assistant.",
+  "text": {
+    "format": {
+      "type": "text"
+    }
+  },
+  "reasoning": null,
+  "safety_identifier": null,
+  "prompt_cache_key": null,
+  "user": null,
   "usage": {
-    "prompt_tokens": 579,
-    "completion_tokens": 55,
+    "input_tokens": 579,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 55,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
     "total_tokens": 634,
     "cost": 0.002562,
     "is_byok": false,
-    "prompt_tokens_details": {
-      "cached_tokens": 0,
-      "cache_write_tokens": 0
-    },
     "cost_details": {
       "upstream_inference_cost": 0.002562,
-      "upstream_inference_prompt_cost": 0.001737,
-      "upstream_inference_completions_cost": 0.000825
-    },
-    "completion_tokens_details": {
-      "reasoning_tokens": 0
+      "upstream_inference_input_cost": 0.001737,
+      "upstream_inference_output_cost": 0.000825
     }
   }
 }
