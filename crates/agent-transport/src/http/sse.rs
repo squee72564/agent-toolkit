@@ -4,18 +4,27 @@ use bytes::BytesMut;
 
 use crate::http::transport::{StreamTerminationReason, TimeoutStage, TransportError};
 
+/// A single server-sent event parsed from an SSE stream.
 #[derive(Debug, Clone)]
 pub struct SseEvent {
+    /// Optional `event` field.
     pub event: Option<String>,
+    /// Concatenated `data` lines separated by `\n`.
     pub data: String,
+    /// Optional event identifier.
     pub id: Option<String>,
+    /// Optional client retry hint in milliseconds.
     pub retry: Option<u64>,
 }
 
+/// Parser limits enforced while reading SSE responses.
 #[derive(Debug, Clone)]
 pub struct SseLimits {
+    /// Maximum size of a single SSE line before parsing fails.
     pub max_line_bytes: usize,
+    /// Maximum total size of concatenated `data` lines for one event.
     pub max_event_bytes: usize,
+    /// Maximum unread buffered bytes held while parsing partial frames.
     pub max_buffer_bytes: usize,
 }
 
@@ -29,12 +38,16 @@ impl Default for SseLimits {
     }
 }
 
+/// Response head plus a stream for incrementally reading SSE events.
 #[derive(Debug)]
 pub struct HttpSseResponse {
+    /// Response status and headers.
     pub head: crate::http::HttpResponseHead,
+    /// Parsed SSE event stream.
     pub stream: HttpSseStream,
 }
 
+/// Stateful SSE stream parser over a `reqwest` response body.
 #[derive(Debug)]
 pub struct HttpSseStream {
     pub(crate) head: crate::http::HttpResponseHead,
@@ -79,6 +92,11 @@ impl PendingSseEvent {
 }
 
 impl HttpSseStream {
+    /// Reads the next SSE event from the stream.
+    ///
+    /// Returns `Ok(None)` once the stream ends cleanly. Mid-stream disconnects, invalid UTF-8,
+    /// malformed `retry` fields, and configured parser limit violations are returned as
+    /// [`TransportError`] values.
     pub async fn next_event(&mut self) -> Result<Option<SseEvent>, TransportError> {
         loop {
             if let Some(event) = self.try_parse_event()? {

@@ -20,62 +20,92 @@ use crate::http::response::{build_response_head, content_type_matches};
 use crate::http::retry_policy::RetryPolicy;
 use crate::http::sse::{HttpSseResponse, HttpSseStream, PendingSseEvent, SseLimits};
 
+/// Errors produced while building requests or decoding responses.
 #[derive(Debug, Error)]
 pub enum TransportError {
+    /// A header name derived from platform or context metadata was invalid.
     #[error("invalid header name")]
     InvalidHeaderName,
+    /// A header value derived from platform or context metadata was invalid.
     #[error("invalid header value")]
     InvalidHeaderValue,
+    /// JSON serialization or deserialization failed.
     #[error("serialization error")]
     Serialization,
+    /// A timeout fired while a request or stream was in progress.
     #[error("request timed out during {stage}")]
     Timeout { stage: TimeoutStage },
+    /// The server returned a non-success status that the request mode did not allow.
     #[error("unexpected HTTP status {head:?}")]
     Status {
+        /// Response status and headers for the failed request.
         head: Box<crate::http::HttpResponseHead>,
     },
+    /// The response content type did not match the expected value.
     #[error("unexpected response content-type: expected {expected}, got {actual:?}")]
     ContentTypeMismatch {
+        /// Expected media type.
         expected: String,
+        /// Actual `content-type` value, if one was present and valid UTF-8.
         actual: Option<String>,
+        /// Response status and headers.
         head: Box<crate::http::HttpResponseHead>,
     },
+    /// An SSE stream ended after it had started but before a clean termination point.
     #[error("stream terminated unexpectedly ({reason}): {message}")]
     StreamTerminated {
+        /// Reason category for the termination.
         reason: StreamTerminationReason,
+        /// Lower-level error details.
         message: String,
+        /// Response status and headers for the stream.
         head: Box<crate::http::HttpResponseHead>,
     },
+    /// The SSE payload was not valid according to the event stream format.
     #[error("invalid SSE stream: {0}")]
     SseParse(String),
+    /// An SSE parser limit was exceeded.
     #[error("{kind} exceeded limit: {size} > {max}")]
     SseLimit {
+        /// Name of the limit that fired.
         kind: &'static str,
+        /// Observed size.
         size: usize,
+        /// Configured maximum size.
         max: usize,
     },
+    /// `reqwest` returned an error that was not normalized into another transport error.
     #[error("request error: {0}")]
     Request(reqwest::Error),
 }
 
+/// Stages used to classify timeout failures.
 #[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
 pub enum TimeoutStage {
+    /// The overall request timed out before a response was received.
     #[error("request")]
     Request,
+    /// Waiting for SSE response headers timed out.
     #[error("stream setup")]
     StreamSetup,
+    /// Waiting for the first body bytes of an SSE stream timed out.
     #[error("first byte")]
     FirstByte,
+    /// Waiting for additional body bytes of an SSE stream timed out.
     #[error("stream idle")]
     StreamIdle,
 }
 
+/// Categories of abnormal SSE stream termination.
 #[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
 pub enum StreamTerminationReason {
+    /// The underlying connection closed unexpectedly.
     #[error("disconnect")]
     Disconnect,
+    /// The stream exceeded an idle timeout.
     #[error("idle timeout")]
     IdleTimeout,
+    /// The stream ended in a protocol-invalid state.
     #[error("protocol")]
     Protocol,
 }
@@ -104,6 +134,7 @@ impl From<InvalidHeaderValue> for TransportError {
     }
 }
 
+/// HTTP transport with retry, timeout, and SSE support.
 #[derive(Debug, Clone)]
 pub struct HttpTransport {
     pub(crate) client: reqwest::Client,
@@ -114,6 +145,7 @@ pub struct HttpTransport {
 }
 
 impl HttpTransport {
+    /// Starts building a transport around an existing `reqwest` client.
     pub fn builder(client: reqwest::Client) -> HttpTransportBuilder {
         HttpTransportBuilder {
             client,
@@ -124,6 +156,11 @@ impl HttpTransport {
         }
     }
 
+    /// Builds request headers from platform defaults and adapter metadata.
+    ///
+    /// The context may override the response request-id header with
+    /// `transport.request_id_header` and may add custom outbound headers using metadata keys
+    /// prefixed with `transport.header.`.
     pub fn build_header_config(
         &self,
         platform: &PlatformConfig,
@@ -132,6 +169,11 @@ impl HttpTransport {
         build_header_config(platform, ctx)
     }
 
+    /// Sends a request and decodes the response according to `response_mode`.
+    ///
+    /// Retries are applied only before a response body is handed to the caller. For JSON mode,
+    /// non-success statuses can be preserved by setting
+    /// [`HttpRequestOptions::allow_error_status`](crate::http::HttpRequestOptions::allow_error_status).
     pub async fn send(&self, request: HttpSendRequest<'_>) -> Result<HttpResponse, TransportError> {
         let HttpSendRequest {
             platform,
@@ -222,6 +264,7 @@ impl HttpTransport {
         }
     }
 
+    /// Serializes `body` as JSON and deserializes the response into `TResp`.
     pub async fn send_json<TReq, TResp>(
         &self,
         platform: &PlatformConfig,
@@ -275,6 +318,7 @@ impl HttpTransport {
         }
     }
 
+    /// Issues a JSON `GET` request and deserializes the response.
     pub async fn get_json<TResp>(
         &self,
         platform: &PlatformConfig,
@@ -288,6 +332,7 @@ impl HttpTransport {
             .await
     }
 
+    /// Convenience wrapper for [`send_json`](Self::send_json) using `POST`.
     pub async fn post_json<TReq, TResp>(
         &self,
         platform: &PlatformConfig,
@@ -302,6 +347,9 @@ impl HttpTransport {
         self.send_json(platform, Method::POST, url, body, ctx).await
     }
 
+    /// Sends JSON and returns the raw JSON response body with status metadata preserved.
+    ///
+    /// Unlike [`send_json`](Self::send_json), this method does not fail on non-success statuses.
     pub async fn send_json_response<TReq>(
         &self,
         platform: &PlatformConfig,
@@ -336,6 +384,7 @@ impl HttpTransport {
         Ok(HttpJsonResponse { head, body })
     }
 
+    /// Convenience wrapper for [`send_json_response`](Self::send_json_response) using `POST`.
     pub async fn post_json_value<TReq>(
         &self,
         platform: &PlatformConfig,
@@ -350,6 +399,7 @@ impl HttpTransport {
             .await
     }
 
+    /// Sends a request and returns the response body as raw bytes.
     pub async fn send_bytes_request(
         &self,
         platform: &PlatformConfig,
@@ -376,6 +426,11 @@ impl HttpTransport {
         }
     }
 
+    /// Sends a request and returns an SSE stream.
+    ///
+    /// When not provided explicitly, this method defaults the `accept` header, expected content
+    /// type, and stream idle timeout to SSE-appropriate values. Retries only happen before the
+    /// stream has started.
     pub async fn send_sse_request(
         &self,
         platform: &PlatformConfig,
@@ -412,6 +467,7 @@ impl HttpTransport {
         }
     }
 
+    /// Opens an SSE stream with a `GET` request.
     pub async fn get_sse(
         &self,
         platform: &PlatformConfig,
@@ -429,6 +485,7 @@ impl HttpTransport {
         .await
     }
 
+    /// Serializes `body` as JSON and opens an SSE stream with `method`.
     pub async fn send_sse<TReq>(
         &self,
         platform: &PlatformConfig,
@@ -455,6 +512,7 @@ impl HttpTransport {
         .await
     }
 
+    /// Convenience wrapper for [`send_sse`](Self::send_sse) using `POST`.
     pub async fn post_sse<TReq>(
         &self,
         platform: &PlatformConfig,

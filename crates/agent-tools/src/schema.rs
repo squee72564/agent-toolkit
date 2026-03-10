@@ -1,40 +1,54 @@
+//! JSON schema compilation and argument validation helpers for tools.
+
 use agent_core::types::ToolDefinition;
 use jsonschema::JSONSchema;
 use serde_json::{Map, Value};
 use thiserror::Error;
 
+/// A normalized validation error reported against tool arguments.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidationIssue {
+    /// JSON path to the offending input value.
     pub instance_path: String,
+    /// JSON path to the schema keyword that reported the failure.
     pub keyword_path: String,
+    /// Human-readable validation error.
     pub message: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ToolSchemaError {
+    /// Tool schemas must describe an object at the root.
     #[error("tool schema root must be a JSON object with type 'object'")]
     RootSchemaMustBeObject,
+    /// The JSON schema library rejected the schema during compilation.
     #[error("tool schema compilation failed: {message}")]
     SchemaCompilation { message: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ToolArgsValidationError {
+    /// Tool arguments must be passed as a JSON object.
     #[error("tool arguments must be a JSON object")]
     ArgsMustBeObject,
+    /// One or more validation issues were reported.
     #[error("{message}")]
     ValidationFailed {
+        /// Concise message assembled from all reported issues.
         message: String,
+        /// Structured details for each validation failure.
         issues: Vec<ValidationIssue>,
     },
 }
 
+/// Compiled validator for a tool's input schema.
 #[derive(Debug)]
 pub struct CompiledToolSchema {
     validator: JSONSchema,
 }
 
 impl CompiledToolSchema {
+    /// Compiles the schema from a tool definition into a reusable validator.
     pub fn from_definition(def: &ToolDefinition) -> Result<Self, ToolSchemaError> {
         let schema_object = def
             .parameters_schema
@@ -54,6 +68,7 @@ impl CompiledToolSchema {
         Ok(Self { validator })
     }
 
+    /// Validates a JSON argument object against the compiled schema.
     pub fn validate_args(&self, args: &Value) -> Result<(), ToolArgsValidationError> {
         if !args.is_object() {
             return Err(ToolArgsValidationError::ArgsMustBeObject);

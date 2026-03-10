@@ -1,3 +1,5 @@
+//! Builder utilities for defining tools from schemas and handlers.
+
 use std::sync::Arc;
 
 use agent_core::types::ToolDefinition;
@@ -12,17 +14,22 @@ use crate::tool::{BoxToolFuture, BuiltTool, ToolError, ToolHandler, ToolOutput};
 
 #[derive(Debug, Error)]
 pub enum ToolBuilderError {
+    /// The builder did not receive a non-empty tool name.
     #[error("tool name is required")]
     MissingName,
+    /// The builder does not have an input schema available.
     #[error("tool schema is required")]
     MissingSchema,
+    /// The builder does not have an execution handler.
     #[error("tool handler is required")]
     MissingHandler,
+    /// Converting a derived schema into JSON failed.
     #[error("tool schema could not be generated: {source}")]
     GeneratedSchema {
         #[source]
         source: serde_json::Error,
     },
+    /// The supplied or derived schema failed validation.
     #[error("tool schema is invalid: {source}")]
     InvalidSchema {
         #[source]
@@ -30,6 +37,7 @@ pub enum ToolBuilderError {
     },
 }
 
+/// Incrementally constructs a [`BuiltTool`] from metadata, schema, and handler state.
 #[derive(Default)]
 pub struct ToolBuilder {
     name: Option<String>,
@@ -40,10 +48,14 @@ pub struct ToolBuilder {
 }
 
 impl ToolBuilder {
+    /// Creates an empty builder.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Seeds the builder from an existing [`ToolDefinition`].
+    ///
+    /// This copies the tool metadata and schema but leaves the handler unset.
     pub fn from_definition(definition: ToolDefinition) -> Self {
         Self {
             name: Some(definition.name),
@@ -54,22 +66,26 @@ impl ToolBuilder {
         }
     }
 
+    /// Sets the tool name.
     pub fn name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
     }
 
+    /// Sets the human-readable tool description.
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
 
+    /// Sets the JSON schema used to validate tool inputs.
     pub fn schema(mut self, schema: Value) -> Self {
         self.schema = Some(schema);
         self.generated_schema_error = None;
         self
     }
 
+    /// Registers a handler that receives raw JSON arguments.
     pub fn handler<F, Fut>(mut self, handler: F) -> Self
     where
         F: Fn(Value) -> Fut + Send + Sync + 'static,
@@ -136,6 +152,10 @@ impl ToolBuilder {
         self
     }
 
+    /// Finalizes the builder into a [`BuiltTool`].
+    ///
+    /// This verifies required fields are present and confirms that the final
+    /// schema can be compiled for runtime validation.
     pub fn build(self) -> Result<BuiltTool, ToolBuilderError> {
         let name = self.name.ok_or(ToolBuilderError::MissingName)?;
         if name.trim().is_empty() {

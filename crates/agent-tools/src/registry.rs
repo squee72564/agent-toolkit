@@ -1,3 +1,5 @@
+//! Storage and lookup for named tools.
+
 use std::collections::HashMap;
 
 use agent_core::types::ToolDefinition;
@@ -8,8 +10,10 @@ use crate::tool::Tool;
 
 #[derive(Debug, Error)]
 pub enum ToolRegistryError {
+    /// A tool with the same name is already registered.
     #[error("tool '{name}' is already registered")]
     DuplicateName { name: String },
+    /// A tool's declared input schema could not be compiled.
     #[error("tool schema for '{name}' is invalid: {source}")]
     InvalidSchema {
         name: String,
@@ -34,16 +38,19 @@ impl RegisteredTool {
     }
 }
 
+/// Owns a set of tools indexed by unique tool name.
 #[derive(Default)]
 pub struct ToolRegistry {
     tools: HashMap<String, RegisteredTool>,
 }
 
 impl ToolRegistry {
+    /// Creates an empty registry.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Registers a tool and validates its input schema.
     pub fn register<T>(&mut self, tool: T) -> Result<(), ToolRegistryError>
     where
         T: Tool + 'static,
@@ -51,6 +58,9 @@ impl ToolRegistry {
         self.insert(tool)
     }
 
+    /// Registers a tool and validates its input schema.
+    ///
+    /// This currently behaves the same as [`Self::register`].
     pub fn register_validated<T>(&mut self, tool: T) -> Result<(), ToolRegistryError>
     where
         T: Tool + 'static,
@@ -58,18 +68,22 @@ impl ToolRegistry {
         self.insert(tool)
     }
 
+    /// Returns the registered tool with the given name.
     pub fn get(&self, name: &str) -> Option<&dyn Tool> {
         self.tools.get(name).map(RegisteredTool::tool)
     }
 
+    /// Returns the number of registered tools.
     pub fn len(&self) -> usize {
         self.tools.len()
     }
 
+    /// Returns `true` when the registry has no tools.
     pub fn is_empty(&self) -> bool {
         self.tools.is_empty()
     }
 
+    /// Returns tool definitions sorted by tool name.
     pub fn tool_definitions(&self) -> Vec<ToolDefinition> {
         let mut definitions: Vec<_> = self
             .tools
