@@ -19,6 +19,7 @@ mod fallback_test;
 mod message_create_input_test;
 mod observer_test;
 mod provider_client_test;
+mod provider_config_test;
 mod provider_runtime_test;
 mod provider_stream_runtime_test;
 mod runtime_error_test;

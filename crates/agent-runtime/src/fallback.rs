@@ -5,8 +5,11 @@ use crate::target::Target;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FallbackMode {
+    /// Evaluate only legacy transport/status fallback settings and ignore rules.
     LegacyOnly,
+    /// Evaluate only explicit rules and ignore legacy transport/status fallback settings.
     RulesOnly,
+    /// Retry if either legacy settings or explicit rules allow fallback.
     #[default]
     LegacyOrRules,
 }
@@ -150,6 +153,11 @@ impl FallbackPolicy {
         self
     }
 
+    /// Decide whether the given error should advance to the next fallback target.
+    ///
+    /// Legacy transport/status settings and explicit rules are evaluated according
+    /// to [`FallbackMode`]. Rule evaluation is insertion-ordered: the first rule
+    /// whose `when` matcher fully matches the error decides the rule-based outcome.
     pub fn should_fallback(&self, error: &RuntimeError) -> bool {
         let legacy_decision = self.should_fallback_legacy(error);
         let rules_decision = self.should_fallback_rules(error);

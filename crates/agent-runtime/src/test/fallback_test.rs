@@ -175,6 +175,21 @@ fn fallback_policy_legacy_or_rules_applies_rule_when_legacy_does_not() {
 }
 
 #[test]
+fn fallback_policy_legacy_or_rules_uses_legacy_when_rules_do_not_match() {
+    let policy = FallbackPolicy::default()
+        .with_mode(FallbackMode::LegacyOrRules)
+        .with_rule(FallbackRule::stop_on_kind(RuntimeErrorKind::Validation));
+
+    let error = runtime_error(
+        RuntimeErrorKind::Upstream,
+        Some(ProviderId::OpenAi),
+        Some(429),
+        None,
+    );
+    assert!(policy.should_fallback(&error));
+}
+
+#[test]
 fn fallback_policy_rules_only_no_match_does_not_fallback() {
     let policy = FallbackPolicy::default()
         .with_mode(FallbackMode::RulesOnly)

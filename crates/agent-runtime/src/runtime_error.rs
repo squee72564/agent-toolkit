@@ -2,6 +2,7 @@ use agent_core::ProviderId;
 use agent_providers::error::{AdapterError, AdapterErrorKind};
 use agent_transport::{TimeoutStage, TransportError};
 use std::error::Error as StdError;
+use std::sync::Arc;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -18,7 +19,13 @@ pub enum RuntimeErrorKind {
     Transport,
 }
 
-#[derive(Debug, Error)]
+/// Runtime-level error surfaced by `agent-runtime`.
+///
+/// `source` carries the underlying causal chain when one exists. In particular,
+/// [`RuntimeErrorKind::FallbackExhausted`] wraps the terminal attempt error in
+/// `source`, so callers that need the last concrete failure should inspect
+/// [`RuntimeError::source_ref`] and downcast to `RuntimeError`.
+#[derive(Debug, Error, Clone)]
 #[error("{kind:?}: {message}")]
 pub struct RuntimeError {
     pub kind: RuntimeErrorKind,
@@ -28,21 +35,7 @@ pub struct RuntimeError {
     pub request_id: Option<String>,
     pub provider_code: Option<String>,
     #[source]
-    pub source: Option<Box<dyn StdError + Send + Sync>>,
-}
-
-impl Clone for RuntimeError {
-    fn clone(&self) -> Self {
-        Self {
-            kind: self.kind,
-            message: self.message.clone(),
-            provider: self.provider,
-            status_code: self.status_code,
-            request_id: self.request_id.clone(),
-            provider_code: self.provider_code.clone(),
-            source: None,
-        }
-    }
+    pub source: Option<Arc<dyn StdError + Send + Sync>>,
 }
 
 impl RuntimeError {
@@ -78,7 +71,7 @@ impl RuntimeError {
             status_code: last_error.status_code,
             request_id: last_error.request_id.clone(),
             provider_code: last_error.provider_code.clone(),
-            source: Some(Box::new(last_error)),
+            source: Some(Arc::new(last_error)),
         }
     }
 
@@ -95,7 +88,7 @@ impl RuntimeError {
             status_code,
             request_id,
             provider_code,
-            source: Some(Box::new(error)),
+            source: Some(Arc::new(error)),
         }
     }
 
@@ -162,7 +155,7 @@ impl RuntimeError {
             status_code,
             request_id,
             provider_code: None,
-            source: Some(Box::new(error)),
+            source: Some(Arc::new(error)),
         }
     }
 

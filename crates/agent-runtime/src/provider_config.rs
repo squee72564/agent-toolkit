@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use agent_transport::RetryPolicy;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct ProviderConfig {
     pub api_key: String,
     pub base_url: Option<String>,
@@ -43,5 +43,18 @@ impl ProviderConfig {
     pub fn with_stream_timeout(mut self, timeout: Duration) -> Self {
         self.stream_timeout = Some(timeout);
         self
+    }
+}
+
+impl std::fmt::Debug for ProviderConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProviderConfig")
+            .field("api_key", &"<redacted>")
+            .field("base_url", &self.base_url)
+            .field("default_model", &self.default_model)
+            .field("retry_policy", &self.retry_policy)
+            .field("request_timeout", &self.request_timeout)
+            .field("stream_timeout", &self.stream_timeout)
+            .finish()
     }
 }
