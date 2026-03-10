@@ -3,7 +3,7 @@ use std::time::Duration;
 use super::{
     AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, HttpJsonResponse, ProviderId,
     RequestEndEvent, RequestStartEvent, RetryPolicy, RuntimeObserver, StreamCompletion, core,
-    protocols, runtime, tools, transport,
+    message, platform, protocols, request, response, runtime, tool, tools, transport,
 };
 
 #[test]
@@ -97,6 +97,12 @@ fn module_reexports_are_accessible() {
     let _default_retry_from_transport_mod = transport::RetryPolicy::default();
     let _runtime_error_kind = runtime::RuntimeErrorKind::Validation;
     let _tool_registry = tools::ToolRegistry::new();
+
+    let _message_role = message::MessageRole::User;
+    let _platform_provider = platform::ProviderId::OpenAi;
+    let _response_format = request::ResponseFormat::default();
+    let _finish_reason = response::FinishReason::Stop;
+    let _tool_choice = tool::ToolChoice::Auto;
 }
 
 #[test]
