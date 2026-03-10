@@ -5,22 +5,21 @@ use agent_core::{ProviderId, Request, Response};
 use crate::message_response_stream::{
     AttemptContext, LiveAttempt, MessageResponseStream, RoutedStreamInit,
 };
-use crate::observer::{RuntimeObserver, resolve_observer_for_request, safe_call_observer};
+use crate::observer::RuntimeObserver;
 use crate::provider_client::ProviderClient;
 use crate::provider_runtime::{ProviderAttemptOutcome, ProviderStreamAttemptOutcome};
 use crate::routed_messages_api::RoutedMessagesApi;
 use crate::routed_streaming_api::RoutedStreamingApi;
-use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
+use crate::runtime_error::RuntimeError;
 use crate::send_options::SendOptions;
 use crate::target::Target;
-use crate::types::{
-    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, RequestEndEvent,
-    RequestStartEvent, ResponseMeta,
-};
+use crate::types::ResponseMeta;
 
 mod builder;
+mod execution;
 
 pub use self::builder::AgentToolkitBuilder;
+use self::execution::PreparedExecution;
 
 #[derive(Clone)]
 pub struct AgentToolkit {
@@ -65,32 +64,8 @@ impl AgentToolkit {
         request: Request,
         options: SendOptions,
     ) -> Result<(Response, ResponseMeta), RuntimeError> {
-        let request_started_at = std::time::Instant::now();
-        let targets = self.resolve_targets(&options)?;
-        let first_client_observer = targets
-            .first()
-            .and_then(|target| self.clients.get(&target.provider))
-            .and_then(|client| client.runtime.observer.as_ref());
-        let request_observer = resolve_observer_for_request(
-            first_client_observer,
-            self.observer.as_ref(),
-            options.observer.as_ref(),
-        );
-        let request_start_event = RequestStartEvent {
-            request_id: None,
-            provider: targets.first().map(|target| target.provider),
-            model: targets
-                .first()
-                .and_then(|target| event_model(target.model.as_deref(), &request.model_id)),
-            target_index: None,
-            attempt_index: None,
-            elapsed: request_started_at.elapsed(),
-            first_target: targets.first().map(|target| target.provider),
-            resolved_target_count: targets.len(),
-        };
-        safe_call_observer(request_observer, |observer| {
-            observer.on_request_start(&request_start_event)
-        });
+        let prepared = PreparedExecution::new(self, &request, &options)?;
+        prepared.emit_request_start(&request);
 
         let fallback_policy = options.fallback_policy.clone();
         let mut attempts = Vec::new();
@@ -99,47 +74,25 @@ impl AgentToolkit {
         let request_model_id = request.model_id.clone();
         let mut request = Some(request);
 
-        for (index, target) in targets.iter().enumerate() {
+        for (index, target) in prepared.targets.iter().enumerate() {
             let Some(client) = self.clients.get(&target.provider) else {
                 let error = RuntimeError::target_resolution(format!(
                     "provider {:?} is not registered",
                     target.provider
                 ));
-                let request_end_event = RequestEndEvent {
-                    request_id: error.request_id.clone(),
-                    provider: Some(target.provider),
-                    model: event_model(target.model.as_deref(), &request_model_id),
-                    target_index: Some(index),
-                    attempt_index: Some(index),
-                    elapsed: request_started_at.elapsed(),
-                    status_code: error.status_code,
-                    error_kind: Some(error.kind),
-                    error_message: Some(error.message.clone()),
-                };
-                safe_call_observer(request_observer, |runtime_observer| {
-                    runtime_observer.on_request_end(&request_end_event);
-                });
+                prepared.emit_request_end_failure(
+                    Some(target.provider),
+                    execution::event_model(target.model.as_deref(), &request_model_id),
+                    Some(index),
+                    Some(index),
+                    &error,
+                );
                 return Err(error);
             };
-            let observer = resolve_observer_for_request(
-                client.runtime.observer.as_ref(),
-                self.observer.as_ref(),
-                options.observer.as_ref(),
-            );
-            let attempt_started_at = std::time::Instant::now();
-            let attempt_start_event = AttemptStartEvent {
-                request_id: None,
-                provider: Some(target.provider),
-                model: event_model(target.model.as_deref(), &request_model_id),
-                target_index: Some(index),
-                attempt_index: Some(index),
-                elapsed: attempt_started_at.elapsed(),
-            };
-            safe_call_observer(observer, |runtime_observer| {
-                runtime_observer.on_attempt_start(&attempt_start_event);
-            });
+            let attempt_execution =
+                prepared.attempt(self, &options, &request_model_id, target, index);
 
-            let is_last = index + 1 >= targets.len();
+            let is_last = index + 1 >= prepared.targets.len();
             let Some(attempt_request) = (if is_last {
                 request.take()
             } else {
@@ -148,20 +101,13 @@ impl AgentToolkit {
                 let error = RuntimeError::target_resolution(
                     "request state was exhausted before completing fallback attempts",
                 );
-                let request_end_event = RequestEndEvent {
-                    request_id: error.request_id.clone(),
-                    provider: Some(target.provider),
-                    model: event_model(target.model.as_deref(), &request_model_id),
-                    target_index: Some(index),
-                    attempt_index: Some(index),
-                    elapsed: request_started_at.elapsed(),
-                    status_code: error.status_code,
-                    error_kind: Some(error.kind),
-                    error_message: Some(error.message.clone()),
-                };
-                safe_call_observer(request_observer, |runtime_observer| {
-                    runtime_observer.on_request_end(&request_end_event);
-                });
+                prepared.emit_request_end_failure(
+                    Some(target.provider),
+                    execution::event_model(target.model.as_deref(), &request_model_id),
+                    Some(index),
+                    Some(index),
+                    &error,
+                );
                 return Err(error);
             };
 
@@ -176,61 +122,26 @@ impl AgentToolkit {
 
             match attempt {
                 ProviderAttemptOutcome::Success { response, meta } => {
-                    let attempt_success_event = AttemptSuccessEvent {
-                        request_id: meta.request_id.clone(),
-                        provider: Some(meta.provider),
-                        model: Some(meta.model.clone()),
-                        target_index: Some(index),
-                        attempt_index: Some(index),
-                        elapsed: attempt_started_at.elapsed(),
-                        status_code: meta.status_code,
-                    };
-                    safe_call_observer(observer, |runtime_observer| {
-                        runtime_observer.on_attempt_success(&attempt_success_event);
-                    });
+                    attempt_execution.emit_success(&meta, index);
 
                     attempts.push(meta.clone());
-                    let response_meta = ResponseMeta {
-                        selected_provider: meta.provider,
-                        selected_model: meta.model,
-                        status_code: meta.status_code,
-                        request_id: meta.request_id.clone(),
-                        attempts,
-                    };
-
-                    let request_end_event = RequestEndEvent {
-                        request_id: response_meta.request_id.clone(),
-                        provider: Some(response_meta.selected_provider),
-                        model: Some(response_meta.selected_model.clone()),
-                        target_index: Some(index),
-                        attempt_index: Some(index),
-                        elapsed: request_started_at.elapsed(),
-                        status_code: response_meta.status_code,
-                        error_kind: None,
-                        error_message: None,
-                    };
-                    safe_call_observer(observer, |runtime_observer| {
-                        runtime_observer.on_request_end(&request_end_event);
-                    });
+                    let response_meta = attempt_execution.response_meta(attempts, meta);
+                    let response_model = response_meta.selected_model.clone();
+                    prepared.emit_request_end_success(
+                        Some(response_meta.selected_provider),
+                        Some(response_model),
+                        Some(index),
+                        Some(index),
+                        response_meta.request_id.clone(),
+                        response_meta.status_code,
+                    );
                     return Ok((response, response_meta));
                 }
                 ProviderAttemptOutcome::Failure { error, meta } => {
-                    let attempt_failure_event = AttemptFailureEvent {
-                        request_id: meta.request_id.clone(),
-                        provider: Some(meta.provider),
-                        model: Some(meta.model.clone()),
-                        target_index: Some(index),
-                        attempt_index: Some(index),
-                        elapsed: attempt_started_at.elapsed(),
-                        error_kind: meta.error_kind,
-                        error_message: meta.error_message.clone(),
-                    };
-                    safe_call_observer(observer, |runtime_observer| {
-                        runtime_observer.on_attempt_failure(&attempt_failure_event);
-                    });
+                    attempt_execution.emit_failure(&meta, index);
 
                     attempts.push(meta);
-                    let should_continue = index + 1 < targets.len()
+                    let should_continue = index + 1 < prepared.targets.len()
                         && fallback_policy
                             .as_ref()
                             .is_some_and(|policy| policy.should_fallback(&error));
@@ -251,34 +162,7 @@ impl AgentToolkit {
         };
 
         if let Err(error) = &result {
-            let terminal_error = terminal_failure_error(error);
-            let terminal_provider = terminal_error
-                .provider
-                .or_else(|| attempts.last().map(|attempt| attempt.provider));
-            let terminal_observer = terminal_provider
-                .and_then(|provider| self.clients.get(&provider))
-                .and_then(|client| {
-                    resolve_observer_for_request(
-                        client.runtime.observer.as_ref(),
-                        self.observer.as_ref(),
-                        options.observer.as_ref(),
-                    )
-                });
-            let terminal_index = attempts.len().checked_sub(1);
-            let request_end_event = RequestEndEvent {
-                request_id: terminal_error.request_id.clone(),
-                provider: terminal_provider,
-                model: attempts.last().map(|attempt| attempt.model.clone()),
-                target_index: terminal_index,
-                attempt_index: terminal_index,
-                elapsed: request_started_at.elapsed(),
-                status_code: terminal_error.status_code,
-                error_kind: Some(terminal_error.kind),
-                error_message: Some(terminal_error.message.clone()),
-            };
-            safe_call_observer(terminal_observer, |runtime_observer| {
-                runtime_observer.on_request_end(&request_end_event);
-            });
+            prepared.emit_terminal_request_end(self, &options, &attempts, error);
         }
 
         result
@@ -305,61 +189,20 @@ impl AgentToolkit {
             ));
         }
 
-        let request_started_at = std::time::Instant::now();
-        let targets = self.resolve_targets(&options)?;
-        let first_client_observer = targets
-            .first()
-            .and_then(|target| self.clients.get(&target.provider))
-            .and_then(|client| client.runtime.observer.as_ref());
-        let request_observer = resolve_observer_for_request(
-            first_client_observer,
-            self.observer.as_ref(),
-            options.observer.as_ref(),
-        )
-        .cloned();
-        let request_start_event = RequestStartEvent {
-            request_id: None,
-            provider: targets.first().map(|target| target.provider),
-            model: targets
-                .first()
-                .and_then(|target| event_model(target.model.as_deref(), &request.model_id)),
-            target_index: None,
-            attempt_index: None,
-            elapsed: request_started_at.elapsed(),
-            first_target: targets.first().map(|target| target.provider),
-            resolved_target_count: targets.len(),
-        };
-        safe_call_observer(request_observer.as_ref(), |observer| {
-            observer.on_request_start(&request_start_event)
-        });
+        let prepared = PreparedExecution::new(self, &request, &options)?;
+        prepared.emit_request_start(&request);
 
         let fallback_policy = options.fallback_policy.clone();
 
-        for (index, target) in targets.iter().enumerate() {
+        for (index, target) in prepared.targets.iter().enumerate() {
             let Some(client) = self.clients.get(&target.provider) else {
                 return Err(RuntimeError::target_resolution(format!(
                     "provider {:?} is not registered",
                     target.provider
                 )));
             };
-            let observer = resolve_observer_for_request(
-                client.runtime.observer.as_ref(),
-                self.observer.as_ref(),
-                options.observer.as_ref(),
-            )
-            .cloned();
-            let attempt_started_at = std::time::Instant::now();
-            let attempt_start_event = AttemptStartEvent {
-                request_id: None,
-                provider: Some(target.provider),
-                model: event_model(target.model.as_deref(), &request.model_id),
-                target_index: Some(index),
-                attempt_index: Some(index),
-                elapsed: attempt_started_at.elapsed(),
-            };
-            safe_call_observer(observer.as_ref(), |runtime_observer| {
-                runtime_observer.on_attempt_start(&attempt_start_event);
-            });
+            let attempt_execution =
+                prepared.attempt(self, &options, &request.model_id, target, index);
 
             match client
                 .runtime
@@ -375,16 +218,16 @@ impl AgentToolkit {
                         request,
                         toolkit: self,
                         options,
-                        request_started_at,
-                        request_observer,
-                        targets,
+                        request_started_at: prepared.request_started_at,
+                        request_observer: prepared.request_observer.clone(),
+                        targets: prepared.targets.clone(),
                         current_attempt: LiveAttempt {
                             stream: *stream,
                             context: AttemptContext {
                                 target_index: index,
                                 attempt_index: index,
-                                started_at: attempt_started_at,
-                                observer,
+                                started_at: attempt_execution.started_at,
+                                observer: attempt_execution.observer,
                                 provider: meta.provider,
                                 model: meta.model,
                                 request_id: meta.request_id,
@@ -395,38 +238,19 @@ impl AgentToolkit {
                     }));
                 }
                 ProviderStreamAttemptOutcome::Failure { error, meta } => {
-                    let attempt_failure_event = AttemptFailureEvent {
-                        request_id: meta.request_id.clone(),
-                        provider: Some(meta.provider),
-                        model: Some(meta.model.clone()),
-                        target_index: Some(index),
-                        attempt_index: Some(index),
-                        elapsed: attempt_started_at.elapsed(),
-                        error_kind: meta.error_kind,
-                        error_message: meta.error_message.clone(),
-                    };
-                    safe_call_observer(observer.as_ref(), |runtime_observer| {
-                        runtime_observer.on_attempt_failure(&attempt_failure_event);
-                    });
-                    let should_continue = index + 1 < targets.len()
+                    attempt_execution.emit_failure(&meta, index);
+                    let should_continue = index + 1 < prepared.targets.len()
                         && fallback_policy
                             .as_ref()
                             .is_some_and(|policy| policy.should_fallback(&error));
                     if !should_continue {
-                        let request_end_event = RequestEndEvent {
-                            request_id: error.request_id.clone(),
-                            provider: Some(meta.provider),
-                            model: Some(meta.model),
-                            target_index: Some(index),
-                            attempt_index: Some(index),
-                            elapsed: request_started_at.elapsed(),
-                            status_code: error.status_code,
-                            error_kind: Some(error.kind),
-                            error_message: Some(error.message.clone()),
-                        };
-                        safe_call_observer(request_observer.as_ref(), |observer| {
-                            observer.on_request_end(&request_end_event)
-                        });
+                        prepared.emit_request_end_failure(
+                            Some(meta.provider),
+                            Some(meta.model),
+                            Some(index),
+                            Some(index),
+                            &error,
+                        );
                         return Err(error);
                     }
                 }
@@ -436,6 +260,21 @@ impl AgentToolkit {
         Err(RuntimeError::target_resolution(
             "no target providers were resolved for this request",
         ))
+    }
+
+    fn resolve_attempt_observer(
+        &self,
+        options: &SendOptions,
+        provider: ProviderId,
+    ) -> Option<Arc<dyn RuntimeObserver>> {
+        self.clients.get(&provider).and_then(|client| {
+            crate::observer::resolve_observer_for_request(
+                client.runtime.observer.as_ref(),
+                self.observer.as_ref(),
+                options.observer.as_ref(),
+            )
+            .cloned()
+        })
     }
 
     pub fn resolve_targets(&self, options: &SendOptions) -> Result<Vec<Target>, RuntimeError> {
@@ -481,30 +320,4 @@ impl AgentToolkit {
 
         Ok(targets)
     }
-}
-
-fn event_model(target_model: Option<&str>, request_model: &str) -> Option<String> {
-    target_model
-        .and_then(trimmed_non_empty)
-        .or_else(|| trimmed_non_empty(request_model))
-        .map(ToString::to_string)
-}
-
-fn trimmed_non_empty(value: &str) -> Option<&str> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed)
-    }
-}
-
-fn terminal_failure_error(error: &RuntimeError) -> &RuntimeError {
-    if error.kind == RuntimeErrorKind::FallbackExhausted
-        && let Some(source) = error.source_ref()
-        && let Some(terminal_error) = source.downcast_ref::<RuntimeError>()
-    {
-        return terminal_error;
-    }
-    error
 }
