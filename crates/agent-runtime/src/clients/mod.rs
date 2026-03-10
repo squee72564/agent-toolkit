@@ -1,7 +1,8 @@
 mod anthropic;
+mod common;
 mod openai;
 mod openrouter;
 
-pub use anthropic::*;
-pub use openai::*;
-pub use openrouter::*;
+pub use anthropic::{AnthropicClient, AnthropicClientBuilder, anthropic};
+pub use openai::{OpenAiClient, OpenAiClientBuilder, openai};
+pub use openrouter::{OpenRouterClient, OpenRouterClientBuilder, openrouter};

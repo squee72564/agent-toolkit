@@ -14,6 +14,7 @@ use crate::provider_runtime::ProviderRuntime;
 use super::*;
 
 mod agent_toolkit_test;
+mod clients_test;
 mod conversation_test;
 mod fallback_test;
 mod message_create_input_test;
