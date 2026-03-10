@@ -9,7 +9,7 @@ use crate::provider_runtime::OpenedProviderStream;
 use crate::runtime_error::RuntimeError;
 use crate::send_options::SendOptions;
 use crate::target::Target;
-use crate::types::{AttemptMeta, ResponseMeta};
+use crate::types::{AttemptMeta, ResponseMeta, response_meta};
 
 pub(super) struct StreamDriverState {
     pub(super) request_started_at: Instant,
@@ -103,13 +103,13 @@ pub(super) struct PendingCompletion {
 impl PendingCompletion {
     pub(super) fn meta(self, mut attempts: Vec<AttemptMeta>) -> ResponseMeta {
         attempts.push(self.attempt.meta.clone());
-        ResponseMeta {
-            selected_provider: self.selected_provider,
-            selected_model: self.selected_model,
-            status_code: self.status_code,
-            request_id: self.request_id,
+        response_meta(
+            self.selected_provider,
+            self.selected_model,
+            self.status_code,
+            self.request_id,
             attempts,
-        }
+        )
     }
 }
 

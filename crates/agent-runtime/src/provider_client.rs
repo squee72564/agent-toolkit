@@ -12,8 +12,9 @@ use crate::provider_runtime::{
 };
 use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
 use crate::types::{
-    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, RequestEndEvent,
-    RequestStartEvent, ResponseMeta,
+    RequestEndContext, ResponseMeta, attempt_failure_event, attempt_start_event,
+    attempt_success_event, request_end_failure_event, request_end_success_event,
+    request_start_event, response_meta, terminal_failure_error,
 };
 
 #[derive(Debug, Clone)]
@@ -97,13 +98,13 @@ impl ProviderClient {
         match attempt {
             ProviderAttemptOutcome::Success { response, meta } => {
                 self.emit_attempt_success(&context, &meta);
-                let response_meta = ResponseMeta {
-                    selected_provider: meta.provider,
-                    selected_model: meta.model.clone(),
-                    status_code: meta.status_code,
-                    request_id: meta.request_id.clone(),
-                    attempts: vec![meta],
-                };
+                let response_meta = response_meta(
+                    meta.provider,
+                    meta.model.clone(),
+                    meta.status_code,
+                    meta.request_id.clone(),
+                    vec![meta],
+                );
                 self.emit_request_end_success(&context, &response_meta);
 
                 Ok((response, response_meta))
@@ -198,29 +199,25 @@ impl ProviderClient {
         let request_started_at = Instant::now();
         let observer = resolve_observer_for_request(self.runtime.observer.as_ref(), None, None);
         let request_model = request_model(&request.model_id);
-        let request_start_event = RequestStartEvent {
-            request_id: None,
-            provider: Some(self.runtime.provider),
-            model: request_model.clone(),
-            target_index: None,
-            attempt_index: None,
-            elapsed: request_started_at.elapsed(),
-            first_target: Some(self.runtime.provider),
-            resolved_target_count: 1,
-        };
+        let request_start_event = request_start_event(
+            Some(self.runtime.provider),
+            request_model.clone(),
+            request_started_at.elapsed(),
+            Some(self.runtime.provider),
+            1,
+        );
         safe_call_observer(observer, |runtime_observer| {
             runtime_observer.on_request_start(&request_start_event);
         });
 
         let attempt_started_at = Instant::now();
-        let attempt_start_event = AttemptStartEvent {
-            request_id: None,
-            provider: Some(self.runtime.provider),
-            model: request_model.clone(),
-            target_index: Some(0),
-            attempt_index: Some(0),
-            elapsed: attempt_started_at.elapsed(),
-        };
+        let attempt_start_event = attempt_start_event(
+            self.runtime.provider,
+            request_model.clone(),
+            0,
+            0,
+            attempt_started_at.elapsed(),
+        );
         safe_call_observer(observer, |runtime_observer| {
             runtime_observer.on_attempt_start(&attempt_start_event);
         });
@@ -238,15 +235,7 @@ impl ProviderClient {
         context: &DirectRequestContext<'_>,
         meta: &crate::types::AttemptMeta,
     ) {
-        let event = AttemptSuccessEvent {
-            request_id: meta.request_id.clone(),
-            provider: Some(meta.provider),
-            model: Some(meta.model.clone()),
-            target_index: Some(0),
-            attempt_index: Some(0),
-            elapsed: context.attempt_started_at.elapsed(),
-            status_code: meta.status_code,
-        };
+        let event = attempt_success_event(meta, 0, 0, context.attempt_started_at.elapsed());
         safe_call_observer(context.observer, |runtime_observer| {
             runtime_observer.on_attempt_success(&event);
         });
@@ -257,16 +246,7 @@ impl ProviderClient {
         context: &DirectRequestContext<'_>,
         meta: &crate::types::AttemptMeta,
     ) {
-        let event = AttemptFailureEvent {
-            request_id: meta.request_id.clone(),
-            provider: Some(meta.provider),
-            model: Some(meta.model.clone()),
-            target_index: Some(0),
-            attempt_index: Some(0),
-            elapsed: context.attempt_started_at.elapsed(),
-            error_kind: meta.error_kind,
-            error_message: meta.error_message.clone(),
-        };
+        let event = attempt_failure_event(meta, 0, 0, context.attempt_started_at.elapsed());
         safe_call_observer(context.observer, |runtime_observer| {
             runtime_observer.on_attempt_failure(&event);
         });
@@ -277,7 +257,7 @@ impl ProviderClient {
         context: &DirectRequestContext<'_>,
         response_meta: &ResponseMeta,
     ) {
-        let event = RequestEndEvent {
+        let event = request_end_success_event(RequestEndContext {
             request_id: response_meta.request_id.clone(),
             provider: Some(response_meta.selected_provider),
             model: Some(response_meta.selected_model.clone()),
@@ -285,9 +265,7 @@ impl ProviderClient {
             attempt_index: Some(0),
             elapsed: context.request_started_at.elapsed(),
             status_code: response_meta.status_code,
-            error_kind: None,
-            error_message: None,
-        };
+        });
         safe_call_observer(context.observer, |runtime_observer| {
             runtime_observer.on_request_end(&event);
         });
@@ -298,31 +276,23 @@ impl ProviderClient {
         context: &DirectRequestContext<'_>,
         failure: DirectFailureContext,
     ) {
-        let event = RequestEndEvent {
-            request_id: failure.request_id,
-            provider: failure.provider,
-            model: failure.model.or_else(|| context.request_model.clone()),
-            target_index: Some(0),
-            attempt_index: Some(0),
-            elapsed: context.request_started_at.elapsed(),
-            status_code: failure.status_code,
-            error_kind: Some(failure.error_kind),
-            error_message: Some(failure.error_message),
-        };
+        let event = request_end_failure_event(
+            RequestEndContext {
+                request_id: failure.request_id,
+                provider: failure.provider,
+                model: failure.model.or_else(|| context.request_model.clone()),
+                target_index: Some(0),
+                attempt_index: Some(0),
+                elapsed: context.request_started_at.elapsed(),
+                status_code: failure.status_code,
+            },
+            failure.error_kind,
+            failure.error_message,
+        );
         safe_call_observer(context.observer, |runtime_observer| {
             runtime_observer.on_request_end(&event);
         });
     }
-}
-
-fn terminal_failure_error(error: &RuntimeError) -> &RuntimeError {
-    if error.kind == RuntimeErrorKind::FallbackExhausted
-        && let Some(source) = error.source_ref()
-        && let Some(terminal_error) = source.downcast_ref::<RuntimeError>()
-    {
-        return terminal_error;
-    }
-    error
 }
 
 impl DirectRequestContext<'_> {

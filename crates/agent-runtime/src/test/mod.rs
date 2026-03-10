@@ -26,6 +26,7 @@ mod provider_stream_runtime_test;
 mod runtime_error_test;
 mod send_options_test;
 mod streaming_api_test;
+mod types_test;
 
 fn runtime_error(
     kind: RuntimeErrorKind,
@@ -72,11 +73,5 @@ struct ObserverStub;
 impl RuntimeObserver for ObserverStub {}
 
 fn terminal_failure_error(error: &RuntimeError) -> &RuntimeError {
-    if error.kind == RuntimeErrorKind::FallbackExhausted
-        && let Some(source) = error.source_ref()
-        && let Some(terminal_error) = source.downcast_ref::<RuntimeError>()
-    {
-        return terminal_error;
-    }
-    error
+    crate::types::terminal_failure_error(error)
 }
