@@ -1,3 +1,5 @@
+//! OpenAI-family wire-format payload types and spec-level errors.
+
 use std::error::Error as StdError;
 
 use serde_json::Value;
@@ -12,15 +14,21 @@ mod schema_rules;
 #[cfg(test)]
 mod test;
 
+/// Encoded OpenAI-family request payload plus non-fatal planning warnings.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpenAiEncodedRequest {
+    /// Serialized provider request body.
     pub body: Value,
+    /// Non-fatal warnings produced while encoding the request.
     pub warnings: Vec<RuntimeWarning>,
 }
 
+/// Input envelope for decoding an OpenAI-family JSON response.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpenAiDecodeEnvelope {
+    /// Raw JSON response body.
     pub body: Value,
+    /// Response format originally requested by the caller.
     pub requested_response_format: ResponseFormat,
 }
 
@@ -34,14 +42,21 @@ pub(crate) struct OpenAiErrorEnvelope {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpenAiSpecErrorKind {
+    /// Caller input is invalid for the OpenAI-family wire contract.
     Validation,
+    /// Encoding a request payload failed.
     Encode,
+    /// Decoding a response payload failed.
     Decode,
+    /// The provider returned an upstream application error payload.
     Upstream,
+    /// The payload violated an expected protocol contract.
     ProtocolViolation,
+    /// The requested feature is unsupported by this wire contract.
     UnsupportedFeature,
 }
 
+/// OpenAI-family wire-format error used inside provider translations.
 #[derive(Debug, Error)]
 pub enum OpenAiSpecError {
     #[error("validation error: {message}")]

@@ -58,10 +58,14 @@ macro_rules! impl_provider_client {
         env = $env:expr
     ) => {
         impl $client {
+            /// Creates a builder for this provider client.
             pub fn builder() -> $builder {
                 $builder::default()
             }
 
+            /// Builds a client from provider-specific environment variables.
+            ///
+            /// A `.env` file is loaded if present.
             pub fn from_env() -> Result<Self, crate::runtime_error::RuntimeError> {
                 $builder {
                     inner: super::common::build_base_from_env(
@@ -72,14 +76,17 @@ macro_rules! impl_provider_client {
                 .build()
             }
 
+            /// Returns the non-streaming API for this provider.
             pub fn messages(&self) -> crate::direct_messages_api::DirectMessagesApi<'_> {
                 self.inner.messages()
             }
 
+            /// Returns the streaming API for this provider.
             pub fn streaming(&self) -> crate::direct_streaming_api::DirectStreamingApi<'_> {
                 self.inner.streaming()
             }
 
+            /// Sends a fully-formed request directly to this provider.
             pub async fn send(
                 &self,
                 request: agent_core::Request,
@@ -87,6 +94,7 @@ macro_rules! impl_provider_client {
                 self.inner.send(request).await
             }
 
+            /// Sends a fully-formed request and returns attempt metadata.
             pub async fn send_with_meta(
                 &self,
                 request: agent_core::Request,
@@ -99,41 +107,49 @@ macro_rules! impl_provider_client {
         }
 
         impl $builder {
+            /// Sets the provider API key.
             pub fn api_key(mut self, api_key: impl Into<String>) -> Self {
                 self.inner.api_key = Some(api_key.into());
                 self
             }
 
+            /// Sets the provider base URL override.
             pub fn base_url(mut self, base_url: impl Into<String>) -> Self {
                 self.inner.base_url = Some(base_url.into());
                 self
             }
 
+            /// Sets the default model used when requests omit one.
             pub fn default_model(mut self, default_model: impl Into<String>) -> Self {
                 self.inner.default_model = Some(default_model.into());
                 self
             }
 
+            /// Sets the transport retry policy.
             pub fn retry_policy(mut self, retry_policy: agent_transport::RetryPolicy) -> Self {
                 self.inner.retry_policy = Some(retry_policy);
                 self
             }
 
+            /// Sets the non-streaming request timeout.
             pub fn request_timeout(mut self, timeout: std::time::Duration) -> Self {
                 self.inner.request_timeout = Some(timeout);
                 self
             }
 
+            /// Sets the stream timeout configuration.
             pub fn stream_timeout(mut self, timeout: std::time::Duration) -> Self {
                 self.inner.stream_timeout = Some(timeout);
                 self
             }
 
+            /// Supplies a preconfigured `reqwest` client.
             pub fn client(mut self, client: reqwest::Client) -> Self {
                 self.inner.client = Some(client);
                 self
             }
 
+            /// Sets a client-level observer.
             pub fn observer(
                 mut self,
                 observer: std::sync::Arc<dyn crate::observer::RuntimeObserver>,
@@ -142,6 +158,7 @@ macro_rules! impl_provider_client {
                 self
             }
 
+            /// Builds the provider client.
             pub fn build(self) -> Result<$client, crate::runtime_error::RuntimeError> {
                 let provider_runtime = self.inner.build_runtime($provider)?;
                 Ok($client {
@@ -150,6 +167,7 @@ macro_rules! impl_provider_client {
             }
         }
 
+        /// Convenience constructor returning the provider-specific builder.
         pub fn $constructor() -> $builder {
             $client::builder()
         }

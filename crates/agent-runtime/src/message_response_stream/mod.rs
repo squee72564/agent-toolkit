@@ -51,6 +51,7 @@ impl std::fmt::Debug for MessageResponseStream {
 }
 
 impl MessageResponseStream {
+    /// Converts this stream into a text-only view of assistant text deltas.
     pub fn into_text_stream(self) -> MessageTextStream {
         MessageTextStream::new(self)
     }

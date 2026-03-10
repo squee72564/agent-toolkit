@@ -7,11 +7,13 @@ const OPENAI_API_KEY_ENV: &str = "OPENAI_API_KEY";
 const OPENAI_BASE_URL_ENV: &str = "OPENAI_BASE_URL";
 const OPENAI_MODEL_ENV: &str = "OPENAI_MODEL";
 
+/// Direct client for the OpenAI-compatible runtime path.
 #[derive(Debug, Clone)]
 pub struct OpenAiClient {
     inner: ProviderClient,
 }
 
+/// Builder for [`OpenAiClient`].
 #[derive(Debug, Clone, Default)]
 pub struct OpenAiClientBuilder {
     inner: BaseClientBuilder,

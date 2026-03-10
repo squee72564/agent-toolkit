@@ -3,6 +3,7 @@ use agent_core::ProviderId;
 use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
 use crate::target::Target;
 
+/// Strategy for combining legacy fallback toggles with explicit rules.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FallbackMode {
     /// Evaluate only legacy transport/status fallback settings and ignore rules.
@@ -14,17 +15,27 @@ pub enum FallbackMode {
     LegacyOrRules,
 }
 
+/// Action taken when a [`FallbackRule`] matches.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FallbackAction {
+    /// Continue routed execution with the next configured target.
     RetryNextTarget,
+    /// Stop fallback evaluation and surface the current error.
     Stop,
 }
 
+/// Match criteria for fallback rule evaluation.
+///
+/// All non-empty fields must match for the rule to apply.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FallbackMatch {
+    /// Accepted runtime error kinds.
     pub error_kinds: Vec<RuntimeErrorKind>,
+    /// Accepted HTTP status codes.
     pub status_codes: Vec<u16>,
+    /// Accepted provider-specific error codes after trimming whitespace.
     pub provider_codes: Vec<String>,
+    /// Accepted providers.
     pub providers: Vec<ProviderId>,
 }
 
@@ -71,13 +82,17 @@ impl FallbackMatch {
     }
 }
 
+/// Ordered fallback rule evaluated against a [`RuntimeError`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FallbackRule {
+    /// Match criteria for the rule.
     pub when: FallbackMatch,
+    /// Action to take when the matcher succeeds.
     pub action: FallbackAction,
 }
 
 impl FallbackRule {
+    /// Creates a rule that retries the next target for a specific HTTP status.
     pub fn retry_on_status(status_code: u16) -> Self {
         Self {
             when: FallbackMatch {
@@ -88,6 +103,7 @@ impl FallbackRule {
         }
     }
 
+    /// Creates a rule that retries the next target for a runtime error kind.
     pub fn retry_on_kind(kind: RuntimeErrorKind) -> Self {
         Self {
             when: FallbackMatch {
@@ -98,6 +114,7 @@ impl FallbackRule {
         }
     }
 
+    /// Creates a rule that retries the next target for a provider error code.
     pub fn retry_on_provider_code(provider_code: impl Into<String>) -> Self {
         Self {
             when: FallbackMatch {
@@ -108,6 +125,7 @@ impl FallbackRule {
         }
     }
 
+    /// Creates a rule that stops fallback when a runtime error kind matches.
     pub fn stop_on_kind(kind: RuntimeErrorKind) -> Self {
         Self {
             when: FallbackMatch {
@@ -118,6 +136,7 @@ impl FallbackRule {
         }
     }
 
+    /// Restricts the rule to errors originating from a specific provider.
     pub fn for_provider(mut self, provider: ProviderId) -> Self {
         if !self.when.providers.contains(&provider) {
             self.when.providers.push(provider);
@@ -126,16 +145,25 @@ impl FallbackRule {
     }
 }
 
+/// Ordered fallback configuration for routed execution.
+///
+/// `targets` supplies the fallback destinations after the primary target.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FallbackPolicy {
+    /// Additional targets attempted after the primary target fails.
     pub targets: Vec<Target>,
+    /// Legacy HTTP status codes that trigger fallback.
     pub retry_on_status_codes: Vec<u16>,
+    /// Whether transport errors trigger fallback under legacy behavior.
     pub retry_on_transport_error: bool,
+    /// Explicit ordered rules.
     pub rules: Vec<FallbackRule>,
+    /// How legacy settings and rules are combined.
     pub mode: FallbackMode,
 }
 
 impl FallbackPolicy {
+    /// Creates a fallback policy with the supplied fallback targets.
     pub fn new(targets: Vec<Target>) -> Self {
         Self {
             targets,
@@ -143,11 +171,13 @@ impl FallbackPolicy {
         }
     }
 
+    /// Sets how legacy fallback settings and explicit rules are combined.
     pub fn with_mode(mut self, mode: FallbackMode) -> Self {
         self.mode = mode;
         self
     }
 
+    /// Appends a fallback rule.
     pub fn with_rule(mut self, rule: FallbackRule) -> Self {
         self.rules.push(rule);
         self

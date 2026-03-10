@@ -7,11 +7,13 @@ const ANTHROPIC_API_KEY_ENV: &str = "ANTHROPIC_API_KEY";
 const ANTHROPIC_BASE_URL_ENV: &str = "ANTHROPIC_BASE_URL";
 const ANTHROPIC_MODEL_ENV: &str = "ANTHROPIC_MODEL";
 
+/// Direct client for Anthropic requests.
 #[derive(Debug, Clone)]
 pub struct AnthropicClient {
     inner: ProviderClient,
 }
 
+/// Builder for [`AnthropicClient`].
 #[derive(Debug, Clone, Default)]
 pub struct AnthropicClientBuilder {
     inner: BaseClientBuilder,

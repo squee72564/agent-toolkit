@@ -6,6 +6,7 @@ use crate::message_response_stream::MessageResponseStream;
 use crate::runtime_error::RuntimeError;
 use crate::send_options::SendOptions;
 
+/// Streaming API for routed multi-provider execution.
 #[derive(Debug, Clone)]
 pub struct RoutedStreamingApi<'a> {
     toolkit: &'a AgentToolkit,
@@ -16,6 +17,8 @@ impl RoutedStreamingApi<'_> {
         RoutedStreamingApi { toolkit }
     }
 
+    /// Builds a streaming request from [`MessageCreateInput`] and opens a
+    /// routed stream using the supplied options.
     pub async fn create(
         &self,
         input: impl Into<MessageCreateInput>,
@@ -24,6 +27,9 @@ impl RoutedStreamingApi<'_> {
         self.toolkit.create_stream(input.into(), options).await
     }
 
+    /// Sends a fully-formed routed request.
+    ///
+    /// The request must have `stream = true`.
     pub async fn create_request(
         &self,
         request: Request,

@@ -5,6 +5,7 @@ use std::error::Error as StdError;
 use std::sync::Arc;
 use thiserror::Error;
 
+/// Category of error surfaced by the runtime layer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeErrorKind {
     Configuration,
@@ -28,17 +29,25 @@ pub enum RuntimeErrorKind {
 #[derive(Debug, Error, Clone)]
 #[error("{kind:?}: {message}")]
 pub struct RuntimeError {
+    /// High-level runtime error category.
     pub kind: RuntimeErrorKind,
+    /// Human-readable error message.
     pub message: String,
+    /// Provider associated with the error, when known.
     pub provider: Option<ProviderId>,
+    /// HTTP status code associated with the error, when known.
     pub status_code: Option<u16>,
+    /// Provider request identifier, when one was returned.
     pub request_id: Option<String>,
+    /// Provider-specific error code, when available.
     pub provider_code: Option<String>,
     #[source]
+    /// Underlying source error preserved for inspection and downcasting.
     pub source: Option<Arc<dyn StdError + Send + Sync>>,
 }
 
 impl RuntimeError {
+    /// Creates a configuration error.
     pub fn configuration(message: impl Into<String>) -> Self {
         Self {
             kind: RuntimeErrorKind::Configuration,
@@ -51,6 +60,7 @@ impl RuntimeError {
         }
     }
 
+    /// Creates a target resolution error.
     pub fn target_resolution(message: impl Into<String>) -> Self {
         Self {
             kind: RuntimeErrorKind::TargetResolution,
@@ -63,6 +73,7 @@ impl RuntimeError {
         }
     }
 
+    /// Wraps the last error after all fallback targets have been exhausted.
     pub fn fallback_exhausted(last_error: RuntimeError) -> Self {
         Self {
             kind: RuntimeErrorKind::FallbackExhausted,
@@ -75,6 +86,7 @@ impl RuntimeError {
         }
     }
 
+    /// Converts a provider adapter error into a runtime error.
     pub fn from_adapter(error: AdapterError) -> Self {
         let status_code = error.status_code;
         let request_id = error.request_id.clone();
@@ -92,6 +104,7 @@ impl RuntimeError {
         }
     }
 
+    /// Converts a transport-layer error into a runtime error.
     pub fn from_transport(provider: ProviderId, error: TransportError) -> Self {
         let (message, status_code, request_id) = match &error {
             TransportError::InvalidHeaderName => ("invalid header name".to_string(), None, None),
@@ -159,6 +172,7 @@ impl RuntimeError {
         }
     }
 
+    /// Returns the source error as a trait object for further inspection.
     pub fn source_ref(&self) -> Option<&(dyn StdError + Send + Sync + 'static)> {
         self.source.as_deref()
     }

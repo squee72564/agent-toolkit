@@ -1,3 +1,6 @@
+//! OpenRouter translation implementation built on the OpenAI-style responses
+//! API shape plus OpenRouter-specific request overrides.
+
 pub(crate) mod request;
 pub(crate) mod response;
 pub(crate) mod stream;

@@ -10,10 +10,15 @@ use crate::types::{
 /// observer panics so instrumentation cannot change request control flow or
 /// fail an otherwise successful operation.
 pub trait RuntimeObserver: Send + Sync {
+    /// Called once when a request begins.
     fn on_request_start(&self, _event: &RequestStartEvent) {}
+    /// Called when an individual provider attempt begins.
     fn on_attempt_start(&self, _event: &AttemptStartEvent) {}
+    /// Called when an individual provider attempt succeeds.
     fn on_attempt_success(&self, _event: &AttemptSuccessEvent) {}
+    /// Called when an individual provider attempt fails.
     fn on_attempt_failure(&self, _event: &AttemptFailureEvent) {}
+    /// Called once when the overall request completes.
     fn on_request_end(&self, _event: &RequestEndEvent) {}
 }
 

@@ -1,3 +1,5 @@
+//! Built-in provider adapter implementations and adapter selection.
+
 use reqwest::Url;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde_json::Value;
@@ -19,17 +21,34 @@ use crate::platform::openrouter::{
 use crate::request_plan::ProviderRequestPlan;
 use crate::streaming::ProviderStreamProjector;
 
+/// Provider-specific translation contract used by the runtime layer.
+///
+/// A `ProviderAdapter` is responsible for:
+///
+/// - describing the provider's HTTP platform configuration,
+/// - translating provider-agnostic [`Request`] values into a
+///   [`ProviderRequestPlan`],
+/// - decoding provider JSON responses back into [`Response`], and
+/// - projecting raw streaming events into canonical stream events.
 pub trait ProviderAdapter: Sync + std::fmt::Debug {
+    /// Returns the provider identifier implemented by this adapter.
     fn id(&self) -> ProviderId;
+    /// Returns the provider's default API base URL.
     fn default_base_url(&self) -> &'static str;
+    /// Returns the default endpoint path used for requests.
     fn endpoint_path(&self) -> &'static str;
+    /// Builds transport-facing platform configuration for the provider.
     fn platform_config(&self, base_url: String) -> Result<PlatformConfig, AdapterError>;
+    /// Translates a provider-agnostic request into a provider-specific request
+    /// plan for the transport layer.
     fn plan_request(&self, req: Request) -> Result<ProviderRequestPlan, AdapterError>;
+    /// Decodes a provider JSON response into the canonical response type.
     fn decode_response_json(
         &self,
         body: Value,
         requested_format: &ResponseFormat,
     ) -> Result<Response, AdapterError>;
+    /// Creates a streaming projector for this provider.
     fn create_stream_projector(&self) -> Box<dyn ProviderStreamProjector>;
 }
 
@@ -41,12 +60,15 @@ const OPENAI_ENDPOINT_PATH: &str = "/v1/responses";
 const ANTHROPIC_ENDPOINT_PATH: &str = "/v1/messages";
 const OPENROUTER_ENDPOINT_PATH: &str = "/v1/responses";
 
+/// Built-in adapter for OpenAI-compatible response endpoints.
 #[derive(Debug, Clone, Copy)]
 pub struct OpenAiAdapter;
 
+/// Built-in adapter for Anthropic message endpoints.
 #[derive(Debug, Clone, Copy)]
 pub struct AnthropicAdapter;
 
+/// Built-in adapter for OpenRouter's OpenAI-compatible response endpoints.
 #[derive(Debug, Clone, Copy)]
 pub struct OpenRouterAdapter;
 
@@ -54,6 +76,9 @@ static OPENAI_ADAPTER: OpenAiAdapter = OpenAiAdapter;
 static ANTHROPIC_ADAPTER: AnthropicAdapter = AnthropicAdapter;
 static OPENROUTER_ADAPTER: OpenRouterAdapter = OpenRouterAdapter;
 
+/// Returns the built-in adapter for a provider identifier.
+///
+/// The returned adapter is a shared `'static` singleton.
 pub fn adapter_for(id: ProviderId) -> &'static dyn ProviderAdapter {
     match id {
         ProviderId::OpenAi => &OPENAI_ADAPTER,

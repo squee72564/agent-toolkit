@@ -1,3 +1,14 @@
+//! Runtime clients and routing primitives for `agent-toolkit`.
+//!
+//! This crate exposes two main entry points:
+//!
+//! - Direct provider clients such as [`OpenAiClient`] for single-provider use.
+//! - [`AgentToolkit`] for routed execution across multiple configured providers
+//!   with target selection, fallback, and observer hooks.
+//!
+//! Use `messages()` for non-streaming requests and `streaming()` when you need
+//! canonical stream envelopes or text deltas.
+
 mod agent_toolkit;
 mod base_client_builder;
 mod clients;

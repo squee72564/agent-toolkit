@@ -21,6 +21,11 @@ mod execution;
 pub use self::builder::AgentToolkitBuilder;
 use self::execution::PreparedExecution;
 
+/// Multi-provider runtime for routed request execution.
+///
+/// `AgentToolkit` is the high-level entry point when a request may need an
+/// explicit [`Target`], a [`crate::FallbackPolicy`], or request-scoped
+/// observability through [`RuntimeObserver`].
 #[derive(Clone)]
 pub struct AgentToolkit {
     pub(crate) clients: HashMap<ProviderId, ProviderClient>,
@@ -37,18 +42,23 @@ impl std::fmt::Debug for AgentToolkit {
 }
 
 impl AgentToolkit {
+    /// Creates a builder for configuring the providers available to the
+    /// toolkit.
     pub fn builder() -> AgentToolkitBuilder {
         AgentToolkitBuilder::default()
     }
 
+    /// Returns the non-streaming routed request API.
     pub fn messages(&self) -> RoutedMessagesApi<'_> {
         RoutedMessagesApi::new(self)
     }
 
+    /// Returns the streaming routed request API.
     pub fn streaming(&self) -> RoutedStreamingApi<'_> {
         RoutedStreamingApi::new(self)
     }
 
+    /// Sends a fully-formed request through the routed execution path.
     pub async fn send(
         &self,
         request: Request,
@@ -59,6 +69,8 @@ impl AgentToolkit {
             .map(|(response, _)| response)
     }
 
+    /// Sends a fully-formed request and returns metadata for the selected
+    /// target and all attempts.
     pub async fn send_with_meta(
         &self,
         request: Request,

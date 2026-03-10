@@ -48,25 +48,40 @@ pub struct AttemptStartEvent {
 /// Observer payload emitted when an attempt finishes successfully.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttemptSuccessEvent {
+    /// Provider request identifier, when available.
     pub request_id: Option<String>,
+    /// Provider used for the attempt.
     pub provider: Option<ProviderId>,
+    /// Model selected for the attempt.
     pub model: Option<String>,
+    /// Zero-based target index for the attempt.
     pub target_index: Option<usize>,
+    /// Zero-based attempt index for the attempt.
     pub attempt_index: Option<usize>,
+    /// Elapsed wall-clock time since the attempt started.
     pub elapsed: Duration,
+    /// HTTP status code associated with the successful attempt, when available.
     pub status_code: Option<u16>,
 }
 
 /// Observer payload emitted when an attempt finishes with an error.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttemptFailureEvent {
+    /// Provider request identifier, when available.
     pub request_id: Option<String>,
+    /// Provider used for the attempt.
     pub provider: Option<ProviderId>,
+    /// Model selected for the attempt.
     pub model: Option<String>,
+    /// Zero-based target index for the attempt.
     pub target_index: Option<usize>,
+    /// Zero-based attempt index for the attempt.
     pub attempt_index: Option<usize>,
+    /// Elapsed wall-clock time since the attempt started.
     pub elapsed: Duration,
+    /// High-level error kind, when known.
     pub error_kind: Option<RuntimeErrorKind>,
+    /// Human-readable error message, when available.
     pub error_message: Option<String>,
 }
 
@@ -77,14 +92,23 @@ pub struct AttemptFailureEvent {
 /// status before the request failed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RequestEndEvent {
+    /// Provider request identifier, when available.
     pub request_id: Option<String>,
+    /// Provider selected for the terminal attempt, when known.
     pub provider: Option<ProviderId>,
+    /// Model selected for the terminal attempt, when known.
     pub model: Option<String>,
+    /// Zero-based target index for the terminal attempt.
     pub target_index: Option<usize>,
+    /// Zero-based attempt index for the terminal attempt.
     pub attempt_index: Option<usize>,
+    /// Elapsed wall-clock time since request start.
     pub elapsed: Duration,
+    /// HTTP status code returned by the terminal attempt, when available.
     pub status_code: Option<u16>,
+    /// Terminal error kind, or `None` on success.
     pub error_kind: Option<RuntimeErrorKind>,
+    /// Terminal error message, or `None` on success.
     pub error_message: Option<String>,
 }
 
@@ -94,22 +118,34 @@ pub struct RequestEndEvent {
 /// payload construction.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttemptMeta {
+    /// Provider used for the attempt.
     pub provider: ProviderId,
+    /// Model selected for the attempt.
     pub model: String,
+    /// Whether the attempt succeeded.
     pub success: bool,
+    /// HTTP status code returned by the provider, when available.
     pub status_code: Option<u16>,
+    /// Provider request identifier, when available.
     pub request_id: Option<String>,
+    /// Error kind for failed attempts.
     pub error_kind: Option<RuntimeErrorKind>,
+    /// Error message for failed attempts.
     pub error_message: Option<String>,
 }
 
 /// Returned metadata describing the selected response and all attempted targets.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResponseMeta {
+    /// Provider that produced the returned response.
     pub selected_provider: ProviderId,
+    /// Model that produced the returned response.
     pub selected_model: String,
+    /// HTTP status code from the selected response, when available.
     pub status_code: Option<u16>,
+    /// Provider request identifier from the selected response, when available.
     pub request_id: Option<String>,
+    /// Attempt metadata in execution order.
     pub attempts: Vec<AttemptMeta>,
 }
 

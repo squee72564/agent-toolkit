@@ -1,3 +1,5 @@
+//! Anthropic wire-format payload types and spec-level errors.
+
 use std::error::Error as StdError;
 
 use serde_json::Value;
@@ -12,15 +14,21 @@ mod schema_rules;
 #[cfg(test)]
 mod test;
 
+/// Encoded Anthropic request payload plus non-fatal planning warnings.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AnthropicEncodedRequest {
+    /// Serialized provider request body.
     pub body: Value,
+    /// Non-fatal warnings produced while encoding the request.
     pub warnings: Vec<RuntimeWarning>,
 }
 
+/// Input envelope for decoding an Anthropic JSON response.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AnthropicDecodeEnvelope {
+    /// Raw JSON response body.
     pub body: Value,
+    /// Response format originally requested by the caller.
     pub requested_response_format: ResponseFormat,
 }
 
@@ -33,14 +41,21 @@ pub(crate) struct AnthropicErrorEnvelope {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnthropicSpecErrorKind {
+    /// Caller input is invalid for the Anthropic wire contract.
     Validation,
+    /// Encoding a request payload failed.
     Encode,
+    /// Decoding a response payload failed.
     Decode,
+    /// The provider returned an upstream application error payload.
     Upstream,
+    /// The payload violated an expected protocol contract.
     ProtocolViolation,
+    /// The requested feature is unsupported by this wire contract.
     UnsupportedFeature,
 }
 
+/// Anthropic wire-format error used inside provider translations.
 #[derive(Debug, Error)]
 pub enum AnthropicSpecError {
     #[error("validation error: {message}")]

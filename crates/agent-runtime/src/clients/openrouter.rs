@@ -7,11 +7,13 @@ const OPENROUTER_API_KEY_ENV: &str = "OPENROUTER_API_KEY";
 const OPENROUTER_BASE_URL_ENV: &str = "OPENROUTER_BASE_URL";
 const OPENROUTER_MODEL_ENV: &str = "OPENROUTER_MODEL";
 
+/// Direct client for OpenRouter requests.
 #[derive(Debug, Clone)]
 pub struct OpenRouterClient {
     inner: ProviderClient,
 }
 
+/// Builder for [`OpenRouterClient`].
 #[derive(Debug, Clone, Default)]
 pub struct OpenRouterClientBuilder {
     inner: BaseClientBuilder,
