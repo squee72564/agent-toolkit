@@ -2,13 +2,11 @@ use std::{collections::HashMap, sync::Arc};
 
 use agent_core::{ProviderId, Request, Response};
 
-use crate::base_client_builder::BaseClientBuilder;
 use crate::message_response_stream::{
     AttemptContext, LiveAttempt, MessageResponseStream, RoutedStreamInit,
 };
 use crate::observer::{RuntimeObserver, resolve_observer_for_request, safe_call_observer};
 use crate::provider_client::ProviderClient;
-use crate::provider_config::ProviderConfig;
 use crate::provider_runtime::{ProviderAttemptOutcome, ProviderStreamAttemptOutcome};
 use crate::routed_messages_api::RoutedMessagesApi;
 use crate::routed_streaming_api::RoutedStreamingApi;
@@ -19,6 +17,10 @@ use crate::types::{
     AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, RequestEndEvent,
     RequestStartEvent, ResponseMeta,
 };
+
+mod builder;
+
+pub use self::builder::AgentToolkitBuilder;
 
 #[derive(Clone)]
 pub struct AgentToolkit {
@@ -478,73 +480,6 @@ impl AgentToolkit {
         }
 
         Ok(targets)
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct AgentToolkitBuilder {
-    openai: Option<ProviderConfig>,
-    anthropic: Option<ProviderConfig>,
-    openrouter: Option<ProviderConfig>,
-    observer: Option<Arc<dyn RuntimeObserver>>,
-}
-
-impl AgentToolkitBuilder {
-    pub fn with_openai(mut self, config: ProviderConfig) -> Self {
-        self.openai = Some(config);
-        self
-    }
-
-    pub fn with_anthropic(mut self, config: ProviderConfig) -> Self {
-        self.anthropic = Some(config);
-        self
-    }
-
-    pub fn with_openrouter(mut self, config: ProviderConfig) -> Self {
-        self.openrouter = Some(config);
-        self
-    }
-
-    pub fn observer(mut self, observer: Arc<dyn RuntimeObserver>) -> Self {
-        self.observer = Some(observer);
-        self
-    }
-
-    pub fn build(self) -> Result<AgentToolkit, RuntimeError> {
-        let AgentToolkitBuilder {
-            openai,
-            anthropic,
-            openrouter,
-            observer,
-        } = self;
-        let mut clients = HashMap::new();
-
-        if let Some(config) = openai {
-            let mut runtime_builder = BaseClientBuilder::from_provider_config(config);
-            runtime_builder.observer = observer.clone();
-            let runtime = runtime_builder.build_runtime(ProviderId::OpenAi)?;
-            clients.insert(ProviderId::OpenAi, ProviderClient::new(runtime));
-        }
-        if let Some(config) = anthropic {
-            let mut runtime_builder = BaseClientBuilder::from_provider_config(config);
-            runtime_builder.observer = observer.clone();
-            let runtime = runtime_builder.build_runtime(ProviderId::Anthropic)?;
-            clients.insert(ProviderId::Anthropic, ProviderClient::new(runtime));
-        }
-        if let Some(config) = openrouter {
-            let mut runtime_builder = BaseClientBuilder::from_provider_config(config);
-            runtime_builder.observer = observer.clone();
-            let runtime = runtime_builder.build_runtime(ProviderId::OpenRouter)?;
-            clients.insert(ProviderId::OpenRouter, ProviderClient::new(runtime));
-        }
-
-        if clients.is_empty() {
-            return Err(RuntimeError::configuration(
-                "at least one provider must be configured",
-            ));
-        }
-
-        Ok(AgentToolkit { clients, observer })
     }
 }
 
