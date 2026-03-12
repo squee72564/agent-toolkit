@@ -36,7 +36,7 @@ pub struct OpenAiDecodeEnvelope {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OpenAiSpecErrorKind {
+pub enum OpenAiFamilyErrorKind {
     /// Caller input is invalid for the OpenAI-family wire contract.
     Validation,
     /// Encoding a request payload failed.
@@ -53,7 +53,7 @@ pub enum OpenAiSpecErrorKind {
 
 /// OpenAI-family wire-format error used inside provider translations.
 #[derive(Debug, Error)]
-pub enum OpenAiSpecError {
+pub enum OpenAiFamilyError {
     #[error("validation error: {message}")]
     Validation { message: String },
     #[error("encode error: {message}")]
@@ -77,7 +77,7 @@ pub enum OpenAiSpecError {
     UnsupportedFeature { message: String },
 }
 
-impl OpenAiSpecError {
+impl OpenAiFamilyError {
     #[must_use]
     pub(crate) fn validation(message: impl Into<String>) -> Self {
         Self::Validation {
@@ -127,14 +127,14 @@ impl OpenAiSpecError {
     }
 
     #[must_use]
-    pub(crate) fn kind(&self) -> OpenAiSpecErrorKind {
+    pub(crate) fn kind(&self) -> OpenAiFamilyErrorKind {
         match self {
-            Self::Validation { .. } => OpenAiSpecErrorKind::Validation,
-            Self::Encode { .. } => OpenAiSpecErrorKind::Encode,
-            Self::Decode { .. } => OpenAiSpecErrorKind::Decode,
-            Self::Upstream { .. } => OpenAiSpecErrorKind::Upstream,
-            Self::ProtocolViolation { .. } => OpenAiSpecErrorKind::ProtocolViolation,
-            Self::UnsupportedFeature { .. } => OpenAiSpecErrorKind::UnsupportedFeature,
+            Self::Validation { .. } => OpenAiFamilyErrorKind::Validation,
+            Self::Encode { .. } => OpenAiFamilyErrorKind::Encode,
+            Self::Decode { .. } => OpenAiFamilyErrorKind::Decode,
+            Self::Upstream { .. } => OpenAiFamilyErrorKind::Upstream,
+            Self::ProtocolViolation { .. } => OpenAiFamilyErrorKind::ProtocolViolation,
+            Self::UnsupportedFeature { .. } => OpenAiFamilyErrorKind::UnsupportedFeature,
         }
     }
 

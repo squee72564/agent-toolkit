@@ -1,7 +1,7 @@
 use serde_json::{Map, Value};
 
 use super::types::{OpenAiErrorEnvelope, OpenAiResponsesBody};
-use super::{OpenAiDecodeEnvelope, OpenAiSpecError};
+use super::{OpenAiDecodeEnvelope, OpenAiFamilyError};
 use agent_core::types::{
     AssistantOutput, ContentPart, FinishReason, Response, ResponseFormat, RuntimeWarning, Usage,
 };
@@ -22,21 +22,21 @@ struct NormalizedOpenAiErrorEnvelope {
 
 pub(crate) fn decode_openai_response(
     payload: &OpenAiDecodeEnvelope,
-) -> Result<Response, OpenAiSpecError> {
+) -> Result<Response, OpenAiFamilyError> {
     let parsed: OpenAiResponsesBody =
         serde_json::from_value(payload.body.clone()).map_err(|error| {
-            OpenAiSpecError::decode(format!(
+            OpenAiFamilyError::decode(format!(
                 "failed to deserialize OpenAI-family response: {error}"
             ))
         })?;
     if !payload.body.is_object() {
-        return Err(OpenAiSpecError::decode(
+        return Err(OpenAiFamilyError::decode(
             "response payload must be a JSON object",
         ));
     }
 
     if let Some(error) = parsed.error.as_ref().and_then(normalize_error_envelope) {
-        return Err(OpenAiSpecError::upstream(format_openai_error_message(
+        return Err(OpenAiFamilyError::upstream(format_openai_error_message(
             &error,
         )));
     }
@@ -44,7 +44,7 @@ pub(crate) fn decode_openai_response(
     let status = parsed
         .status
         .as_deref()
-        .ok_or_else(|| OpenAiSpecError::decode("openai response missing status"))?;
+        .ok_or_else(|| OpenAiFamilyError::decode("openai response missing status"))?;
 
     let model = parsed
         .model
@@ -155,14 +155,14 @@ fn decode_output_item(
     item: &Value,
     content: &mut Vec<ContentPart>,
     warnings: &mut Vec<RuntimeWarning>,
-) -> Result<(), OpenAiSpecError> {
+) -> Result<(), OpenAiFamilyError> {
     let item_obj = item
         .as_object()
-        .ok_or_else(|| OpenAiSpecError::decode("output item must be an object"))?;
+        .ok_or_else(|| OpenAiFamilyError::decode("output item must be an object"))?;
     let item_type = item_obj
         .get("type")
         .and_then(Value::as_str)
-        .ok_or_else(|| OpenAiSpecError::decode("output item missing type"))?;
+        .ok_or_else(|| OpenAiFamilyError::decode("output item missing type"))?;
 
     match item_type {
         "message" => decode_output_message(item_obj, content, warnings),
@@ -189,17 +189,17 @@ fn decode_output_message(
     item_obj: &Map<String, Value>,
     content: &mut Vec<ContentPart>,
     warnings: &mut Vec<RuntimeWarning>,
-) -> Result<(), OpenAiSpecError> {
+) -> Result<(), OpenAiFamilyError> {
     if let Some(parts) = item_obj.get("content").and_then(Value::as_array) {
         for part in parts {
             let Some(part_obj) = part.as_object() else {
-                return Err(OpenAiSpecError::decode(
+                return Err(OpenAiFamilyError::decode(
                     "output message content part must be an object",
                 ));
             };
 
             let Some(part_type) = part_obj.get("type").and_then(Value::as_str) else {
-                return Err(OpenAiSpecError::decode(
+                return Err(OpenAiFamilyError::decode(
                     "output message content part missing type",
                 ));
             };
@@ -241,14 +241,14 @@ fn decode_required_non_empty_str<'a>(
     key: &str,
     missing_message: &str,
     blank_message: &str,
-) -> Result<&'a str, OpenAiSpecError> {
+) -> Result<&'a str, OpenAiFamilyError> {
     let value = item_obj
         .get(key)
         .and_then(Value::as_str)
-        .ok_or_else(|| OpenAiSpecError::decode(missing_message))?;
+        .ok_or_else(|| OpenAiFamilyError::decode(missing_message))?;
 
     if value.trim().is_empty() {
-        return Err(OpenAiSpecError::decode(blank_message));
+        return Err(OpenAiFamilyError::decode(blank_message));
     }
 
     Ok(value)
@@ -258,7 +258,7 @@ fn decode_output_tool_call(
     item_obj: &Map<String, Value>,
     content: &mut Vec<ContentPart>,
     warnings: &mut Vec<RuntimeWarning>,
-) -> Result<(), OpenAiSpecError> {
+) -> Result<(), OpenAiFamilyError> {
     let call_id = decode_required_non_empty_str(
         item_obj,
         "call_id",
@@ -373,7 +373,7 @@ fn map_finish_reason(
     status: &str,
     incomplete_reason: Option<&str>,
     content: &[ContentPart],
-) -> Result<FinishReason, OpenAiSpecError> {
+) -> Result<FinishReason, OpenAiFamilyError> {
     match status {
         "completed" => {
             if should_finish_with_tool_calls(content) {
@@ -388,14 +388,14 @@ fn map_finish_reason(
             Some(_) => Ok(FinishReason::Other),
             None => Ok(FinishReason::Other),
         },
-        "cancelled" => Err(OpenAiSpecError::decode(
+        "cancelled" => Err(OpenAiFamilyError::decode(
             "openai response status is cancelled",
         )),
-        "failed" => Err(OpenAiSpecError::decode("openai response status is failed")),
-        "in_progress" | "queued" => Err(OpenAiSpecError::decode(format!(
+        "failed" => Err(OpenAiFamilyError::decode("openai response status is failed")),
+        "in_progress" | "queued" => Err(OpenAiFamilyError::decode(format!(
             "openai response status is non-terminal: {status}"
         ))),
-        other => Err(OpenAiSpecError::decode(format!(
+        other => Err(OpenAiFamilyError::decode(format!(
             "unknown openai response status: {other}"
         ))),
     }

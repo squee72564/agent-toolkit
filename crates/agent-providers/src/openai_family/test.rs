@@ -8,11 +8,11 @@ use agent_core::types::{
     ToolDefinition, ToolResult, ToolResultContent,
 };
 
-use super::OpenAiSpecError;
+use super::OpenAiFamilyError;
 use super::decode::decode_openai_response;
 use super::encode::encode_openai_request;
 use super::schema_rules::{canonicalize_json, is_strict_compatible_schema, stable_json_string};
-use super::{OpenAiDecodeEnvelope, OpenAiSpecErrorKind};
+use super::{OpenAiDecodeEnvelope, OpenAiFamilyErrorKind};
 
 fn base_request(messages: Vec<Message>) -> Request {
     Request {
@@ -277,7 +277,7 @@ fn reject_specific_tool_choice_when_tool_missing() {
     assert!(
         matches!(
             &error,
-            OpenAiSpecError::Validation { message }
+            OpenAiFamilyError::Validation { message }
                 if message.contains("requires at least one tool definition")
         ),
         "expected validation error for missing tool definitions, got: {error:?}"
@@ -304,7 +304,7 @@ fn reject_tool_result_without_prior_tool_call() {
     assert!(
         matches!(
             &error,
-            OpenAiSpecError::ProtocolViolation { message }
+            OpenAiFamilyError::ProtocolViolation { message }
                 if message.contains("tool_result_without_matching_tool_call")
         ),
         "expected protocol violation for unmatched tool result, got: {error:?}"
@@ -496,7 +496,7 @@ fn reject_empty_model_id() {
     let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
-        OpenAiSpecError::Validation { message } => {
+        OpenAiFamilyError::Validation { message } => {
             assert!(message.contains("model_id must not be empty"));
         }
         _ => panic!("unexpected error variant"),
@@ -519,7 +519,7 @@ fn reject_json_schema_response_format_with_blank_name() {
     let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
-        OpenAiSpecError::Validation { message } => {
+        OpenAiFamilyError::Validation { message } => {
             assert!(message.contains("requires a non-empty name"));
         }
         _ => panic!("unexpected error variant"),
@@ -537,7 +537,7 @@ fn reject_json_schema_response_format_with_non_object_schema() {
     let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
-        OpenAiSpecError::Validation { message } => {
+        OpenAiFamilyError::Validation { message } => {
             assert!(message.contains("schema to be a JSON object"));
         }
         _ => panic!("unexpected error variant"),
@@ -573,7 +573,7 @@ fn reject_duplicate_tool_names() {
     let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
-        OpenAiSpecError::Validation { message } => {
+        OpenAiFamilyError::Validation { message } => {
             assert!(message.contains("duplicate tool definition name"));
         }
         _ => panic!("unexpected error variant"),
@@ -596,7 +596,7 @@ fn reject_assistant_tool_call_with_blank_id() {
     let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
-        OpenAiSpecError::Validation { message } => {
+        OpenAiFamilyError::Validation { message } => {
             assert!(message.contains("tool_call id must not be empty"));
         }
         _ => panic!("unexpected error variant"),
@@ -619,7 +619,7 @@ fn reject_assistant_tool_call_with_blank_name() {
     let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
-        OpenAiSpecError::Validation { message } => {
+        OpenAiFamilyError::Validation { message } => {
             assert!(message.contains("tool_call name must not be empty"));
         }
         _ => panic!("unexpected error variant"),
@@ -651,7 +651,7 @@ fn reject_duplicate_assistant_tool_call_ids() {
     let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
-        OpenAiSpecError::ProtocolViolation { message } => {
+        OpenAiFamilyError::ProtocolViolation { message } => {
             assert!(message.contains("duplicate_tool_call_id"));
         }
         _ => panic!("unexpected error variant"),
@@ -676,7 +676,7 @@ fn reject_tool_result_with_blank_tool_call_id() {
     let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
 
     match error {
-        OpenAiSpecError::Validation { message } => {
+        OpenAiFamilyError::Validation { message } => {
             assert!(message.contains("tool_result tool_call_id must not be empty"));
         }
         _ => panic!("unexpected error variant"),
@@ -697,7 +697,7 @@ fn decode_top_level_error_maps_to_upstream() {
     };
 
     let error = decode_openai_response(&envelope).expect_err("decode should fail");
-    assert_eq!(error.kind(), OpenAiSpecErrorKind::Upstream);
+    assert_eq!(error.kind(), OpenAiFamilyErrorKind::Upstream);
     assert!(error.message().contains("openai error:"));
     assert!(error.message().contains("invalid_api_key"));
 }
@@ -716,7 +716,7 @@ fn decode_in_progress_status_uses_interpolated_message() {
     let error = decode_openai_response(&envelope).expect_err("decode should fail");
 
     match error {
-        OpenAiSpecError::Decode { message, .. } => {
+        OpenAiFamilyError::Decode { message, .. } => {
             assert!(message.contains("in_progress"));
             assert!(!message.contains("{status}"));
         }
@@ -849,7 +849,7 @@ fn decode_function_call_rejects_blank_call_id() {
 
     let error = decode_openai_response(&envelope).expect_err("decode should fail");
     match error {
-        OpenAiSpecError::Decode { message, .. } => {
+        OpenAiFamilyError::Decode { message, .. } => {
             assert!(message.contains("call_id must not be empty"));
         }
         _ => panic!("expected decode error variant"),
@@ -876,7 +876,7 @@ fn decode_function_call_rejects_blank_name() {
 
     let error = decode_openai_response(&envelope).expect_err("decode should fail");
     match error {
-        OpenAiSpecError::Decode { message, .. } => {
+        OpenAiFamilyError::Decode { message, .. } => {
             assert!(message.contains("name must not be empty"));
         }
         _ => panic!("expected decode error variant"),
@@ -903,7 +903,7 @@ fn decode_function_call_rejects_blank_arguments() {
 
     let error = decode_openai_response(&envelope).expect_err("decode should fail");
     match error {
-        OpenAiSpecError::Decode { message, .. } => {
+        OpenAiFamilyError::Decode { message, .. } => {
             assert!(message.contains("arguments must not be empty"));
         }
         _ => panic!("expected decode error variant"),
@@ -962,56 +962,56 @@ fn decode_refusal_text_is_trimmed_and_emitted() {
 
 #[test]
 fn error_kind_maps_for_all_variants() {
-    let validation = OpenAiSpecError::validation("invalid input");
-    assert_eq!(validation.kind(), OpenAiSpecErrorKind::Validation);
+    let validation = OpenAiFamilyError::validation("invalid input");
+    assert_eq!(validation.kind(), OpenAiFamilyErrorKind::Validation);
 
-    let encode = OpenAiSpecError::encode_with_source("encode failed", io::Error::other("boom"));
-    assert_eq!(encode.kind(), OpenAiSpecErrorKind::Encode);
+    let encode = OpenAiFamilyError::encode_with_source("encode failed", io::Error::other("boom"));
+    assert_eq!(encode.kind(), OpenAiFamilyErrorKind::Encode);
 
-    let decode = OpenAiSpecError::decode("decode failed");
-    assert_eq!(decode.kind(), OpenAiSpecErrorKind::Decode);
+    let decode = OpenAiFamilyError::decode("decode failed");
+    assert_eq!(decode.kind(), OpenAiFamilyErrorKind::Decode);
 
-    let upstream = OpenAiSpecError::upstream("upstream failed");
-    assert_eq!(upstream.kind(), OpenAiSpecErrorKind::Upstream);
+    let upstream = OpenAiFamilyError::upstream("upstream failed");
+    assert_eq!(upstream.kind(), OpenAiFamilyErrorKind::Upstream);
 
-    let protocol = OpenAiSpecError::protocol_violation("protocol failed");
-    assert_eq!(protocol.kind(), OpenAiSpecErrorKind::ProtocolViolation);
+    let protocol = OpenAiFamilyError::protocol_violation("protocol failed");
+    assert_eq!(protocol.kind(), OpenAiFamilyErrorKind::ProtocolViolation);
 
-    let unsupported = OpenAiSpecError::unsupported_feature("unsupported feature");
-    assert_eq!(unsupported.kind(), OpenAiSpecErrorKind::UnsupportedFeature);
+    let unsupported = OpenAiFamilyError::unsupported_feature("unsupported feature");
+    assert_eq!(unsupported.kind(), OpenAiFamilyErrorKind::UnsupportedFeature);
 }
 
 #[test]
 fn error_message_returns_original_message_for_all_variants() {
     assert_eq!(
-        OpenAiSpecError::validation("invalid input").message(),
+        OpenAiFamilyError::validation("invalid input").message(),
         "invalid input"
     );
     assert_eq!(
-        OpenAiSpecError::encode_with_source("encode failed", io::Error::other("boom")).message(),
+        OpenAiFamilyError::encode_with_source("encode failed", io::Error::other("boom")).message(),
         "encode failed"
     );
     assert_eq!(
-        OpenAiSpecError::decode("decode failed").message(),
+        OpenAiFamilyError::decode("decode failed").message(),
         "decode failed"
     );
     assert_eq!(
-        OpenAiSpecError::upstream("upstream failed").message(),
+        OpenAiFamilyError::upstream("upstream failed").message(),
         "upstream failed"
     );
     assert_eq!(
-        OpenAiSpecError::protocol_violation("protocol failed").message(),
+        OpenAiFamilyError::protocol_violation("protocol failed").message(),
         "protocol failed"
     );
     assert_eq!(
-        OpenAiSpecError::unsupported_feature("unsupported feature").message(),
+        OpenAiFamilyError::unsupported_feature("unsupported feature").message(),
         "unsupported feature"
     );
 }
 
 #[test]
 fn encode_with_source_preserves_error_chain() {
-    let error = OpenAiSpecError::encode_with_source("encode failed", io::Error::other("boom"));
+    let error = OpenAiFamilyError::encode_with_source("encode failed", io::Error::other("boom"));
 
     let source = std::error::Error::source(&error).expect("source should be present");
     assert!(
@@ -1022,7 +1022,7 @@ fn encode_with_source_preserves_error_chain() {
 
 #[test]
 fn decode_constructor_has_no_source() {
-    let error = OpenAiSpecError::decode("decode failed");
+    let error = OpenAiFamilyError::decode("decode failed");
     assert!(
         std::error::Error::source(&error).is_none(),
         "decode constructor should not attach a source"

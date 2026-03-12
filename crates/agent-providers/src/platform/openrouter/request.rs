@@ -5,7 +5,7 @@ use agent_transport::HttpRequestOptions;
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
 use crate::openai_family::encode::{OpenAiEncodeInput, encode_openai_request_parts};
-use crate::openai_family::{OpenAiSpecError, OpenAiSpecErrorKind};
+use crate::openai_family::{OpenAiFamilyError, OpenAiFamilyErrorKind};
 use crate::request_plan::{ProviderRequestPlan, ProviderResponseKind, ProviderTransportKind};
 
 const WARN_IGNORED_TOP_P: &str = "openai.encode.ignored_top_p";
@@ -109,9 +109,9 @@ fn apply_openrouter_overrides(
     overrides: &OpenRouterOverrides,
     request_body: &mut Value,
     warnings: &mut Vec<RuntimeWarning>,
-) -> Result<(), OpenAiSpecError> {
+) -> Result<(), OpenAiFamilyError> {
     let body = request_body.as_object_mut().ok_or_else(|| {
-        OpenAiSpecError::protocol_violation("encoded request body must be an object")
+        OpenAiFamilyError::protocol_violation("encoded request body must be an object")
     })?;
 
     let mut mapped_top_p = false;
@@ -243,16 +243,16 @@ fn insert_optional_f32(
     body: &mut Map<String, Value>,
     key: &str,
     value: Option<f32>,
-) -> Result<(), OpenAiSpecError> {
+) -> Result<(), OpenAiFamilyError> {
     if let Some(value) = value {
         let number = serde_json::Number::from_f64(f64::from(value))
-            .ok_or_else(|| OpenAiSpecError::validation(format!("{key} must be finite")))?;
+            .ok_or_else(|| OpenAiFamilyError::validation(format!("{key} must be finite")))?;
         body.insert(key.to_string(), Value::Number(number));
     }
     Ok(())
 }
 
-fn map_openrouter_plan_error(error: OpenAiSpecError) -> AdapterError {
+fn map_openrouter_plan_error(error: OpenAiFamilyError) -> AdapterError {
     let message = error.message().to_string();
     AdapterError::with_source(
         map_spec_error_kind(error.kind()),
@@ -263,13 +263,13 @@ fn map_openrouter_plan_error(error: OpenAiSpecError) -> AdapterError {
     )
 }
 
-fn map_spec_error_kind(kind: OpenAiSpecErrorKind) -> AdapterErrorKind {
+fn map_spec_error_kind(kind: OpenAiFamilyErrorKind) -> AdapterErrorKind {
     match kind {
-        OpenAiSpecErrorKind::Validation => AdapterErrorKind::Validation,
-        OpenAiSpecErrorKind::Encode => AdapterErrorKind::Encode,
-        OpenAiSpecErrorKind::Decode => AdapterErrorKind::Decode,
-        OpenAiSpecErrorKind::Upstream => AdapterErrorKind::Upstream,
-        OpenAiSpecErrorKind::ProtocolViolation => AdapterErrorKind::ProtocolViolation,
-        OpenAiSpecErrorKind::UnsupportedFeature => AdapterErrorKind::UnsupportedFeature,
+        OpenAiFamilyErrorKind::Validation => AdapterErrorKind::Validation,
+        OpenAiFamilyErrorKind::Encode => AdapterErrorKind::Encode,
+        OpenAiFamilyErrorKind::Decode => AdapterErrorKind::Decode,
+        OpenAiFamilyErrorKind::Upstream => AdapterErrorKind::Upstream,
+        OpenAiFamilyErrorKind::ProtocolViolation => AdapterErrorKind::ProtocolViolation,
+        OpenAiFamilyErrorKind::UnsupportedFeature => AdapterErrorKind::UnsupportedFeature,
     }
 }
