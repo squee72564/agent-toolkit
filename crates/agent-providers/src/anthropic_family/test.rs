@@ -294,7 +294,10 @@ fn encode_rejects_invalid_tool_schema_or_name() {
     }];
     let empty_name_error =
         encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(empty_name_error.kind(), AnthropicFamilyErrorKind::Validation);
+    assert_eq!(
+        empty_name_error.kind(),
+        AnthropicFamilyErrorKind::Validation
+    );
     assert!(empty_name_error.message().contains("non-empty names"));
 
     request.tools = vec![ToolDefinition {
@@ -304,7 +307,10 @@ fn encode_rejects_invalid_tool_schema_or_name() {
     }];
     let bad_schema_error =
         encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(bad_schema_error.kind(), AnthropicFamilyErrorKind::Validation);
+    assert_eq!(
+        bad_schema_error.kind(),
+        AnthropicFamilyErrorKind::Validation
+    );
     assert!(bad_schema_error.message().contains("must be a JSON object"));
 }
 
@@ -1249,7 +1255,10 @@ fn encode_and_decode_error_variant_smoke() {
 #[test]
 fn anthropic_family_error_constructors_set_kind_and_message() {
     let validation_error = AnthropicFamilyError::validation("bad validation");
-    assert_eq!(validation_error.kind(), AnthropicFamilyErrorKind::Validation);
+    assert_eq!(
+        validation_error.kind(),
+        AnthropicFamilyErrorKind::Validation
+    );
     assert_eq!(validation_error.message(), "bad validation");
 
     let protocol_error = AnthropicFamilyError::protocol_violation("bad protocol");

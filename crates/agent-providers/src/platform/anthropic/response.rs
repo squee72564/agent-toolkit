@@ -1,7 +1,9 @@
 use agent_core::{Response, ResponseFormat};
 use serde_json::Value;
 
-use crate::anthropic_family::{AnthropicDecodeEnvelope, AnthropicFamilyError, AnthropicFamilyErrorKind};
+use crate::anthropic_family::{
+    AnthropicDecodeEnvelope, AnthropicFamilyError, AnthropicFamilyErrorKind,
+};
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
 
 pub(crate) fn decode_response_json(

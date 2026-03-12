@@ -978,7 +978,10 @@ fn error_kind_maps_for_all_variants() {
     assert_eq!(protocol.kind(), OpenAiFamilyErrorKind::ProtocolViolation);
 
     let unsupported = OpenAiFamilyError::unsupported_feature("unsupported feature");
-    assert_eq!(unsupported.kind(), OpenAiFamilyErrorKind::UnsupportedFeature);
+    assert_eq!(
+        unsupported.kind(),
+        OpenAiFamilyErrorKind::UnsupportedFeature
+    );
 }
 
 #[test]

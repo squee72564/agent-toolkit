@@ -246,7 +246,9 @@ fn map_system_prefix(
     Ok((system, remaining_messages))
 }
 
-fn map_non_system_messages(messages: Vec<Message>) -> Result<Vec<WireMessage>, AnthropicFamilyError> {
+fn map_non_system_messages(
+    messages: Vec<Message>,
+) -> Result<Vec<WireMessage>, AnthropicFamilyError> {
     let mut mapped = Vec::new();
     let mut seen_tool_call_ids = BTreeSet::new();
 

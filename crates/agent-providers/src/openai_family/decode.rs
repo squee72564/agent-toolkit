@@ -391,7 +391,9 @@ fn map_finish_reason(
         "cancelled" => Err(OpenAiFamilyError::decode(
             "openai response status is cancelled",
         )),
-        "failed" => Err(OpenAiFamilyError::decode("openai response status is failed")),
+        "failed" => Err(OpenAiFamilyError::decode(
+            "openai response status is failed",
+        )),
         "in_progress" | "queued" => Err(OpenAiFamilyError::decode(format!(
             "openai response status is non-terminal: {status}"
         ))),

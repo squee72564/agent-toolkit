@@ -27,7 +27,9 @@ pub(crate) struct OpenAiEncodeInput<'a> {
     pub(crate) metadata: BTreeMap<String, String>,
 }
 
-pub(crate) fn encode_openai_request(req: Request) -> Result<OpenAiEncodedRequest, OpenAiFamilyError> {
+pub(crate) fn encode_openai_request(
+    req: Request,
+) -> Result<OpenAiEncodedRequest, OpenAiFamilyError> {
     let Request {
         model_id,
         stream: _,
@@ -266,7 +268,10 @@ fn map_tool_definition(
         strict: Some(strict),
     })
     .map_err(|error| {
-        OpenAiFamilyError::encode_with_source("failed to serialize OpenAI-family tool payload", error)
+        OpenAiFamilyError::encode_with_source(
+            "failed to serialize OpenAI-family tool payload",
+            error,
+        )
     })
 }
 
