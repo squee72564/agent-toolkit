@@ -1,14 +1,14 @@
 use agent_core::{Response, ResponseFormat};
 use serde_json::Value;
 
-use crate::anthropic_spec::{AnthropicDecodeEnvelope, AnthropicSpecError, AnthropicSpecErrorKind};
+use crate::anthropic_family::{AnthropicDecodeEnvelope, AnthropicSpecError, AnthropicSpecErrorKind};
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
 
 pub(crate) fn decode_response_json(
     body: Value,
     requested_format: &ResponseFormat,
 ) -> Result<Response, AdapterError> {
-    crate::anthropic_spec::decode::decode_anthropic_response(&AnthropicDecodeEnvelope {
+    crate::anthropic_family::decode::decode_anthropic_response(&AnthropicDecodeEnvelope {
         body,
         requested_response_format: requested_format.clone(),
     })

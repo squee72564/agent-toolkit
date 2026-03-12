@@ -1247,7 +1247,7 @@ fn encode_and_decode_error_variant_smoke() {
 }
 
 #[test]
-fn anthropic_spec_error_constructors_set_kind_and_message() {
+fn anthropic_family_error_constructors_set_kind_and_message() {
     let validation_error = AnthropicSpecError::validation("bad validation");
     assert_eq!(validation_error.kind(), AnthropicSpecErrorKind::Validation);
     assert_eq!(validation_error.message(), "bad validation");
@@ -1269,7 +1269,7 @@ fn anthropic_spec_error_constructors_set_kind_and_message() {
 }
 
 #[test]
-fn anthropic_spec_error_encode_with_source_preserves_source_chain() {
+fn anthropic_family_error_encode_with_source_preserves_source_chain() {
     let encode_error =
         AnthropicSpecError::encode_with_source("failed to encode", std::io::Error::other("io"));
     assert_eq!(encode_error.kind(), AnthropicSpecErrorKind::Encode);
@@ -1280,7 +1280,7 @@ fn anthropic_spec_error_encode_with_source_preserves_source_chain() {
 }
 
 #[test]
-fn anthropic_spec_error_decode_variant_with_source_exposes_source() {
+fn anthropic_family_error_decode_variant_with_source_exposes_source() {
     let decode_error = AnthropicSpecError::Decode {
         message: "failed to decode".to_string(),
         source: Some(Box::new(std::io::Error::other("wire"))),
@@ -1293,7 +1293,7 @@ fn anthropic_spec_error_decode_variant_with_source_exposes_source() {
 }
 
 #[test]
-fn anthropic_spec_error_unsupported_feature_kind_and_message() {
+fn anthropic_family_error_unsupported_feature_kind_and_message() {
     let error = AnthropicSpecError::unsupported_feature("streaming tools");
     assert_eq!(error.kind(), AnthropicSpecErrorKind::UnsupportedFeature);
     assert_eq!(error.message(), "streaming tools");

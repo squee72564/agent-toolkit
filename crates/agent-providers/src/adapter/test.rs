@@ -8,7 +8,7 @@ use agent_core::types::{
     ResponseFormat, ToolChoice,
 };
 
-use crate::anthropic_spec::AnthropicDecodeEnvelope;
+use crate::anthropic_family::AnthropicDecodeEnvelope;
 use crate::openai_family::OpenAiDecodeEnvelope;
 use crate::platform::anthropic::{request as anthropic_request, response as anthropic_response};
 use crate::platform::openai::{request as openai_request, response as openai_response};

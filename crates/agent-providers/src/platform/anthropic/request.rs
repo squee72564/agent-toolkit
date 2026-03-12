@@ -1,13 +1,13 @@
 use agent_core::Request;
 use agent_transport::HttpRequestOptions;
 
-use crate::anthropic_spec::{AnthropicSpecError, AnthropicSpecErrorKind};
+use crate::anthropic_family::{AnthropicSpecError, AnthropicSpecErrorKind};
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
 use crate::request_plan::{ProviderRequestPlan, ProviderResponseKind, ProviderTransportKind};
 
 pub(crate) fn plan_request(req: Request) -> Result<ProviderRequestPlan, AdapterError> {
     let is_stream = req.stream;
-    let encoded = crate::anthropic_spec::encode::encode_anthropic_request(req)
+    let encoded = crate::anthropic_family::encode::encode_anthropic_request(req)
         .map_err(map_anthropic_plan_error)?;
     let mut body = encoded.body;
     if is_stream {
