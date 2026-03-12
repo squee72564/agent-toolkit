@@ -14,7 +14,7 @@ use super::encode::encode_anthropic_request;
 use super::schema_rules::{
     canonicalize_json, extract_first_json_object, permissive_json_object_schema, stable_json_string,
 };
-use super::{AnthropicDecodeEnvelope, AnthropicSpecError, AnthropicSpecErrorKind};
+use super::{AnthropicDecodeEnvelope, AnthropicFamilyError, AnthropicFamilyErrorKind};
 
 fn base_request(messages: Vec<Message>) -> Request {
     Request {
@@ -254,7 +254,7 @@ fn encode_rejects_non_prefix_system_message() {
     ]);
 
     let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Validation);
     assert!(error.message().contains("contiguous prefix"));
 }
 
@@ -271,7 +271,7 @@ fn encode_rejects_bad_tool_choice() {
     };
 
     let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Validation);
     assert!(
         error
             .message()
@@ -294,7 +294,7 @@ fn encode_rejects_invalid_tool_schema_or_name() {
     }];
     let empty_name_error =
         encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(empty_name_error.kind(), AnthropicSpecErrorKind::Validation);
+    assert_eq!(empty_name_error.kind(), AnthropicFamilyErrorKind::Validation);
     assert!(empty_name_error.message().contains("non-empty names"));
 
     request.tools = vec![ToolDefinition {
@@ -304,7 +304,7 @@ fn encode_rejects_invalid_tool_schema_or_name() {
     }];
     let bad_schema_error =
         encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(bad_schema_error.kind(), AnthropicSpecErrorKind::Validation);
+    assert_eq!(bad_schema_error.kind(), AnthropicFamilyErrorKind::Validation);
     assert!(bad_schema_error.message().contains("must be a JSON object"));
 }
 
@@ -319,7 +319,7 @@ fn encode_rejects_temperature_out_of_range() {
     request.temperature = Some(1.1);
 
     let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Validation);
     assert!(
         error
             .message()
@@ -338,7 +338,7 @@ fn encode_rejects_top_p_out_of_range() {
     request.top_p = Some(-0.1);
 
     let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Validation);
     assert!(error.message().contains("top_p must be in [0.0, 1.0]"));
 }
 
@@ -353,7 +353,7 @@ fn encode_rejects_zero_max_output_tokens() {
     request.max_output_tokens = Some(0);
 
     let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Validation);
     assert!(
         error
             .message()
@@ -372,7 +372,7 @@ fn encode_rejects_empty_stop_sequence() {
     request.stop = vec!["".to_string()];
 
     let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Validation);
     assert!(error.message().contains("must not contain empty strings"));
 }
 
@@ -400,7 +400,7 @@ fn encode_rejects_tool_result_before_tool_call() {
     ]);
 
     let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::ProtocolViolation);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::ProtocolViolation);
     assert!(error.message().contains("unknown tool_call_id"));
 }
 
@@ -418,7 +418,7 @@ fn encode_rejects_empty_tool_call_id() {
     }]);
 
     let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Validation);
     assert!(error.message().contains("non-empty tool_call id"));
 }
 
@@ -436,7 +436,7 @@ fn encode_rejects_empty_tool_call_name() {
     }]);
 
     let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Validation);
     assert!(error.message().contains("non-empty tool_call name"));
 }
 
@@ -468,7 +468,7 @@ fn encode_rejects_empty_tool_result_tool_call_id() {
     ]);
 
     let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Validation);
     assert!(error.message().contains("non-empty tool_call_id"));
 }
 
@@ -495,7 +495,7 @@ fn encode_rejects_duplicate_tool_call_ids() {
     }]);
 
     let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::ProtocolViolation);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::ProtocolViolation);
     assert!(
         error
             .message()
@@ -517,7 +517,7 @@ fn encode_rejects_non_object_tool_call_arguments_json() {
     }]);
 
     let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Validation);
     assert!(
         error
             .message()
@@ -559,7 +559,7 @@ fn encode_rejects_non_text_tool_result_parts() {
     ]);
 
     let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Validation);
     assert!(error.message().contains("must contain only text parts"));
 }
 
@@ -582,7 +582,7 @@ fn encode_rejects_structured_output_with_assistant_prefill() {
     request.response_format = ResponseFormat::JsonObject;
 
     let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Validation);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Validation);
     assert!(error.message().contains("assistant-prefill"));
 }
 
@@ -804,7 +804,7 @@ fn decode_rejects_malformed_payload() {
     };
 
     let error = decode_anthropic_response(&payload).expect_err("decode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Decode);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Decode);
     assert!(error.message().contains("JSON object"));
 }
 
@@ -820,7 +820,7 @@ fn decode_rejects_missing_required_fields() {
     };
 
     let error = decode_anthropic_response(&payload).expect_err("decode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Decode);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Decode);
     assert!(error.message().contains("missing stop_reason"));
 }
 
@@ -843,7 +843,7 @@ fn decode_rejects_non_object_tool_use_input() {
     };
 
     let error = decode_anthropic_response(&payload).expect_err("decode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Decode);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Decode);
     assert!(error.message().contains("must be a JSON object"));
 }
 
@@ -941,7 +941,7 @@ fn decode_rejects_non_object_usage() {
     };
 
     let error = decode_anthropic_response(&payload).expect_err("decode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Decode);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Decode);
     assert!(error.message().contains("usage must be a JSON object"));
 }
 
@@ -962,7 +962,7 @@ fn decode_rejects_non_numeric_usage_field() {
     };
 
     let error = decode_anthropic_response(&payload).expect_err("decode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Decode);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Decode);
     assert!(error.message().contains("must be numeric"));
 }
 
@@ -983,7 +983,7 @@ fn decode_rejects_signed_usage_field() {
     };
 
     let error = decode_anthropic_response(&payload).expect_err("decode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Decode);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Decode);
     assert!(error.message().contains("must be an unsigned integer"));
 }
 
@@ -1159,7 +1159,7 @@ fn decode_top_level_upstream_error_parsing_and_formatting() {
     };
 
     let error = decode_anthropic_response(&payload).expect_err("decode should fail");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::Upstream);
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Upstream);
     assert!(error.message().contains("anthropic error:"));
     assert!(error.message().contains("type=invalid_request_error"));
     assert!(error.message().contains("request_id=req_123"));
@@ -1231,7 +1231,7 @@ fn encode_and_decode_error_variant_smoke() {
     let encode_error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
     assert!(matches!(
         encode_error,
-        AnthropicSpecError::Validation { .. } | AnthropicSpecError::ProtocolViolation { .. }
+        AnthropicFamilyError::Validation { .. } | AnthropicFamilyError::ProtocolViolation { .. }
     ));
 
     let payload = AnthropicDecodeEnvelope {
@@ -1243,36 +1243,36 @@ fn encode_and_decode_error_variant_smoke() {
         requested_response_format: ResponseFormat::Text,
     };
     let decode_error = decode_anthropic_response(&payload).expect_err("decode should fail");
-    assert_eq!(decode_error.kind(), AnthropicSpecErrorKind::Decode);
+    assert_eq!(decode_error.kind(), AnthropicFamilyErrorKind::Decode);
 }
 
 #[test]
 fn anthropic_family_error_constructors_set_kind_and_message() {
-    let validation_error = AnthropicSpecError::validation("bad validation");
-    assert_eq!(validation_error.kind(), AnthropicSpecErrorKind::Validation);
+    let validation_error = AnthropicFamilyError::validation("bad validation");
+    assert_eq!(validation_error.kind(), AnthropicFamilyErrorKind::Validation);
     assert_eq!(validation_error.message(), "bad validation");
 
-    let protocol_error = AnthropicSpecError::protocol_violation("bad protocol");
+    let protocol_error = AnthropicFamilyError::protocol_violation("bad protocol");
     assert_eq!(
         protocol_error.kind(),
-        AnthropicSpecErrorKind::ProtocolViolation
+        AnthropicFamilyErrorKind::ProtocolViolation
     );
     assert_eq!(protocol_error.message(), "bad protocol");
 
-    let decode_error = AnthropicSpecError::decode("bad decode");
-    assert_eq!(decode_error.kind(), AnthropicSpecErrorKind::Decode);
+    let decode_error = AnthropicFamilyError::decode("bad decode");
+    assert_eq!(decode_error.kind(), AnthropicFamilyErrorKind::Decode);
     assert_eq!(decode_error.message(), "bad decode");
 
-    let upstream_error = AnthropicSpecError::upstream("bad upstream");
-    assert_eq!(upstream_error.kind(), AnthropicSpecErrorKind::Upstream);
+    let upstream_error = AnthropicFamilyError::upstream("bad upstream");
+    assert_eq!(upstream_error.kind(), AnthropicFamilyErrorKind::Upstream);
     assert_eq!(upstream_error.message(), "bad upstream");
 }
 
 #[test]
 fn anthropic_family_error_encode_with_source_preserves_source_chain() {
     let encode_error =
-        AnthropicSpecError::encode_with_source("failed to encode", std::io::Error::other("io"));
-    assert_eq!(encode_error.kind(), AnthropicSpecErrorKind::Encode);
+        AnthropicFamilyError::encode_with_source("failed to encode", std::io::Error::other("io"));
+    assert_eq!(encode_error.kind(), AnthropicFamilyErrorKind::Encode);
     assert_eq!(encode_error.message(), "failed to encode");
 
     let source = std::error::Error::source(&encode_error).expect("source should exist");
@@ -1281,11 +1281,11 @@ fn anthropic_family_error_encode_with_source_preserves_source_chain() {
 
 #[test]
 fn anthropic_family_error_decode_variant_with_source_exposes_source() {
-    let decode_error = AnthropicSpecError::Decode {
+    let decode_error = AnthropicFamilyError::Decode {
         message: "failed to decode".to_string(),
         source: Some(Box::new(std::io::Error::other("wire"))),
     };
-    assert_eq!(decode_error.kind(), AnthropicSpecErrorKind::Decode);
+    assert_eq!(decode_error.kind(), AnthropicFamilyErrorKind::Decode);
     assert_eq!(decode_error.message(), "failed to decode");
 
     let source = std::error::Error::source(&decode_error).expect("source should exist");
@@ -1294,8 +1294,8 @@ fn anthropic_family_error_decode_variant_with_source_exposes_source() {
 
 #[test]
 fn anthropic_family_error_unsupported_feature_kind_and_message() {
-    let error = AnthropicSpecError::unsupported_feature("streaming tools");
-    assert_eq!(error.kind(), AnthropicSpecErrorKind::UnsupportedFeature);
+    let error = AnthropicFamilyError::unsupported_feature("streaming tools");
+    assert_eq!(error.kind(), AnthropicFamilyErrorKind::UnsupportedFeature);
     assert_eq!(error.message(), "streaming tools");
 }
 

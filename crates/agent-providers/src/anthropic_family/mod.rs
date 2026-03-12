@@ -40,7 +40,7 @@ pub(crate) struct AnthropicErrorEnvelope {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AnthropicSpecErrorKind {
+pub enum AnthropicFamilyErrorKind {
     /// Caller input is invalid for the Anthropic wire contract.
     Validation,
     /// Encoding a request payload failed.
@@ -57,7 +57,7 @@ pub enum AnthropicSpecErrorKind {
 
 /// Anthropic wire-format error used inside provider translations.
 #[derive(Debug, Error)]
-pub enum AnthropicSpecError {
+pub enum AnthropicFamilyError {
     #[error("validation error: {message}")]
     Validation { message: String },
     #[error("encode error: {message}")]
@@ -81,7 +81,7 @@ pub enum AnthropicSpecError {
     UnsupportedFeature { message: String },
 }
 
-impl AnthropicSpecError {
+impl AnthropicFamilyError {
     #[must_use]
     pub(crate) fn validation(message: impl Into<String>) -> Self {
         Self::Validation {
@@ -132,14 +132,14 @@ impl AnthropicSpecError {
     }
 
     #[must_use]
-    pub(crate) fn kind(&self) -> AnthropicSpecErrorKind {
+    pub(crate) fn kind(&self) -> AnthropicFamilyErrorKind {
         match self {
-            Self::Validation { .. } => AnthropicSpecErrorKind::Validation,
-            Self::Encode { .. } => AnthropicSpecErrorKind::Encode,
-            Self::Decode { .. } => AnthropicSpecErrorKind::Decode,
-            Self::Upstream { .. } => AnthropicSpecErrorKind::Upstream,
-            Self::ProtocolViolation { .. } => AnthropicSpecErrorKind::ProtocolViolation,
-            Self::UnsupportedFeature { .. } => AnthropicSpecErrorKind::UnsupportedFeature,
+            Self::Validation { .. } => AnthropicFamilyErrorKind::Validation,
+            Self::Encode { .. } => AnthropicFamilyErrorKind::Encode,
+            Self::Decode { .. } => AnthropicFamilyErrorKind::Decode,
+            Self::Upstream { .. } => AnthropicFamilyErrorKind::Upstream,
+            Self::ProtocolViolation { .. } => AnthropicFamilyErrorKind::ProtocolViolation,
+            Self::UnsupportedFeature { .. } => AnthropicFamilyErrorKind::UnsupportedFeature,
         }
     }
 

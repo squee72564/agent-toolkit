@@ -5,7 +5,7 @@ use agent_core::types::{
 };
 
 use super::schema_rules::{canonicalize_json, extract_first_json_object, stable_json_string};
-use super::{AnthropicDecodeEnvelope, AnthropicErrorEnvelope, AnthropicSpecError};
+use super::{AnthropicDecodeEnvelope, AnthropicErrorEnvelope, AnthropicFamilyError};
 
 const WARN_UNKNOWN_CONTENT_BLOCK_MAPPED: &str =
     "anthropic.decode.unknown_content_block_mapped_to_text";
@@ -19,14 +19,14 @@ const WARN_STRUCTURED_OUTPUT_PARSE_FAILED: &str = "anthropic.decode.structured_o
 
 pub(crate) fn decode_anthropic_response(
     payload: &AnthropicDecodeEnvelope,
-) -> Result<Response, AnthropicSpecError> {
+) -> Result<Response, AnthropicFamilyError> {
     let root = payload
         .body
         .as_object()
-        .ok_or_else(|| AnthropicSpecError::decode("response payload must be a JSON object"))?;
+        .ok_or_else(|| AnthropicFamilyError::decode("response payload must be a JSON object"))?;
 
     if let Some(error) = parse_anthropic_error_value(root) {
-        return Err(AnthropicSpecError::upstream(
+        return Err(AnthropicFamilyError::upstream(
             format_anthropic_error_message(&error),
         ));
     }
@@ -40,9 +40,9 @@ pub(crate) fn decode_anthropic_response(
     let role = root
         .get("role")
         .and_then(Value::as_str)
-        .ok_or_else(|| AnthropicSpecError::decode("anthropic response missing role"))?;
+        .ok_or_else(|| AnthropicFamilyError::decode("anthropic response missing role"))?;
     if role != "assistant" {
-        return Err(AnthropicSpecError::decode(format!(
+        return Err(AnthropicFamilyError::decode(format!(
             "anthropic response role must be assistant, got {role}",
         )));
     }
@@ -50,9 +50,9 @@ pub(crate) fn decode_anthropic_response(
     let stop_reason = root
         .get("stop_reason")
         .and_then(Value::as_str)
-        .ok_or_else(|| AnthropicSpecError::decode("anthropic response missing stop_reason"))?;
+        .ok_or_else(|| AnthropicFamilyError::decode("anthropic response missing stop_reason"))?;
     if stop_reason.is_empty() {
-        return Err(AnthropicSpecError::decode(
+        return Err(AnthropicFamilyError::decode(
             "anthropic stop_reason must not be empty",
         ));
     }
@@ -60,7 +60,7 @@ pub(crate) fn decode_anthropic_response(
     let content_blocks = root
         .get("content")
         .and_then(Value::as_array)
-        .ok_or_else(|| AnthropicSpecError::decode("anthropic response missing content array"))?;
+        .ok_or_else(|| AnthropicFamilyError::decode("anthropic response missing content array"))?;
 
     let mut warnings = Vec::new();
     let mut content = Vec::new();
@@ -162,21 +162,21 @@ fn decode_content_block(
     content: &mut Vec<ContentPart>,
     text_blocks: &mut Vec<String>,
     warnings: &mut Vec<RuntimeWarning>,
-) -> Result<(), AnthropicSpecError> {
+) -> Result<(), AnthropicFamilyError> {
     let block_obj = block
         .as_object()
-        .ok_or_else(|| AnthropicSpecError::decode("anthropic content block must be object"))?;
+        .ok_or_else(|| AnthropicFamilyError::decode("anthropic content block must be object"))?;
     let block_type = block_obj
         .get("type")
         .and_then(Value::as_str)
-        .ok_or_else(|| AnthropicSpecError::decode("anthropic content block missing type"))?;
+        .ok_or_else(|| AnthropicFamilyError::decode("anthropic content block missing type"))?;
 
     match block_type {
         "text" => {
             let text = block_obj
                 .get("text")
                 .and_then(Value::as_str)
-                .ok_or_else(|| AnthropicSpecError::decode("text content block missing text"))?;
+                .ok_or_else(|| AnthropicFamilyError::decode("text content block missing text"))?;
             text_blocks.push(text.to_string());
             content.push(ContentPart::Text {
                 text: text.to_string(),
@@ -187,17 +187,17 @@ fn decode_content_block(
             let id = block_obj
                 .get("id")
                 .and_then(Value::as_str)
-                .ok_or_else(|| AnthropicSpecError::decode("tool_use block missing id"))?;
+                .ok_or_else(|| AnthropicFamilyError::decode("tool_use block missing id"))?;
             let name = block_obj
                 .get("name")
                 .and_then(Value::as_str)
-                .ok_or_else(|| AnthropicSpecError::decode("tool_use block missing name"))?;
+                .ok_or_else(|| AnthropicFamilyError::decode("tool_use block missing name"))?;
             let input = block_obj
                 .get("input")
-                .ok_or_else(|| AnthropicSpecError::decode("tool_use block missing input"))?
+                .ok_or_else(|| AnthropicFamilyError::decode("tool_use block missing input"))?
                 .clone();
             if !input.is_object() {
-                return Err(AnthropicSpecError::decode(
+                return Err(AnthropicFamilyError::decode(
                     "tool_use input must be a JSON object",
                 ));
             }
@@ -293,7 +293,7 @@ fn decode_structured_output(
 fn decode_usage(
     usage_value: Option<&Value>,
     warnings: &mut Vec<RuntimeWarning>,
-) -> Result<Usage, AnthropicSpecError> {
+) -> Result<Usage, AnthropicFamilyError> {
     let Some(usage_value) = usage_value else {
         push_warning(
             warnings,
@@ -305,7 +305,7 @@ fn decode_usage(
 
     let usage_obj = usage_value
         .as_object()
-        .ok_or_else(|| AnthropicSpecError::decode("anthropic usage must be a JSON object"))?;
+        .ok_or_else(|| AnthropicFamilyError::decode("anthropic usage must be a JSON object"))?;
 
     let input_tokens = parse_usage_u64(usage_obj.get("input_tokens"), "input_tokens")?;
     let cache_creation_input_tokens = parse_usage_u64(
@@ -362,18 +362,18 @@ fn decode_usage(
 fn parse_usage_u64(
     value: Option<&Value>,
     field_name: &str,
-) -> Result<Option<u64>, AnthropicSpecError> {
+) -> Result<Option<u64>, AnthropicFamilyError> {
     match value {
         None => Ok(None),
         Some(Value::Number(number)) => number
             .as_u64()
             .ok_or_else(|| {
-                AnthropicSpecError::decode(format!(
+                AnthropicFamilyError::decode(format!(
                     "anthropic usage field '{field_name}' must be an unsigned integer",
                 ))
             })
             .map(Some),
-        Some(_) => Err(AnthropicSpecError::decode(format!(
+        Some(_) => Err(AnthropicFamilyError::decode(format!(
             "anthropic usage field '{field_name}' must be numeric",
         ))),
     }

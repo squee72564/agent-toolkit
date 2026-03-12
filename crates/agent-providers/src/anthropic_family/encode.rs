@@ -8,7 +8,7 @@ use agent_core::types::{
 };
 
 use super::schema_rules::{canonicalize_json, permissive_json_object_schema, stable_json_string};
-use super::{AnthropicEncodedRequest, AnthropicSpecError};
+use super::{AnthropicEncodedRequest, AnthropicFamilyError};
 
 const DEFAULT_MAX_TOKENS: u32 = 1024;
 
@@ -34,7 +34,7 @@ impl WireMessage {
 
 pub(crate) fn encode_anthropic_request(
     req: Request,
-) -> Result<AnthropicEncodedRequest, AnthropicSpecError> {
+) -> Result<AnthropicEncodedRequest, AnthropicFamilyError> {
     validate_request(&req)?;
 
     let mut warnings = Vec::new();
@@ -66,7 +66,7 @@ pub(crate) fn encode_anthropic_request(
     validate_tool_ordering(&merged_messages)?;
 
     if merged_messages.is_empty() {
-        return Err(AnthropicSpecError::validation("empty messages"));
+        return Err(AnthropicFamilyError::validation("empty messages"));
     }
 
     // Validate tool_choice against the original tool definitions before consuming them.
@@ -130,13 +130,13 @@ pub(crate) fn encode_anthropic_request(
     })
 }
 
-fn validate_request(req: &Request) -> Result<(), AnthropicSpecError> {
+fn validate_request(req: &Request) -> Result<(), AnthropicFamilyError> {
     if req.model_id.trim().is_empty() {
-        return Err(AnthropicSpecError::validation("missing model_id"));
+        return Err(AnthropicFamilyError::validation("missing model_id"));
     }
 
     if req.max_output_tokens == Some(0) {
-        return Err(AnthropicSpecError::validation(
+        return Err(AnthropicFamilyError::validation(
             "max_output_tokens must be at least 1 for Anthropic",
         ));
     }
@@ -144,7 +144,7 @@ fn validate_request(req: &Request) -> Result<(), AnthropicSpecError> {
     if let Some(temperature) = req.temperature
         && !(0.0..=1.0).contains(&temperature)
     {
-        return Err(AnthropicSpecError::validation(format!(
+        return Err(AnthropicFamilyError::validation(format!(
             "temperature must be in [0.0, 1.0], got {temperature}",
         )));
     }
@@ -152,14 +152,14 @@ fn validate_request(req: &Request) -> Result<(), AnthropicSpecError> {
     if let Some(top_p) = req.top_p
         && !(0.0..=1.0).contains(&top_p)
     {
-        return Err(AnthropicSpecError::validation(format!(
+        return Err(AnthropicFamilyError::validation(format!(
             "top_p must be in [0.0, 1.0], got {top_p}",
         )));
     }
 
     for stop in &req.stop {
         if stop.is_empty() {
-            return Err(AnthropicSpecError::validation(
+            return Err(AnthropicFamilyError::validation(
                 "stop sequences must not contain empty strings",
             ));
         }
@@ -170,16 +170,16 @@ fn validate_request(req: &Request) -> Result<(), AnthropicSpecError> {
     Ok(())
 }
 
-fn validate_tool_choice(req: &Request) -> Result<(), AnthropicSpecError> {
+fn validate_tool_choice(req: &Request) -> Result<(), AnthropicFamilyError> {
     if req.tools.is_empty() {
         if matches!(req.tool_choice, ToolChoice::Required) {
-            return Err(AnthropicSpecError::validation(
+            return Err(AnthropicFamilyError::validation(
                 "tool_choice 'required' requires at least one tool definition",
             ));
         }
 
         if matches!(req.tool_choice, ToolChoice::Specific { .. }) {
-            return Err(AnthropicSpecError::validation(
+            return Err(AnthropicFamilyError::validation(
                 "tool_choice 'specific' requires at least one tool definition",
             ));
         }
@@ -187,12 +187,12 @@ fn validate_tool_choice(req: &Request) -> Result<(), AnthropicSpecError> {
 
     if let ToolChoice::Specific { name } = &req.tool_choice {
         if name.trim().is_empty() {
-            return Err(AnthropicSpecError::validation(
+            return Err(AnthropicFamilyError::validation(
                 "tool_choice specific requires a non-empty tool name",
             ));
         }
         if !req.tools.iter().any(|tool| tool.name == *name) {
-            return Err(AnthropicSpecError::validation(format!(
+            return Err(AnthropicFamilyError::validation(format!(
                 "tool_choice specific references unknown tool: {name}",
             )));
         }
@@ -203,7 +203,7 @@ fn validate_tool_choice(req: &Request) -> Result<(), AnthropicSpecError> {
 
 fn map_system_prefix(
     messages: Vec<Message>,
-) -> Result<(Option<Vec<Value>>, Vec<Message>), AnthropicSpecError> {
+) -> Result<(Option<Vec<Value>>, Vec<Message>), AnthropicFamilyError> {
     let mut system_blocks = Vec::new();
     let mut remaining_messages = Vec::new();
     let mut non_system_started = false;
@@ -211,7 +211,7 @@ fn map_system_prefix(
     for message in messages {
         let Message { role, content } = message;
         if role == MessageRole::System && non_system_started {
-            return Err(AnthropicSpecError::validation(
+            return Err(AnthropicFamilyError::validation(
                 "system messages must form a contiguous prefix for Anthropic",
             ));
         }
@@ -224,7 +224,7 @@ fn map_system_prefix(
                         "text": text,
                     })),
                     _ => {
-                        return Err(AnthropicSpecError::validation(
+                        return Err(AnthropicFamilyError::validation(
                             "system messages only support text content",
                         ));
                     }
@@ -246,7 +246,7 @@ fn map_system_prefix(
     Ok((system, remaining_messages))
 }
 
-fn map_non_system_messages(messages: Vec<Message>) -> Result<Vec<WireMessage>, AnthropicSpecError> {
+fn map_non_system_messages(messages: Vec<Message>) -> Result<Vec<WireMessage>, AnthropicFamilyError> {
     let mut mapped = Vec::new();
     let mut seen_tool_call_ids = BTreeSet::new();
 
@@ -264,7 +264,7 @@ fn map_non_system_messages(messages: Vec<Message>) -> Result<Vec<WireMessage>, A
             match part {
                 ContentPart::Text { text } => {
                     if role == MessageRole::Tool {
-                        return Err(AnthropicSpecError::validation(
+                        return Err(AnthropicFamilyError::validation(
                             "tool messages must contain tool_result content only",
                         ));
                     }
@@ -276,31 +276,31 @@ fn map_non_system_messages(messages: Vec<Message>) -> Result<Vec<WireMessage>, A
                 }
                 ContentPart::ToolCall { tool_call } => {
                     if role != MessageRole::Assistant {
-                        return Err(AnthropicSpecError::validation(
+                        return Err(AnthropicFamilyError::validation(
                             "tool_call content is only valid in assistant messages",
                         ));
                     }
                     let tool_call_id = tool_call.id;
                     if tool_call_id.trim().is_empty() {
-                        return Err(AnthropicSpecError::validation(
+                        return Err(AnthropicFamilyError::validation(
                             "tool_call content requires a non-empty tool_call id",
                         ));
                     }
                     let tool_call_name = tool_call.name;
                     if tool_call_name.trim().is_empty() {
-                        return Err(AnthropicSpecError::validation(
+                        return Err(AnthropicFamilyError::validation(
                             "tool_call content requires a non-empty tool_call name",
                         ));
                     }
                     if !tool_call.arguments_json.is_object() {
-                        return Err(AnthropicSpecError::validation(format!(
+                        return Err(AnthropicFamilyError::validation(format!(
                             "tool_call '{}' arguments_json must be a JSON object",
                             tool_call_name
                         )));
                     }
 
                     if !seen_tool_call_ids.insert(tool_call_id.clone()) {
-                        return Err(AnthropicSpecError::protocol_violation(format!(
+                        return Err(AnthropicFamilyError::protocol_violation(format!(
                             "duplicate assistant tool_call id '{}'",
                             tool_call_id
                         )));
@@ -314,18 +314,18 @@ fn map_non_system_messages(messages: Vec<Message>) -> Result<Vec<WireMessage>, A
                 }
                 ContentPart::ToolResult { tool_result } => {
                     if role != MessageRole::Tool {
-                        return Err(AnthropicSpecError::validation(
+                        return Err(AnthropicFamilyError::validation(
                             "tool_result content is only valid in tool messages",
                         ));
                     }
                     let tool_call_id = tool_result.tool_call_id;
                     if tool_call_id.trim().is_empty() {
-                        return Err(AnthropicSpecError::validation(
+                        return Err(AnthropicFamilyError::validation(
                             "tool_result content requires a non-empty tool_call_id",
                         ));
                     }
                     if !seen_tool_call_ids.contains(&tool_call_id) {
-                        return Err(AnthropicSpecError::protocol_violation(format!(
+                        return Err(AnthropicFamilyError::protocol_violation(format!(
                             "tool_result references unknown tool_call_id: {}",
                             tool_call_id
                         )));
@@ -342,7 +342,7 @@ fn map_non_system_messages(messages: Vec<Message>) -> Result<Vec<WireMessage>, A
         }
 
         if blocks.is_empty() {
-            return Err(AnthropicSpecError::validation(
+            return Err(AnthropicFamilyError::validation(
                 "message content must contain at least one encodable part",
             ));
         }
@@ -358,7 +358,7 @@ fn map_non_system_messages(messages: Vec<Message>) -> Result<Vec<WireMessage>, A
 
 fn tool_result_content_as_text_blocks(
     content: ToolResultContent,
-) -> Result<Vec<Value>, AnthropicSpecError> {
+) -> Result<Vec<Value>, AnthropicFamilyError> {
     match content {
         ToolResultContent::Text { text } => Ok(vec![json!({
             "type": "text",
@@ -377,7 +377,7 @@ fn tool_result_content_as_text_blocks(
                         "text": text,
                     })),
                     _ => {
-                        return Err(AnthropicSpecError::validation(
+                        return Err(AnthropicFamilyError::validation(
                             "tool_result parts content must contain only text parts",
                         ));
                     }
@@ -433,7 +433,7 @@ fn reorder_user_content_tool_results_first(content: &mut Vec<Value>) {
     content.extend(other_blocks);
 }
 
-fn validate_tool_ordering(messages: &[WireMessage]) -> Result<(), AnthropicSpecError> {
+fn validate_tool_ordering(messages: &[WireMessage]) -> Result<(), AnthropicFamilyError> {
     for (index, message) in messages.iter().enumerate() {
         if message.role != "assistant" {
             continue;
@@ -456,13 +456,13 @@ fn validate_tool_ordering(messages: &[WireMessage]) -> Result<(), AnthropicSpecE
         }
 
         let Some(next_message) = messages.get(index + 1) else {
-            return Err(AnthropicSpecError::protocol_violation(
+            return Err(AnthropicFamilyError::protocol_violation(
                 "assistant tool_use requires a following user tool_result message",
             ));
         };
 
         if next_message.role != "user" {
-            return Err(AnthropicSpecError::protocol_violation(
+            return Err(AnthropicFamilyError::protocol_violation(
                 "assistant tool_use must be followed by a user message containing tool_result blocks",
             ));
         }
@@ -470,12 +470,12 @@ fn validate_tool_ordering(messages: &[WireMessage]) -> Result<(), AnthropicSpecE
         let mut prefix_tool_result_ids = Vec::new();
         for block in &next_message.content {
             let Some(block_obj) = block.as_object() else {
-                return Err(AnthropicSpecError::protocol_violation(
+                return Err(AnthropicFamilyError::protocol_violation(
                     "anthropic user content block must be object",
                 ));
             };
             let Some(block_type) = block_obj.get("type").and_then(Value::as_str) else {
-                return Err(AnthropicSpecError::protocol_violation(
+                return Err(AnthropicFamilyError::protocol_violation(
                     "anthropic user content block missing type",
                 ));
             };
@@ -484,7 +484,7 @@ fn validate_tool_ordering(messages: &[WireMessage]) -> Result<(), AnthropicSpecE
                 break;
             }
             let Some(tool_use_id) = block_obj.get("tool_use_id").and_then(Value::as_str) else {
-                return Err(AnthropicSpecError::protocol_violation(
+                return Err(AnthropicFamilyError::protocol_violation(
                     "tool_result block missing tool_use_id",
                 ));
             };
@@ -492,14 +492,14 @@ fn validate_tool_ordering(messages: &[WireMessage]) -> Result<(), AnthropicSpecE
         }
 
         if prefix_tool_result_ids.is_empty() {
-            return Err(AnthropicSpecError::protocol_violation(
+            return Err(AnthropicFamilyError::protocol_violation(
                 "assistant tool_use requires tool_result blocks at the start of the next user message",
             ));
         }
 
         for pending_id in pending_tool_ids {
             if !prefix_tool_result_ids.iter().any(|id| id == &pending_id) {
-                return Err(AnthropicSpecError::protocol_violation(format!(
+                return Err(AnthropicFamilyError::protocol_violation(format!(
                     "missing tool_result for assistant tool_use id '{pending_id}' in following user message",
                 )));
             }
@@ -509,14 +509,14 @@ fn validate_tool_ordering(messages: &[WireMessage]) -> Result<(), AnthropicSpecE
     Ok(())
 }
 
-fn map_tools(tools: Vec<ToolDefinition>) -> Result<Vec<Value>, AnthropicSpecError> {
+fn map_tools(tools: Vec<ToolDefinition>) -> Result<Vec<Value>, AnthropicFamilyError> {
     tools
         .into_iter()
         .map(map_tool_definition)
         .collect::<Result<Vec<_>, _>>()
 }
 
-fn map_tool_definition(tool: ToolDefinition) -> Result<Value, AnthropicSpecError> {
+fn map_tool_definition(tool: ToolDefinition) -> Result<Value, AnthropicFamilyError> {
     let ToolDefinition {
         name,
         description,
@@ -524,18 +524,18 @@ fn map_tool_definition(tool: ToolDefinition) -> Result<Value, AnthropicSpecError
     } = tool;
 
     if name.trim().is_empty() {
-        return Err(AnthropicSpecError::validation(
+        return Err(AnthropicFamilyError::validation(
             "tool definitions require non-empty names",
         ));
     }
     if name.chars().count() > 128 {
-        return Err(AnthropicSpecError::validation(format!(
+        return Err(AnthropicFamilyError::validation(format!(
             "tool '{}' name exceeds 128 characters",
             name
         )));
     }
     if !parameters_schema.is_object() {
-        return Err(AnthropicSpecError::validation(format!(
+        return Err(AnthropicFamilyError::validation(format!(
             "tool '{}' parameters_schema must be a JSON object",
             name
         )));
@@ -554,19 +554,19 @@ fn map_tool_definition(tool: ToolDefinition) -> Result<Value, AnthropicSpecError
 fn map_tool_choice(
     tools: &[ToolDefinition],
     tool_choice: &ToolChoice,
-) -> Result<Value, AnthropicSpecError> {
+) -> Result<Value, AnthropicFamilyError> {
     match tool_choice {
         ToolChoice::None => Ok(json!({ "type": "none" })),
         ToolChoice::Auto => Ok(json!({ "type": "auto" })),
         ToolChoice::Required => Ok(json!({ "type": "any" })),
         ToolChoice::Specific { name } => {
             if name.trim().is_empty() {
-                return Err(AnthropicSpecError::validation(
+                return Err(AnthropicFamilyError::validation(
                     "tool_choice specific requires a non-empty tool name",
                 ));
             }
             if !tools.iter().any(|tool| tool.name == *name) {
-                return Err(AnthropicSpecError::validation(format!(
+                return Err(AnthropicFamilyError::validation(format!(
                     "tool_choice specific references unknown tool: {name}",
                 )));
             }
@@ -582,7 +582,7 @@ fn map_tool_choice(
 fn map_response_format(
     response_format: ResponseFormat,
     messages: &[WireMessage],
-) -> Result<Option<Value>, AnthropicSpecError> {
+) -> Result<Option<Value>, AnthropicFamilyError> {
     match response_format {
         ResponseFormat::Text => Ok(None),
         ResponseFormat::JsonObject => {
@@ -606,12 +606,12 @@ fn map_response_format(
     }
 }
 
-fn validate_no_assistant_prefill(messages: &[WireMessage]) -> Result<(), AnthropicSpecError> {
+fn validate_no_assistant_prefill(messages: &[WireMessage]) -> Result<(), AnthropicFamilyError> {
     if messages
         .last()
         .is_some_and(|message| message.role == "assistant")
     {
-        return Err(AnthropicSpecError::validation(
+        return Err(AnthropicFamilyError::validation(
             "json response formats are incompatible with assistant-prefill final messages",
         ));
     }

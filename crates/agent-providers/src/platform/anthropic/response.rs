@@ -1,7 +1,7 @@
 use agent_core::{Response, ResponseFormat};
 use serde_json::Value;
 
-use crate::anthropic_family::{AnthropicDecodeEnvelope, AnthropicSpecError, AnthropicSpecErrorKind};
+use crate::anthropic_family::{AnthropicDecodeEnvelope, AnthropicFamilyError, AnthropicFamilyErrorKind};
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
 
 pub(crate) fn decode_response_json(
@@ -15,7 +15,7 @@ pub(crate) fn decode_response_json(
     .map_err(map_anthropic_decode_error)
 }
 
-fn map_anthropic_decode_error(error: AnthropicSpecError) -> AdapterError {
+fn map_anthropic_decode_error(error: AnthropicFamilyError) -> AdapterError {
     let message = error.message().to_string();
     AdapterError::with_source(
         map_spec_error_kind(error.kind()),
@@ -26,13 +26,13 @@ fn map_anthropic_decode_error(error: AnthropicSpecError) -> AdapterError {
     )
 }
 
-fn map_spec_error_kind(kind: AnthropicSpecErrorKind) -> AdapterErrorKind {
+fn map_spec_error_kind(kind: AnthropicFamilyErrorKind) -> AdapterErrorKind {
     match kind {
-        AnthropicSpecErrorKind::Validation => AdapterErrorKind::Validation,
-        AnthropicSpecErrorKind::Encode => AdapterErrorKind::Encode,
-        AnthropicSpecErrorKind::Decode => AdapterErrorKind::Decode,
-        AnthropicSpecErrorKind::Upstream => AdapterErrorKind::Upstream,
-        AnthropicSpecErrorKind::ProtocolViolation => AdapterErrorKind::ProtocolViolation,
-        AnthropicSpecErrorKind::UnsupportedFeature => AdapterErrorKind::UnsupportedFeature,
+        AnthropicFamilyErrorKind::Validation => AdapterErrorKind::Validation,
+        AnthropicFamilyErrorKind::Encode => AdapterErrorKind::Encode,
+        AnthropicFamilyErrorKind::Decode => AdapterErrorKind::Decode,
+        AnthropicFamilyErrorKind::Upstream => AdapterErrorKind::Upstream,
+        AnthropicFamilyErrorKind::ProtocolViolation => AdapterErrorKind::ProtocolViolation,
+        AnthropicFamilyErrorKind::UnsupportedFeature => AdapterErrorKind::UnsupportedFeature,
     }
 }

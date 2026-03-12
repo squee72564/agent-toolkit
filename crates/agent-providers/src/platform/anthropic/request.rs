@@ -1,7 +1,7 @@
 use agent_core::Request;
 use agent_transport::HttpRequestOptions;
 
-use crate::anthropic_family::{AnthropicSpecError, AnthropicSpecErrorKind};
+use crate::anthropic_family::{AnthropicFamilyError, AnthropicFamilyErrorKind};
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
 use crate::request_plan::{ProviderRequestPlan, ProviderResponseKind, ProviderTransportKind};
 
@@ -36,7 +36,7 @@ pub(crate) fn plan_request(req: Request) -> Result<ProviderRequestPlan, AdapterE
     })
 }
 
-fn map_anthropic_plan_error(error: AnthropicSpecError) -> AdapterError {
+fn map_anthropic_plan_error(error: AnthropicFamilyError) -> AdapterError {
     let message = error.message().to_string();
     AdapterError::with_source(
         map_spec_error_kind(error.kind()),
@@ -47,13 +47,13 @@ fn map_anthropic_plan_error(error: AnthropicSpecError) -> AdapterError {
     )
 }
 
-fn map_spec_error_kind(kind: AnthropicSpecErrorKind) -> AdapterErrorKind {
+fn map_spec_error_kind(kind: AnthropicFamilyErrorKind) -> AdapterErrorKind {
     match kind {
-        AnthropicSpecErrorKind::Validation => AdapterErrorKind::Validation,
-        AnthropicSpecErrorKind::Encode => AdapterErrorKind::Encode,
-        AnthropicSpecErrorKind::Decode => AdapterErrorKind::Decode,
-        AnthropicSpecErrorKind::Upstream => AdapterErrorKind::Upstream,
-        AnthropicSpecErrorKind::ProtocolViolation => AdapterErrorKind::ProtocolViolation,
-        AnthropicSpecErrorKind::UnsupportedFeature => AdapterErrorKind::UnsupportedFeature,
+        AnthropicFamilyErrorKind::Validation => AdapterErrorKind::Validation,
+        AnthropicFamilyErrorKind::Encode => AdapterErrorKind::Encode,
+        AnthropicFamilyErrorKind::Decode => AdapterErrorKind::Decode,
+        AnthropicFamilyErrorKind::Upstream => AdapterErrorKind::Upstream,
+        AnthropicFamilyErrorKind::ProtocolViolation => AdapterErrorKind::ProtocolViolation,
+        AnthropicFamilyErrorKind::UnsupportedFeature => AdapterErrorKind::UnsupportedFeature,
     }
 }
