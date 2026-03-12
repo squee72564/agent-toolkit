@@ -7,7 +7,7 @@ use agent_core::types::{
     ToolDefinition, ToolResult, ToolResultContent,
 };
 
-use crate::providers::openai_compatible::{
+use super::types::{
     OpenAiFunctionToolDefinition, OpenAiTextFormat, OpenAiToolType, StructuredOutputFormat,
 };
 

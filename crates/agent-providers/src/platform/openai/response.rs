@@ -2,14 +2,14 @@ use agent_core::{Request, Response, ResponseFormat};
 use serde_json::Value;
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
-use crate::openai_spec::{OpenAiDecodeEnvelope, OpenAiSpecError, OpenAiSpecErrorKind};
+use crate::openai_family::{OpenAiDecodeEnvelope, OpenAiSpecError, OpenAiSpecErrorKind};
 
 pub(crate) fn decode_response_json(
     body: Value,
     requested_format: &ResponseFormat,
 ) -> Result<Response, AdapterError> {
     let _ = std::marker::PhantomData::<Request>;
-    crate::openai_spec::decode::decode_openai_response(&OpenAiDecodeEnvelope {
+    crate::openai_family::decode::decode_openai_response(&OpenAiDecodeEnvelope {
         body,
         requested_response_format: requested_format.clone(),
     })

@@ -1,6 +1,6 @@
 use serde_json::{Value, json};
 
-use crate::openai_spec::OpenAiDecodeEnvelope;
+use crate::openai_family::OpenAiDecodeEnvelope;
 use crate::platform::test_fixtures::{
     choose_valid_success_fixture, list_decoded_error_fixture_models,
     list_decoded_error_fixture_relpaths, list_decoded_fixture_models,

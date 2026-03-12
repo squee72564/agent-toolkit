@@ -10,9 +10,12 @@ use agent_core::types::{ResponseFormat, RuntimeWarning};
 pub(crate) mod decode;
 pub(crate) mod encode;
 mod schema_rules;
+pub(crate) mod types;
 
 #[cfg(test)]
 mod test;
+#[cfg(test)]
+mod types_test;
 
 /// Encoded OpenAI-family request payload plus non-fatal planning warnings.
 #[derive(Debug, Clone, PartialEq)]

@@ -4,8 +4,8 @@ use agent_core::{Request, RuntimeWarning};
 use agent_transport::HttpRequestOptions;
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
-use crate::openai_spec::encode::{OpenAiEncodeInput, encode_openai_request_parts};
-use crate::openai_spec::{OpenAiSpecError, OpenAiSpecErrorKind};
+use crate::openai_family::encode::{OpenAiEncodeInput, encode_openai_request_parts};
+use crate::openai_family::{OpenAiSpecError, OpenAiSpecErrorKind};
 use crate::request_plan::{ProviderRequestPlan, ProviderResponseKind, ProviderTransportKind};
 
 const WARN_IGNORED_TOP_P: &str = "openai.encode.ignored_top_p";

@@ -1,11 +1,11 @@
 use serde_json::json;
 
-use crate::platform::test_fixtures::{
-    load_decoded_success_fixture, load_streaming_success_fixture,
-};
-use crate::providers::openai_compatible::{
+use crate::openai_family::types::{
     OpenAiFunctionToolDefinition, OpenAiResponsesBody, OpenAiResponsesStreamEvent,
     OpenAiTextFormat, OpenAiToolType, StructuredOutputFormat,
+};
+use crate::platform::test_fixtures::{
+    load_decoded_success_fixture, load_streaming_success_fixture,
 };
 
 #[test]

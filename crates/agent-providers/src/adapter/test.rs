@@ -9,7 +9,7 @@ use agent_core::types::{
 };
 
 use crate::anthropic_spec::AnthropicDecodeEnvelope;
-use crate::openai_spec::OpenAiDecodeEnvelope;
+use crate::openai_family::OpenAiDecodeEnvelope;
 use crate::platform::anthropic::{request as anthropic_request, response as anthropic_response};
 use crate::platform::openai::{request as openai_request, response as openai_response};
 use crate::platform::openrouter::{request as openrouter_request, response as openrouter_response};

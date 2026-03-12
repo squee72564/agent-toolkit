@@ -2,8 +2,8 @@ use agent_core::{Response, ResponseFormat};
 use serde_json::Value;
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
-use crate::openai_spec::decode::decode_openai_response;
-use crate::openai_spec::{OpenAiDecodeEnvelope, OpenAiSpecError, OpenAiSpecErrorKind};
+use crate::openai_family::decode::decode_openai_response;
+use crate::openai_family::{OpenAiDecodeEnvelope, OpenAiSpecError, OpenAiSpecErrorKind};
 
 pub(crate) fn decode_response_json(
     body: Value,

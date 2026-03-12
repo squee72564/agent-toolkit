@@ -96,14 +96,6 @@ impl OpenAiTextFormat {
     }
 }
 
-/// Responses API `text` payload wrapper.
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
-pub struct OpenAiTextConfig {
-    pub format: OpenAiTextFormat,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub verbosity: Option<String>,
-}
-
 /// OpenAI-family tool type.
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 pub enum OpenAiToolType {
@@ -195,6 +187,7 @@ pub struct OpenAiResponsesBody {
 }
 
 /// Shared OpenAI-family Responses API streaming event envelope.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
 pub struct OpenAiResponsesStreamEvent {
     #[serde(default, rename = "type")]

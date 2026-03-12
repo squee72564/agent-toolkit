@@ -113,7 +113,7 @@ fn openrouter_request_error_preserves_source_chain() {
 }
 
 #[test]
-fn openrouter_request_reuses_openai_spec_encoder() {
+fn openrouter_request_reuses_openai_family_encoder() {
     let encoded = request::plan_request(base_request(), &OpenRouterOverrides::default())
         .expect("planning should succeed");
 

@@ -8,16 +8,13 @@
 //! - [`request_plan`] for transport/response execution contracts.
 //! - [`streaming`] for projecting raw provider stream events into canonical
 //!   stream events.
-//! - [`openai_spec`] and [`anthropic_spec`] for provider-family payload types
+//! - [`openai_family`] and [`anthropic_spec`] for provider-family payload types
 //!   and spec-level error models.
 
 pub mod adapter;
 pub mod anthropic_spec;
 pub mod error;
-pub mod openai_spec;
+pub mod openai_family;
 pub mod platform;
 pub mod request_plan;
 pub mod streaming;
-
-// Add docs
-pub mod providers;

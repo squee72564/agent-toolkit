@@ -1,7 +1,7 @@
 use serde_json::{Map, Value};
 
+use super::types::{OpenAiErrorEnvelope, OpenAiResponsesBody};
 use super::{OpenAiDecodeEnvelope, OpenAiSpecError};
-use crate::providers::openai_compatible::{OpenAiErrorEnvelope, OpenAiResponsesBody};
 use agent_core::types::{
     AssistantOutput, ContentPart, FinishReason, Response, ResponseFormat, RuntimeWarning, Usage,
 };
