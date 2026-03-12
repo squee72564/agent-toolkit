@@ -1,3 +1,4 @@
+use serde::Serialize;
 use serde_json::{Map, Value};
 
 use agent_core::{Request, RuntimeWarning};
@@ -11,28 +12,49 @@ use crate::request_plan::{ProviderRequestPlan, ProviderResponseKind, ProviderTra
 const WARN_IGNORED_TOP_P: &str = "openai.encode.ignored_top_p";
 const WARN_IGNORED_STOP: &str = "openai.encode.ignored_stop";
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
 pub(crate) struct OpenRouterOverrides {
+    #[serde(skip_serializing)]
     pub fallback_models: Vec<String>,
+    #[serde(rename = "provider", skip_serializing_if = "Option::is_none")]
     pub provider_preferences: Option<Value>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub plugins: Vec<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub parallel_tool_calls: Option<bool>,
+    #[serde(skip_serializing)]
     pub frequency_penalty: Option<f32>,
+    #[serde(skip_serializing)]
     pub presence_penalty: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub logit_bias: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub logprobs: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub top_logprobs: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub trace: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub route: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub max_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub modalities: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub image_config: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub debug: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub stream_options: Option<Value>,
+    #[serde(skip_serializing)]
     pub extra: Map<String, Value>,
 }
 
@@ -156,87 +178,25 @@ fn apply_openrouter_overrides(
         }
     }
 
-    insert_optional_bool(body, "parallel_tool_calls", overrides.parallel_tool_calls);
     insert_optional_f32(body, "frequency_penalty", overrides.frequency_penalty)?;
     insert_optional_f32(body, "presence_penalty", overrides.presence_penalty)?;
-    insert_optional_u8(body, "top_logprobs", overrides.top_logprobs);
-    insert_optional_i64(body, "seed", overrides.seed);
-    insert_optional_u32(body, "max_tokens", overrides.max_tokens);
+    let serialized_overrides = serde_json::to_value(overrides).map_err(|error| {
+        OpenAiFamilyError::protocol_violation(format!(
+            "failed to serialize OpenRouter overrides: {error}"
+        ))
+    })?;
+    let serialized_overrides = serialized_overrides.as_object().ok_or_else(|| {
+        OpenAiFamilyError::protocol_violation("serialized OpenRouter overrides must be an object")
+    })?;
+    for (key, value) in serialized_overrides {
+        body.insert(key.clone(), value.clone());
+    }
 
-    if let Some(provider_preferences) = &overrides.provider_preferences {
-        body.insert("provider".to_string(), provider_preferences.clone());
-    }
-    if !overrides.plugins.is_empty() {
-        body.insert(
-            "plugins".to_string(),
-            Value::Array(overrides.plugins.clone()),
-        );
-    }
-    if let Some(logit_bias) = &overrides.logit_bias {
-        body.insert("logit_bias".to_string(), logit_bias.clone());
-    }
-    if let Some(logprobs) = overrides.logprobs {
-        body.insert("logprobs".to_string(), Value::Bool(logprobs));
-    }
-    if let Some(reasoning) = &overrides.reasoning {
-        body.insert("reasoning".to_string(), reasoning.clone());
-    }
-    if let Some(user) = &overrides.user {
-        body.insert("user".to_string(), Value::String(user.clone()));
-    }
-    if let Some(session_id) = &overrides.session_id {
-        body.insert("session_id".to_string(), Value::String(session_id.clone()));
-    }
-    if let Some(trace) = &overrides.trace {
-        body.insert("trace".to_string(), trace.clone());
-    }
-    if let Some(route) = &overrides.route {
-        body.insert("route".to_string(), Value::String(route.clone()));
-    }
-    if let Some(modalities) = &overrides.modalities {
-        body.insert(
-            "modalities".to_string(),
-            Value::Array(modalities.iter().cloned().map(Value::String).collect()),
-        );
-    }
-    if let Some(image_config) = &overrides.image_config {
-        body.insert("image_config".to_string(), image_config.clone());
-    }
-    if let Some(debug) = &overrides.debug {
-        body.insert("debug".to_string(), debug.clone());
-    }
-    if let Some(stream_options) = &overrides.stream_options {
-        body.insert("stream_options".to_string(), stream_options.clone());
-    }
     for (key, value) in &overrides.extra {
         body.insert(key.clone(), value.clone());
     }
 
     Ok(())
-}
-
-fn insert_optional_bool(body: &mut Map<String, Value>, key: &str, value: Option<bool>) {
-    if let Some(value) = value {
-        body.insert(key.to_string(), Value::Bool(value));
-    }
-}
-
-fn insert_optional_u8(body: &mut Map<String, Value>, key: &str, value: Option<u8>) {
-    if let Some(value) = value {
-        body.insert(key.to_string(), Value::from(value));
-    }
-}
-
-fn insert_optional_u32(body: &mut Map<String, Value>, key: &str, value: Option<u32>) {
-    if let Some(value) = value {
-        body.insert(key.to_string(), Value::from(value));
-    }
-}
-
-fn insert_optional_i64(body: &mut Map<String, Value>, key: &str, value: Option<i64>) {
-    if let Some(value) = value {
-        body.insert(key.to_string(), Value::from(value));
-    }
 }
 
 fn insert_optional_f32(

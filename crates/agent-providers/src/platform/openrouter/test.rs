@@ -191,6 +191,22 @@ fn openrouter_request_applies_typed_overrides() {
 }
 
 #[test]
+fn openrouter_request_omits_empty_serde_backed_overrides() {
+    let overrides = OpenRouterOverrides {
+        plugins: Vec::new(),
+        modalities: Some(Vec::new()),
+        ..OpenRouterOverrides::default()
+    };
+    let encoded =
+        request::plan_request(base_request(), &overrides).expect("planning should succeed");
+
+    assert!(encoded.body.get("plugins").is_none());
+    assert_eq!(encoded.body["modalities"], json!([]));
+    assert!(encoded.body.get("provider").is_none());
+    assert!(encoded.body.get("user").is_none());
+}
+
+#[test]
 fn openrouter_request_rejects_non_finite_frequency_penalty_override() {
     let overrides = OpenRouterOverrides {
         frequency_penalty: Some(f32::NAN),
