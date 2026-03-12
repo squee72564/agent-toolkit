@@ -32,14 +32,6 @@ pub struct OpenAiDecodeEnvelope {
     pub requested_response_format: ResponseFormat,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct OpenAiErrorEnvelope {
-    pub message: String,
-    pub code: Option<String>,
-    pub error_type: Option<String>,
-    pub param: Option<String>,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpenAiSpecErrorKind {
     /// Caller input is invalid for the OpenAI-family wire contract.

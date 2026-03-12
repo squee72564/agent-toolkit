@@ -1,10 +1,10 @@
 use serde_json::{Map, Value};
 
+use super::{OpenAiDecodeEnvelope, OpenAiSpecError};
+use crate::providers::openai_compatible::{OpenAiErrorEnvelope, OpenAiResponsesBody};
 use agent_core::types::{
     AssistantOutput, ContentPart, FinishReason, Response, ResponseFormat, RuntimeWarning, Usage,
 };
-
-use super::{OpenAiDecodeEnvelope, OpenAiErrorEnvelope, OpenAiSpecError};
 
 const WARN_EMPTY_CONTENT: &str = "openai.decode.empty_content";
 const WARN_UNKNOWN_OUTPUT_ITEM: &str = "openai.decode.unknown_output_item";
@@ -13,35 +13,47 @@ const WARN_INVALID_TOOL_CALL_ARGUMENTS: &str = "openai.decode.invalid_tool_call_
 const WARN_STRUCTURED_OUTPUT_NOT_OBJECT: &str = "openai.decode.structured_output_not_object";
 const WARN_STRUCTURED_OUTPUT_PARSE_FAILED: &str = "openai.decode.structured_output_parse_failed";
 
+struct NormalizedOpenAiErrorEnvelope {
+    message: String,
+    code: Option<String>,
+    error_type: Option<String>,
+    param: Option<String>,
+}
+
 pub(crate) fn decode_openai_response(
     payload: &OpenAiDecodeEnvelope,
 ) -> Result<Response, OpenAiSpecError> {
-    let root = payload
-        .body
-        .as_object()
-        .ok_or_else(|| OpenAiSpecError::decode("response payload must be a JSON object"))?;
+    let parsed: OpenAiResponsesBody =
+        serde_json::from_value(payload.body.clone()).map_err(|error| {
+            OpenAiSpecError::decode(format!(
+                "failed to deserialize OpenAI-family response: {error}"
+            ))
+        })?;
+    if !payload.body.is_object() {
+        return Err(OpenAiSpecError::decode(
+            "response payload must be a JSON object",
+        ));
+    }
 
-    if let Some(error) = parse_openai_error_value(root) {
+    if let Some(error) = parsed.error.as_ref().and_then(normalize_error_envelope) {
         return Err(OpenAiSpecError::upstream(format_openai_error_message(
             &error,
         )));
     }
 
-    let status = root
-        .get("status")
-        .and_then(Value::as_str)
+    let status = parsed
+        .status
+        .as_deref()
         .ok_or_else(|| OpenAiSpecError::decode("openai response missing status"))?;
 
-    let model = root
-        .get("model")
-        .and_then(Value::as_str)
-        .unwrap_or("<unknown-model>")
-        .to_string();
+    let model = parsed
+        .model
+        .unwrap_or_else(|| "<unknown-model>".to_string());
 
     let mut content = Vec::new();
     let mut warnings = Vec::new();
 
-    if let Some(output_items) = root.get("output").and_then(Value::as_array) {
+    if let Some(output_items) = parsed.output.as_ref().and_then(Value::as_array) {
         for item in output_items {
             decode_output_item(item, &mut content, &mut warnings)?;
         }
@@ -58,13 +70,12 @@ pub(crate) fn decode_openai_response(
     let structured_output =
         decode_structured_output(&payload.requested_response_format, &content, &mut warnings);
 
-    let usage = decode_usage(root.get("usage"));
+    let usage = parsed.usage.map(Usage::from).unwrap_or_default();
 
-    let incomplete_reason = root
-        .get("incomplete_details")
-        .and_then(Value::as_object)
-        .and_then(|details| details.get("reason"))
-        .and_then(Value::as_str);
+    let incomplete_reason = parsed
+        .incomplete_details
+        .as_ref()
+        .and_then(|details| details.reason.as_deref());
 
     let finish_reason = map_finish_reason(status, incomplete_reason, &content)?;
 
@@ -81,20 +92,7 @@ pub(crate) fn decode_openai_response(
     })
 }
 
-fn parse_openai_error_value(root: &Map<String, Value>) -> Option<OpenAiErrorEnvelope> {
-    let error = root.get("error")?.as_object()?;
-    let message = value_to_string(error.get("message"))
-        .unwrap_or_else(|| "openai response reported an error".to_string());
-
-    Some(OpenAiErrorEnvelope {
-        message,
-        code: value_to_string(error.get("code")),
-        error_type: value_to_string(error.get("type")),
-        param: value_to_string(error.get("param")),
-    })
-}
-
-pub(crate) fn format_openai_error_message(envelope: &OpenAiErrorEnvelope) -> String {
+fn format_openai_error_message(envelope: &NormalizedOpenAiErrorEnvelope) -> String {
     let mut context = Vec::new();
 
     if let Some(code) = &envelope.code {
@@ -115,6 +113,25 @@ pub(crate) fn format_openai_error_message(envelope: &OpenAiErrorEnvelope) -> Str
             envelope.message,
             context.join(", ")
         )
+    }
+}
+
+fn normalize_error_envelope(error: &OpenAiErrorEnvelope) -> Option<NormalizedOpenAiErrorEnvelope> {
+    let message = value_to_string(error.message.as_ref())
+        .unwrap_or_else(|| "openai response reported an error".to_string());
+    let code = value_to_string(error.code.as_ref());
+    let error_type = value_to_string(error.error_type.as_ref());
+    let param = value_to_string(error.param.as_ref());
+
+    if !message.trim().is_empty() || code.is_some() || error_type.is_some() || param.is_some() {
+        Some(NormalizedOpenAiErrorEnvelope {
+            message,
+            code,
+            error_type,
+            param,
+        })
+    } else {
+        None
     }
 }
 
@@ -349,28 +366,6 @@ fn decode_structured_output(
             );
             None
         }
-    }
-}
-
-fn decode_usage(usage: Option<&Value>) -> Usage {
-    let Some(usage_obj) = usage.and_then(Value::as_object) else {
-        return Usage::default();
-    };
-
-    let input_tokens = usage_obj.get("input_tokens").and_then(Value::as_u64);
-    let output_tokens = usage_obj.get("output_tokens").and_then(Value::as_u64);
-    let total_tokens = usage_obj.get("total_tokens").and_then(Value::as_u64);
-    let cached_input_tokens = usage_obj
-        .get("input_tokens_details")
-        .and_then(Value::as_object)
-        .and_then(|details| details.get("cached_tokens"))
-        .and_then(Value::as_u64);
-
-    Usage {
-        input_tokens,
-        output_tokens,
-        cached_input_tokens,
-        total_tokens,
     }
 }
 

@@ -18,3 +18,6 @@ pub mod openai_spec;
 pub mod platform;
 pub mod request_plan;
 pub mod streaming;
+
+// Add docs
+pub mod providers;

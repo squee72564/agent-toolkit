@@ -7,6 +7,10 @@ use agent_core::types::{
     ToolDefinition, ToolResult, ToolResultContent,
 };
 
+use crate::providers::openai_compatible::{
+    OpenAiFunctionToolDefinition, OpenAiTextFormat, OpenAiToolType, StructuredOutputFormat,
+};
+
 use super::schema_rules::{canonicalize_json, is_strict_compatible_schema, stable_json_string};
 use super::{OpenAiEncodedRequest, OpenAiSpecError};
 
@@ -129,10 +133,12 @@ pub(crate) fn encode_openai_request_parts(
     })
 }
 
-fn map_response_format(response_format: ResponseFormat) -> Result<Value, OpenAiSpecError> {
+fn map_response_format(
+    response_format: ResponseFormat,
+) -> Result<OpenAiTextFormat, OpenAiSpecError> {
     match response_format {
-        ResponseFormat::Text => Ok(json!({ "type": "text" })),
-        ResponseFormat::JsonObject => Ok(json!({ "type": "json_object" })),
+        ResponseFormat::Text => Ok(OpenAiTextFormat::text()),
+        ResponseFormat::JsonObject => Ok(OpenAiTextFormat::json_object()),
         ResponseFormat::JsonSchema { name, schema } => {
             if name.trim().is_empty() {
                 return Err(OpenAiSpecError::validation(
@@ -146,11 +152,11 @@ fn map_response_format(response_format: ResponseFormat) -> Result<Value, OpenAiS
                 ));
             }
 
-            Ok(json!({
-                "type": "json_schema",
-                "name": name,
-                "schema": schema,
-                "strict": true,
+            Ok(OpenAiTextFormat::json_schema(StructuredOutputFormat {
+                name,
+                description: None,
+                schema: Some(schema),
+                strict: Some(true),
             }))
         }
     }
@@ -252,18 +258,16 @@ fn map_tool_definition(
         );
     }
 
-    let mut payload = Map::new();
-    payload.insert("type".to_string(), Value::String("function".to_string()));
-    payload.insert("name".to_string(), Value::String(name));
-
-    if let Some(description) = description {
-        payload.insert("description".to_string(), Value::String(description));
-    }
-
-    payload.insert("parameters".to_string(), parameters_schema);
-    payload.insert("strict".to_string(), Value::Bool(strict));
-
-    Ok(Value::Object(payload))
+    serde_json::to_value(OpenAiFunctionToolDefinition {
+        tool_type: OpenAiToolType::Function,
+        name,
+        description,
+        parameters: parameters_schema,
+        strict: Some(strict),
+    })
+    .map_err(|error| {
+        OpenAiSpecError::encode_with_source("failed to serialize OpenAI-family tool payload", error)
+    })
 }
 
 fn map_messages(messages: Vec<Message>) -> Result<Vec<Value>, OpenAiSpecError> {
