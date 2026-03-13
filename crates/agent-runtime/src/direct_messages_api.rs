@@ -1,5 +1,6 @@
-use agent_core::{Request, Response};
+use agent_core::{Response, TaskRequest};
 
+use crate::execution_options::ExecutionOptions;
 use crate::message_create_input::MessageCreateInput;
 use crate::provider_client::ProviderClient;
 use crate::runtime_error::RuntimeError;
@@ -33,16 +34,26 @@ impl DirectMessagesApi<'_> {
         self.client.create_with_meta(input.into()).await
     }
 
-    /// Sends a fully-formed non-streaming request directly to this client.
-    pub async fn create_request(&self, request: Request) -> Result<Response, RuntimeError> {
-        self.client.send(request).await
+    /// Executes an explicit semantic task using the client's configured
+    /// default model unless `model_override` is supplied.
+    pub async fn create_task(
+        &self,
+        task: TaskRequest,
+        model_override: Option<String>,
+        execution: ExecutionOptions,
+    ) -> Result<Response, RuntimeError> {
+        self.client.execute(task, model_override, execution).await
     }
 
-    /// Like [`Self::create_request`], but also returns attempt metadata.
-    pub async fn create_request_with_meta(
+    /// Like [`Self::create_task`], but also returns attempt metadata.
+    pub async fn create_task_with_meta(
         &self,
-        request: Request,
+        task: TaskRequest,
+        model_override: Option<String>,
+        execution: ExecutionOptions,
     ) -> Result<(Response, ResponseMeta), RuntimeError> {
-        self.client.send_with_meta(request).await
+        self.client
+            .execute_with_meta(task, model_override, execution)
+            .await
     }
 }

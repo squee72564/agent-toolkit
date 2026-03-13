@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 use std::env;
 
 use agent_toolkit::{
-    ContentPart, Message, MessageRole, Request, ResponseFormat, ToolChoice, ToolDefinition, openai,
+    ContentPart, ExecutionOptions, Message, MessageCreateInput, MessageRole, ResponseFormat,
+    ToolChoice, ToolDefinition, openai,
 };
 use serde_json::json;
 
@@ -31,37 +32,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "example-explicit-request".to_string(),
     );
 
-    let request = Request {
-        model_id: "gpt-5-mini".to_string(),
-        stream: false,
-        messages: vec![Message::new(
-            MessageRole::User,
-            vec![ContentPart::text(
-                "Write one sentence about explicit request construction.",
-            )],
+    let task = MessageCreateInput::new(vec![Message::new(
+        MessageRole::User,
+        vec![ContentPart::text(
+            "Write one sentence about explicit request construction.",
         )],
-        tools: vec![ToolDefinition {
-            name: "raw_echo".to_string(),
-            description: Some("Echo the provided value".to_string()),
-            parameters_schema: json!({
-                "type": "object",
-                "properties": {
-                    "value": { "type": "string" }
-                },
-                "required": ["value"],
-                "additionalProperties": false
-            }),
-        }],
-        tool_choice: ToolChoice::Auto,
-        response_format: ResponseFormat::Text,
-        temperature: None,
-        top_p: None,
-        max_output_tokens: Some(128),
-        stop: Vec::new(),
-        metadata,
-    };
+    )])
+    .with_tools(vec![ToolDefinition {
+        name: "raw_echo".to_string(),
+        description: Some("Echo the provided value".to_string()),
+        parameters_schema: json!({
+            "type": "object",
+            "properties": {
+                "value": { "type": "string" }
+            },
+            "required": ["value"],
+            "additionalProperties": false
+        }),
+    }])
+    .with_tool_choice(ToolChoice::Auto)
+    .with_response_format(ResponseFormat::Text)
+    .with_max_output_tokens(128)
+    .with_metadata(metadata)
+    .into_task_request()?;
 
-    let (response, meta) = client.messages().create_request_with_meta(request).await?;
+    let (response, meta) = client
+        .messages()
+        .create_task_with_meta(
+            task,
+            Some("gpt-5-mini".to_string()),
+            ExecutionOptions::default(),
+        )
+        .await?;
 
     println!("selected_provider: {:?}", meta.selected_provider);
     println!("selected_model: {}", meta.selected_model);

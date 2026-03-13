@@ -1,17 +1,18 @@
 use std::{collections::HashMap, sync::Arc};
 
-use agent_core::{ProviderId, Request, Response};
+use agent_core::{ProviderInstanceId, Request, Response, TaskRequest};
 
+use crate::execution_options::{ExecutionOptions, ResponseMode};
 use crate::message_response_stream::{
     AttemptContext, LiveAttempt, MessageResponseStream, RoutedStreamInit,
 };
 use crate::observer::RuntimeObserver;
 use crate::provider_client::ProviderClient;
 use crate::provider_runtime::{ProviderAttemptOutcome, ProviderStreamAttemptOutcome};
+use crate::route::Route;
 use crate::routed_messages_api::RoutedMessagesApi;
 use crate::routed_streaming_api::RoutedStreamingApi;
 use crate::runtime_error::RuntimeError;
-use crate::send_options::SendOptions;
 use crate::target::Target;
 use crate::types::ResponseMeta;
 
@@ -28,7 +29,7 @@ use self::execution::PreparedExecution;
 /// observability through [`RuntimeObserver`].
 #[derive(Clone)]
 pub struct AgentToolkit {
-    pub(crate) clients: HashMap<ProviderId, ProviderClient>,
+    pub(crate) clients: HashMap<ProviderInstanceId, ProviderClient>,
     pub(crate) observer: Option<Arc<dyn RuntimeObserver>>,
 }
 
@@ -58,77 +59,63 @@ impl AgentToolkit {
         RoutedStreamingApi::new(self)
     }
 
-    /// Sends a fully-formed request through the routed execution path.
-    pub async fn send(
+    /// Executes a semantic task over the supplied route.
+    pub async fn execute(
         &self,
-        request: Request,
-        options: SendOptions,
+        task: TaskRequest,
+        route: Route,
+        execution: ExecutionOptions,
     ) -> Result<Response, RuntimeError> {
-        self.send_with_meta(request, options)
+        self.execute_with_meta(task, route, execution)
             .await
             .map(|(response, _)| response)
     }
 
-    /// Sends a fully-formed request and returns metadata for the selected
+    /// Like [`Self::execute`], but also returns metadata for the selected
     /// target and all attempts.
-    pub async fn send_with_meta(
+    pub async fn execute_with_meta(
         &self,
-        request: Request,
-        options: SendOptions,
+        task: TaskRequest,
+        route: Route,
+        execution: ExecutionOptions,
     ) -> Result<(Response, ResponseMeta), RuntimeError> {
-        let prepared = PreparedExecution::new(self, &request, &options)?;
-        prepared.emit_request_start(&request);
+        if execution.response_mode != ResponseMode::NonStreaming {
+            return Err(RuntimeError::configuration(
+                "messages() requires ExecutionOptions.response_mode = ResponseMode::NonStreaming",
+            ));
+        }
 
-        let fallback_policy = options.fallback_policy.clone();
+        let prepared = PreparedExecution::new(self, &route, &execution)?;
+        prepared.emit_request_start(None);
+
+        let fallback_policy = route.fallback_policy.clone();
         let mut attempts = Vec::new();
         let mut last_error: Option<RuntimeError> = None;
 
-        let request_model_id = request.model_id.clone();
-        let mut request = Some(request);
-
         for (index, target) in prepared.targets.iter().enumerate() {
-            let Some(client) = self.clients.get(&target.provider) else {
+            let Some(client) = self.clients.get(&target.instance) else {
                 let error = RuntimeError::target_resolution(format!(
-                    "provider {:?} is not registered",
-                    target.provider
+                    "provider instance {} is not registered",
+                    target.instance
                 ));
                 prepared.emit_request_end_failure(
-                    Some(target.provider),
-                    execution::event_model(target.model.as_deref(), &request_model_id),
+                    None,
+                    execution::event_model(target.model.as_deref(), None),
                     Some(index),
                     Some(index),
                     &error,
                 );
                 return Err(error);
             };
-            let attempt_execution =
-                prepared.attempt(self, &options, &request_model_id, target, index);
-
-            let is_last = index + 1 >= prepared.targets.len();
-            let Some(attempt_request) = (if is_last {
-                request.take()
-            } else {
-                request.as_ref().cloned()
-            }) else {
-                let error = RuntimeError::target_resolution(
-                    "request state was exhausted before completing fallback attempts",
-                );
-                prepared.emit_request_end_failure(
-                    Some(target.provider),
-                    execution::event_model(target.model.as_deref(), &request_model_id),
-                    Some(index),
-                    Some(index),
-                    &error,
-                );
-                return Err(error);
-            };
+            let attempt_execution = prepared.attempt(self, &execution, None, target, index);
+            let attempt_request = Request::from(task.clone());
 
             let attempt = client
                 .runtime
                 .execute_attempt(
                     attempt_request,
                     target.model.as_deref(),
-                    options.metadata.clone(),
+                    execution.transport.extra_headers.clone(),
                 )
                 .await;
 
@@ -154,9 +141,7 @@ impl AgentToolkit {
 
                     attempts.push(meta);
                     let should_continue = index + 1 < prepared.targets.len()
-                        && fallback_policy
-                            .as_ref()
-                            .is_some_and(|policy| policy.should_fallback(&error));
+                        && fallback_policy.should_fallback(&error);
                     last_error = Some(error);
                     if !should_continue {
                         break;
@@ -174,54 +159,49 @@ impl AgentToolkit {
         };
 
         if let Err(error) = &result {
-            prepared.emit_terminal_request_end(self, &options, &attempts, error);
+            prepared.emit_terminal_request_end(self, &execution, &attempts, error);
         }
 
         result
     }
 
-    pub(crate) async fn create_stream(
+    /// Executes a semantic task over the supplied route and opens a routed stream.
+    pub async fn execute_stream(
         &self,
-        mut input: crate::message_create_input::MessageCreateInput,
-        options: SendOptions,
+        task: TaskRequest,
+        route: Route,
+        execution: ExecutionOptions,
     ) -> Result<MessageResponseStream, RuntimeError> {
-        input.stream = true;
-        let request = input.into_request_with_options(None, true)?;
-        self.send_stream(request, options).await
-    }
-
-    pub(crate) async fn send_stream(
-        &self,
-        request: Request,
-        options: SendOptions,
-    ) -> Result<MessageResponseStream, RuntimeError> {
-        if !request.stream {
+        if execution.response_mode != ResponseMode::Streaming {
             return Err(RuntimeError::configuration(
-                "streaming().create_request(...) requires request.stream = true",
+                "streaming() requires ExecutionOptions.response_mode = ResponseMode::Streaming",
             ));
         }
 
-        let prepared = PreparedExecution::new(self, &request, &options)?;
-        prepared.emit_request_start(&request);
+        let request = Request {
+            stream: true,
+            ..Request::from(task)
+        };
+        let prepared = PreparedExecution::new(self, &route, &execution)?;
+        prepared.emit_request_start(None);
 
-        let fallback_policy = options.fallback_policy.clone();
+        let fallback_policy = route.fallback_policy.clone();
 
         for (index, target) in prepared.targets.iter().enumerate() {
-            let Some(client) = self.clients.get(&target.provider) else {
+            let Some(client) = self.clients.get(&target.instance) else {
                 return Err(RuntimeError::target_resolution(format!(
-                    "provider {:?} is not registered",
-                    target.provider
+                    "provider instance {} is not registered",
+                    target.instance
                 )));
             };
-            let attempt_execution =
-                prepared.attempt(self, &options, &request.model_id, target, index);
+            let attempt_execution = prepared.attempt(self, &execution, None, target, index);
 
             match client
                 .runtime
                 .open_stream_attempt(
                     request.clone(),
                     target.model.as_deref(),
-                    options.metadata.clone(),
+                    execution.transport.extra_headers.clone(),
                 )
                 .await
             {
@@ -229,7 +209,8 @@ impl AgentToolkit {
                     return Ok(MessageResponseStream::new_routed(RoutedStreamInit {
                         request,
                         toolkit: self,
-                        options,
+                        execution: execution.clone(),
+                        fallback_policy: route.fallback_policy.clone(),
                         request_started_at: prepared.request_started_at,
                         request_observer: prepared.request_observer.clone(),
                         targets: prepared.targets.clone(),
@@ -252,9 +233,7 @@ impl AgentToolkit {
                 ProviderStreamAttemptOutcome::Failure { error, meta } => {
                     attempt_execution.emit_failure(&meta, index);
                     let should_continue = index + 1 < prepared.targets.len()
-                        && fallback_policy
-                            .as_ref()
-                            .is_some_and(|policy| policy.should_fallback(&error));
+                        && fallback_policy.should_fallback(&error);
                     if !should_continue {
                         prepared.emit_request_end_failure(
                             Some(meta.provider),
@@ -276,56 +255,32 @@ impl AgentToolkit {
 
     fn resolve_attempt_observer(
         &self,
-        options: &SendOptions,
-        provider: ProviderId,
+        execution: &ExecutionOptions,
+        provider: ProviderInstanceId,
     ) -> Option<Arc<dyn RuntimeObserver>> {
         self.clients.get(&provider).and_then(|client| {
             crate::observer::resolve_observer_for_request(
                 client.runtime.observer.as_ref(),
                 self.observer.as_ref(),
-                options.observer.as_ref(),
+                execution.observer.as_ref(),
             )
             .cloned()
         })
     }
 
-    pub fn resolve_targets(&self, options: &SendOptions) -> Result<Vec<Target>, RuntimeError> {
+    pub fn resolve_route_targets(&self, route: &Route) -> Result<Vec<Target>, RuntimeError> {
         let mut targets = Vec::new();
-
-        if let Some(primary_target) = &options.target {
-            if !targets.contains(primary_target) {
-                targets.push(primary_target.clone());
+        for target in route.targets() {
+            if !targets.contains(&target) {
+                targets.push(target);
             }
-
-            if let Some(fallback_policy) = &options.fallback_policy {
-                for target in &fallback_policy.targets {
-                    if !targets.contains(target) {
-                        targets.push(target.clone());
-                    }
-                }
-            }
-        } else if let Some(fallback_policy) = &options.fallback_policy {
-            if fallback_policy.targets.is_empty() {
-                return Err(RuntimeError::target_resolution(
-                    "fallback policy requires at least one target",
-                ));
-            }
-            for target in &fallback_policy.targets {
-                if !targets.contains(target) {
-                    targets.push(target.clone());
-                }
-            }
-        } else {
-            return Err(RuntimeError::target_resolution(
-                "explicit target is required unless a fallback policy is provided",
-            ));
         }
 
         for target in &targets {
-            if !self.clients.contains_key(&target.provider) {
+            if !self.clients.contains_key(&target.instance) {
                 return Err(RuntimeError::target_resolution(format!(
-                    "provider {:?} is not registered",
-                    target.provider
+                    "provider instance {} is not registered",
+                    target.instance
                 )));
             }
         }

@@ -1,8 +1,8 @@
 use std::env;
 
 use agent_toolkit::{
-    AgentToolkit, FallbackMode, FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig,
-    ProviderId, SendOptions, Target,
+    AgentToolkit, ExecutionOptions, FallbackMode, FallbackPolicy, FallbackRule, MessageCreateInput,
+    ProviderConfig, ProviderId, Route, Target,
 };
 
 fn response_text(parts: &[agent_toolkit::ContentPart]) -> String {
@@ -33,14 +33,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_mode(FallbackMode::RulesOnly)
         .with_rule(FallbackRule::retry_on_status(429))
         .with_rule(FallbackRule::retry_on_provider_code("rate_limit_exceeded"));
+    let task =
+        MessageCreateInput::user("Write one short sentence about Rust.").into_task_request()?;
+    let route = Route::to(Target::new(ProviderId::OpenAi))
+        .with_fallback(Target::new(ProviderId::OpenRouter))
+        .with_fallback_policy(fallback_policy);
 
     let (response, meta) = toolkit
         .messages()
-        .create_with_meta(
-            MessageCreateInput::user("Write one short sentence about Rust."),
-            SendOptions::for_target(Target::new(ProviderId::OpenAi))
-                .with_fallback_policy(fallback_policy),
-        )
+        .create_task_with_meta(task, route, ExecutionOptions::default())
         .await?;
 
     println!("selected_provider: {:?}", meta.selected_provider);

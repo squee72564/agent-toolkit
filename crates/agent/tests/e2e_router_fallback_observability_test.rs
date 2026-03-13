@@ -4,9 +4,10 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use agent_toolkit::{
-    AgentToolkit, AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, FallbackMode,
-    FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig, ProviderId, RequestEndEvent,
-    RequestStartEvent, RetryPolicy, RuntimeErrorKind, RuntimeObserver, SendOptions, Target,
+    AgentToolkit, AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
+    FallbackMode, FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig, ProviderId,
+    RequestEndEvent, RequestStartEvent, RetryPolicy, Route, RuntimeErrorKind, RuntimeObserver,
+    Target,
 };
 
 use e2e::fixtures::{FixtureProvider, FixtureScenario, load_fixture_json};
@@ -99,13 +100,18 @@ async fn fallback_retries_next_provider_on_status_rule_then_succeeds() {
         .with_mode(FallbackMode::RulesOnly)
         .with_rule(FallbackRule::retry_on_status(401));
 
-    let options = SendOptions::for_target(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
+    let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
+        .with_fallbacks(fallback.targets.clone())
         .with_fallback_policy(fallback);
 
     let (_response, meta) = with_test_timeout(
-        toolkit
-            .messages()
-            .create_with_meta(MessageCreateInput::user("hello"), options),
+        toolkit.execute_with_meta(
+            MessageCreateInput::user("hello")
+                .into_task_request()
+                .expect("task should build"),
+            route,
+            ExecutionOptions::default(),
+        ),
     )
     .await
     .expect("fallback should succeed on anthropic");
@@ -152,13 +158,18 @@ async fn fallback_exhaustion_returns_terminal_error_kind() {
         .with_mode(FallbackMode::RulesOnly)
         .with_rule(FallbackRule::retry_on_status(401));
 
-    let options = SendOptions::for_target(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
+    let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
+        .with_fallbacks(fallback.targets.clone())
         .with_fallback_policy(fallback);
 
     let error = with_test_timeout(
-        toolkit
-            .messages()
-            .create_with_meta(MessageCreateInput::user("hello"), options),
+        toolkit.execute_with_meta(
+            MessageCreateInput::user("hello")
+                .into_task_request()
+                .expect("task should build"),
+            route,
+            ExecutionOptions::default(),
+        ),
     )
     .await
     .expect_err("fallback should be exhausted");
@@ -213,13 +224,18 @@ async fn fallback_rule_retry_on_provider_code_is_honored() {
         .with_mode(FallbackMode::RulesOnly)
         .with_rule(FallbackRule::retry_on_provider_code("rate_limit_exceeded"));
 
-    let options = SendOptions::for_target(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
+    let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
+        .with_fallbacks(fallback.targets.clone())
         .with_fallback_policy(fallback);
 
     let (_response, meta) = with_test_timeout(
-        toolkit
-            .messages()
-            .create_with_meta(MessageCreateInput::user("hello"), options),
+        toolkit.execute_with_meta(
+            MessageCreateInput::user("hello")
+                .into_task_request()
+                .expect("task should build"),
+            route,
+            ExecutionOptions::default(),
+        ),
     )
     .await
     .expect("provider-code fallback should succeed");
@@ -229,7 +245,7 @@ async fn fallback_rule_retry_on_provider_code_is_honored() {
 }
 
 #[tokio::test]
-async fn send_observer_takes_precedence_over_toolkit_observer_and_records_ordered_callbacks() {
+async fn execution_observer_takes_precedence_over_toolkit_observer_and_records_ordered_callbacks() {
     let success = load_fixture_json(
         FixtureProvider::OpenAi,
         FixtureScenario::BasicChat,
@@ -254,17 +270,20 @@ async fn send_observer_takes_precedence_over_toolkit_observer_and_records_ordere
         .build()
         .expect("build toolkit");
 
-    let options = SendOptions {
-        target: Some(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini")),
-        fallback_policy: None,
-        metadata: Default::default(),
+    let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"));
+    let execution = ExecutionOptions {
         observer: Some(send_observer.clone()),
+        ..ExecutionOptions::default()
     };
 
     let _ = with_test_timeout(
-        toolkit
-            .messages()
-            .create_with_meta(MessageCreateInput::user("hello"), options),
+        toolkit.execute_with_meta(
+            MessageCreateInput::user("hello")
+                .into_task_request()
+                .expect("task should build"),
+            route,
+            execution,
+        ),
     )
     .await
     .expect("request should succeed");
@@ -295,12 +314,16 @@ async fn observer_lifecycle_on_failure_attempts_is_deterministic() {
         .build()
         .expect("build toolkit");
 
-    let options = SendOptions::for_target(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"));
+    let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"));
 
     let error = with_test_timeout(
-        toolkit
-            .messages()
-            .create_with_meta(MessageCreateInput::user("hello"), options),
+        toolkit.execute_with_meta(
+            MessageCreateInput::user("hello")
+                .into_task_request()
+                .expect("task should build"),
+            route,
+            ExecutionOptions::default(),
+        ),
     )
     .await
     .expect_err("request should fail");

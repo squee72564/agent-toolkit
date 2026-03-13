@@ -3,7 +3,7 @@ use std::time::Duration;
 use super::{
     AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, HttpJsonResponse, ProviderId,
     RequestEndEvent, RequestStartEvent, RetryPolicy, RuntimeObserver, StreamCompletion, core,
-    message, platform, protocols, request, response, runtime, tool, tools, transport,
+    message, protocols, request, response, runtime, tool, tools, transport,
 };
 
 #[test]
@@ -18,6 +18,9 @@ fn provider_id_reexport_matches_agent_core_type() {
             ProviderId::OpenAi => agent_core::types::ProviderId::OpenAi,
             ProviderId::Anthropic => agent_core::types::ProviderId::Anthropic,
             ProviderId::OpenRouter => agent_core::types::ProviderId::OpenRouter,
+            ProviderId::GenericOpenAiCompatible => {
+                agent_core::types::ProviderId::GenericOpenAiCompatible
+            }
         };
 
         assert_eq!(provider_from_core, expected);
@@ -99,7 +102,7 @@ fn module_reexports_are_accessible() {
     let _tool_registry = tools::ToolRegistry::new();
 
     let _message_role = message::MessageRole::User;
-    let _platform_provider = platform::ProviderId::OpenAi;
+    let _platform_provider = core::types::ProviderId::OpenAi;
     let _response_format = request::ResponseFormat::default();
     let _finish_reason = response::FinishReason::Stop;
     let _tool_choice = tool::ToolChoice::Auto;

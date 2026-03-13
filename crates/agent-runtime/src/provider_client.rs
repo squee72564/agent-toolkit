@@ -1,9 +1,10 @@
 use std::{collections::BTreeMap, sync::Arc, time::Instant};
 
-use agent_core::{Request, Response};
+use agent_core::{Request, Response, TaskRequest};
 
 use crate::direct_messages_api::DirectMessagesApi;
 use crate::direct_streaming_api::DirectStreamingApi;
+use crate::execution_options::{ExecutionOptions, ResponseMode};
 use crate::message_create_input::MessageCreateInput;
 use crate::message_response_stream::{LiveAttempt, MessageResponseStream};
 use crate::observer::{resolve_observer_for_request, safe_call_observer};
@@ -63,31 +64,39 @@ impl ProviderClient {
         &self,
         input: MessageCreateInput,
     ) -> Result<(Response, ResponseMeta), RuntimeError> {
-        if input.stream {
+        if input.is_streaming() {
             return Err(RuntimeError::configuration(
                 "stream=true is not supported by the current messages/send response API yet",
             ));
         }
-        let request =
-            input.into_request_with_options(self.runtime.default_model.as_deref(), false)?;
-        self.send_with_meta(request).await
+        let (task, model_override, execution) = input.into_task_request_parts()?;
+        self.execute_with_meta(task, model_override, execution)
+            .await
     }
 
-    pub(crate) async fn send(&self, request: Request) -> Result<Response, RuntimeError> {
-        self.send_with_meta(request)
+    pub(crate) async fn execute(
+        &self,
+        task: TaskRequest,
+        model_override: Option<String>,
+        execution: ExecutionOptions,
+    ) -> Result<Response, RuntimeError> {
+        self.execute_with_meta(task, model_override, execution)
             .await
             .map(|(response, _)| response)
     }
 
-    pub(crate) async fn send_with_meta(
+    pub(crate) async fn execute_with_meta(
         &self,
-        request: Request,
+        task: TaskRequest,
+        model_override: Option<String>,
+        execution: ExecutionOptions,
     ) -> Result<(Response, ResponseMeta), RuntimeError> {
-        if request.stream {
+        if execution.response_mode != ResponseMode::NonStreaming {
             return Err(RuntimeError::configuration(
-                "stream=true is not supported by the current messages/send response API yet",
+                "messages() requires ExecutionOptions.response_mode = ResponseMode::NonStreaming",
             ));
         }
+        let request = self.request_from_task(task, model_override, false)?;
         let context = self.begin_direct_request(&request);
 
         let attempt = self
@@ -131,23 +140,25 @@ impl ProviderClient {
 
     pub(crate) async fn create_stream(
         &self,
-        mut input: MessageCreateInput,
+        input: MessageCreateInput,
     ) -> Result<MessageResponseStream, RuntimeError> {
-        input.stream = true;
-        let request =
-            input.into_request_with_options(self.runtime.default_model.as_deref(), false)?;
-        self.send_stream(request).await
+        let (task, model_override, mut execution) = input.into_task_request_parts()?;
+        execution.response_mode = ResponseMode::Streaming;
+        self.execute_stream(task, model_override, execution).await
     }
 
-    pub(crate) async fn send_stream(
+    pub(crate) async fn execute_stream(
         &self,
-        request: Request,
+        task: TaskRequest,
+        model_override: Option<String>,
+        execution: ExecutionOptions,
     ) -> Result<MessageResponseStream, RuntimeError> {
-        if !request.stream {
+        if execution.response_mode != ResponseMode::Streaming {
             return Err(RuntimeError::configuration(
-                "streaming().create_request(...) requires request.stream = true",
+                "streaming() requires ExecutionOptions.response_mode = ResponseMode::Streaming",
             ));
         }
+        let request = self.request_from_task(task, model_override, true)?;
 
         let context = self.begin_direct_request(&request);
         let stream_observer = context.cloned_observer();
@@ -200,10 +211,10 @@ impl ProviderClient {
         let observer = resolve_observer_for_request(self.runtime.observer.as_ref(), None, None);
         let request_model = request_model(&request.model_id);
         let request_start_event = request_start_event(
-            Some(self.runtime.provider),
+            Some(self.runtime.kind),
             request_model.clone(),
             request_started_at.elapsed(),
-            Some(self.runtime.provider),
+            Some(self.runtime.kind),
             1,
         );
         safe_call_observer(observer, |runtime_observer| {
@@ -212,7 +223,7 @@ impl ProviderClient {
 
         let attempt_started_at = Instant::now();
         let attempt_start_event = attempt_start_event(
-            self.runtime.provider,
+            self.runtime.kind,
             request_model.clone(),
             0,
             0,
@@ -293,6 +304,37 @@ impl ProviderClient {
             runtime_observer.on_request_end(&event);
         });
     }
+
+    fn request_from_task(
+        &self,
+        task: TaskRequest,
+        model_override: Option<String>,
+        stream: bool,
+    ) -> Result<Request, RuntimeError> {
+        let model_id = model_override
+            .as_deref()
+            .and_then(trimmed_model)
+            .or_else(|| {
+                self.runtime
+                    .registered
+                    .config
+                    .default_model
+                    .as_deref()
+                    .and_then(trimmed_model)
+            })
+            .ok_or_else(|| {
+                RuntimeError::configuration(
+                    "no model was provided and no default model is configured",
+                )
+            })?
+            .to_string();
+
+        Ok(Request {
+            model_id,
+            stream,
+            ..Request::from(task)
+        })
+    }
 }
 
 impl DirectRequestContext<'_> {
@@ -303,4 +345,9 @@ impl DirectRequestContext<'_> {
 
 fn request_model(model_id: &str) -> Option<String> {
     (!model_id.is_empty()).then(|| model_id.to_string())
+}
+
+fn trimmed_model(model_id: &str) -> Option<&str> {
+    let trimmed = model_id.trim();
+    (!trimmed.is_empty()).then_some(trimmed)
 }

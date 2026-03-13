@@ -1,10 +1,11 @@
-use agent_core::Request;
+use agent_core::TaskRequest;
 
 use crate::agent_toolkit::AgentToolkit;
+use crate::execution_options::ExecutionOptions;
 use crate::message_create_input::MessageCreateInput;
 use crate::message_response_stream::MessageResponseStream;
+use crate::route::Route;
 use crate::runtime_error::RuntimeError;
-use crate::send_options::SendOptions;
 
 /// Streaming API for routed multi-provider execution.
 #[derive(Debug, Clone)]
@@ -18,23 +19,29 @@ impl RoutedStreamingApi<'_> {
     }
 
     /// Builds a streaming request from [`MessageCreateInput`] and opens a
-    /// routed stream using the supplied options.
+    /// routed stream using the supplied route and execution options.
     pub async fn create(
         &self,
         input: impl Into<MessageCreateInput>,
-        options: SendOptions,
+        route: Route,
+        execution: ExecutionOptions,
     ) -> Result<MessageResponseStream, RuntimeError> {
-        self.toolkit.create_stream(input.into(), options).await
+        let input = input.into();
+        let (task, model_override, input_execution) = input.into_task_request_parts()?;
+        let route = super::routed_messages_api::apply_model_override(route, model_override);
+        let mut execution =
+            super::routed_messages_api::merge_execution_options(input_execution, execution);
+        execution.response_mode = crate::ResponseMode::Streaming;
+        self.toolkit.execute_stream(task, route, execution).await
     }
 
-    /// Sends a fully-formed routed request.
-    ///
-    /// The request must have `stream = true`.
-    pub async fn create_request(
+    /// Opens a routed stream for an explicit semantic task.
+    pub async fn create_task(
         &self,
-        request: Request,
-        options: SendOptions,
+        task: TaskRequest,
+        route: Route,
+        execution: ExecutionOptions,
     ) -> Result<MessageResponseStream, RuntimeError> {
-        self.toolkit.send_stream(request, options).await
+        self.toolkit.execute_stream(task, route, execution).await
     }
 }

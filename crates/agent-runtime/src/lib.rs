@@ -6,6 +6,9 @@
 //! - [`AgentToolkit`] for routed execution across multiple configured providers
 //!   with target selection, fallback, and observer hooks.
 //!
+//! The explicit low-level execution boundary is
+//! [`agent_core::TaskRequest`] + [`Route`] + [`ExecutionOptions`].
+//!
 //! Use `messages()` for non-streaming requests and `streaming()` when you need
 //! canonical stream envelopes or text deltas.
 
@@ -15,6 +18,7 @@ mod clients;
 mod conversation;
 mod direct_messages_api;
 mod direct_streaming_api;
+mod execution_options;
 mod fallback;
 mod message_create_input;
 mod message_response_stream;
@@ -24,10 +28,11 @@ mod provider_client;
 mod provider_config;
 mod provider_runtime;
 mod provider_stream_runtime;
+mod registered_provider;
+mod route;
 mod routed_messages_api;
 mod routed_streaming_api;
 mod runtime_error;
-mod send_options;
 mod target;
 mod types;
 
@@ -39,6 +44,7 @@ pub use crate::clients::{
 pub use crate::conversation::Conversation;
 pub use crate::direct_messages_api::DirectMessagesApi;
 pub use crate::direct_streaming_api::DirectStreamingApi;
+pub use crate::execution_options::{ExecutionOptions, ResponseMode, TransportOptions};
 pub use crate::fallback::{
     FallbackAction, FallbackMatch, FallbackMode, FallbackPolicy, FallbackRule,
 };
@@ -47,10 +53,11 @@ pub use crate::message_response_stream::{MessageResponseStream, StreamCompletion
 pub use crate::message_text_stream::MessageTextStream;
 pub use crate::observer::RuntimeObserver;
 pub use crate::provider_config::ProviderConfig;
+pub use crate::registered_provider::RegisteredProvider;
+pub use crate::route::Route;
 pub use crate::routed_messages_api::RoutedMessagesApi;
 pub use crate::routed_streaming_api::RoutedStreamingApi;
 pub use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
-pub use crate::send_options::SendOptions;
 pub use crate::target::Target;
 pub use crate::types::{
     AttemptFailureEvent, AttemptMeta, AttemptStartEvent, AttemptSuccessEvent, RequestEndEvent,

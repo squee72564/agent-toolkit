@@ -86,23 +86,29 @@ macro_rules! impl_provider_client {
                 self.inner.streaming()
             }
 
-            /// Sends a fully-formed request directly to this provider.
-            pub async fn send(
+            /// Executes an explicit semantic task against this provider.
+            pub async fn execute(
                 &self,
-                request: agent_core::Request,
+                task: agent_core::TaskRequest,
+                model_override: Option<String>,
+                execution: crate::execution_options::ExecutionOptions,
             ) -> Result<agent_core::Response, crate::runtime_error::RuntimeError> {
-                self.inner.send(request).await
+                self.inner.execute(task, model_override, execution).await
             }
 
-            /// Sends a fully-formed request and returns attempt metadata.
-            pub async fn send_with_meta(
+            /// Executes an explicit semantic task and returns attempt metadata.
+            pub async fn execute_with_meta(
                 &self,
-                request: agent_core::Request,
+                task: agent_core::TaskRequest,
+                model_override: Option<String>,
+                execution: crate::execution_options::ExecutionOptions,
             ) -> Result<
                 (agent_core::Response, crate::types::ResponseMeta),
                 crate::runtime_error::RuntimeError,
             > {
-                self.inner.send_with_meta(request).await
+                self.inner
+                    .execute_with_meta(task, model_override, execution)
+                    .await
             }
         }
 
@@ -160,7 +166,10 @@ macro_rules! impl_provider_client {
 
             /// Builds the provider client.
             pub fn build(self) -> Result<$client, crate::runtime_error::RuntimeError> {
-                let provider_runtime = self.inner.build_runtime($provider)?;
+                let provider_runtime = self.inner.build_runtime(
+                    $provider,
+                    crate::target::Target::default_instance_for($provider),
+                )?;
                 Ok($client {
                     inner: crate::provider_client::ProviderClient::new(provider_runtime),
                 })

@@ -33,9 +33,9 @@ pub mod platform {
     pub use agent_core::types::platform::*;
 }
 
-/// Request models sent from the runtime to provider adapters.
+/// Task and request models shared across runtime boundaries.
 pub mod request {
-    pub use agent_core::types::request::*;
+    pub use agent_core::types::task::*;
 }
 
 /// Normalized response models returned from provider adapters.
@@ -52,12 +52,12 @@ pub use agent_core::types::*;
 pub use agent_runtime::{
     AgentToolkit, AgentToolkitBuilder, AnthropicClient, AnthropicClientBuilder,
     AttemptFailureEvent, AttemptMeta, AttemptStartEvent, AttemptSuccessEvent, Conversation,
-    DirectMessagesApi, DirectStreamingApi, FallbackAction, FallbackMatch, FallbackMode,
-    FallbackPolicy, FallbackRule, MessageCreateInput, MessageResponseStream, MessageTextStream,
-    OpenAiClient, OpenAiClientBuilder, OpenRouterClient, OpenRouterClientBuilder, ProviderConfig,
-    RequestEndEvent, RequestStartEvent, ResponseMeta, RoutedMessagesApi, RoutedStreamingApi,
-    RuntimeError, RuntimeErrorKind, RuntimeObserver, SendOptions, StreamCompletion, Target,
-    anthropic, openai, openrouter,
+    DirectMessagesApi, DirectStreamingApi, ExecutionOptions, FallbackAction, FallbackMatch,
+    FallbackMode, FallbackPolicy, FallbackRule, MessageCreateInput, MessageResponseStream,
+    MessageTextStream, OpenAiClient, OpenAiClientBuilder, OpenRouterClient,
+    OpenRouterClientBuilder, ProviderConfig, RequestEndEvent, RequestStartEvent, ResponseMeta,
+    ResponseMode, Route, RoutedMessagesApi, RoutedStreamingApi, RuntimeError, RuntimeErrorKind,
+    RuntimeObserver, StreamCompletion, Target, TransportOptions, anthropic, openai, openrouter,
 };
 pub use agent_transport::{
     HttpJsonResponse, HttpTransport, HttpTransportBuilder, RetryPolicy, TransportError,

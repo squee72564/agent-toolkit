@@ -1,5 +1,6 @@
-use agent_core::Request;
+use agent_core::TaskRequest;
 
+use crate::execution_options::ExecutionOptions;
 use crate::message_create_input::MessageCreateInput;
 use crate::message_response_stream::MessageResponseStream;
 use crate::provider_client::ProviderClient;
@@ -25,13 +26,16 @@ impl DirectStreamingApi<'_> {
         self.client.create_stream(input.into()).await
     }
 
-    /// Sends a fully-formed request directly to this client.
-    ///
-    /// The request must have `stream = true`.
-    pub async fn create_request(
+    /// Opens a stream for an explicit semantic task using the client's
+    /// configured default model unless `model_override` is supplied.
+    pub async fn create_task(
         &self,
-        request: Request,
+        task: TaskRequest,
+        model_override: Option<String>,
+        execution: ExecutionOptions,
     ) -> Result<MessageResponseStream, RuntimeError> {
-        self.client.send_stream(request).await
+        self.client
+            .execute_stream(task, model_override, execution)
+            .await
     }
 }

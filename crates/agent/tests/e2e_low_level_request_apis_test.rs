@@ -3,8 +3,9 @@ mod e2e;
 use std::collections::BTreeMap;
 
 use agent_toolkit::{
-    AgentToolkit, ContentPart, Message, MessageCreateInput, MessageRole, ProviderConfig,
-    ProviderId, Request, SendOptions, Target, ToolChoice, ToolDefinition, anthropic, openai,
+    AgentToolkit, ContentPart, ExecutionOptions, Message, MessageCreateInput, MessageRole,
+    ProviderConfig, ProviderId, Route, Target, TaskRequest, ToolChoice, ToolDefinition, anthropic,
+    openai,
 };
 
 use e2e::assertions::{
@@ -15,43 +16,43 @@ use e2e::fixtures::{FixtureProvider, FixtureScenario, load_fixture_json};
 use e2e::mock_server::{MockResponse, MockServer};
 use e2e::timeout::with_test_timeout;
 
-fn explicit_request(model_id: &str) -> Request {
+fn explicit_task_with_text(text: &str) -> TaskRequest {
     let mut metadata = BTreeMap::new();
     metadata.insert("trace_id".to_string(), "trace-123".to_string());
 
-    Request {
-        model_id: model_id.to_string(),
-        stream: false,
-        messages: vec![Message::new(
-            MessageRole::User,
-            vec![ContentPart::text("hello from explicit request")],
-        )],
-        tools: vec![ToolDefinition {
-            name: "raw_echo".to_string(),
-            description: Some("echo tool".to_string()),
-            parameters_schema: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "value": { "type": "string" }
-                },
-                "required": ["value"],
-                "additionalProperties": false
-            }),
-        }],
-        tool_choice: ToolChoice::Specific {
-            name: "raw_echo".to_string(),
-        },
-        response_format: Default::default(),
-        temperature: Some(0.2),
-        top_p: None,
-        max_output_tokens: Some(128),
-        stop: vec![],
-        metadata,
-    }
+    MessageCreateInput::new(vec![Message::new(
+        MessageRole::User,
+        vec![ContentPart::text(text)],
+    )])
+    .with_tools(vec![ToolDefinition {
+        name: "raw_echo".to_string(),
+        description: Some("echo tool".to_string()),
+        parameters_schema: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "value": { "type": "string" }
+            },
+            "required": ["value"],
+            "additionalProperties": false
+        }),
+    }])
+    .with_tool_choice(ToolChoice::Specific {
+        name: "raw_echo".to_string(),
+    })
+    .with_response_format(Default::default())
+    .with_temperature(0.2)
+    .with_max_output_tokens(128)
+    .with_metadata(metadata)
+    .into_task_request()
+    .expect("explicit task should build")
+}
+
+fn explicit_task() -> agent_toolkit::TaskRequest {
+    explicit_task_with_text("hello from explicit task")
 }
 
 #[tokio::test]
-async fn create_request_with_meta_openai_uses_explicit_request_and_captures_shape() {
+async fn create_task_with_meta_openai_uses_explicit_task_and_captures_shape() {
     let fixture = load_fixture_json(
         FixtureProvider::OpenAi,
         FixtureScenario::BasicChat,
@@ -69,11 +70,14 @@ async fn create_request_with_meta_openai_uses_explicit_request_and_captures_shap
         .build()
         .expect("build openai client");
 
-    let request = explicit_request("gpt-5-mini");
-    let (_response, meta) =
-        with_test_timeout(client.messages().create_request_with_meta(request.clone()))
-            .await
-            .expect("create_request_with_meta should succeed");
+    let task = explicit_task_with_text("hello from explicit request");
+    let (_response, meta) = with_test_timeout(client.messages().create_task_with_meta(
+        task,
+        Some("gpt-5-mini".to_string()),
+        ExecutionOptions::default(),
+    ))
+    .await
+    .expect("create_task_with_meta should succeed");
 
     assert_eq!(meta.selected_provider, ProviderId::OpenAi);
     assert_eq!(meta.selected_model, "gpt-5-mini");
@@ -91,7 +95,7 @@ async fn create_request_with_meta_openai_uses_explicit_request_and_captures_shap
 }
 
 #[tokio::test]
-async fn create_request_with_meta_anthropic_uses_expected_auth_headers_and_tool_choice_mapping() {
+async fn create_task_with_meta_anthropic_uses_expected_auth_headers_and_tool_choice_mapping() {
     let fixture = load_fixture_json(
         FixtureProvider::Anthropic,
         FixtureScenario::BasicChat,
@@ -109,10 +113,14 @@ async fn create_request_with_meta_anthropic_uses_expected_auth_headers_and_tool_
         .build()
         .expect("build anthropic client");
 
-    let request = explicit_request("claude-sonnet-4-6");
-    let _ = with_test_timeout(client.messages().create_request_with_meta(request))
-        .await
-        .expect("anthropic request should succeed");
+    let task = explicit_task_with_text("hello from explicit request");
+    let _ = with_test_timeout(client.messages().create_task_with_meta(
+        task,
+        Some("claude-sonnet-4-6".to_string()),
+        ExecutionOptions::default(),
+    ))
+    .await
+    .expect("anthropic task should succeed");
 
     let captured = server.captured_requests().await;
     assert_eq!(captured.len(), 1);
@@ -127,7 +135,7 @@ async fn create_request_with_meta_anthropic_uses_expected_auth_headers_and_tool_
 }
 
 #[tokio::test]
-async fn toolkit_send_with_meta_honors_target_model_and_send_metadata_headers() {
+async fn toolkit_execute_with_meta_honors_target_model_and_execution_headers() {
     let fixture = load_fixture_json(
         FixtureProvider::OpenRouter,
         FixtureScenario::BasicChat,
@@ -147,18 +155,17 @@ async fn toolkit_send_with_meta_honors_target_model_and_send_metadata_headers() 
         .build()
         .expect("build toolkit");
 
-    let request = explicit_request("openai.gpt-5-nano");
-
-    let mut options =
-        SendOptions::for_target(Target::new(ProviderId::OpenRouter).with_model("openai.gpt-5.4"));
-    options.metadata.insert(
+    let task = explicit_task_with_text("hello from explicit request");
+    let route = Route::to(Target::new(ProviderId::OpenRouter).with_model("openai.gpt-5.4"));
+    let mut execution = ExecutionOptions::default();
+    execution.transport.extra_headers.insert(
         "transport.header.x-e2e-meta".to_string(),
         "header-value".to_string(),
     );
 
-    let (_response, meta) = with_test_timeout(toolkit.send_with_meta(request, options))
+    let (_response, meta) = with_test_timeout(toolkit.execute_with_meta(task, route, execution))
         .await
-        .expect("toolkit send_with_meta should succeed");
+        .expect("toolkit execute_with_meta should succeed");
 
     assert_eq!(meta.selected_provider, ProviderId::OpenRouter);
     assert_eq!(meta.selected_model, "openai.gpt-5.4");
@@ -174,7 +181,53 @@ async fn toolkit_send_with_meta_honors_target_model_and_send_metadata_headers() 
 }
 
 #[tokio::test]
-async fn router_messages_create_request_and_send_match_same_explicit_contract() {
+async fn toolkit_execute_with_meta_honors_route_and_execution_headers() {
+    let fixture = load_fixture_json(
+        FixtureProvider::OpenRouter,
+        FixtureScenario::BasicChat,
+        "openai.gpt-5.4.json",
+    );
+    let server = MockServer::spawn(vec![
+        MockResponse::json(200, fixture).with_header("x-request-id", "low_openrouter_task_1"),
+    ])
+    .await;
+
+    let toolkit = AgentToolkit::builder()
+        .with_openrouter(
+            ProviderConfig::new("openrouter-key")
+                .with_base_url(server.base_url())
+                .with_default_model("openai.gpt-5-nano"),
+        )
+        .build()
+        .expect("build toolkit");
+
+    let task = explicit_task();
+    let route = Route::to(Target::new(ProviderId::OpenRouter).with_model("openai.gpt-5.4"));
+    let mut execution = ExecutionOptions::default();
+    execution.transport.extra_headers.insert(
+        "transport.header.x-e2e-meta".to_string(),
+        "header-value".to_string(),
+    );
+
+    let (_response, meta) = with_test_timeout(toolkit.execute_with_meta(task, route, execution))
+        .await
+        .expect("toolkit execute_with_meta should succeed");
+
+    assert_eq!(meta.selected_provider, ProviderId::OpenRouter);
+    assert_eq!(meta.selected_model, "openai.gpt-5.4");
+
+    let captured = server.captured_requests().await;
+    assert_eq!(captured.len(), 1);
+
+    let req = &captured[0];
+    assert_post_path(req, "/v1/responses");
+    assert_auth_bearer(req, "openrouter-key");
+    assert_header(req, "x-e2e-meta", "header-value");
+    assert_json_string(&req.body_json, "/model", "openai.gpt-5.4");
+}
+
+#[tokio::test]
+async fn router_messages_create_task_and_execute_match_same_explicit_contract() {
     let fixture = load_fixture_json(
         FixtureProvider::OpenAi,
         FixtureScenario::BasicChat,
@@ -196,22 +249,22 @@ async fn router_messages_create_request_and_send_match_same_explicit_contract() 
         .build()
         .expect("build toolkit");
 
-    let options = SendOptions::for_target(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"));
+    let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"));
+    let task_a = explicit_task_with_text("hello from explicit request");
+    let task_b = explicit_task_with_text("hello from explicit request");
 
-    let request_a = explicit_request("gpt-5-mini");
-    let request_b = explicit_request("gpt-5-mini");
-
-    let _ = with_test_timeout(
-        toolkit
-            .messages()
-            .create_request_with_meta(request_a, options.clone()),
-    )
+    let _ = with_test_timeout(toolkit.messages().create_task_with_meta(
+        task_a,
+        route.clone(),
+        ExecutionOptions::default(),
+    ))
     .await
-    .expect("create_request_with_meta succeeds");
+    .expect("create_task_with_meta succeeds");
 
-    let _ = with_test_timeout(toolkit.send_with_meta(request_b, options))
-        .await
-        .expect("send_with_meta succeeds");
+    let _ =
+        with_test_timeout(toolkit.execute_with_meta(task_b, route, ExecutionOptions::default()))
+            .await
+            .expect("execute_with_meta succeeds");
 
     let captured = server.captured_requests().await;
     assert_eq!(captured.len(), 2);

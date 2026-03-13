@@ -5,8 +5,9 @@ mod e2e;
 use std::sync::{Arc, Mutex};
 
 use agent_toolkit::{
-    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, MessageCreateInput, ProviderId,
-    RequestEndEvent, RequestStartEvent, RuntimeObserver, SendOptions, Target, openai,
+    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
+    MessageCreateInput, ProviderId, RequestEndEvent, RequestStartEvent, ResponseMode, Route,
+    RuntimeObserver, Target, openai,
 };
 
 use e2e::live::{
@@ -166,13 +167,19 @@ async fn live_openai_routed_streaming_supports_per_call_observer_override() {
 
     let observer = Arc::new(RecordingObserver::default());
     let observer_trait: Arc<dyn RuntimeObserver> = observer.clone();
+    let task = MessageCreateInput::user("Say hello in five words.")
+        .into_task_request()
+        .expect("task should build");
+    let route = Route::to(Target::new(ProviderId::OpenAi));
+    let execution = ExecutionOptions {
+        response_mode: ResponseMode::Streaming,
+        observer: Some(observer_trait),
+        ..ExecutionOptions::default()
+    };
 
-    let stream = with_live_test_timeout(toolkit.streaming().create(
-        MessageCreateInput::user("Say hello in five words."),
-        SendOptions::for_target(Target::new(ProviderId::OpenAi)).with_observer(observer_trait),
-    ))
-    .await
-    .expect("routed stream should open");
+    let stream = with_live_test_timeout(toolkit.streaming().create_task(task, route, execution))
+        .await
+        .expect("routed stream should open");
 
     let completion = with_live_test_timeout(stream.into_text_stream().finish())
         .await

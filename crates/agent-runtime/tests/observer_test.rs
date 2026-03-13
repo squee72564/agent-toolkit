@@ -6,9 +6,9 @@ use std::time::Duration;
 
 use agent_core::types::ProviderId;
 use agent_runtime::{
-    AgentToolkit, AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, FallbackMode,
-    FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig, RequestEndEvent,
-    RequestStartEvent, RuntimeErrorKind, RuntimeObserver, SendOptions, Target, openai,
+    AgentToolkit, AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
+    FallbackMode, FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig,
+    RequestEndEvent, RequestStartEvent, Route, RuntimeErrorKind, RuntimeObserver, Target, openai,
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -323,8 +323,10 @@ async fn router_fallback_ordered_attempts_with_indices() {
     let (_response, meta) = with_timeout(
         toolkit.messages().create_with_meta(
             MessageCreateInput::user("hello"),
-            SendOptions::for_target(Target::new(ProviderId::OpenAi).with_model(" "))
+            Route::to(Target::new(ProviderId::OpenAi).with_model(" "))
+                .with_fallbacks(fallback_policy.targets.clone())
                 .with_fallback_policy(fallback_policy),
+            ExecutionOptions::default(),
         ),
     )
     .await
@@ -354,7 +356,7 @@ async fn router_fallback_ordered_attempts_with_indices() {
 }
 
 #[tokio::test]
-async fn toolkit_observer_and_send_override_precedence() {
+async fn toolkit_observer_and_execution_override_precedence() {
     let toolkit_observer = Arc::new(RecordingObserver::new());
     let send_observer = Arc::new(RecordingObserver::new());
 
@@ -364,13 +366,14 @@ async fn toolkit_observer_and_send_override_precedence() {
         .build()
         .expect("build toolkit");
 
-    let _ = with_timeout(
-        toolkit.messages().create_with_meta(
-            MessageCreateInput::user("hello"),
-            SendOptions::for_target(Target::new(ProviderId::OpenAi))
-                .with_observer(send_observer.clone()),
-        ),
-    )
+    let _ = with_timeout(toolkit.messages().create_with_meta(
+        MessageCreateInput::user("hello"),
+        Route::to(Target::new(ProviderId::OpenAi)),
+        ExecutionOptions {
+            observer: Some(send_observer.clone()),
+            ..ExecutionOptions::default()
+        },
+    ))
     .await
     .expect_err("request should fail and still emit observer events");
 
@@ -404,8 +407,10 @@ async fn fallback_exhausted_request_end_uses_terminal_failure_context() {
     let error = with_timeout(
         toolkit.messages().create_with_meta(
             MessageCreateInput::user("hello"),
-            SendOptions::for_target(Target::new(ProviderId::OpenAi).with_model(" "))
+            Route::to(Target::new(ProviderId::OpenAi).with_model(" "))
+                .with_fallbacks(fallback_policy.targets.clone())
                 .with_fallback_policy(fallback_policy),
+            ExecutionOptions::default(),
         ),
     )
     .await

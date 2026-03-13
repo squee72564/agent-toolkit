@@ -19,6 +19,7 @@ pub fn provider_api_key_env(provider: ProviderId) -> &'static str {
         ProviderId::OpenAi => "OPENAI_API_KEY",
         ProviderId::Anthropic => "ANTHROPIC_API_KEY",
         ProviderId::OpenRouter => "OPENROUTER_API_KEY",
+        ProviderId::GenericOpenAiCompatible => "OPENAI_API_KEY",
     }
 }
 
@@ -38,6 +39,7 @@ pub fn default_live_model(provider: ProviderId) -> &'static str {
         ProviderId::OpenAi => "gpt-5-mini",
         ProviderId::Anthropic => "claude-sonnet-4-6",
         ProviderId::OpenRouter => "openai/gpt-5-nano",
+        ProviderId::GenericOpenAiCompatible => "gpt-5-mini",
     }
 }
 

@@ -19,7 +19,11 @@ fn builder_registers_openai_provider() {
         .build()
         .expect("builder should register openai");
 
-    assert!(toolkit.clients.contains_key(&ProviderId::OpenAi));
+    assert!(
+        toolkit
+            .clients
+            .contains_key(&Target::default_instance_for(ProviderId::OpenAi))
+    );
 }
 
 #[test]
@@ -29,7 +33,11 @@ fn builder_registers_anthropic_provider() {
         .build()
         .expect("builder should register anthropic");
 
-    assert!(toolkit.clients.contains_key(&ProviderId::Anthropic));
+    assert!(
+        toolkit
+            .clients
+            .contains_key(&Target::default_instance_for(ProviderId::Anthropic))
+    );
 }
 
 #[test]
@@ -39,7 +47,11 @@ fn builder_registers_openrouter_provider() {
         .build()
         .expect("builder should register openrouter");
 
-    assert!(toolkit.clients.contains_key(&ProviderId::OpenRouter));
+    assert!(
+        toolkit
+            .clients
+            .contains_key(&Target::default_instance_for(ProviderId::OpenRouter))
+    );
 }
 
 #[test]
@@ -53,7 +65,7 @@ fn builder_propagates_observer_to_provider_runtime() {
 
     let client = toolkit
         .clients
-        .get(&ProviderId::OpenAi)
+        .get(&Target::default_instance_for(ProviderId::OpenAi))
         .expect("openai client should be registered");
 
     assert!(toolkit.observer.is_some());
@@ -67,64 +79,92 @@ fn router_requires_explicit_target_without_policy() {
         observer: None,
     };
     let error = toolkit
-        .resolve_targets(&SendOptions::default())
+        .resolve_route_targets(&Route {
+            primary: Target::new(ProviderId::OpenAi),
+            fallbacks: Vec::new(),
+            fallback_policy: FallbackPolicy::default(),
+        })
         .expect_err("target resolution should fail");
     assert_eq!(error.kind, RuntimeErrorKind::TargetResolution);
 }
 
 #[test]
-fn fallback_policy_requires_targets_without_primary_target() {
+fn resolve_route_targets_errors_for_unregistered_provider() {
     let toolkit = AgentToolkit {
-        clients: HashMap::new(),
+        clients: HashMap::from([(
+            Target::default_instance_for(ProviderId::OpenAi),
+            test_provider_client(ProviderId::OpenAi),
+        )]),
         observer: None,
     };
-    let options = SendOptions::default().with_fallback_policy(FallbackPolicy::new(vec![]));
     let error = toolkit
-        .resolve_targets(&options)
-        .expect_err("empty fallback target list should fail without primary target");
-
-    assert_eq!(error.kind, RuntimeErrorKind::TargetResolution);
-}
-
-#[test]
-fn resolve_targets_errors_for_unregistered_provider() {
-    let toolkit = AgentToolkit {
-        clients: HashMap::from([(ProviderId::OpenAi, test_provider_client(ProviderId::OpenAi))]),
-        observer: None,
-    };
-
-    let options =
-        SendOptions::for_target(Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"));
-    let error = toolkit
-        .resolve_targets(&options)
+        .resolve_route_targets(&Route::to(
+            Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"),
+        ))
         .expect_err("unregistered provider should fail target resolution");
 
     assert_eq!(error.kind, RuntimeErrorKind::TargetResolution);
 }
 
 #[test]
-fn resolve_targets_deduplicates_primary_and_fallback_targets() {
+fn resolve_route_targets_deduplicates_primary_and_fallback_targets() {
     let toolkit = AgentToolkit {
         clients: HashMap::from([
-            (ProviderId::OpenAi, test_provider_client(ProviderId::OpenAi)),
             (
-                ProviderId::OpenRouter,
+                Target::default_instance_for(ProviderId::OpenAi),
+                test_provider_client(ProviderId::OpenAi),
+            ),
+            (
+                Target::default_instance_for(ProviderId::OpenRouter),
                 test_provider_client(ProviderId::OpenRouter),
             ),
         ]),
         observer: None,
     };
 
-    let options = SendOptions::for_target(Target::new(ProviderId::OpenAi).with_model("gpt-5"))
-        .with_fallback_policy(FallbackPolicy::new(vec![
+    let route = crate::Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5"))
+        .with_fallbacks(vec![
             Target::new(ProviderId::OpenAi).with_model("gpt-5"),
             Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"),
             Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"),
-        ]));
+        ]);
 
     let targets = toolkit
-        .resolve_targets(&options)
+        .resolve_route_targets(&route)
         .expect("target resolution should succeed");
+
+    assert_eq!(
+        targets,
+        vec![
+            Target::new(ProviderId::OpenAi).with_model("gpt-5"),
+            Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"),
+        ]
+    );
+}
+
+#[test]
+fn resolve_route_targets_preserves_fallback_policy_targets_when_deduplicating() {
+    let toolkit = AgentToolkit {
+        clients: HashMap::from([
+            (
+                Target::default_instance_for(ProviderId::OpenAi),
+                test_provider_client(ProviderId::OpenAi),
+            ),
+            (
+                Target::default_instance_for(ProviderId::OpenRouter),
+                test_provider_client(ProviderId::OpenRouter),
+            ),
+        ]),
+        observer: None,
+    };
+
+    let route = crate::Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5"))
+        .with_fallback(Target::new(ProviderId::OpenAi).with_model("gpt-5"))
+        .with_fallback(Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"));
+
+    let targets = toolkit
+        .resolve_route_targets(&route)
+        .expect("route target resolution should succeed");
 
     assert_eq!(
         targets,
