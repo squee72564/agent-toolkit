@@ -6,6 +6,8 @@ pub mod identity;
 pub mod message;
 /// Layered family-scoped and provider-scoped native request controls.
 pub mod native_options;
+/// Shared planning and execution-boundary types.
+pub mod planning;
 /// Provider and transport configuration shared with HTTP adapters.
 pub mod platform;
 /// Normalized response models returned from provider adapters.
@@ -47,6 +49,18 @@ pub use native_options::OpenAiOptions;
 pub use native_options::OpenRouterOptions;
 /// Re-export of [`native_options::ProviderOptions`].
 pub use native_options::ProviderOptions;
+/// Re-export of [`planning::ExecutionPlan`].
+pub use planning::ExecutionPlan;
+/// Re-export of [`planning::ResolvedAuthContext`].
+pub use planning::ResolvedAuthContext;
+/// Re-export of [`planning::ResolvedProviderAttempt`].
+pub use planning::ResolvedProviderAttempt;
+/// Re-export of [`planning::ResolvedTransportOptions`].
+pub use planning::ResolvedTransportOptions;
+/// Re-export of [`planning::ResponseMode`].
+pub use planning::ResponseMode;
+/// Re-export of [`planning::TransportTimeoutOverrides`].
+pub use planning::TransportTimeoutOverrides;
 /// Re-export of [`platform::AdapterContext`].
 pub use platform::AdapterContext;
 /// Re-export of [`platform::AuthCredentials`].
