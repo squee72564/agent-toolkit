@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use agent_core::{
-    CanonicalStreamEnvelope, PlatformConfig, ProviderId, ProviderInstanceId, ProviderKind,
-    Response, ResponseFormat, RuntimeWarning,
+    CanonicalStreamEnvelope, ExecutionPlan, PlatformConfig, ProviderId, ProviderInstanceId,
+    ProviderKind, Response, ResponseFormat, RuntimeWarning,
 };
 use agent_providers::error::AdapterOperation;
 use agent_providers::{
@@ -11,7 +11,6 @@ use agent_providers::{
 use agent_transport::{HttpJsonResponse, HttpResponseMode, HttpSseResponse, HttpTransport};
 
 use crate::observer::RuntimeObserver;
-use crate::planner::ExecutionPlan;
 use crate::provider_stream_runtime::{ProviderStreamRuntime, StreamRuntimeError};
 use crate::registered_provider::RegisteredProvider;
 use crate::runtime_error::RuntimeError;
@@ -21,6 +20,7 @@ mod attempt;
 mod transport;
 
 use self::attempt::{PreparedAttempt, prepare_attempt};
+#[cfg(test)]
 pub(crate) use self::transport::apply_timeout_overrides;
 use self::transport::{
     execute_planned_non_streaming, open_planned_stream, plan_execution, validate_streaming_plan,
@@ -138,7 +138,15 @@ impl ProviderRuntime {
             selected_model,
             adapter_context,
         } = prepare_attempt(&execution_plan);
-        let planned = plan_execution(self, &execution_plan);
+        let planned = match plan_execution(self, &execution_plan) {
+            Ok(planned) => planned,
+            Err(error) => {
+                return ProviderAttemptOutcome::Failure {
+                    meta: attempt::failure_meta(self.kind, selected_model, &error),
+                    error,
+                };
+            }
+        };
         let provider_response =
             execute_planned_non_streaming(self, planned, &adapter_context).await;
 
@@ -168,7 +176,15 @@ impl ProviderRuntime {
             adapter_context,
         } = prepare_attempt(&execution_plan);
 
-        let planned = plan_execution(self, &execution_plan);
+        let planned = match plan_execution(self, &execution_plan) {
+            Ok(planned) => planned,
+            Err(error) => {
+                return ProviderStreamAttemptOutcome::Failure {
+                    meta: attempt::failure_meta(self.kind, selected_model, &error),
+                    error,
+                };
+            }
+        };
         let stream = match validate_streaming_plan(self.kind, &planned.plan) {
             Ok(()) => open_planned_stream(self, planned, &adapter_context).await,
             Err(error) => Err(error),

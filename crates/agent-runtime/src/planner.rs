@@ -1,18 +1,14 @@
-use std::collections::BTreeMap;
-
 use agent_core::{
-    AdapterContext, AuthCredentials, NativeOptions, PlatformConfig, ProviderCapabilities,
-    ProviderFamilyId, ProviderInstanceId, ProviderKind, Request, TaskRequest,
+    AdapterContext, AuthCredentials, ExecutionPlan, ProviderCapabilities, ProviderFamilyId,
+    ProviderInstanceId, ProviderKind, ResolvedAuthContext, ResolvedProviderAttempt,
+    ResolvedTransportOptions, ResponseMode, TaskRequest,
 };
-use agent_providers::request_plan::ProviderRequestPlan;
 
 use crate::agent_toolkit::AgentToolkit;
-use crate::attempt_execution_options::TransportTimeoutOverrides;
 use crate::attempt_spec::AttemptSpec;
-use crate::execution_options::{ExecutionOptions, ResponseMode};
+use crate::execution_options::ExecutionOptions;
 use crate::planning_rejection_policy::PlanningRejectionPolicy;
 use crate::provider_client::ProviderClient;
-use crate::provider_runtime::apply_timeout_overrides;
 use crate::route::Route;
 use crate::runtime_error::RuntimeError;
 use crate::types::{
@@ -40,52 +36,6 @@ pub(crate) struct PlanningRejection {
 pub(crate) enum AttemptPlanningError {
     Fatal(Box<RuntimeError>),
     Rejected(Box<PlanningRejection>),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct ResolvedProviderAttempt {
-    pub(crate) instance_id: ProviderInstanceId,
-    pub(crate) provider_kind: ProviderKind,
-    pub(crate) family: ProviderFamilyId,
-    pub(crate) model: String,
-    pub(crate) capabilities: ProviderCapabilities,
-    pub(crate) native_options: Option<NativeOptions>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ResolvedAuthContext {
-    pub(crate) credentials: Option<AuthCredentials>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ResolvedTransportOptions {
-    pub(crate) request_id_header_override: Option<String>,
-    pub(crate) route_extra_headers: BTreeMap<String, String>,
-    pub(crate) attempt_extra_headers: BTreeMap<String, String>,
-    pub(crate) timeout_overrides: TransportTimeoutOverrides,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct ExecutionPlan {
-    #[allow(dead_code)]
-    pub(crate) response_mode: ResponseMode,
-    pub(crate) task: TaskRequest,
-    pub(crate) provider_request_plan: ProviderRequestPlan,
-    pub(crate) attempt: ResolvedProviderAttempt,
-    pub(crate) platform: PlatformConfig,
-    pub(crate) auth: ResolvedAuthContext,
-    pub(crate) transport: ResolvedTransportOptions,
-    #[allow(dead_code)]
-    pub(crate) capabilities: ProviderCapabilities,
-}
-
-impl ExecutionPlan {
-    pub(crate) fn adapter_context(&self) -> AdapterContext {
-        AdapterContext {
-            metadata: build_transport_metadata_shim(&self.transport),
-            auth_token: self.auth.credentials.clone(),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -273,32 +223,6 @@ fn plan_attempt(
     )
     .map_err(AttemptPlanningError::Rejected)?;
 
-    let request = Request {
-        model_id: selected_model.clone(),
-        stream: execution.response_mode == ResponseMode::Streaming,
-        ..Request::from(task.clone())
-    };
-
-    let mut provider_request_plan = client
-        .runtime
-        .adapter
-        .plan_request(request, attempt.execution.native.as_ref())
-        .map_err(RuntimeError::from_adapter)
-        .map_err(|error| {
-            AttemptPlanningError::Rejected(Box::new(PlanningRejection {
-                kind: PlanningRejectionKind::AdapterPlanningRejected,
-                error,
-                provider_instance: client.runtime.instance_id.clone(),
-                provider_kind: client.runtime.kind,
-                model: selected_model.clone(),
-            }))
-        })?;
-
-    apply_timeout_overrides(
-        &mut provider_request_plan,
-        &attempt.execution.timeout_overrides,
-    );
-
     let platform = client
         .runtime
         .registered
@@ -320,21 +244,37 @@ fn plan_attempt(
         instance_id: client.runtime.instance_id.clone(),
         provider_kind: client.runtime.kind,
         family: descriptor.family,
-        model: selected_model,
+        model: selected_model.clone(),
         capabilities,
         native_options: attempt.execution.native.clone(),
     };
 
-    Ok(ExecutionPlan {
+    let execution_plan = ExecutionPlan {
         response_mode: execution.response_mode,
         task: task.clone(),
-        provider_request_plan,
-        attempt: resolved_attempt,
+        provider_attempt: resolved_attempt,
         platform,
         auth,
         transport,
         capabilities,
-    })
+    };
+
+    client
+        .runtime
+        .adapter
+        .plan_request(&execution_plan)
+        .map_err(RuntimeError::from_adapter)
+        .map_err(|error| {
+            AttemptPlanningError::Rejected(Box::new(PlanningRejection {
+                kind: PlanningRejectionKind::AdapterPlanningRejected,
+                error,
+                provider_instance: client.runtime.instance_id.clone(),
+                provider_kind: client.runtime.kind,
+                model: selected_model,
+            }))
+        })?;
+
+    Ok(execution_plan)
 }
 
 fn validate_attempt_spec(
@@ -522,7 +462,33 @@ pub(crate) fn build_transport_metadata_shim(
         metadata.insert(normalize_transport_header_key(key), value.clone());
     }
 
+    if let Some(timeout) = transport.timeout_overrides.request_timeout {
+        metadata.insert(
+            "transport.timeout.request_ms".to_string(),
+            timeout.as_millis().to_string(),
+        );
+    }
+    if let Some(timeout) = transport.timeout_overrides.stream_setup_timeout {
+        metadata.insert(
+            "transport.timeout.stream_setup_ms".to_string(),
+            timeout.as_millis().to_string(),
+        );
+    }
+    if let Some(timeout) = transport.timeout_overrides.stream_idle_timeout {
+        metadata.insert(
+            "transport.timeout.stream_idle_ms".to_string(),
+            timeout.as_millis().to_string(),
+        );
+    }
+
     metadata
+}
+
+pub(crate) fn adapter_context(execution_plan: &ExecutionPlan) -> AdapterContext {
+    AdapterContext {
+        metadata: build_transport_metadata_shim(&execution_plan.transport),
+        auth_token: execution_plan.auth.credentials.clone(),
+    }
 }
 
 fn normalize_transport_header_key(key: &str) -> String {

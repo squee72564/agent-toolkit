@@ -1,16 +1,8 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use crate::observer::RuntimeObserver;
+pub use agent_core::ResponseMode;
 
-/// Route-wide response delivery mode.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum ResponseMode {
-    /// Return one completed canonical response.
-    #[default]
-    NonStreaming,
-    /// Open a canonical event stream and finalize it separately.
-    Streaming,
-}
+use crate::observer::RuntimeObserver;
 
 /// Typed route-wide transport controls.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

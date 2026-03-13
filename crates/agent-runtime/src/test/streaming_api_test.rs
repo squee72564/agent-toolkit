@@ -644,15 +644,15 @@ fn test_streaming_provider_client(
         .build()
         .expect("test client should build");
     let transport = HttpTransport::builder(client).build();
-    let platform = adapter
-        .platform_config(base_url.to_string())
-        .expect("test platform should build");
     let instance_id = crate::Target::default_instance_for(provider);
     let mut config = crate::ProviderConfig::new("test-key").with_base_url(base_url);
     if let Some(default_model) = default_model {
         config = config.with_default_model(default_model);
     }
     let registered = crate::RegisteredProvider::new(instance_id.clone(), provider, config);
+    let platform = registered
+        .platform_config(adapter.descriptor())
+        .expect("test platform should build");
 
     crate::provider_client::ProviderClient::new(crate::provider_runtime::ProviderRuntime {
         instance_id,

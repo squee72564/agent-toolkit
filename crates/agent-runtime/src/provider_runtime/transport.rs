@@ -1,14 +1,11 @@
-use agent_core::{AdapterContext, ProviderId, Response, ResponseFormat};
-use agent_providers::request_plan::{
-    ProviderRequestPlan, ProviderResponseKind, ProviderTransportKind,
+use agent_core::{
+    AdapterContext, ExecutionPlan, ProviderId, Response, ResponseFormat, ResponseMode,
 };
+use agent_providers::request_plan::{ProviderRequestPlan, TransportResponseFraming};
 use agent_transport::{
     HttpJsonResponse, HttpRequestBody, HttpResponse, HttpResponseMode, HttpSendRequest,
 };
-use reqwest::Method;
 
-use crate::attempt_execution_options::TransportTimeoutOverrides;
-use crate::planner::ExecutionPlan;
 use crate::provider_runtime::{
     OpenedProviderStream, ProviderRuntime, extract_provider_code, join_url,
     prepend_encode_warnings, response_mode_mismatch_error,
@@ -22,40 +19,42 @@ pub(super) struct PlannedExecution {
     pub(super) url: String,
 }
 
-/// Extracts the planner-resolved adapter output from an `ExecutionPlan` and
-/// resolves the final outbound URL.  The adapter is never re-called here;
-/// all planning happened when the `ExecutionPlan` was created.
 pub(super) fn plan_execution(
     runtime: &ProviderRuntime,
     execution_plan: &ExecutionPlan,
-) -> PlannedExecution {
+) -> Result<PlannedExecution, RuntimeError> {
     let response_format = execution_plan.task.response_format.clone();
-    let plan = execution_plan.provider_request_plan.clone();
+    let mut plan = runtime
+        .adapter
+        .plan_request(execution_plan)
+        .map_err(RuntimeError::from_adapter)?;
+    apply_timeout_overrides(&mut plan, &execution_plan.transport);
+    validate_response_framing(execution_plan, &plan)?;
     let endpoint_path = plan
         .endpoint_path_override
         .as_deref()
         .unwrap_or(runtime.adapter.descriptor().endpoint_path);
     let url = join_url(&execution_plan.platform.base_url, endpoint_path);
 
-    PlannedExecution {
+    Ok(PlannedExecution {
         plan,
         response_format,
         platform: execution_plan.platform.clone(),
         url,
-    }
+    })
 }
 
 pub(crate) fn apply_timeout_overrides(
     plan: &mut ProviderRequestPlan,
-    timeout_overrides: &TransportTimeoutOverrides,
+    transport: &agent_core::ResolvedTransportOptions,
 ) {
-    if let Some(request_timeout) = timeout_overrides.request_timeout {
+    if let Some(request_timeout) = transport.timeout_overrides.request_timeout {
         plan.request_options.request_timeout = Some(request_timeout);
     }
-    if let Some(stream_setup_timeout) = timeout_overrides.stream_setup_timeout {
+    if let Some(stream_setup_timeout) = transport.timeout_overrides.stream_setup_timeout {
         plan.request_options.stream_setup_timeout = Some(stream_setup_timeout);
     }
-    if let Some(stream_idle_timeout) = timeout_overrides.stream_idle_timeout {
+    if let Some(stream_idle_timeout) = transport.timeout_overrides.stream_idle_timeout {
         plan.request_options.stream_idle_timeout = Some(stream_idle_timeout);
     }
 }
@@ -65,15 +64,15 @@ pub(super) async fn execute_planned_non_streaming(
     planned: PlannedExecution,
     adapter_context: &AdapterContext,
 ) -> Result<(Response, HttpJsonResponse), RuntimeError> {
-    match (planned.plan.transport_kind, planned.plan.response_kind) {
-        (ProviderTransportKind::HttpJson, ProviderResponseKind::JsonBody) => {
+    match planned.plan.response_framing {
+        TransportResponseFraming::Json => {
             execute_json_attempt(runtime, planned, adapter_context).await
         }
-        (ProviderTransportKind::HttpSse, ProviderResponseKind::RawProviderStream) => {
+        TransportResponseFraming::Sse => {
             execute_sse_attempt(runtime, planned, adapter_context).await
         }
-        (transport_kind, response_kind) => Err(RuntimeError::configuration(format!(
-            "unsupported provider execution plan for {:?}: transport={transport_kind:?}, response={response_kind:?}",
+        TransportResponseFraming::Bytes => Err(RuntimeError::configuration(format!(
+            "unsupported provider execution plan for {:?}: response_framing=Bytes",
             runtime.kind
         ))),
     }
@@ -83,10 +82,10 @@ pub(super) fn validate_streaming_plan(
     provider: ProviderId,
     plan: &ProviderRequestPlan,
 ) -> Result<(), RuntimeError> {
-    match (plan.transport_kind, plan.response_kind) {
-        (ProviderTransportKind::HttpSse, ProviderResponseKind::RawProviderStream) => Ok(()),
-        (transport_kind, response_kind) => Err(RuntimeError::configuration(format!(
-            "streaming API requires an SSE stream plan for {:?}: transport={transport_kind:?}, response={response_kind:?}",
+    match plan.response_framing {
+        TransportResponseFraming::Sse => Ok(()),
+        framing => Err(RuntimeError::configuration(format!(
+            "streaming API requires an SSE stream plan for {:?}: response_framing={framing:?}",
             provider
         ))),
     }
@@ -125,7 +124,7 @@ async fn execute_json_attempt(
         .transport
         .send(HttpSendRequest {
             platform: &platform,
-            method: Method::POST,
+            method: plan.method.clone(),
             url: &url,
             body,
             ctx: adapter_context,
@@ -192,7 +191,7 @@ async fn open_sse_stream(
         .transport
         .send(HttpSendRequest {
             platform,
-            method: Method::POST,
+            method: plan.method.clone(),
             url,
             body,
             ctx: adapter_context,
@@ -241,4 +240,25 @@ fn serialize_request_body(plan: &ProviderRequestPlan) -> Result<HttpRequestBody,
                 "failed to serialize provider request body: {error}"
             ))
         })
+}
+
+fn validate_response_framing(
+    execution_plan: &ExecutionPlan,
+    plan: &ProviderRequestPlan,
+) -> Result<(), RuntimeError> {
+    match (execution_plan.response_mode, plan.response_framing) {
+        (ResponseMode::NonStreaming, TransportResponseFraming::Sse) => {
+            Err(RuntimeError::configuration(format!(
+                "non-streaming execution cannot use SSE response framing for {:?}",
+                execution_plan.provider_attempt.provider_kind
+            )))
+        }
+        (ResponseMode::Streaming, TransportResponseFraming::Sse)
+        | (ResponseMode::NonStreaming, TransportResponseFraming::Json)
+        | (ResponseMode::NonStreaming, TransportResponseFraming::Bytes) => Ok(()),
+        (ResponseMode::Streaming, framing) => Err(RuntimeError::configuration(format!(
+            "streaming execution requires SSE response framing for {:?}, got {framing:?}",
+            execution_plan.provider_attempt.provider_kind
+        ))),
+    }
 }

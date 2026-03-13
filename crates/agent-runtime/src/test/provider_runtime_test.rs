@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use agent_core::{Message, ProviderId, Request, ResponseFormat, ToolChoice};
-use agent_providers::request_plan::{
-    ProviderRequestPlan, ProviderResponseKind, ProviderTransportKind,
+use agent_core::{
+    Message, ProviderId, Request, ResolvedTransportOptions, ResponseFormat, ToolChoice,
 };
+use agent_providers::request_plan::{ProviderRequestPlan, TransportResponseFraming};
 use agent_transport::{HttpResponseHead, HttpResponseMode};
-use reqwest::{StatusCode, header::HeaderMap};
+use reqwest::{Method, StatusCode, header::HeaderMap};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
@@ -179,9 +179,10 @@ fn timeout_overrides_only_replace_attempt_local_timeout_fields() {
     let mut plan = ProviderRequestPlan {
         body: serde_json::json!({}),
         warnings: Vec::new(),
-        transport_kind: ProviderTransportKind::HttpJson,
-        response_kind: ProviderResponseKind::JsonBody,
+        method: Method::POST,
+        response_framing: TransportResponseFraming::Json,
         endpoint_path_override: None,
+        provider_headers: HeaderMap::new(),
         request_options: agent_transport::HttpRequestOptions::json_defaults()
             .with_request_timeout(Duration::from_secs(10))
             .with_stream_setup_timeout(Duration::from_secs(11))
@@ -190,10 +191,15 @@ fn timeout_overrides_only_replace_attempt_local_timeout_fields() {
 
     crate::provider_runtime::apply_timeout_overrides(
         &mut plan,
-        &crate::TransportTimeoutOverrides {
-            request_timeout: Some(Duration::from_secs(3)),
-            stream_setup_timeout: Some(Duration::from_secs(4)),
-            stream_idle_timeout: Some(Duration::from_secs(5)),
+        &agent_core::ResolvedTransportOptions {
+            request_id_header_override: None,
+            route_extra_headers: BTreeMap::new(),
+            attempt_extra_headers: BTreeMap::new(),
+            timeout_overrides: crate::TransportTimeoutOverrides {
+                request_timeout: Some(Duration::from_secs(3)),
+                stream_setup_timeout: Some(Duration::from_secs(4)),
+                stream_idle_timeout: Some(Duration::from_secs(5)),
+            },
         },
     );
 
@@ -225,7 +231,7 @@ fn transport_metadata_shim_preserves_route_then_attempt_header_precedence() {
         ("x-attempt-only".to_string(), "attempt-only".to_string()),
     ]));
 
-    let metadata = planner::build_transport_metadata_shim(&planner::ResolvedTransportOptions {
+    let metadata = planner::build_transport_metadata_shim(&ResolvedTransportOptions {
         request_id_header_override: transport.request_id_header_override.clone(),
         route_extra_headers: transport.extra_headers.clone(),
         attempt_extra_headers: execution.extra_headers.clone(),
@@ -263,7 +269,7 @@ fn direct_execution_plan(
     task: agent_core::TaskRequest,
     model_override: Option<&str>,
     execution: crate::ExecutionOptions,
-) -> planner::ExecutionPlan {
+) -> agent_core::ExecutionPlan {
     planner::plan_direct_attempt(
         &ProviderClient::new(runtime.clone()),
         &task,
@@ -292,15 +298,15 @@ fn test_provider_runtime(
         .build()
         .expect("test client should build");
     let transport = agent_transport::HttpTransport::builder(client).build();
-    let platform = adapter
-        .platform_config(base_url.to_string())
-        .expect("test platform should build");
     let instance_id = crate::Target::default_instance_for(provider);
     let mut config = crate::ProviderConfig::new("test-key").with_base_url(base_url);
     if let Some(default_model) = default_model {
         config = config.with_default_model(default_model);
     }
     let registered = crate::RegisteredProvider::new(instance_id.clone(), provider, config);
+    let platform = registered
+        .platform_config(adapter.descriptor())
+        .expect("test platform should build");
 
     ProviderRuntime {
         instance_id,

@@ -187,7 +187,7 @@ fn routed_planner_uses_target_model_before_provider_default() {
     )
     .expect("planning must succeed");
 
-    assert_eq!(plan.attempt.model, "target-model");
+    assert_eq!(plan.provider_attempt.model, "target-model");
 }
 
 #[test]
@@ -204,7 +204,7 @@ fn routed_planner_uses_provider_default_when_target_model_is_blank() {
     )
     .expect("planning must succeed");
 
-    assert_eq!(plan.attempt.model, "default-model");
+    assert_eq!(plan.provider_attempt.model, "default-model");
 }
 
 #[test]
@@ -290,7 +290,10 @@ fn direct_planner_resolves_platform_auth_and_transport() {
         planner::plan_direct_attempt(&client, &test_request().task_request(), None, &execution)
             .expect("planning must succeed");
 
-    assert_eq!(plan.attempt.instance_id, client.runtime.instance_id);
+    assert_eq!(
+        plan.provider_attempt.instance_id,
+        client.runtime.instance_id
+    );
     assert_eq!(plan.platform.base_url, "http://127.0.0.1:1");
     assert_eq!(
         plan.auth.credentials,
@@ -581,15 +584,15 @@ fn provider_client_with_default_model(
         .build()
         .expect("test client should build");
     let transport = agent_transport::HttpTransport::builder(client).build();
-    let platform = adapter
-        .platform_config("http://127.0.0.1:1".to_string())
-        .expect("test platform should build");
     let instance_id = Target::default_instance_for(provider);
     let mut config = ProviderConfig::new("test-key").with_base_url("http://127.0.0.1:1");
     if let Some(default_model) = default_model {
         config = config.with_default_model(default_model);
     }
     let registered = RegisteredProvider::new(instance_id.clone(), provider, config);
+    let platform = registered
+        .platform_config(adapter.descriptor())
+        .expect("test platform should build");
 
     ProviderClient::new(ProviderRuntime {
         instance_id,

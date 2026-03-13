@@ -146,7 +146,7 @@ impl AgentToolkit {
             let attempt_execution = prepared.attempt(
                 self,
                 &execution,
-                Some(execution_plan.attempt.model.as_str()),
+                Some(execution_plan.provider_attempt.model.as_str()),
                 target,
                 index,
             );
@@ -244,7 +244,7 @@ impl AgentToolkit {
         let attempt_execution = prepared.attempt(
             self,
             &execution,
-            Some(execution_plan.attempt.model.as_str()),
+            Some(execution_plan.provider_attempt.model.as_str()),
             target,
             index,
         );

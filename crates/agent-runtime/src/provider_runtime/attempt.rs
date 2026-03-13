@@ -1,6 +1,6 @@
-use agent_core::{AdapterContext, ProviderId};
+use agent_core::{AdapterContext, ExecutionPlan, ProviderId};
 
-use crate::planner::ExecutionPlan;
+use crate::planner::adapter_context;
 use crate::runtime_error::RuntimeError;
 use crate::types::AttemptMeta;
 
@@ -11,8 +11,8 @@ pub(super) struct PreparedAttempt {
 
 pub(super) fn prepare_attempt(execution_plan: &ExecutionPlan) -> PreparedAttempt {
     PreparedAttempt {
-        selected_model: execution_plan.attempt.model.clone(),
-        adapter_context: execution_plan.adapter_context(),
+        selected_model: execution_plan.provider_attempt.model.clone(),
+        adapter_context: adapter_context(execution_plan),
     }
 }
 

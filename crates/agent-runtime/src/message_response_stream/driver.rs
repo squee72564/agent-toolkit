@@ -172,7 +172,7 @@ async fn try_open_fallback_attempt(
         emit_attempt_start(
             observer.as_ref(),
             client.runtime.kind,
-            Some(execution_plan.attempt.model.clone()),
+            Some(execution_plan.provider_attempt.model.clone()),
             index,
             index,
             attempt_started_at,
@@ -206,7 +206,7 @@ async fn try_open_fallback_attempt(
                 let should_continue = routed.next_target_index < routed.attempts.len()
                     && routed.fallback_policy.should_fallback(&attempt_error);
                 let provider = client.runtime.kind;
-                let model = execution_plan.attempt.model;
+                let model = execution_plan.provider_attempt.model;
                 let request_id = attempt_error.request_id.clone();
                 let status_code = attempt_error.status_code;
                 let observer_for_end = observer.clone();

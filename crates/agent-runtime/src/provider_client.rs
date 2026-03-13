@@ -99,7 +99,7 @@ impl ProviderClient {
         }
         let execution_plan =
             planner::plan_direct_attempt(self, &task, model_override.as_deref(), &execution)?;
-        let context = self.begin_direct_request(execution_plan.attempt.model.as_str());
+        let context = self.begin_direct_request(execution_plan.provider_attempt.model.as_str());
 
         let attempt = self.runtime.execute_attempt(execution_plan).await;
 
@@ -159,7 +159,7 @@ impl ProviderClient {
         }
         let execution_plan =
             planner::plan_direct_attempt(self, &task, model_override.as_deref(), &execution)?;
-        let context = self.begin_direct_request(execution_plan.attempt.model.as_str());
+        let context = self.begin_direct_request(execution_plan.provider_attempt.model.as_str());
         let stream_observer = context.cloned_observer();
 
         match self.runtime.open_stream_attempt(execution_plan).await {
