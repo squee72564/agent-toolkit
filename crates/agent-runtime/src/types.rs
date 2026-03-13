@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use agent_core::ProviderId;
+use agent_core::{ProviderId, ProviderInstanceId, ProviderKind};
 
 use crate::{RuntimeError, RuntimeErrorKind};
 
@@ -133,6 +133,77 @@ pub struct AttemptMeta {
     /// Error message for failed attempts.
     pub error_message: Option<String>,
 }
+
+/// Planning-only reason for skipping a candidate route attempt before
+/// provider execution begins.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SkipReason {
+    StaticIncompatibility { message: String },
+    AdapterPlanningRejected { message: String },
+}
+
+/// Route-attempt disposition shared by planning-failure and execution-history
+/// surfaces.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AttemptDisposition {
+    Skipped {
+        reason: SkipReason,
+    },
+    Succeeded {
+        status_code: Option<u16>,
+        request_id: Option<String>,
+    },
+    Failed {
+        error_kind: RuntimeErrorKind,
+        error_message: String,
+        status_code: Option<u16>,
+        request_id: Option<String>,
+    },
+}
+
+/// Ordered route-attempt history entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttemptRecord {
+    pub provider_instance: ProviderInstanceId,
+    pub provider_kind: ProviderKind,
+    pub model: String,
+    pub target_index: usize,
+    pub attempt_index: usize,
+    pub disposition: AttemptDisposition,
+}
+
+/// Planning-only route failure emitted when routing terminates before any
+/// attempt executes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoutePlanningFailure {
+    pub reason: RoutePlanningFailureReason,
+    pub attempts: Vec<AttemptRecord>,
+}
+
+/// Distinguishes pure static incompatibility exhaustion from adapter-planning
+/// rejections that occurred before execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RoutePlanningFailureReason {
+    NoCompatibleAttempts,
+    AllAttemptsRejectedDuringPlanning,
+}
+
+impl std::fmt::Display for RoutePlanningFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = match self.reason {
+            RoutePlanningFailureReason::NoCompatibleAttempts => {
+                "no compatible route attempts remained during planning"
+            }
+            RoutePlanningFailureReason::AllAttemptsRejectedDuringPlanning => {
+                "all route attempts were rejected during planning"
+            }
+        };
+
+        write!(f, "{message}")
+    }
+}
+
+impl std::error::Error for RoutePlanningFailure {}
 
 /// Returned metadata describing the selected response and all attempted targets.
 #[derive(Debug, Clone, PartialEq, Eq)]

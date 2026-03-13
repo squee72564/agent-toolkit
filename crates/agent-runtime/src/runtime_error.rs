@@ -5,6 +5,8 @@ use std::error::Error as StdError;
 use std::sync::Arc;
 use thiserror::Error;
 
+use crate::types::RoutePlanningFailure;
+
 /// Category of error surfaced by the runtime layer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeErrorKind {
@@ -70,6 +72,19 @@ impl RuntimeError {
             request_id: None,
             provider_code: None,
             source: None,
+        }
+    }
+
+    /// Wraps a typed route-planning failure in the runtime error surface.
+    pub fn route_planning_failure(failure: RoutePlanningFailure) -> Self {
+        Self {
+            kind: RuntimeErrorKind::TargetResolution,
+            message: failure.to_string(),
+            provider: None,
+            status_code: None,
+            request_id: None,
+            provider_code: None,
+            source: Some(Arc::new(failure)),
         }
     }
 

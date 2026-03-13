@@ -26,6 +26,7 @@ mod message_create_input;
 mod message_response_stream;
 mod message_text_stream;
 mod observer;
+mod planner;
 mod planning_rejection_policy;
 mod provider_client;
 mod provider_config;
@@ -33,7 +34,6 @@ mod provider_runtime;
 mod provider_stream_runtime;
 mod registered_provider;
 mod route;
-mod route_planning;
 mod routed_messages_api;
 mod routed_streaming_api;
 mod runtime_error;
@@ -67,8 +67,9 @@ pub use crate::routed_streaming_api::RoutedStreamingApi;
 pub use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
 pub use crate::target::Target;
 pub use crate::types::{
-    AttemptFailureEvent, AttemptMeta, AttemptStartEvent, AttemptSuccessEvent, RequestEndEvent,
-    RequestStartEvent, ResponseMeta,
+    AttemptDisposition, AttemptFailureEvent, AttemptMeta, AttemptRecord, AttemptStartEvent,
+    AttemptSuccessEvent, RequestEndEvent, RequestStartEvent, ResponseMeta, RoutePlanningFailure,
+    RoutePlanningFailureReason, SkipReason,
 };
 pub use agent_core::{
     AnthropicFamilyOptions, AnthropicOptions, FamilyOptions, NativeOptions,
