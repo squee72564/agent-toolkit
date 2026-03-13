@@ -100,22 +100,31 @@ Do not declare the refactor done until every item is checked.
 
 ## Planning Rejection and Attempt Metadata
 
-- [ ] static capability mismatch fails fast by default
-- [ ] optional skip-on-planning-rejection is supported through `PlanningRejectionPolicy`
-- [ ] skipped attempts are first-class `AttemptRecord` outcomes, not failed executions
-- [ ] `SkipReason::StaticIncompatibility` and `SkipReason::AdapterPlanningRejected` are distinct skipped-attempt reasons
+### Phase 03: Planning-Only Metadata (Complete)
+
+- [x] static capability mismatch fails fast by default
+- [x] optional skip-on-planning-rejection is supported through `PlanningRejectionPolicy`
+- [x] skipped attempts are first-class `AttemptRecord` outcomes, not failed executions
+- [x] `SkipReason::StaticIncompatibility` and `SkipReason::AdapterPlanningRejected` are distinct skipped-attempt reasons
+- [x] `AttemptRecord` includes `provider_instance`, `provider_kind`, concrete resolved `model`, `target_index`, and `attempt_index`
+- [x] skipped attempts never carry provider request id or executed-attempt status metadata
+- [x] `RoutePlanningFailure` is the planning-only failure surface and never carries success-only or executed-failure-only selected-attempt metadata
+- [x] `RoutePlanningFailureReason` preserves the `NoCompatibleAttempts` vs `AllAttemptsRejectedDuringPlanning` distinction
+- [x] runtime does not create an `AttemptRecord` or skipped-attempt observer event when effective model resolution fails before a concrete attempt is resolved
+
+### Phase 09: Execution Metadata Unification (Deferred)
+
 - [ ] skipped attempts emit `on_attempt_skipped`, not `on_attempt_start` or `on_attempt_failure`
-- [ ] `AttemptRecord` includes `provider_instance`, `provider_kind`, concrete resolved `model`, `target_index`, and `attempt_index`
-- [ ] skipped attempts never carry provider request id or executed-attempt status metadata
 - [ ] executed-failed `AttemptRecord` values carry normalized failure kind/message and execution-derived status/request-id fields only when available
 - [ ] returned route metadata is ordered attempt history, including both skipped and executed attempts, and records both provider instance and provider kind
 - [ ] `ResponseMeta` is success-only metadata and records the successful attempt's selected provider instance, selected provider kind, concrete resolved selected model, and final status/request-id fields when available
+- [ ] `ResponseMeta.attempts` uses `AttemptRecord` shape (not `Vec<AttemptMeta>`)
 - [ ] `ExecutedFailureMeta` is the executed-failure metadata surface, records the failed attempt's selected provider instance, selected provider kind, concrete resolved selected model, and final status/request-id fields when available, and is never used for planning-only outcomes
-- [ ] `RoutePlanningFailure` is the planning-only failure surface and never carries success-only or executed-failure-only selected-attempt metadata
-- [ ] `RoutePlanningFailureReason` preserves the `NoCompatibleAttempts` vs `AllAttemptsRejectedDuringPlanning` distinction
 - [ ] `ResponseMeta.attempts`, `ExecutedFailureMeta.attempts`, and `RoutePlanningFailure.attempts` use the same `AttemptRecord` shape, ordering rules, and skip semantics
 - [ ] `on_attempt_skipped` carries the resolved skipped-attempt identity/order fields plus elapsed planning time
 - [ ] `on_attempt_start`, `on_attempt_success`, and `on_attempt_failure` are execution-only lifecycle callbacks; skipped attempts emit only `on_attempt_skipped`
-- [ ] runtime does not create an `AttemptRecord` or skipped-attempt observer event when effective model resolution fails before a concrete attempt is resolved
 - [ ] incremental stream events never expose partial/live `ResponseMeta` or route-attempt metadata; terminal streaming success yields normal `ResponseMeta`, and terminal streaming executed failure yields normalized `RuntimeError` plus `ExecutedFailureMeta`
+
+## Provider Families and Overlays
+
 - [ ] provider families are modeled explicitly via codecs and provider-specific differences are modeled via overlays

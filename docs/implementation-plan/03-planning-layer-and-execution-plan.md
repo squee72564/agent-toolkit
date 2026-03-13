@@ -139,3 +139,42 @@ This phase must fully cover the `REFACTOR.md` material for:
   correct failure reason and without executed-failure metadata
 - planning-only `AttemptRecord` emission follows the locked route-failure
   semantics for resolved model recording and absence of execution-only metadata
+
+## Execution Metadata Boundaries
+
+### Phase 03 Scope
+
+Phase 03 owns planning-layer metadata only:
+- `RoutePlanningFailure.attempts: Vec<AttemptRecord>` carries planning-only skip history
+- Skipped attempts never contain provider request-id or executed-attempt status metadata
+- Pre-execution planning rejection records include resolved provider identity and model
+
+### Deferred to Phase 06/09
+
+Execution-phase attempt history tracking is intentionally out of scope for Phase 03:
+- `ResponseMeta.attempts` continues using `Vec<AttemptMeta>` (execution summary)
+- `ExecutedFailureMeta` creation and unified attempt history (planning + execution phases)
+- Fallback-time planning rejections are not yet recorded in execution-phase history
+- Observer event `on_attempt_skipped` for execution-time planning rejections
+- Unified `AttemptRecord` usage across all success/failure metadata surfaces
+
+**Rationale**: Phase 06 (Runtime Orchestration) owns attempt ordering, emission timing, and execution-phase history accumulation patterns required for full unification. Phase 09 (Observability, Metadata, and Errors) implements the unified metadata model once orchestration patterns are established.
+
+### Current Behavior
+
+**Planning-phase failures** (`RoutePlanningFailure`):
+- Records all planning rejections as `AttemptRecord` with `AttemptDisposition::Skipped`
+- Distinguishes `NoCompatibleAttempts` vs `AllAttemptsRejectedDuringPlanning`
+- Includes resolved provider instance, provider kind, and effective model
+
+**Execution-phase successes** (`ResponseMeta`):
+- Uses `Vec<AttemptMeta>` for executed attempt history
+- Streaming path accumulates all executed fallback attempts
+- Non-streaming path tracks only the final successful attempt
+
+**Execution-phase failures** (current RuntimeError):
+- Non-streaming: Only final error tracked, not intermediate fallback attempts
+- Streaming: Accumulates executed attempts but drops planning rejections during fallback
+- No `ExecutedFailureMeta` surface exists yet
+
+This boundary is intentional and will be resolved when Phase 06 establishes runtime orchestration patterns and Phase 09 implements the unified metadata model.
