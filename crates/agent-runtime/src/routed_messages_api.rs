@@ -19,14 +19,13 @@ impl RoutedMessagesApi<'_> {
     }
 
     /// Builds a request from [`MessageCreateInput`] and executes it using the
-    /// supplied route and execution options.
+    /// supplied route with default execution options.
     pub async fn create(
         &self,
         input: impl Into<MessageCreateInput>,
         route: Route,
-        execution: ExecutionOptions,
     ) -> Result<Response, RuntimeError> {
-        self.create_with_meta(input, route, execution)
+        self.create_with_meta(input, route)
             .await
             .map(|(response, _)| response)
     }
@@ -37,12 +36,55 @@ impl RoutedMessagesApi<'_> {
         &self,
         input: impl Into<MessageCreateInput>,
         route: Route,
+    ) -> Result<(Response, ResponseMeta), RuntimeError> {
+        self.create_with_meta_and_options(input, route, ExecutionOptions::default())
+            .await
+    }
+
+    /// Builds a request from [`MessageCreateInput`] and executes it using the
+    /// supplied route and explicit execution options.
+    pub async fn create_with_options(
+        &self,
+        input: impl Into<MessageCreateInput>,
+        route: Route,
+        execution: ExecutionOptions,
+    ) -> Result<Response, RuntimeError> {
+        self.create_with_meta_and_options(input, route, execution)
+            .await
+            .map(|(response, _)| response)
+    }
+
+    /// Like [`Self::create_with_options`], but also returns metadata for the
+    /// selected target and all attempts.
+    pub async fn create_with_meta_and_options(
+        &self,
+        input: impl Into<MessageCreateInput>,
+        route: Route,
         execution: ExecutionOptions,
     ) -> Result<(Response, ResponseMeta), RuntimeError> {
-        let input = input.into();
-        let (task, model_override, input_execution) = input.into_task_request_parts()?;
-        let route = apply_model_override(route, model_override);
-        let execution = merge_execution_options(input_execution, execution);
+        self.toolkit
+            .execute_with_meta(input.into().into_task_request()?, route, execution)
+            .await
+    }
+
+    /// Executes an explicit semantic task over a routed attempt chain.
+    pub async fn execute(
+        &self,
+        task: TaskRequest,
+        route: Route,
+        execution: ExecutionOptions,
+    ) -> Result<Response, RuntimeError> {
+        self.toolkit.execute(task, route, execution).await
+    }
+
+    /// Like [`Self::execute`], but also returns metadata for the selected
+    /// target and all attempts.
+    pub async fn execute_with_meta(
+        &self,
+        task: TaskRequest,
+        route: Route,
+        execution: ExecutionOptions,
+    ) -> Result<(Response, ResponseMeta), RuntimeError> {
         self.toolkit.execute_with_meta(task, route, execution).await
     }
 
@@ -53,7 +95,7 @@ impl RoutedMessagesApi<'_> {
         route: Route,
         execution: ExecutionOptions,
     ) -> Result<Response, RuntimeError> {
-        self.toolkit.execute(task, route, execution).await
+        self.execute(task, route, execution).await
     }
 
     /// Like [`Self::create_task`], but also returns metadata for the selected
@@ -64,33 +106,6 @@ impl RoutedMessagesApi<'_> {
         route: Route,
         execution: ExecutionOptions,
     ) -> Result<(Response, ResponseMeta), RuntimeError> {
-        self.toolkit.execute_with_meta(task, route, execution).await
+        self.execute_with_meta(task, route, execution).await
     }
-}
-
-pub(crate) fn apply_model_override(route: Route, model_override: Option<String>) -> Route {
-    let Some(model_override) = model_override else {
-        return route;
-    };
-
-    let primary = crate::AttemptSpec::to(route.primary.target.with_model(model_override))
-        .with_execution(route.primary.execution);
-    Route::to(primary)
-        .with_fallbacks(route.fallbacks)
-        .with_fallback_policy(route.fallback_policy)
-        .with_planning_rejection_policy(route.planning_rejection_policy)
-}
-
-pub(crate) fn merge_execution_options(
-    input_execution: ExecutionOptions,
-    mut execution: ExecutionOptions,
-) -> ExecutionOptions {
-    execution.response_mode = input_execution.response_mode;
-    if execution.observer.is_none() {
-        execution.observer = input_execution.observer;
-    }
-    if execution.transport == crate::TransportOptions::default() {
-        execution.transport = input_execution.transport;
-    }
-    execution
 }

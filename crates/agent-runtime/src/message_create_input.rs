@@ -1,8 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use agent_core::{Message, Request, ResponseFormat, TaskRequest, ToolChoice, ToolDefinition};
-
-use crate::execution_options::{ExecutionOptions, ResponseMode};
+use agent_core::{Message, ResponseFormat, TaskRequest, ToolChoice, ToolDefinition};
 
 use crate::conversation::Conversation;
 use crate::runtime_error::RuntimeError;
@@ -49,16 +47,11 @@ impl MessagesPayload {
 
 /// High-level task input used by the `messages` and `streaming` APIs.
 ///
-/// This builder normalizes into [`TaskRequest`] plus route/execution state.
+/// This builder normalizes into [`TaskRequest`] only.
 /// It keeps message storage ergonomic for direct construction and copy-on-write
-/// sharing with [`Conversation`], while carrying a narrow set of legacy shim
-/// fields until the older request surface is fully removed.
+/// sharing with [`Conversation`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct MessageCreateInput {
-    /// REFACTOR-SHIM: legacy model override preserved until route construction fully migrates.
-    model: Option<String>,
-    /// REFACTOR-SHIM: legacy streaming flag preserved until explicit execution options replace it.
-    stream: bool,
     messages: MessagesPayload,
     /// Tool definitions exposed to the model for this request.
     pub tools: Vec<ToolDefinition>,
@@ -87,8 +80,6 @@ impl MessageCreateInput {
     /// Creates input from an owned message history.
     pub fn new_owned(messages: Vec<Message>) -> Self {
         Self {
-            model: None,
-            stream: false,
             messages: MessagesPayload::Owned(messages),
             tools: Vec::new(),
             tool_choice: ToolChoice::default(),
@@ -106,8 +97,6 @@ impl MessageCreateInput {
     /// Mutating the message list later will detach it into an owned buffer.
     pub fn new_shared(messages: Arc<Vec<Message>>) -> Self {
         Self {
-            model: None,
-            stream: false,
             messages: MessagesPayload::Shared(messages),
             tools: Vec::new(),
             tool_choice: ToolChoice::default(),
@@ -139,30 +128,6 @@ impl MessageCreateInput {
     /// Consumes the input and returns an owned message vector.
     pub fn into_messages(self) -> Vec<Message> {
         self.messages.into_vec()
-    }
-
-    /// REFACTOR-SHIM: legacy model override helper retained during migration to
-    /// explicit route/model selection.
-    pub fn with_model(mut self, model: impl Into<String>) -> Self {
-        self.model = Some(model.into());
-        self
-    }
-
-    /// REFACTOR-SHIM: legacy model override accessor.
-    pub fn model_override(&self) -> Option<&str> {
-        self.model.as_deref()
-    }
-
-    /// REFACTOR-SHIM: legacy streaming helper retained during migration to
-    /// explicit [`ExecutionOptions`].
-    pub fn with_stream(mut self, stream: bool) -> Self {
-        self.stream = stream;
-        self
-    }
-
-    /// REFACTOR-SHIM: legacy streaming accessor.
-    pub fn is_streaming(&self) -> bool {
-        self.stream
     }
 
     /// Replaces the tool definitions for this request.
@@ -249,72 +214,6 @@ impl MessageCreateInput {
             max_output_tokens,
             stop,
             metadata,
-        })
-    }
-
-    /// Converts this input into the explicit phase-1 execution boundary.
-    pub fn into_task_request_parts(
-        self,
-    ) -> Result<(TaskRequest, Option<String>, ExecutionOptions), RuntimeError> {
-        let execution = self.inferred_execution_options();
-        let model = self.model.clone();
-        let task = self.into_task_request()?;
-        Ok((task, model, execution))
-    }
-
-    /// Infers route-wide execution options from the legacy builder shape.
-    pub fn inferred_execution_options(&self) -> ExecutionOptions {
-        ExecutionOptions {
-            response_mode: if self.stream {
-                ResponseMode::Streaming
-            } else {
-                ResponseMode::NonStreaming
-            },
-            ..ExecutionOptions::default()
-        }
-    }
-
-    /// REFACTOR-SHIM: converts this input into the legacy low-level request.
-    ///
-    /// Prefer [`Self::into_task_request`] or
-    /// [`Self::into_task_request_parts`] for new code.
-    ///
-    /// `default_model` is used when no explicit model override is present.
-    /// When `allow_empty_model` is `true`, callers may intentionally produce a
-    /// request with an empty `model_id` so routed execution can resolve the
-    /// effective model from a [`crate::Target`].
-    pub fn into_request_with_options(
-        self,
-        default_model: Option<&str>,
-        allow_empty_model: bool,
-    ) -> Result<Request, RuntimeError> {
-        let (task, model, execution) = self.into_task_request_parts()?;
-
-        let model_id = match (model, default_model) {
-            (Some(model_id), _) if !model_id.trim().is_empty() => model_id,
-            (_, Some(default_model)) if !default_model.trim().is_empty() => {
-                default_model.to_string()
-            }
-            _ if allow_empty_model => String::new(),
-            _ => {
-                return Err(RuntimeError::configuration(
-                    "no model was provided and no default model is configured",
-                ));
-            }
-        };
-
-        Ok(Request {
-            model_id,
-            stream: execution.response_mode == ResponseMode::Streaming,
-            messages: task.messages,
-            tools: task.tools,
-            tool_choice: task.tool_choice,
-            response_format: task.response_format,
-            temperature: task.temperature,
-            top_p: task.top_p,
-            max_output_tokens: task.max_output_tokens,
-            stop: task.stop,
-            metadata: task.metadata,
         })
     }
 }

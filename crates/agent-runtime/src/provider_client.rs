@@ -2,6 +2,7 @@ use std::{sync::Arc, time::Instant};
 
 use agent_core::{Response, TaskRequest};
 
+use crate::attempt_spec::AttemptSpec;
 use crate::direct_messages_api::DirectMessagesApi;
 use crate::direct_streaming_api::DirectStreamingApi;
 use crate::execution_options::{ExecutionOptions, ResponseMode};
@@ -13,6 +14,7 @@ use crate::provider_runtime::{
     ProviderAttemptOutcome, ProviderRuntime, ProviderStreamAttemptOutcome,
 };
 use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
+use crate::target::Target;
 use crate::types::{
     RequestEndContext, ResponseMeta, attempt_failure_event, attempt_start_event,
     attempt_success_event, request_end_failure_event, request_end_success_event,
@@ -65,23 +67,16 @@ impl ProviderClient {
         &self,
         input: MessageCreateInput,
     ) -> Result<(Response, ResponseMeta), RuntimeError> {
-        if input.is_streaming() {
-            return Err(RuntimeError::configuration(
-                "stream=true is not supported by the current messages/send response API yet",
-            ));
-        }
-        let (task, model_override, execution) = input.into_task_request_parts()?;
-        self.execute_with_meta(task, model_override, execution)
+        self.execute_with_meta(input.into_task_request()?, ExecutionOptions::default())
             .await
     }
 
     pub(crate) async fn execute(
         &self,
         task: TaskRequest,
-        model_override: Option<String>,
         execution: ExecutionOptions,
     ) -> Result<Response, RuntimeError> {
-        self.execute_with_meta(task, model_override, execution)
+        self.execute_with_meta(task, execution)
             .await
             .map(|(response, _)| response)
     }
@@ -89,7 +84,27 @@ impl ProviderClient {
     pub(crate) async fn execute_with_meta(
         &self,
         task: TaskRequest,
-        model_override: Option<String>,
+        execution: ExecutionOptions,
+    ) -> Result<(Response, ResponseMeta), RuntimeError> {
+        self.execute_on_attempt_with_meta(task, self.default_attempt(), execution)
+            .await
+    }
+
+    pub(crate) async fn execute_on_attempt(
+        &self,
+        task: TaskRequest,
+        attempt: AttemptSpec,
+        execution: ExecutionOptions,
+    ) -> Result<Response, RuntimeError> {
+        self.execute_on_attempt_with_meta(task, attempt, execution)
+            .await
+            .map(|(response, _)| response)
+    }
+
+    pub(crate) async fn execute_on_attempt_with_meta(
+        &self,
+        task: TaskRequest,
+        attempt: AttemptSpec,
         execution: ExecutionOptions,
     ) -> Result<(Response, ResponseMeta), RuntimeError> {
         if execution.response_mode != ResponseMode::NonStreaming {
@@ -97,8 +112,7 @@ impl ProviderClient {
                 "messages() requires ExecutionOptions.response_mode = ResponseMode::NonStreaming",
             ));
         }
-        let execution_plan =
-            planner::plan_direct_attempt(self, &task, model_override.as_deref(), &execution)?;
+        let execution_plan = planner::plan_direct_attempt(self, &task, &attempt, &execution)?;
         let context = self.begin_direct_request(execution_plan.provider_attempt.model.as_str());
 
         let attempt = self.runtime.execute_attempt(execution_plan).await;
@@ -141,15 +155,29 @@ impl ProviderClient {
         &self,
         input: MessageCreateInput,
     ) -> Result<MessageResponseStream, RuntimeError> {
-        let (task, model_override, mut execution) = input.into_task_request_parts()?;
-        execution.response_mode = ResponseMode::Streaming;
-        self.execute_stream(task, model_override, execution).await
+        self.execute_stream(
+            input.into_task_request()?,
+            ExecutionOptions {
+                response_mode: ResponseMode::Streaming,
+                ..ExecutionOptions::default()
+            },
+        )
+        .await
     }
 
     pub(crate) async fn execute_stream(
         &self,
         task: TaskRequest,
-        model_override: Option<String>,
+        execution: ExecutionOptions,
+    ) -> Result<MessageResponseStream, RuntimeError> {
+        self.execute_stream_on_attempt(task, self.default_attempt(), execution)
+            .await
+    }
+
+    pub(crate) async fn execute_stream_on_attempt(
+        &self,
+        task: TaskRequest,
+        attempt: AttemptSpec,
         execution: ExecutionOptions,
     ) -> Result<MessageResponseStream, RuntimeError> {
         if execution.response_mode != ResponseMode::Streaming {
@@ -157,8 +185,7 @@ impl ProviderClient {
                 "streaming() requires ExecutionOptions.response_mode = ResponseMode::Streaming",
             ));
         }
-        let execution_plan =
-            planner::plan_direct_attempt(self, &task, model_override.as_deref(), &execution)?;
+        let execution_plan = planner::plan_direct_attempt(self, &task, &attempt, &execution)?;
         let context = self.begin_direct_request(execution_plan.provider_attempt.model.as_str());
         let stream_observer = context.cloned_observer();
 
@@ -298,6 +325,10 @@ impl ProviderClient {
         safe_call_observer(context.observer, |runtime_observer| {
             runtime_observer.on_request_end(&event);
         });
+    }
+
+    pub(crate) fn default_attempt(&self) -> AttemptSpec {
+        AttemptSpec::to(Target::new(self.runtime.instance_id.clone()))
     }
 }
 

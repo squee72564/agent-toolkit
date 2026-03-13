@@ -1,5 +1,6 @@
 use agent_core::{Response, TaskRequest};
 
+use crate::attempt_spec::AttemptSpec;
 use crate::execution_options::ExecutionOptions;
 use crate::message_create_input::MessageCreateInput;
 use crate::provider_client::ProviderClient;
@@ -34,26 +35,90 @@ impl DirectMessagesApi<'_> {
         self.client.create_with_meta(input.into()).await
     }
 
-    /// Executes an explicit semantic task using the client's configured
-    /// default model unless `model_override` is supplied.
+    /// Executes an explicit semantic task against the client's configured
+    /// provider instance using its default attempt target.
+    pub async fn execute(
+        &self,
+        task: TaskRequest,
+        execution: ExecutionOptions,
+    ) -> Result<Response, RuntimeError> {
+        self.client.execute(task, execution).await
+    }
+
+    /// Like [`Self::execute`], but also returns attempt metadata.
+    pub async fn execute_with_meta(
+        &self,
+        task: TaskRequest,
+        execution: ExecutionOptions,
+    ) -> Result<(Response, ResponseMeta), RuntimeError> {
+        self.client.execute_with_meta(task, execution).await
+    }
+
+    /// Executes an explicit semantic task against an explicit single-attempt
+    /// target scoped to this client.
+    pub async fn execute_on_attempt(
+        &self,
+        task: TaskRequest,
+        attempt: AttemptSpec,
+        execution: ExecutionOptions,
+    ) -> Result<Response, RuntimeError> {
+        self.client
+            .execute_on_attempt(task, attempt, execution)
+            .await
+    }
+
+    /// Like [`Self::execute_on_attempt`], but also returns attempt
+    /// metadata.
+    pub async fn execute_on_attempt_with_meta(
+        &self,
+        task: TaskRequest,
+        attempt: AttemptSpec,
+        execution: ExecutionOptions,
+    ) -> Result<(Response, ResponseMeta), RuntimeError> {
+        self.client
+            .execute_on_attempt_with_meta(task, attempt, execution)
+            .await
+    }
+
+    /// Executes an explicit semantic task against the client's configured
+    /// provider instance using its default attempt target.
     pub async fn create_task(
         &self,
         task: TaskRequest,
-        model_override: Option<String>,
         execution: ExecutionOptions,
     ) -> Result<Response, RuntimeError> {
-        self.client.execute(task, model_override, execution).await
+        self.execute(task, execution).await
     }
 
     /// Like [`Self::create_task`], but also returns attempt metadata.
     pub async fn create_task_with_meta(
         &self,
         task: TaskRequest,
-        model_override: Option<String>,
         execution: ExecutionOptions,
     ) -> Result<(Response, ResponseMeta), RuntimeError> {
-        self.client
-            .execute_with_meta(task, model_override, execution)
+        self.execute_with_meta(task, execution).await
+    }
+
+    /// Executes an explicit semantic task against an explicit single-attempt
+    /// target scoped to this client.
+    pub async fn create_task_on_attempt(
+        &self,
+        task: TaskRequest,
+        attempt: AttemptSpec,
+        execution: ExecutionOptions,
+    ) -> Result<Response, RuntimeError> {
+        self.execute_on_attempt(task, attempt, execution).await
+    }
+
+    /// Like [`Self::create_task_on_attempt`], but also returns attempt
+    /// metadata.
+    pub async fn create_task_on_attempt_with_meta(
+        &self,
+        task: TaskRequest,
+        attempt: AttemptSpec,
+        execution: ExecutionOptions,
+    ) -> Result<(Response, ResponseMeta), RuntimeError> {
+        self.execute_on_attempt_with_meta(task, attempt, execution)
             .await
     }
 }

@@ -1,5 +1,6 @@
 use agent_core::TaskRequest;
 
+use crate::attempt_spec::AttemptSpec;
 use crate::execution_options::ExecutionOptions;
 use crate::message_create_input::MessageCreateInput;
 use crate::message_response_stream::MessageResponseStream;
@@ -27,15 +28,46 @@ impl DirectStreamingApi<'_> {
     }
 
     /// Opens a stream for an explicit semantic task using the client's
-    /// configured default model unless `model_override` is supplied.
-    pub async fn create_task(
+    /// configured default attempt target.
+    pub async fn execute(
         &self,
         task: TaskRequest,
-        model_override: Option<String>,
+        execution: ExecutionOptions,
+    ) -> Result<MessageResponseStream, RuntimeError> {
+        self.client.execute_stream(task, execution).await
+    }
+
+    /// Opens a stream for an explicit semantic task on an explicit single
+    /// attempt target scoped to this client.
+    pub async fn execute_on_attempt(
+        &self,
+        task: TaskRequest,
+        attempt: AttemptSpec,
         execution: ExecutionOptions,
     ) -> Result<MessageResponseStream, RuntimeError> {
         self.client
-            .execute_stream(task, model_override, execution)
+            .execute_stream_on_attempt(task, attempt, execution)
             .await
+    }
+
+    /// Opens a stream for an explicit semantic task using the client's
+    /// configured default attempt target.
+    pub async fn create_task(
+        &self,
+        task: TaskRequest,
+        execution: ExecutionOptions,
+    ) -> Result<MessageResponseStream, RuntimeError> {
+        self.execute(task, execution).await
+    }
+
+    /// Opens a stream for an explicit semantic task on an explicit single
+    /// attempt target scoped to this client.
+    pub async fn create_task_on_attempt(
+        &self,
+        task: TaskRequest,
+        attempt: AttemptSpec,
+        execution: ExecutionOptions,
+    ) -> Result<MessageResponseStream, RuntimeError> {
+        self.execute_on_attempt(task, attempt, execution).await
     }
 }

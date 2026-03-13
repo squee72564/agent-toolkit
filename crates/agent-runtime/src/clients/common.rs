@@ -90,24 +90,50 @@ macro_rules! impl_provider_client {
             pub async fn execute(
                 &self,
                 task: agent_core::TaskRequest,
-                model_override: Option<String>,
                 execution: crate::execution_options::ExecutionOptions,
             ) -> Result<agent_core::Response, crate::runtime_error::RuntimeError> {
-                self.inner.execute(task, model_override, execution).await
+                self.inner.execute(task, execution).await
             }
 
             /// Executes an explicit semantic task and returns attempt metadata.
             pub async fn execute_with_meta(
                 &self,
                 task: agent_core::TaskRequest,
-                model_override: Option<String>,
+                execution: crate::execution_options::ExecutionOptions,
+            ) -> Result<
+                (agent_core::Response, crate::types::ResponseMeta),
+                crate::runtime_error::RuntimeError,
+            > {
+                self.inner.execute_with_meta(task, execution).await
+            }
+
+            /// Executes an explicit semantic task against an explicit
+            /// single-attempt route for this client.
+            pub async fn execute_on_attempt(
+                &self,
+                task: agent_core::TaskRequest,
+                attempt: crate::AttemptSpec,
+                execution: crate::execution_options::ExecutionOptions,
+            ) -> Result<agent_core::Response, crate::runtime_error::RuntimeError> {
+                self.inner
+                    .execute_on_attempt(task, attempt, execution)
+                    .await
+            }
+
+            /// Executes an explicit semantic task against an explicit
+            /// single-attempt route for this client and returns attempt
+            /// metadata.
+            pub async fn execute_on_attempt_with_meta(
+                &self,
+                task: agent_core::TaskRequest,
+                attempt: crate::AttemptSpec,
                 execution: crate::execution_options::ExecutionOptions,
             ) -> Result<
                 (agent_core::Response, crate::types::ResponseMeta),
                 crate::runtime_error::RuntimeError,
             > {
                 self.inner
-                    .execute_with_meta(task, model_override, execution)
+                    .execute_on_attempt_with_meta(task, attempt, execution)
                     .await
             }
         }

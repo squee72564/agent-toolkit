@@ -210,15 +210,10 @@ pub(crate) fn plan_routed_execution(
 pub(crate) fn plan_direct_attempt(
     client: &ProviderClient,
     task: &TaskRequest,
-    model_override: Option<&str>,
+    attempt: &AttemptSpec,
     execution: &ExecutionOptions,
 ) -> Result<ExecutionPlan, RuntimeError> {
-    let attempt = AttemptSpec::to(crate::Target {
-        instance: client.runtime.instance_id.clone(),
-        model: model_override.map(ToString::to_string),
-    });
-
-    match plan_attempt(client, &attempt, task, execution) {
+    match plan_attempt(client, attempt, task, execution) {
         Ok(plan) => Ok(plan),
         Err(AttemptPlanningError::Fatal(error)) => Err(*error),
         Err(AttemptPlanningError::Rejected(rejection)) => Err(rejection.error),

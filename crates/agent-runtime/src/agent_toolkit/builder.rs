@@ -8,34 +8,102 @@ use crate::observer::RuntimeObserver;
 use crate::provider_client::ProviderClient;
 use crate::provider_config::ProviderConfig;
 use crate::runtime_error::RuntimeError;
+use crate::target::Target;
+
+#[derive(Clone)]
+struct ProviderRegistration {
+    kind: ProviderKind,
+    instance_id: ProviderInstanceId,
+    config: ProviderConfig,
+}
 
 /// Builder for an [`AgentToolkit`].
 ///
 /// At least one provider must be configured before calling [`Self::build`].
 #[derive(Clone, Default)]
 pub struct AgentToolkitBuilder {
-    openai: Option<ProviderConfig>,
-    anthropic: Option<ProviderConfig>,
-    openrouter: Option<ProviderConfig>,
+    registrations: Vec<ProviderRegistration>,
     observer: Option<Arc<dyn RuntimeObserver>>,
 }
 
 impl AgentToolkitBuilder {
     /// Registers an OpenAI provider configuration.
     pub fn with_openai(mut self, config: ProviderConfig) -> Self {
-        self.openai = Some(config);
+        self =
+            self.with_openai_instance(Target::default_instance_for(ProviderKind::OpenAi), config);
         self
     }
 
     /// Registers an Anthropic provider configuration.
     pub fn with_anthropic(mut self, config: ProviderConfig) -> Self {
-        self.anthropic = Some(config);
+        self = self.with_anthropic_instance(
+            Target::default_instance_for(ProviderKind::Anthropic),
+            config,
+        );
         self
     }
 
     /// Registers an OpenRouter provider configuration.
     pub fn with_openrouter(mut self, config: ProviderConfig) -> Self {
-        self.openrouter = Some(config);
+        self = self.with_openrouter_instance(
+            Target::default_instance_for(ProviderKind::OpenRouter),
+            config,
+        );
+        self
+    }
+
+    /// Registers an OpenAI provider configuration for a specific instance id.
+    pub fn with_openai_instance(
+        mut self,
+        instance_id: impl Into<ProviderInstanceId>,
+        config: ProviderConfig,
+    ) -> Self {
+        self.upsert_registration(ProviderKind::OpenAi, instance_id.into(), config);
+        self
+    }
+
+    /// Registers an Anthropic provider configuration for a specific instance id.
+    pub fn with_anthropic_instance(
+        mut self,
+        instance_id: impl Into<ProviderInstanceId>,
+        config: ProviderConfig,
+    ) -> Self {
+        self.upsert_registration(ProviderKind::Anthropic, instance_id.into(), config);
+        self
+    }
+
+    /// Registers an OpenRouter provider configuration for a specific instance id.
+    pub fn with_openrouter_instance(
+        mut self,
+        instance_id: impl Into<ProviderInstanceId>,
+        config: ProviderConfig,
+    ) -> Self {
+        self.upsert_registration(ProviderKind::OpenRouter, instance_id.into(), config);
+        self
+    }
+
+    /// Registers a generic OpenAI-compatible provider configuration for a specific instance id.
+    pub fn with_generic_openai_compatible_instance(
+        mut self,
+        instance_id: impl Into<ProviderInstanceId>,
+        config: ProviderConfig,
+    ) -> Self {
+        self.upsert_registration(
+            ProviderKind::GenericOpenAiCompatible,
+            instance_id.into(),
+            config,
+        );
+        self
+    }
+
+    /// Registers a provider configuration for an explicit provider instance id.
+    pub fn with_provider_instance(
+        mut self,
+        kind: ProviderKind,
+        instance_id: impl Into<ProviderInstanceId>,
+        config: ProviderConfig,
+    ) -> Self {
+        self.upsert_registration(kind, instance_id.into(), config);
         self
     }
 
@@ -52,45 +120,19 @@ impl AgentToolkitBuilder {
     /// any provider configuration is invalid.
     pub fn build(self) -> Result<AgentToolkit, RuntimeError> {
         let Self {
-            openai,
-            anthropic,
-            openrouter,
+            registrations,
             observer,
         } = self;
         let mut clients = HashMap::new();
 
-        if let Some(config) = openai {
-            clients.insert(
-                ProviderInstanceId::new("openai-default"),
-                build_provider_client(
-                    ProviderKind::OpenAi,
-                    ProviderInstanceId::new("openai-default"),
-                    config,
-                    observer.clone(),
-                )?,
-            );
-        }
-        if let Some(config) = anthropic {
-            clients.insert(
-                ProviderInstanceId::new("anthropic-default"),
-                build_provider_client(
-                    ProviderKind::Anthropic,
-                    ProviderInstanceId::new("anthropic-default"),
-                    config,
-                    observer.clone(),
-                )?,
-            );
-        }
-        if let Some(config) = openrouter {
-            clients.insert(
-                ProviderInstanceId::new("openrouter-default"),
-                build_provider_client(
-                    ProviderKind::OpenRouter,
-                    ProviderInstanceId::new("openrouter-default"),
-                    config,
-                    observer.clone(),
-                )?,
-            );
+        for registration in registrations {
+            let client = build_provider_client(
+                registration.kind,
+                registration.instance_id.clone(),
+                registration.config,
+                observer.clone(),
+            )?;
+            clients.insert(registration.instance_id, client);
         }
 
         if clients.is_empty() {
@@ -100,6 +142,29 @@ impl AgentToolkitBuilder {
         }
 
         Ok(AgentToolkit { clients, observer })
+    }
+
+    fn upsert_registration(
+        &mut self,
+        kind: ProviderKind,
+        instance_id: ProviderInstanceId,
+        config: ProviderConfig,
+    ) {
+        if let Some(existing) = self
+            .registrations
+            .iter_mut()
+            .find(|existing| existing.instance_id == instance_id)
+        {
+            existing.kind = kind;
+            existing.config = config;
+            return;
+        }
+
+        self.registrations.push(ProviderRegistration {
+            kind,
+            instance_id,
+            config,
+        });
     }
 }
 
