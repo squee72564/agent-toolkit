@@ -6,17 +6,11 @@ Use these before submitting changes:
 
 ```bash
 cargo check --workspace --all-targets --locked
-cargo fmt --all -- --check
+cargo fmt --all
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo clippy --workspace --lib --all-features -- -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic
-cargo test --workspace --all-targets --all-features
+cargo test --workspace --all-targets --all-features -- --quiet
 RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --document-private-items
-```
-
-(If needed to apply formatting:)
-
-```bash
-cargo fmt --all
 ```
 
 ## Test Organization
