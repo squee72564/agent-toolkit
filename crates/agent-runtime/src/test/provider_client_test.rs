@@ -2,9 +2,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::{
-    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
+    AttemptFailureEvent, AttemptSpec, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
     MessageCreateInput, RequestEndEvent, RequestStartEvent, RuntimeErrorKind, RuntimeObserver,
-    openai,
+    Target, openai,
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -241,13 +241,38 @@ async fn direct_provider_client_explicit_task_api_uses_execution_boundary() {
         .into_task_request()
         .expect("task request should build");
 
-    let (_response, meta) = with_timeout(client.messages().create_task_with_meta(
+    let (_response, meta) = with_timeout(
+        client
+            .messages()
+            .execute_with_meta(task, ExecutionOptions::default()),
+    )
+    .await
+    .expect("direct explicit task request should succeed");
+
+    assert_eq!(meta.selected_provider, agent_core::ProviderId::OpenAi);
+    assert_eq!(meta.selected_model, "gpt-5-mini");
+    assert_eq!(meta.attempts.len(), 1);
+}
+
+#[tokio::test]
+async fn direct_provider_client_explicit_attempt_api_uses_attempt_model_override() {
+    let base_url = spawn_stub(StubHttpResponse::json_success("req_direct_attempt")).await;
+    let observer = Arc::new(RecordingObserver::new());
+    let client = direct_client(base_url, observer);
+
+    let task = MessageCreateInput::user("hello explicit attempt")
+        .into_task_request()
+        .expect("task request should build");
+
+    let (_response, meta) = with_timeout(client.messages().execute_on_attempt_with_meta(
         task,
-        Some("gpt-5-mini".to_string()),
+        AttemptSpec::to(
+            Target::new(Target::default_instance_for(ProviderId::OpenAi)).with_model("gpt-5-mini"),
+        ),
         ExecutionOptions::default(),
     ))
     .await
-    .expect("direct explicit task request should succeed");
+    .expect("direct explicit attempt request should succeed");
 
     assert_eq!(meta.selected_provider, agent_core::ProviderId::OpenAi);
     assert_eq!(meta.selected_model, "gpt-5-mini");

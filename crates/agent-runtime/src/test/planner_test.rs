@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use agent_core::{
     FamilyOptions, Message, NativeOptions, OpenAiCompatibleOptions, OpenAiOptions, ProviderOptions,
-    Request, ResponseFormat, ToolChoice,
+    ResponseFormat, TaskRequest, ToolChoice,
 };
 
 use crate::planner::{self, AttemptPlanningError, PlanningRejectionKind};
@@ -26,7 +26,7 @@ fn routed_planner_rejects_mismatched_native_family() {
     let error = planner::plan_routed_attempt(
         &client,
         &attempt,
-        &test_request().task_request(),
+        &test_task_request(),
         &ExecutionOptions::default(),
     )
     .expect_err("family mismatch must reject");
@@ -60,7 +60,7 @@ fn routed_planner_rejects_mismatched_native_provider() {
     let error = planner::plan_routed_attempt(
         &client,
         &attempt,
-        &test_request().task_request(),
+        &test_task_request(),
         &ExecutionOptions::default(),
     )
     .expect_err("provider mismatch must reject");
@@ -100,7 +100,7 @@ fn routed_planner_rejects_provider_native_layer_for_generic_openai_compatible() 
     let error = planner::plan_routed_attempt(
         &client,
         &attempt,
-        &test_request().task_request(),
+        &test_task_request(),
         &ExecutionOptions::default(),
     )
     .expect_err("unsupported provider native layer must reject");
@@ -129,13 +129,8 @@ fn routed_planner_rejects_streaming_when_provider_capability_is_disabled() {
         ..ExecutionOptions::default()
     };
 
-    let error = planner::plan_routed_attempt(
-        &client,
-        &attempt,
-        &test_request().task_request(),
-        &execution,
-    )
-    .expect_err("streaming capability mismatch must reject");
+    let error = planner::plan_routed_attempt(&client, &attempt, &test_task_request(), &execution)
+        .expect_err("streaming capability mismatch must reject");
 
     match error {
         AttemptPlanningError::Rejected(rejection) => {
@@ -182,7 +177,7 @@ fn routed_planner_uses_target_model_before_provider_default() {
     let plan = planner::plan_routed_attempt(
         &client,
         &attempt,
-        &test_request().task_request(),
+        &test_task_request(),
         &ExecutionOptions::default(),
     )
     .expect("planning must succeed");
@@ -199,7 +194,7 @@ fn routed_planner_uses_provider_default_when_target_model_is_blank() {
     let plan = planner::plan_routed_attempt(
         &client,
         &attempt,
-        &test_request().task_request(),
+        &test_task_request(),
         &ExecutionOptions::default(),
     )
     .expect("planning must succeed");
@@ -215,7 +210,7 @@ fn routed_planner_treats_missing_model_as_fatal() {
     let error = planner::plan_routed_attempt(
         &client,
         &attempt,
-        &test_request().task_request(),
+        &test_task_request(),
         &ExecutionOptions::default(),
     )
     .expect_err("missing model must fail");
@@ -236,9 +231,7 @@ fn routed_planner_classifies_adapter_planning_rejection() {
         Some("claude-sonnet-4-6"),
     );
     let attempt = AttemptSpec::to(Target::new(agent_core::ProviderId::Anthropic));
-    let task = Request {
-        model_id: String::new(),
-        stream: false,
+    let task = TaskRequest {
         messages: vec![
             Message::user_text("hello"),
             Message::system_text("late system"),
@@ -251,8 +244,7 @@ fn routed_planner_classifies_adapter_planning_rejection() {
         max_output_tokens: None,
         stop: Vec::new(),
         metadata: BTreeMap::new(),
-    }
-    .task_request();
+    };
 
     let error =
         planner::plan_routed_attempt(&client, &attempt, &task, &ExecutionOptions::default())
@@ -286,9 +278,13 @@ fn direct_planner_resolves_platform_auth_and_transport() {
         .extra_headers
         .insert("x-route".to_string(), "route".to_string());
 
-    let plan =
-        planner::plan_direct_attempt(&client, &test_request().task_request(), None, &execution)
-            .expect("planning must succeed");
+    let plan = planner::plan_direct_attempt(
+        &client,
+        &test_task_request(),
+        &crate::AttemptSpec::to(crate::Target::new(client.runtime.instance_id.clone())),
+        &execution,
+    )
+    .expect("planning must succeed");
 
     assert_eq!(
         plan.provider_attempt.instance_id,
@@ -350,7 +346,7 @@ fn routed_planning_failure_tracks_static_skip_history_and_reason() {
     let result = planner::plan_routed_execution(
         &toolkit,
         &attempts,
-        &test_request().task_request(),
+        &test_task_request(),
         &execution,
         PlanningRejectionPolicy::SkipRejectedTargets,
     );
@@ -420,9 +416,7 @@ fn routed_planning_failure_uses_adapter_rejection_reason_when_any_attempt_reache
         response_mode: crate::ResponseMode::Streaming,
         ..ExecutionOptions::default()
     };
-    let task = Request {
-        model_id: String::new(),
-        stream: false,
+    let task = TaskRequest {
         messages: vec![
             Message::user_text("hello"),
             Message::system_text("late system"),
@@ -435,8 +429,7 @@ fn routed_planning_failure_uses_adapter_rejection_reason_when_any_attempt_reache
         max_output_tokens: None,
         stop: Vec::new(),
         metadata: BTreeMap::new(),
-    }
-    .task_request();
+    };
 
     let result = planner::plan_routed_execution(
         &toolkit,
@@ -486,7 +479,7 @@ fn routed_planning_fails_before_attempt_record_when_model_is_unresolved() {
     let result = planner::plan_routed_execution(
         &toolkit,
         &attempts,
-        &test_request().task_request(),
+        &test_task_request(),
         &ExecutionOptions::default(),
         PlanningRejectionPolicy::SkipRejectedTargets,
     );
@@ -541,7 +534,7 @@ fn skipped_planning_records_never_carry_request_id_or_status_metadata() {
     let result = planner::plan_routed_execution(
         &toolkit,
         &attempts,
-        &test_request().task_request(),
+        &test_task_request(),
         &execution,
         PlanningRejectionPolicy::SkipRejectedTargets,
     );
@@ -605,10 +598,8 @@ fn provider_client_with_default_model(
     })
 }
 
-fn test_request() -> Request {
-    Request {
-        model_id: "request-model".to_string(),
-        stream: false,
+fn test_task_request() -> TaskRequest {
+    TaskRequest {
         messages: vec![Message::user_text("hello")],
         tools: Vec::new(),
         tool_choice: ToolChoice::Auto,

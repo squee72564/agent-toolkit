@@ -22,6 +22,7 @@ use crate::target::Target;
 use super::*;
 
 mod agent_toolkit_test;
+mod client_native_options_test;
 mod clients_test;
 mod conversation_test;
 mod fallback_test;

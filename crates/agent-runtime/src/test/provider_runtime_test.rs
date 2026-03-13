@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use agent_core::{
     Message, ProviderCapabilities, ProviderDescriptor, ProviderFamilyId, ProviderId, ProviderKind,
-    Request, Response, ResponseFormat, ToolChoice,
+    Response, ResponseFormat, TaskRequest, ToolChoice,
 };
 use agent_providers::adapter::{ProviderAdapter, adapter_for};
 use agent_providers::error::{AdapterError, ProviderErrorInfo};
@@ -79,7 +79,7 @@ async fn execute_attempt_uses_override_model_in_meta() {
     let attempt = runtime
         .execute_attempt(direct_execution_plan(
             &runtime,
-            test_request("request-model", false).task_request(),
+            test_task_request(),
             Some("override-model"),
             crate::ExecutionOptions::default(),
         ))
@@ -105,7 +105,7 @@ async fn execute_attempt_uses_default_model_when_request_blank() {
     let attempt = runtime
         .execute_attempt(direct_execution_plan(
             &runtime,
-            test_request(" ", false).task_request(),
+            test_task_request(),
             None,
             crate::ExecutionOptions::default(),
         ))
@@ -125,8 +125,10 @@ fn direct_planner_fails_when_no_model_available() {
     let runtime = test_provider_runtime(ProviderId::OpenAi, "http://127.0.0.1:1", None);
     let error = planner::plan_direct_attempt(
         &ProviderClient::new(runtime),
-        &test_request("", false).task_request(),
-        None,
+        &test_task_request(),
+        &crate::AttemptSpec::to(crate::Target::new(crate::Target::default_instance_for(
+            ProviderId::OpenAi,
+        ))),
         &crate::ExecutionOptions::default(),
     )
     .expect_err("missing model must fail during planning");
@@ -152,7 +154,7 @@ async fn open_stream_attempt_reports_selected_model_and_response_meta() {
     let attempt = runtime
         .open_stream_attempt(direct_execution_plan(
             &runtime,
-            test_request("", true).task_request(),
+            test_task_request(),
             Some("override-model"),
             crate::ExecutionOptions {
                 response_mode: crate::ResponseMode::Streaming,
@@ -205,7 +207,7 @@ async fn open_stream_attempt_copies_adapter_selected_method_path_headers_and_fra
     let attempt = runtime
         .open_stream_attempt(direct_execution_plan(
             &runtime,
-            test_request("", true).task_request(),
+            test_task_request(),
             Some("override-model"),
             crate::ExecutionOptions {
                 response_mode: crate::ResponseMode::Streaming,
@@ -293,7 +295,7 @@ fn planner_resolves_transport_headers_timeouts_and_retry_policy() {
                 .with_model("model"),
         )
         .with_execution(execution),
-        &test_request("model", false).task_request(),
+        &test_task_request(),
         &crate::ExecutionOptions {
             transport,
             ..crate::ExecutionOptions::default()
@@ -334,10 +336,14 @@ fn direct_execution_plan(
     model_override: Option<&str>,
     execution: crate::ExecutionOptions,
 ) -> agent_core::ExecutionPlan {
+    let attempt = crate::AttemptSpec::to(crate::Target {
+        instance: runtime.instance_id.clone(),
+        model: model_override.map(ToString::to_string),
+    });
     planner::plan_direct_attempt(
         &ProviderClient::new(runtime.clone()),
         &task,
-        model_override,
+        &attempt,
         &execution,
     )
     .expect("planning should succeed")
@@ -424,10 +430,8 @@ fn test_provider_runtime_with(
     }
 }
 
-fn test_request(model_id: &str, stream: bool) -> Request {
-    Request {
-        model_id: model_id.to_string(),
-        stream,
+fn test_task_request() -> TaskRequest {
+    TaskRequest {
         messages: vec![Message::user_text("hello")],
         tools: Vec::new(),
         tool_choice: ToolChoice::Auto,

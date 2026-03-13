@@ -210,10 +210,6 @@ async fn routed_streaming_happy_path_finishes_with_response_meta() {
         .create(
             MessageCreateInput::user("hello"),
             Route::to(Target::new(ProviderId::OpenAi)),
-            ExecutionOptions {
-                response_mode: crate::ResponseMode::Streaming,
-                ..ExecutionOptions::default()
-            },
         )
         .await
         .expect("stream should open");
@@ -267,7 +263,7 @@ async fn routed_streaming_retries_next_target_when_initial_stream_open_fails() {
 
     let mut stream = toolkit
         .streaming()
-        .create(
+        .create_with_options(
             MessageCreateInput::user("hello"),
             Route::to(Target::new(ProviderId::OpenAi))
                 .with_fallback(Target::new(ProviderId::OpenRouter))
@@ -343,7 +339,7 @@ async fn routed_streaming_allows_fallback_after_raw_envelope_without_canonical_e
 
     let mut stream = toolkit
         .streaming()
-        .create(
+        .create_with_options(
             MessageCreateInput::user("hello"),
             Route::to(Target::new(ProviderId::OpenRouter))
                 .with_fallback(Target::new(ProviderId::OpenAi))
@@ -417,7 +413,7 @@ async fn routed_streaming_explicit_task_api_uses_route_and_execution_options() {
 
     let mut stream = toolkit
         .streaming()
-        .create_task(task, route, execution)
+        .execute(task, route, execution)
         .await
         .expect("explicit routed stream should open");
 
@@ -478,7 +474,7 @@ async fn routed_streaming_does_not_fallback_after_first_canonical_event() {
 
     let mut stream = toolkit
         .streaming()
-        .create(
+        .create_with_options(
             MessageCreateInput::user("hello"),
             Route::to(Target::new(ProviderId::OpenAi))
                 .with_fallback(Target::new(ProviderId::OpenRouter))
@@ -582,7 +578,7 @@ async fn routed_streaming_terminal_error_carries_ordered_attempt_history() {
 
     let mut stream = toolkit
         .streaming()
-        .create(
+        .create_with_options(
             MessageCreateInput::user("hello"),
             Route::to(Target::new(ProviderId::OpenRouter))
                 .with_fallback(Target::new(ProviderId::OpenAi))
@@ -704,7 +700,7 @@ async fn routed_streaming_terminal_error_keeps_pre_open_failures_and_skips_befor
 
     let mut stream = toolkit
         .streaming()
-        .create(
+        .create_with_options(
             MessageCreateInput::user("hello"),
             Route::to(Target::new(ProviderId::OpenRouter))
                 .with_fallback(Target::new(ProviderId::OpenAi))
@@ -846,7 +842,7 @@ async fn routed_streaming_success_uses_typed_attempt_history_for_legacy_response
 
     let mut stream = toolkit
         .streaming()
-        .create(
+        .create_with_options(
             MessageCreateInput::user("hello"),
             Route::to(Target::new(ProviderId::OpenRouter))
                 .with_fallback(Target::new(ProviderId::OpenAi))
@@ -913,7 +909,7 @@ async fn routed_streaming_fail_fast_stops_on_planning_rejection_before_fallback(
 
     let error = toolkit
         .streaming()
-        .create(
+        .create_with_options(
             MessageCreateInput::user("hello"),
             Route::to(Target::new(ProviderId::OpenAi))
                 .with_fallback(Target::new(ProviderId::OpenRouter))
@@ -985,7 +981,7 @@ async fn routed_streaming_emits_attempt_skipped_without_execution_events_for_ski
 
     let mut stream = toolkit
         .streaming()
-        .create(
+        .create_with_options(
             MessageCreateInput::user("hello"),
             Route::to(Target::new(ProviderId::OpenAi))
                 .with_fallback(Target::new(ProviderId::OpenRouter))
@@ -1048,7 +1044,7 @@ async fn routed_streaming_planning_failure_emits_request_end_after_attempt_skipp
 
     let error = toolkit
         .streaming()
-        .create(
+        .create_with_options(
             MessageCreateInput::user("hello"),
             Route::to(Target::new(ProviderId::OpenAi))
                 .with_planning_rejection_policy(crate::PlanningRejectionPolicy::FailFast),
@@ -1163,7 +1159,7 @@ async fn routed_text_stream_yields_text_chunks_and_finishes_with_response_meta()
 
     let mut stream = toolkit
         .streaming()
-        .create(
+        .create_with_options(
             MessageCreateInput::user("hello"),
             Route::to(Target::new(ProviderId::OpenAi)),
             ExecutionOptions {

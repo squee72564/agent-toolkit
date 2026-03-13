@@ -1,4 +1,4 @@
-use agent_runtime::{MessageCreateInput, RuntimeErrorKind, openai};
+use agent_runtime::{ExecutionOptions, MessageCreateInput, ResponseMode, RuntimeErrorKind, openai};
 
 #[tokio::test]
 async fn public_messages_api_rejects_stream_requests_until_streaming_surface_exists() {
@@ -11,14 +11,18 @@ async fn public_messages_api_rejects_stream_requests_until_streaming_surface_exi
 
     let error = client
         .messages()
-        .create(
+        .create_task(
             MessageCreateInput::user("hello")
-                .with_model("gpt-5-mini")
-                .with_stream(true),
+                .into_task_request()
+                .expect("task request should build"),
+            ExecutionOptions {
+                response_mode: ResponseMode::Streaming,
+                ..ExecutionOptions::default()
+            },
         )
         .await
-        .expect_err("current public response API should reject stream=true");
+        .expect_err("messages() should reject streaming execution options");
 
     assert_eq!(error.kind, RuntimeErrorKind::Configuration);
-    assert!(error.message.contains("stream=true is not supported"));
+    assert!(error.message.contains("ResponseMode::NonStreaming"));
 }

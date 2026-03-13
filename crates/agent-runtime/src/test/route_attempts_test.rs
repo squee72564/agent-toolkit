@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use agent_core::{FamilyOptions, NativeOptions, OpenAiCompatibleOptions, ProviderOptions};
 
-use crate::routed_messages_api::apply_model_override;
 use crate::{
     AttemptSpec, FallbackPolicy, OpenRouterOptions, PlanningRejectionPolicy, Route, Target,
     TransportTimeoutOverrides,
@@ -40,7 +39,7 @@ fn attempt_spec_builder_preserves_attempt_local_execution_state() {
 }
 
 #[test]
-fn apply_model_override_updates_only_primary_target_and_preserves_route_state() {
+fn route_builder_preserves_routing_and_attempt_state() {
     let native = NativeOptions {
         family: Some(FamilyOptions::OpenAiCompatible(OpenAiCompatibleOptions {
             parallel_tool_calls: Some(true),
@@ -50,26 +49,21 @@ fn apply_model_override_updates_only_primary_target_and_preserves_route_state() 
     };
 
     let route = Route::to(
-        AttemptSpec::to(Target::new(agent_core::ProviderId::OpenAi))
+        AttemptSpec::to(Target::new(agent_core::ProviderId::OpenAi).with_model("primary-model"))
             .with_native_options(native.clone()),
     )
     .with_fallback(Target::new(agent_core::ProviderId::OpenRouter).with_model("fallback-model"))
     .with_fallback_policy(FallbackPolicy::new())
     .with_planning_rejection_policy(PlanningRejectionPolicy::SkipRejectedTargets);
 
-    let overridden = apply_model_override(route, Some("primary-model".to_string()));
-
+    assert_eq!(route.primary.target.model.as_deref(), Some("primary-model"));
+    assert_eq!(route.primary.execution.native, Some(native));
     assert_eq!(
-        overridden.primary.target.model.as_deref(),
-        Some("primary-model")
-    );
-    assert_eq!(overridden.primary.execution.native, Some(native));
-    assert_eq!(
-        overridden.fallbacks[0].target.model.as_deref(),
+        route.fallbacks[0].target.model.as_deref(),
         Some("fallback-model")
     );
     assert_eq!(
-        overridden.planning_rejection_policy,
+        route.planning_rejection_policy,
         PlanningRejectionPolicy::SkipRejectedTargets
     );
 }

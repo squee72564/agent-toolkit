@@ -327,7 +327,7 @@ async fn router_fallback_ordered_attempts_with_indices() {
         FallbackPolicy::new().with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Transport));
 
     let (_response, meta) = with_timeout(
-        toolkit.messages().create_with_meta(
+        toolkit.messages().create_with_meta_and_options(
             MessageCreateInput::user("hello"),
             Route::to(Target::new(ProviderId::OpenAi))
                 .with_fallback(Target::new(ProviderId::OpenRouter))
@@ -376,7 +376,7 @@ async fn toolkit_observer_and_execution_override_precedence() {
         .build()
         .expect("build toolkit");
 
-    let _ = with_timeout(toolkit.messages().create_with_meta(
+    let _ = with_timeout(toolkit.messages().create_with_meta_and_options(
         MessageCreateInput::user("hello"),
         Route::to(Target::new(ProviderId::OpenAi)),
         ExecutionOptions {
@@ -422,7 +422,7 @@ async fn fallback_exhausted_request_end_uses_terminal_failure_context() {
         FallbackPolicy::new().with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Transport));
 
     let error = with_timeout(
-        toolkit.messages().create_with_meta(
+        toolkit.messages().create_with_meta_and_options(
             MessageCreateInput::user("hello"),
             Route::to(Target::new(ProviderId::OpenAi))
                 .with_fallback(Target::new(ProviderId::OpenRouter))

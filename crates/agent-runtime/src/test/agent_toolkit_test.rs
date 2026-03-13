@@ -1,6 +1,8 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use agent_core::ProviderInstanceId;
+
 use super::*;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -174,6 +176,49 @@ fn builder_registers_openrouter_provider() {
 }
 
 #[test]
+fn builder_registers_custom_provider_instance() {
+    let toolkit = AgentToolkit::builder()
+        .with_openai_instance(
+            "openai-secondary",
+            ProviderConfig::new("test-key").with_base_url("http://127.0.0.1:1"),
+        )
+        .build()
+        .expect("builder should register named openai instance");
+
+    assert!(
+        toolkit
+            .clients
+            .contains_key(&ProviderInstanceId::new("openai-secondary"))
+    );
+}
+
+#[test]
+fn builder_supports_multiple_instances_for_same_provider_kind() {
+    let toolkit = AgentToolkit::builder()
+        .with_openai_instance(
+            "openai-primary",
+            ProviderConfig::new("primary-key").with_base_url("http://127.0.0.1:1"),
+        )
+        .with_openai_instance(
+            "openai-secondary",
+            ProviderConfig::new("secondary-key").with_base_url("http://127.0.0.1:1"),
+        )
+        .build()
+        .expect("builder should register multiple openai instances");
+
+    assert!(
+        toolkit
+            .clients
+            .contains_key(&ProviderInstanceId::new("openai-primary"))
+    );
+    assert!(
+        toolkit
+            .clients
+            .contains_key(&ProviderInstanceId::new("openai-secondary"))
+    );
+}
+
+#[test]
 fn builder_propagates_observer_to_provider_runtime() {
     let observer = Arc::new(ObserverStub);
     let toolkit = AgentToolkit::builder()
@@ -323,27 +368,16 @@ async fn routed_messages_fail_fast_surfaces_typed_route_planning_failure() {
         ]),
         observer: None,
     };
-    let task = agent_core::Request {
-        model_id: String::new(),
-        stream: false,
-        messages: vec![
-            Message::user_text("hello"),
-            Message::system_text("late system"),
-        ],
-        tools: Vec::new(),
-        tool_choice: ToolChoice::Auto,
-        response_format: ResponseFormat::Text,
-        temperature: None,
-        top_p: None,
-        max_output_tokens: None,
-        stop: Vec::new(),
-        metadata: std::collections::BTreeMap::new(),
-    }
-    .task_request();
+    let task = MessageCreateInput::new(vec![
+        Message::user_text("hello"),
+        Message::system_text("late system"),
+    ])
+    .into_task_request()
+    .expect("task request should build");
 
     let error = toolkit
         .messages()
-        .create_task(
+        .execute(
             task,
             Route::to(Target::new(ProviderId::Anthropic).with_model("claude-sonnet-4-6"))
                 .with_fallback(Target::new(ProviderId::OpenRouter))
@@ -370,6 +404,37 @@ async fn routed_messages_fail_fast_surfaces_typed_route_planning_failure() {
 }
 
 #[tokio::test]
+async fn routed_messages_create_uses_explicit_provider_instance_route() {
+    let base_url = spawn_json_success_stub("req_routed_custom_instance").await;
+    let toolkit = AgentToolkit::builder()
+        .with_openai_instance(
+            "openai-primary",
+            ProviderConfig::new("primary-key")
+                .with_base_url("http://127.0.0.1:1")
+                .with_default_model("gpt-4.1-mini"),
+        )
+        .with_openai_instance(
+            "openai-secondary",
+            ProviderConfig::new("secondary-key")
+                .with_base_url(&base_url)
+                .with_default_model("gpt-5-mini"),
+        )
+        .build()
+        .expect("builder should register multiple openai instances");
+
+    let (_response, meta) = toolkit
+        .messages()
+        .create_with_meta(
+            MessageCreateInput::user("hello"),
+            Route::to(Target::new("openai-secondary").with_model("gpt-5-mini")),
+        )
+        .await
+        .expect("request should target the named provider instance");
+
+    assert_eq!(meta.selected_provider, ProviderId::OpenAi);
+}
+
+#[tokio::test]
 async fn routed_messages_emit_attempt_skipped_without_execution_events_for_planning_rejection() {
     let base_url = spawn_json_success_stub("req_routed_skip_success").await;
     let observer = Arc::new(RecordingObserver::new());
@@ -391,27 +456,16 @@ async fn routed_messages_emit_attempt_skipped_without_execution_events_for_plann
         observer: Some(observer.clone()),
     };
 
-    let task = agent_core::Request {
-        model_id: String::new(),
-        stream: false,
-        messages: vec![
-            Message::user_text("hello"),
-            Message::system_text("late system"),
-        ],
-        tools: Vec::new(),
-        tool_choice: ToolChoice::Auto,
-        response_format: ResponseFormat::Text,
-        temperature: None,
-        top_p: None,
-        max_output_tokens: None,
-        stop: Vec::new(),
-        metadata: std::collections::BTreeMap::new(),
-    }
-    .task_request();
+    let task = MessageCreateInput::new(vec![
+        Message::user_text("hello"),
+        Message::system_text("late system"),
+    ])
+    .into_task_request()
+    .expect("task request should build");
 
     let (_response, meta) = toolkit
         .messages()
-        .create_task_with_meta(
+        .execute_with_meta(
             task,
             Route::to(Target::new(ProviderId::Anthropic).with_model("claude-sonnet-4-6"))
                 .with_fallback(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))

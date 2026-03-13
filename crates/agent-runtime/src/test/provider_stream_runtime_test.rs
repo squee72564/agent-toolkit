@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use agent_core::{
     CanonicalStreamEnvelope, CanonicalStreamEvent, ContentPart, FinishReason, Message, ProviderId,
-    RawStreamPayload, RawStreamTransport, Request, Response, ResponseFormat, RuntimeWarning,
-    StreamOutputItemEnd, StreamOutputItemStart, ToolChoice,
+    RawStreamPayload, RawStreamTransport, Response, ResponseFormat, RuntimeWarning,
+    StreamOutputItemEnd, StreamOutputItemStart, TaskRequest, ToolChoice,
 };
 use agent_providers::adapter::adapter_for;
 use agent_providers::error::AdapterErrorKind;
@@ -67,17 +67,22 @@ async fn current_non_streaming_api_rejects_stream_requests() {
     let client = super::test_provider_client(ProviderId::OpenAi);
 
     let error = client
-        .create(
+        .messages()
+        .execute(
             MessageCreateInput::user("hello")
-                .with_model("gpt-5-mini")
-                .with_stream(true),
+                .into_task_request()
+                .expect("task request should build"),
+            crate::ExecutionOptions {
+                response_mode: crate::ResponseMode::Streaming,
+                ..crate::ExecutionOptions::default()
+            },
         )
         .await
-        .expect_err("stream=true should be rejected on the current response API");
+        .expect_err("streaming execution should be rejected on the current response API");
 
     assert_eq!(error.kind, RuntimeErrorKind::Configuration);
     assert!(
-        error.message.contains("stream=true is not supported"),
+        error.message.contains("ResponseMode::NonStreaming"),
         "unexpected message: {}",
         error.message
     );
@@ -107,9 +112,7 @@ async fn runtime_executes_openai_sse_plan_and_builds_response() {
         .execute_attempt(
             planner::plan_direct_attempt(
                 &ProviderClient::new(runtime.clone()),
-                &Request {
-                    model_id: String::new(),
-                    stream: true,
+                &TaskRequest {
                     messages: vec![Message::user_text("hello")],
                     tools: Vec::new(),
                     tool_choice: ToolChoice::Auto,
@@ -119,9 +122,8 @@ async fn runtime_executes_openai_sse_plan_and_builds_response() {
                     max_output_tokens: None,
                     stop: Vec::new(),
                     metadata: BTreeMap::new(),
-                }
-                .task_request(),
-                None,
+                },
+                &crate::AttemptSpec::to(crate::Target::new(runtime.instance_id.clone())),
                 &crate::ExecutionOptions {
                     response_mode: crate::ResponseMode::Streaming,
                     ..crate::ExecutionOptions::default()

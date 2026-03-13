@@ -91,7 +91,6 @@ fn conversation_to_input_and_into_input_preserve_messages() {
 
     let to_input = conversation.to_input();
     assert_eq!(to_input.messages(), conversation.messages());
-    assert!(to_input.model_override().is_none());
     assert!(to_input.tools.is_empty());
     assert_eq!(to_input.tool_choice, ToolChoice::default());
     assert_eq!(to_input.response_format, ResponseFormat::default());
@@ -103,7 +102,6 @@ fn conversation_to_input_and_into_input_preserve_messages() {
 
     let into_input = conversation.clone().into_input();
     assert_eq!(into_input.messages(), conversation.messages());
-    assert!(into_input.model_override().is_none());
     assert!(into_input.tools.is_empty());
     assert_eq!(into_input.tool_choice, ToolChoice::default());
     assert_eq!(into_input.response_format, ResponseFormat::default());
