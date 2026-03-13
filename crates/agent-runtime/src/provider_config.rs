@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use agent_transport::RetryPolicy;
+use reqwest::header::HeaderName;
 
 /// Provider configuration shared by direct clients and [`crate::AgentToolkit`].
 #[derive(Clone, Default)]
@@ -11,6 +12,8 @@ pub struct ProviderConfig {
     pub base_url: Option<String>,
     /// Default model used when requests do not specify one explicitly.
     pub default_model: Option<String>,
+    /// Optional override for response request-id header extraction.
+    pub request_id_header: Option<HeaderName>,
     /// Optional transport retry policy.
     pub retry_policy: Option<RetryPolicy>,
     /// Optional timeout for non-streaming requests.
@@ -40,6 +43,12 @@ impl ProviderConfig {
         self
     }
 
+    /// Sets the default response request-id header for this provider instance.
+    pub fn with_request_id_header(mut self, request_id_header: HeaderName) -> Self {
+        self.request_id_header = Some(request_id_header);
+        self
+    }
+
     /// Sets the transport retry policy.
     pub fn with_retry_policy(mut self, retry_policy: RetryPolicy) -> Self {
         self.retry_policy = Some(retry_policy);
@@ -65,6 +74,7 @@ impl std::fmt::Debug for ProviderConfig {
             .field("api_key", &"<redacted>")
             .field("base_url", &self.base_url)
             .field("default_model", &self.default_model)
+            .field("request_id_header", &self.request_id_header)
             .field("retry_policy", &self.retry_policy)
             .field("request_timeout", &self.request_timeout)
             .field("stream_timeout", &self.stream_timeout)

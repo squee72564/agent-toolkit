@@ -61,6 +61,10 @@ fn adapter_lookup_returns_expected_ids() {
         adapter_for(ProviderId::OpenRouter).id(),
         ProviderId::OpenRouter
     );
+    assert_eq!(
+        adapter_for(ProviderId::GenericOpenAiCompatible).id(),
+        ProviderId::GenericOpenAiCompatible
+    );
 }
 
 #[test]
@@ -69,10 +73,11 @@ fn all_builtin_adapters_contains_all_known_providers() {
         .iter()
         .map(|adapter| adapter.id())
         .collect();
-    assert_eq!(ids.len(), 3);
+    assert_eq!(ids.len(), 4);
     assert!(ids.contains(&ProviderId::OpenAi));
     assert!(ids.contains(&ProviderId::Anthropic));
     assert!(ids.contains(&ProviderId::OpenRouter));
+    assert!(ids.contains(&ProviderId::GenericOpenAiCompatible));
 }
 
 #[test]
@@ -116,6 +121,19 @@ fn anthropic_platform_config_is_correct() {
 fn openrouter_platform_config_is_correct() {
     let config = adapter_for(ProviderId::OpenRouter)
         .platform_config("https://openrouter.ai/api".to_string())
+        .expect("platform config should succeed");
+    assert_eq!(config.protocol, ProtocolKind::OpenAI);
+    assert_eq!(config.auth_style, AuthStyle::Bearer);
+    assert_eq!(
+        config.request_id_header,
+        HeaderName::from_static("x-request-id")
+    );
+}
+
+#[test]
+fn generic_openai_compatible_platform_config_is_correct() {
+    let config = adapter_for(ProviderId::GenericOpenAiCompatible)
+        .platform_config("https://example.test/v1".to_string())
         .expect("platform config should succeed");
     assert_eq!(config.protocol, ProtocolKind::OpenAI);
     assert_eq!(config.auth_style, AuthStyle::Bearer);

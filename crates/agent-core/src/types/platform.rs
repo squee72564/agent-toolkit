@@ -2,17 +2,6 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-/// Identifier for a supported provider family.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ProviderId {
-    /// OpenAI APIs.
-    OpenAi,
-    /// Anthropic APIs.
-    Anthropic,
-    /// OpenRouter APIs.
-    OpenRouter,
-}
-
 /// Transport-level metadata supplied alongside a request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

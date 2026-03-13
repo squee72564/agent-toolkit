@@ -31,7 +31,7 @@ pub(super) fn plan_execution(
     let endpoint_path = plan
         .endpoint_path_override
         .as_deref()
-        .unwrap_or(runtime.adapter.endpoint_path());
+        .unwrap_or(runtime.adapter.descriptor().endpoint_path);
     let url = join_url(&runtime.platform.base_url, endpoint_path);
 
     Ok(PlannedExecution {
@@ -55,7 +55,7 @@ pub(super) async fn execute_planned_non_streaming(
         }
         (transport_kind, response_kind) => Err(RuntimeError::configuration(format!(
             "unsupported provider execution plan for {:?}: transport={transport_kind:?}, response={response_kind:?}",
-            runtime.provider
+            runtime.kind
         ))),
     }
 }
@@ -112,12 +112,12 @@ async fn execute_json_attempt(
             response_mode: HttpResponseMode::Json,
         })
         .await
-        .map_err(|error| RuntimeError::from_transport(runtime.provider, error))?
+        .map_err(|error| RuntimeError::from_transport(runtime.kind, error))?
     {
         HttpResponse::Json(response) => response,
         HttpResponse::Sse(response) => {
             return Err(response_mode_mismatch_error(
-                runtime.provider,
+                runtime.kind,
                 HttpResponseMode::Json,
                 "SSE",
                 &response.head,
@@ -125,7 +125,7 @@ async fn execute_json_attempt(
         }
         HttpResponse::Bytes(response) => {
             return Err(response_mode_mismatch_error(
-                runtime.provider,
+                runtime.kind,
                 HttpResponseMode::Json,
                 "bytes",
                 &response.head,
@@ -178,12 +178,12 @@ async fn open_sse_stream(
             response_mode: HttpResponseMode::Sse,
         })
         .await
-        .map_err(|error| RuntimeError::from_transport(runtime.provider, error))?
+        .map_err(|error| RuntimeError::from_transport(runtime.kind, error))?
     {
         HttpResponse::Sse(response) => *response,
         HttpResponse::Json(response) => {
             return Err(response_mode_mismatch_error(
-                runtime.provider,
+                runtime.kind,
                 HttpResponseMode::Sse,
                 "JSON",
                 &response.head,
@@ -191,7 +191,7 @@ async fn open_sse_stream(
         }
         HttpResponse::Bytes(response) => {
             return Err(response_mode_mismatch_error(
-                runtime.provider,
+                runtime.kind,
                 HttpResponseMode::Sse,
                 "bytes",
                 &response.head,
@@ -200,12 +200,12 @@ async fn open_sse_stream(
     };
 
     Ok(OpenedProviderStream {
-        provider: runtime.provider,
+        provider: runtime.kind,
         response,
         response_format,
         prepended_warnings: plan.warnings,
         projector: runtime.adapter.create_stream_projector(),
-        runtime: crate::provider_stream_runtime::ProviderStreamRuntime::new(runtime.provider),
+        runtime: crate::provider_stream_runtime::ProviderStreamRuntime::new(runtime.kind),
         transcript: Vec::new(),
     })
 }

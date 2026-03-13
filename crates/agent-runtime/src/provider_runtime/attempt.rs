@@ -21,7 +21,7 @@ pub(super) fn prepare_attempt(
     let selected_model = match runtime.resolve_model(&request.model_id, model_override) {
         Ok(model) => model,
         Err(error) => {
-            let meta = preflight_failure_meta(runtime.provider, &error);
+            let meta = preflight_failure_meta(runtime.kind, &error);
             return Err(Box::new((error, meta)));
         }
     };
@@ -32,7 +32,9 @@ pub(super) fn prepare_attempt(
         selected_model,
         adapter_context: AdapterContext {
             metadata,
-            auth_token: Some(AuthCredentials::Token(runtime.auth_token.clone())),
+            auth_token: Some(AuthCredentials::Token(
+                runtime.registered.config.api_key.clone(),
+            )),
         },
     })
 }

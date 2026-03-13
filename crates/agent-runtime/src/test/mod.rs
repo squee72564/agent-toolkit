@@ -9,7 +9,10 @@ use agent_transport::HttpTransport;
 use serde_json::json;
 
 use crate::provider_client::ProviderClient;
+use crate::provider_config::ProviderConfig;
 use crate::provider_runtime::ProviderRuntime;
+use crate::registered_provider::RegisteredProvider;
+use crate::target::Target;
 
 use super::*;
 
@@ -23,8 +26,8 @@ mod provider_client_test;
 mod provider_config_test;
 mod provider_runtime_test;
 mod provider_stream_runtime_test;
+mod registered_provider_test;
 mod runtime_error_test;
-mod send_options_test;
 mod streaming_api_test;
 mod types_test;
 
@@ -55,13 +58,19 @@ fn test_provider_client(provider: ProviderId) -> ProviderClient {
     let platform = adapter
         .platform_config("http://127.0.0.1:1".to_string())
         .expect("test platform should build");
+    let instance_id = Target::default_instance_for(provider);
+    let registered = RegisteredProvider::new(
+        instance_id.clone(),
+        provider,
+        ProviderConfig::new("test-key"),
+    );
 
     ProviderClient::new(ProviderRuntime {
-        provider,
+        instance_id,
+        kind: provider,
+        registered,
         adapter,
         platform,
-        auth_token: "test-key".to_string(),
-        default_model: None,
         transport,
         observer: None,
     })

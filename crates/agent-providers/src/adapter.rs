@@ -5,7 +5,8 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde_json::Value;
 
 use agent_core::{
-    AuthStyle, PlatformConfig, ProtocolKind, ProviderId, Request, Response, ResponseFormat,
+    AuthStyle, ProviderDescriptor, ProviderFamilyId, ProviderKind, Request, Response,
+    ResponseFormat,
 };
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
@@ -25,20 +26,31 @@ use crate::streaming::ProviderStreamProjector;
 ///
 /// A `ProviderAdapter` is responsible for:
 ///
-/// - describing the provider's HTTP platform configuration,
+/// - exposing adapter-owned static provider metadata,
 /// - translating provider-agnostic [`Request`] values into a
 ///   [`ProviderRequestPlan`],
 /// - decoding provider JSON responses back into [`Response`], and
 /// - projecting raw streaming events into canonical stream events.
 pub trait ProviderAdapter: Sync + std::fmt::Debug {
-    /// Returns the provider identifier implemented by this adapter.
-    fn id(&self) -> ProviderId;
-    /// Returns the provider's default API base URL.
-    fn default_base_url(&self) -> &'static str;
-    /// Returns the default endpoint path used for requests.
-    fn endpoint_path(&self) -> &'static str;
-    /// Builds transport-facing platform configuration for the provider.
-    fn platform_config(&self, base_url: String) -> Result<PlatformConfig, AdapterError>;
+    /// Returns the concrete provider kind implemented by this adapter.
+    fn kind(&self) -> ProviderKind;
+    /// Returns static metadata for this provider kind.
+    fn descriptor(&self) -> &ProviderDescriptor;
+    /// REFACTOR-SHIM: legacy accessor preserved while runtime callers migrate.
+    fn default_base_url(&self) -> &'static str {
+        self.descriptor().default_base_url
+    }
+    /// REFACTOR-SHIM: legacy accessor preserved while runtime callers migrate.
+    fn endpoint_path(&self) -> &'static str {
+        self.descriptor().endpoint_path
+    }
+    /// REFACTOR-SHIM: legacy helper preserved for tests and migration paths.
+    fn platform_config(
+        &self,
+        base_url: String,
+    ) -> Result<agent_core::PlatformConfig, AdapterError> {
+        build_platform_config(self.kind(), self.descriptor(), base_url)
+    }
     /// Translates a provider-agnostic request into a provider-specific request
     /// plan for the transport layer.
     fn plan_request(&self, req: Request) -> Result<ProviderRequestPlan, AdapterError>;
@@ -60,6 +72,64 @@ const OPENAI_ENDPOINT_PATH: &str = "/v1/responses";
 const ANTHROPIC_ENDPOINT_PATH: &str = "/v1/messages";
 const OPENROUTER_ENDPOINT_PATH: &str = "/v1/responses";
 
+fn openai_descriptor() -> ProviderDescriptor {
+    ProviderDescriptor {
+        kind: ProviderKind::OpenAi,
+        family: ProviderFamilyId::OpenAiCompatible,
+        protocol: agent_core::ProtocolKind::OpenAI,
+        default_base_url: OPENAI_BASE_URL,
+        endpoint_path: OPENAI_ENDPOINT_PATH,
+        default_auth_style: AuthStyle::Bearer,
+        default_request_id_header: HeaderName::from_static("x-request-id"),
+        default_headers: HeaderMap::new(),
+    }
+}
+
+fn anthropic_descriptor() -> ProviderDescriptor {
+    let mut default_headers = HeaderMap::new();
+    default_headers.insert(
+        HeaderName::from_static("anthropic-version"),
+        HeaderValue::from_static("2023-06-01"),
+    );
+
+    ProviderDescriptor {
+        kind: ProviderKind::Anthropic,
+        family: ProviderFamilyId::Anthropic,
+        protocol: agent_core::ProtocolKind::Anthropic,
+        default_base_url: ANTHROPIC_BASE_URL,
+        endpoint_path: ANTHROPIC_ENDPOINT_PATH,
+        default_auth_style: AuthStyle::ApiKeyHeader(HeaderName::from_static("x-api-key")),
+        default_request_id_header: HeaderName::from_static("request-id"),
+        default_headers,
+    }
+}
+
+fn openrouter_descriptor() -> ProviderDescriptor {
+    ProviderDescriptor {
+        kind: ProviderKind::OpenRouter,
+        family: ProviderFamilyId::OpenAiCompatible,
+        protocol: agent_core::ProtocolKind::OpenAI,
+        default_base_url: OPENROUTER_BASE_URL,
+        endpoint_path: OPENROUTER_ENDPOINT_PATH,
+        default_auth_style: AuthStyle::Bearer,
+        default_request_id_header: HeaderName::from_static("x-request-id"),
+        default_headers: HeaderMap::new(),
+    }
+}
+
+fn generic_openai_compatible_descriptor() -> ProviderDescriptor {
+    ProviderDescriptor {
+        kind: ProviderKind::GenericOpenAiCompatible,
+        family: ProviderFamilyId::OpenAiCompatible,
+        protocol: agent_core::ProtocolKind::OpenAI,
+        default_base_url: OPENAI_BASE_URL,
+        endpoint_path: OPENAI_ENDPOINT_PATH,
+        default_auth_style: AuthStyle::Bearer,
+        default_request_id_header: HeaderName::from_static("x-request-id"),
+        default_headers: HeaderMap::new(),
+    }
+}
+
 /// Built-in adapter for OpenAI-compatible response endpoints.
 #[derive(Debug, Clone, Copy)]
 pub struct OpenAiAdapter;
@@ -72,51 +142,49 @@ pub struct AnthropicAdapter;
 #[derive(Debug, Clone, Copy)]
 pub struct OpenRouterAdapter;
 
+/// Built-in adapter for self-hosted OpenAI-compatible response endpoints.
+#[derive(Debug, Clone, Copy)]
+pub struct GenericOpenAiCompatibleAdapter;
+
 static OPENAI_ADAPTER: OpenAiAdapter = OpenAiAdapter;
 static ANTHROPIC_ADAPTER: AnthropicAdapter = AnthropicAdapter;
 static OPENROUTER_ADAPTER: OpenRouterAdapter = OpenRouterAdapter;
+static GENERIC_OPENAI_COMPATIBLE_ADAPTER: GenericOpenAiCompatibleAdapter =
+    GenericOpenAiCompatibleAdapter;
 
-/// Returns the built-in adapter for a provider identifier.
+/// Returns the built-in adapter for a provider kind.
 ///
 /// The returned adapter is a shared `'static` singleton.
-pub fn adapter_for(id: ProviderId) -> &'static dyn ProviderAdapter {
-    match id {
-        ProviderId::OpenAi => &OPENAI_ADAPTER,
-        ProviderId::Anthropic => &ANTHROPIC_ADAPTER,
-        ProviderId::OpenRouter => &OPENROUTER_ADAPTER,
+pub fn adapter_for(kind: ProviderKind) -> &'static dyn ProviderAdapter {
+    match kind {
+        ProviderKind::OpenAi => &OPENAI_ADAPTER,
+        ProviderKind::Anthropic => &ANTHROPIC_ADAPTER,
+        ProviderKind::OpenRouter => &OPENROUTER_ADAPTER,
+        ProviderKind::GenericOpenAiCompatible => &GENERIC_OPENAI_COMPATIBLE_ADAPTER,
     }
 }
 
 #[cfg(test)]
 #[allow(dead_code)]
 pub(crate) fn all_builtin_adapters() -> &'static [&'static dyn ProviderAdapter] {
-    static ADAPTERS: [&'static dyn ProviderAdapter; 3] =
-        [&OPENAI_ADAPTER, &ANTHROPIC_ADAPTER, &OPENROUTER_ADAPTER];
+    static ADAPTERS: [&'static dyn ProviderAdapter; 4] = [
+        &OPENAI_ADAPTER,
+        &ANTHROPIC_ADAPTER,
+        &OPENROUTER_ADAPTER,
+        &GENERIC_OPENAI_COMPATIBLE_ADAPTER,
+    ];
     &ADAPTERS
 }
 
 impl ProviderAdapter for OpenAiAdapter {
-    fn id(&self) -> ProviderId {
-        ProviderId::OpenAi
+    fn kind(&self) -> ProviderKind {
+        ProviderKind::OpenAi
     }
 
-    fn default_base_url(&self) -> &'static str {
-        OPENAI_BASE_URL
-    }
-
-    fn endpoint_path(&self) -> &'static str {
-        OPENAI_ENDPOINT_PATH
-    }
-
-    fn platform_config(&self, base_url: String) -> Result<PlatformConfig, AdapterError> {
-        build_platform_config(
-            self.id(),
-            base_url,
-            ProtocolKind::OpenAI,
-            AuthStyle::Bearer,
-            HeaderName::from_static("x-request-id"),
-            HeaderMap::new(),
-        )
+    fn descriptor(&self) -> &ProviderDescriptor {
+        static DESCRIPTOR: std::sync::LazyLock<ProviderDescriptor> =
+            std::sync::LazyLock::new(openai_descriptor);
+        &DESCRIPTOR
     }
 
     fn plan_request(&self, req: Request) -> Result<ProviderRequestPlan, AdapterError> {
@@ -137,33 +205,14 @@ impl ProviderAdapter for OpenAiAdapter {
 }
 
 impl ProviderAdapter for AnthropicAdapter {
-    fn id(&self) -> ProviderId {
-        ProviderId::Anthropic
+    fn kind(&self) -> ProviderKind {
+        ProviderKind::Anthropic
     }
 
-    fn default_base_url(&self) -> &'static str {
-        ANTHROPIC_BASE_URL
-    }
-
-    fn endpoint_path(&self) -> &'static str {
-        ANTHROPIC_ENDPOINT_PATH
-    }
-
-    fn platform_config(&self, base_url: String) -> Result<PlatformConfig, AdapterError> {
-        let mut default_headers = HeaderMap::new();
-        default_headers.insert(
-            HeaderName::from_static("anthropic-version"),
-            HeaderValue::from_static("2023-06-01"),
-        );
-
-        build_platform_config(
-            self.id(),
-            base_url,
-            ProtocolKind::Anthropic,
-            AuthStyle::ApiKeyHeader(HeaderName::from_static("x-api-key")),
-            HeaderName::from_static("request-id"),
-            default_headers,
-        )
+    fn descriptor(&self) -> &ProviderDescriptor {
+        static DESCRIPTOR: std::sync::LazyLock<ProviderDescriptor> =
+            std::sync::LazyLock::new(anthropic_descriptor);
+        &DESCRIPTOR
     }
 
     fn plan_request(&self, req: Request) -> Result<ProviderRequestPlan, AdapterError> {
@@ -184,27 +233,14 @@ impl ProviderAdapter for AnthropicAdapter {
 }
 
 impl ProviderAdapter for OpenRouterAdapter {
-    fn id(&self) -> ProviderId {
-        ProviderId::OpenRouter
+    fn kind(&self) -> ProviderKind {
+        ProviderKind::OpenRouter
     }
 
-    fn default_base_url(&self) -> &'static str {
-        OPENROUTER_BASE_URL
-    }
-
-    fn endpoint_path(&self) -> &'static str {
-        OPENROUTER_ENDPOINT_PATH
-    }
-
-    fn platform_config(&self, base_url: String) -> Result<PlatformConfig, AdapterError> {
-        build_platform_config(
-            self.id(),
-            base_url,
-            ProtocolKind::OpenAI,
-            AuthStyle::Bearer,
-            HeaderName::from_static("x-request-id"),
-            HeaderMap::new(),
-        )
+    fn descriptor(&self) -> &ProviderDescriptor {
+        static DESCRIPTOR: std::sync::LazyLock<ProviderDescriptor> =
+            std::sync::LazyLock::new(openrouter_descriptor);
+        &DESCRIPTOR
     }
 
     fn plan_request(&self, req: Request) -> Result<ProviderRequestPlan, AdapterError> {
@@ -224,14 +260,39 @@ impl ProviderAdapter for OpenRouterAdapter {
     }
 }
 
+impl ProviderAdapter for GenericOpenAiCompatibleAdapter {
+    fn kind(&self) -> ProviderKind {
+        ProviderKind::GenericOpenAiCompatible
+    }
+
+    fn descriptor(&self) -> &ProviderDescriptor {
+        static DESCRIPTOR: std::sync::LazyLock<ProviderDescriptor> =
+            std::sync::LazyLock::new(generic_openai_compatible_descriptor);
+        &DESCRIPTOR
+    }
+
+    fn plan_request(&self, req: Request) -> Result<ProviderRequestPlan, AdapterError> {
+        openai_request::plan_request(req)
+    }
+
+    fn decode_response_json(
+        &self,
+        body: Value,
+        requested_format: &ResponseFormat,
+    ) -> Result<Response, AdapterError> {
+        openai_response::decode_response_json(body, requested_format)
+    }
+
+    fn create_stream_projector(&self) -> Box<dyn ProviderStreamProjector> {
+        Box::<openai_stream::OpenAiStreamProjector>::default()
+    }
+}
+
 fn build_platform_config(
-    provider: ProviderId,
+    provider: ProviderKind,
+    descriptor: &ProviderDescriptor,
     base_url: String,
-    protocol: ProtocolKind,
-    auth_style: AuthStyle,
-    request_id_header: HeaderName,
-    default_headers: HeaderMap,
-) -> Result<PlatformConfig, AdapterError> {
+) -> Result<agent_core::PlatformConfig, AdapterError> {
     let trimmed_base_url = base_url.trim().to_string();
     if trimmed_base_url.is_empty() {
         return Err(AdapterError::new(
@@ -261,14 +322,14 @@ fn build_platform_config(
         ));
     }
 
-    Ok(PlatformConfig {
-        protocol,
+    Ok(agent_core::PlatformConfig {
+        protocol: descriptor.protocol.clone(),
         base_url: parsed_base_url
             .to_string()
             .trim_end_matches('/')
             .to_string(),
-        auth_style,
-        request_id_header,
-        default_headers,
+        auth_style: descriptor.default_auth_style.clone(),
+        request_id_header: descriptor.default_request_id_header.clone(),
+        default_headers: descriptor.default_headers.clone(),
     })
 }

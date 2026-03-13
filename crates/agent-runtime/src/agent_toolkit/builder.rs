@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use agent_core::ProviderId;
+use agent_core::{ProviderInstanceId, ProviderKind};
 
 use crate::agent_toolkit::AgentToolkit;
 use crate::base_client_builder::BaseClientBuilder;
@@ -61,20 +61,35 @@ impl AgentToolkitBuilder {
 
         if let Some(config) = openai {
             clients.insert(
-                ProviderId::OpenAi,
-                build_provider_client(ProviderId::OpenAi, config, observer.clone())?,
+                ProviderInstanceId::new("openai-default"),
+                build_provider_client(
+                    ProviderKind::OpenAi,
+                    ProviderInstanceId::new("openai-default"),
+                    config,
+                    observer.clone(),
+                )?,
             );
         }
         if let Some(config) = anthropic {
             clients.insert(
-                ProviderId::Anthropic,
-                build_provider_client(ProviderId::Anthropic, config, observer.clone())?,
+                ProviderInstanceId::new("anthropic-default"),
+                build_provider_client(
+                    ProviderKind::Anthropic,
+                    ProviderInstanceId::new("anthropic-default"),
+                    config,
+                    observer.clone(),
+                )?,
             );
         }
         if let Some(config) = openrouter {
             clients.insert(
-                ProviderId::OpenRouter,
-                build_provider_client(ProviderId::OpenRouter, config, observer.clone())?,
+                ProviderInstanceId::new("openrouter-default"),
+                build_provider_client(
+                    ProviderKind::OpenRouter,
+                    ProviderInstanceId::new("openrouter-default"),
+                    config,
+                    observer.clone(),
+                )?,
             );
         }
 
@@ -89,12 +104,13 @@ impl AgentToolkitBuilder {
 }
 
 fn build_provider_client(
-    provider: ProviderId,
+    provider: ProviderKind,
+    instance_id: ProviderInstanceId,
     config: ProviderConfig,
     observer: Option<Arc<dyn RuntimeObserver>>,
 ) -> Result<ProviderClient, RuntimeError> {
     let mut runtime_builder = BaseClientBuilder::from_provider_config(config);
     runtime_builder.observer = observer;
-    let runtime = runtime_builder.build_runtime(provider)?;
+    let runtime = runtime_builder.build_runtime(provider, instance_id)?;
     Ok(ProviderClient::new(runtime))
 }

@@ -140,29 +140,24 @@ async fn try_open_fallback_attempt(
     };
 
     while routed.next_target_index < routed.targets.len() {
-        if !routed
-            .options
-            .fallback_policy
-            .as_ref()
-            .is_some_and(|policy| policy.should_fallback(error))
-        {
+        if !routed.fallback_policy.should_fallback(error) {
             return None;
         }
 
         let index = routed.next_target_index;
         routed.next_target_index = routed.next_target_index.saturating_add(1);
         let target = routed.targets[index].clone();
-        let client = routed.toolkit.clients.get(&target.provider)?;
+        let client = routed.toolkit.clients.get(&target.instance)?;
         let observer = resolve_observer_for_request(
             client.runtime.observer.as_ref(),
             routed.toolkit.observer.as_ref(),
-            routed.options.observer.as_ref(),
+            routed.execution.observer.as_ref(),
         )
         .cloned();
         let attempt_started_at = Instant::now();
         emit_attempt_start(
             observer.as_ref(),
-            target.provider,
+            client.runtime.kind,
             event_model(target.model.as_deref(), &state.request_model_id),
             index,
             index,
@@ -174,7 +169,7 @@ async fn try_open_fallback_attempt(
             .open_stream_attempt(
                 request,
                 target.model.as_deref(),
-                routed.options.metadata.clone(),
+                routed.execution.transport.extra_headers.clone(),
             )
             .await
         {
@@ -199,24 +194,26 @@ async fn try_open_fallback_attempt(
             } => {
                 emit_attempt_failure(observer.as_ref(), &meta, index, index, attempt_started_at);
                 state.attempts.push(meta);
-                if routed.next_target_index >= routed.targets.len()
-                    || !routed
-                        .options
-                        .fallback_policy
-                        .as_ref()
-                        .is_some_and(|policy| policy.should_fallback(&attempt_error))
-                {
+                let should_continue = routed.next_target_index < routed.targets.len()
+                    && routed.fallback_policy.should_fallback(&attempt_error);
+                let provider = client.runtime.kind;
+                let model = target.model.unwrap_or_default();
+                let request_id = attempt_error.request_id.clone();
+                let status_code = attempt_error.status_code;
+                let observer_for_end = observer.clone();
+                let _ = routed;
+                if !should_continue {
                     emit_request_end_failure(
                         state,
                         &AttemptContext {
                             target_index: index,
                             attempt_index: index,
                             started_at: attempt_started_at,
-                            observer,
-                            provider: target.provider,
-                            model: target.model.unwrap_or_default(),
-                            request_id: attempt_error.request_id.clone(),
-                            status_code: attempt_error.status_code,
+                            observer: observer_for_end,
+                            provider,
+                            model,
+                            request_id,
+                            status_code,
                         },
                         &attempt_error,
                     );

@@ -2,8 +2,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::{
-    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, MessageCreateInput,
-    RequestEndEvent, RequestStartEvent, RuntimeErrorKind, RuntimeObserver, openai,
+    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
+    MessageCreateInput, RequestEndEvent, RequestStartEvent, RuntimeErrorKind, RuntimeObserver,
+    openai,
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -228,6 +229,29 @@ async fn direct_provider_client_non_stream_success_emits_expected_events() {
     assert_eq!(attempt_start.model.as_deref(), Some("gpt-5-mini"));
     assert_eq!(attempt_start.target_index, Some(0));
     assert_eq!(attempt_start.attempt_index, Some(0));
+}
+
+#[tokio::test]
+async fn direct_provider_client_explicit_task_api_uses_execution_boundary() {
+    let base_url = spawn_stub(StubHttpResponse::json_success("req_direct_task")).await;
+    let observer = Arc::new(RecordingObserver::new());
+    let client = direct_client(base_url, observer.clone());
+
+    let task = MessageCreateInput::user("hello explicit task")
+        .into_task_request()
+        .expect("task request should build");
+
+    let (_response, meta) = with_timeout(client.messages().create_task_with_meta(
+        task,
+        Some("gpt-5-mini".to_string()),
+        ExecutionOptions::default(),
+    ))
+    .await
+    .expect("direct explicit task request should succeed");
+
+    assert_eq!(meta.selected_provider, agent_core::ProviderId::OpenAi);
+    assert_eq!(meta.selected_model, "gpt-5-mini");
+    assert_eq!(meta.attempts.len(), 1);
 }
 
 #[tokio::test]

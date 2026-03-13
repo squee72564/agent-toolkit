@@ -1,12 +1,13 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use agent_core::{ProviderId, Request};
+use agent_core::ProviderId;
 
 use super::AgentToolkit;
+use crate::execution_options::ExecutionOptions;
 use crate::observer::{RuntimeObserver, resolve_observer_for_request, safe_call_observer};
+use crate::route::Route;
 use crate::runtime_error::RuntimeError;
-use crate::send_options::SendOptions;
 use crate::target::Target;
 use crate::types::{
     AttemptMeta, RequestEndContext, ResponseMeta, attempt_failure_event, attempt_start_event,
@@ -28,19 +29,19 @@ pub(super) struct AttemptExecution {
 impl PreparedExecution {
     pub(super) fn new(
         toolkit: &AgentToolkit,
-        _request: &Request,
-        options: &SendOptions,
+        route: &Route,
+        execution: &ExecutionOptions,
     ) -> Result<Self, RuntimeError> {
         let request_started_at = Instant::now();
-        let targets = toolkit.resolve_targets(options)?;
+        let targets = toolkit.resolve_route_targets(route)?;
         let first_client_observer = targets
             .first()
-            .and_then(|target| toolkit.clients.get(&target.provider))
+            .and_then(|target| toolkit.clients.get(&target.instance))
             .and_then(|client| client.runtime.observer.as_ref());
         let request_observer = resolve_observer_for_request(
             first_client_observer,
             toolkit.observer.as_ref(),
-            options.observer.as_ref(),
+            execution.observer.as_ref(),
         )
         .cloned();
 
@@ -51,14 +52,14 @@ impl PreparedExecution {
         })
     }
 
-    pub(super) fn emit_request_start(&self, request: &Request) {
+    pub(super) fn emit_request_start(&self, request_model: Option<&str>) {
         let event = request_start_event(
-            self.targets.first().map(|target| target.provider),
+            None,
             self.targets
                 .first()
-                .and_then(|target| event_model(target.model.as_deref(), &request.model_id)),
+                .and_then(|target| event_model(target.model.as_deref(), request_model)),
             self.request_started_at.elapsed(),
-            self.targets.first().map(|target| target.provider),
+            None,
             self.targets.len(),
         );
         safe_call_observer(self.request_observer.as_ref(), |observer| {
@@ -69,16 +70,17 @@ impl PreparedExecution {
     pub(super) fn attempt(
         &self,
         toolkit: &AgentToolkit,
-        options: &SendOptions,
-        request_model_id: &str,
+        execution: &ExecutionOptions,
+        request_model: Option<&str>,
         target: &Target,
         index: usize,
     ) -> AttemptExecution {
-        let observer = toolkit.resolve_attempt_observer(options, target.provider);
+        let observer = toolkit.resolve_attempt_observer(execution, target.instance.clone());
+        let provider = toolkit.clients[&target.instance].runtime.kind;
         let started_at = Instant::now();
         let event = attempt_start_event(
-            target.provider,
-            event_model(target.model.as_deref(), request_model_id),
+            provider,
+            event_model(target.model.as_deref(), request_model),
             index,
             index,
             started_at.elapsed(),
@@ -145,8 +147,8 @@ impl PreparedExecution {
 
     pub(super) fn emit_terminal_request_end(
         &self,
-        toolkit: &AgentToolkit,
-        options: &SendOptions,
+        _toolkit: &AgentToolkit,
+        _execution: &ExecutionOptions,
         attempts: &[AttemptMeta],
         error: &RuntimeError,
     ) {
@@ -154,9 +156,7 @@ impl PreparedExecution {
         let terminal_provider = terminal_error
             .provider
             .or_else(|| attempts.last().map(|attempt| attempt.provider));
-        let request_observer = terminal_provider
-            .and_then(|provider| toolkit.resolve_attempt_observer(options, provider))
-            .or_else(|| self.request_observer.clone());
+        let request_observer = self.request_observer.clone();
         let terminal_index = attempts.len().checked_sub(1);
         let event = request_end_failure_event(
             RequestEndContext {
@@ -207,6 +207,9 @@ impl AttemptExecution {
     }
 }
 
-pub(super) fn event_model(target_model: Option<&str>, request_model: &str) -> Option<String> {
-    normalized_event_model(target_model, request_model)
+pub(super) fn event_model(
+    target_model: Option<&str>,
+    request_model: Option<&str>,
+) -> Option<String> {
+    normalized_event_model(target_model, request_model.unwrap_or_default())
 }

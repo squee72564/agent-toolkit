@@ -32,6 +32,35 @@ fn message_input_requires_at_least_one_message() {
 }
 
 #[test]
+fn message_input_task_request_does_not_reintroduce_model_or_stream() {
+    let mut metadata = std::collections::BTreeMap::new();
+    metadata.insert("trace_id".to_string(), "abc123".to_string());
+
+    let task = MessageCreateInput::from("hello")
+        .with_model("legacy-model")
+        .with_stream(true)
+        .with_max_output_tokens(128)
+        .with_metadata(metadata.clone())
+        .into_task_request()
+        .expect("task request should be built");
+
+    assert_eq!(task.messages.len(), 1);
+    assert_eq!(task.max_output_tokens, Some(128));
+    assert_eq!(task.metadata, metadata);
+}
+
+#[test]
+fn message_input_infers_execution_options_from_legacy_stream_flag() {
+    let non_streaming = MessageCreateInput::from("hello").inferred_execution_options();
+    assert_eq!(non_streaming.response_mode, ResponseMode::NonStreaming);
+
+    let streaming = MessageCreateInput::from("hello")
+        .with_stream(true)
+        .inferred_execution_options();
+    assert_eq!(streaming.response_mode, ResponseMode::Streaming);
+}
+
+#[test]
 fn message_create_input_from_conversation_ref_and_owned() {
     let mut conversation = Conversation::new();
     conversation.push_user_text("u1");

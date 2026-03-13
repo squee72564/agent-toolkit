@@ -4,10 +4,11 @@ use std::time::Instant;
 use agent_core::{Request, Response};
 
 use crate::AgentToolkit;
+use crate::execution_options::ExecutionOptions;
+use crate::fallback::FallbackPolicy;
 use crate::observer::RuntimeObserver;
 use crate::provider_runtime::OpenedProviderStream;
 use crate::runtime_error::RuntimeError;
-use crate::send_options::SendOptions;
 use crate::target::Target;
 use crate::types::{AttemptMeta, ResponseMeta, response_meta};
 
@@ -55,7 +56,8 @@ impl StreamDriverState {
             routing: RoutingState::Routed(Box::new(RoutedState {
                 toolkit: init.toolkit.clone(),
                 request: init.request,
-                options: init.options,
+                execution: init.execution,
+                fallback_policy: init.fallback_policy,
                 targets: init.targets,
                 next_target_index: init.next_target_index,
             })),
@@ -75,7 +77,8 @@ pub(super) enum RoutingState {
 pub(super) struct RoutedState {
     pub(super) toolkit: AgentToolkit,
     pub(super) request: Request,
-    pub(super) options: SendOptions,
+    pub(super) execution: ExecutionOptions,
+    pub(super) fallback_policy: FallbackPolicy,
     pub(super) targets: Vec<Target>,
     pub(super) next_target_index: usize,
 }
@@ -83,7 +86,8 @@ pub(super) struct RoutedState {
 pub(crate) struct RoutedStreamInit<'a> {
     pub(crate) request: Request,
     pub(crate) toolkit: &'a AgentToolkit,
-    pub(crate) options: SendOptions,
+    pub(crate) execution: ExecutionOptions,
+    pub(crate) fallback_policy: FallbackPolicy,
     pub(crate) request_started_at: Instant,
     pub(crate) request_observer: Option<Arc<dyn RuntimeObserver>>,
     pub(crate) targets: Vec<Target>,

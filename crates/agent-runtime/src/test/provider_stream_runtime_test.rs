@@ -637,13 +637,19 @@ fn test_provider_runtime(
     let platform = adapter
         .platform_config(base_url.to_string())
         .expect("test platform should build");
+    let instance_id = crate::Target::default_instance_for(provider);
+    let mut config = crate::ProviderConfig::new("test-key").with_base_url(base_url);
+    if let Some(default_model) = default_model {
+        config = config.with_default_model(default_model);
+    }
+    let registered = crate::RegisteredProvider::new(instance_id.clone(), provider, config);
 
     ProviderRuntime {
-        provider,
+        instance_id,
+        kind: provider,
+        registered,
         adapter,
         platform,
-        auth_token: "test-key".to_string(),
-        default_model: default_model.map(ToString::to_string),
         transport,
         observer: None,
     }

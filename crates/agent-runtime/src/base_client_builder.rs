@@ -1,12 +1,14 @@
 use std::{sync::Arc, time::Duration};
 
-use agent_core::ProviderId;
+use agent_core::{ProviderInstanceId, ProviderKind};
 use agent_providers::adapter::adapter_for;
 use agent_transport::{HttpTransport, RetryPolicy};
+use reqwest::header::HeaderName;
 
 use crate::observer::RuntimeObserver;
 use crate::provider_config::ProviderConfig;
 use crate::provider_runtime::ProviderRuntime;
+use crate::registered_provider::RegisteredProvider;
 use crate::runtime_error::RuntimeError;
 
 #[derive(Clone, Default)]
@@ -14,6 +16,7 @@ pub(crate) struct BaseClientBuilder {
     pub(crate) api_key: Option<String>,
     pub(crate) base_url: Option<String>,
     pub(crate) default_model: Option<String>,
+    pub(crate) request_id_header: Option<HeaderName>,
     pub(crate) retry_policy: Option<RetryPolicy>,
     pub(crate) request_timeout: Option<Duration>,
     pub(crate) stream_timeout: Option<Duration>,
@@ -27,6 +30,7 @@ impl BaseClientBuilder {
             api_key: Some(config.api_key),
             base_url: config.base_url,
             default_model: config.default_model,
+            request_id_header: config.request_id_header,
             retry_policy: config.retry_policy,
             request_timeout: config.request_timeout,
             stream_timeout: config.stream_timeout,
@@ -37,15 +41,16 @@ impl BaseClientBuilder {
 
     pub(crate) fn build_runtime(
         self,
-        provider: ProviderId,
+        kind: ProviderKind,
+        instance_id: ProviderInstanceId,
     ) -> Result<ProviderRuntime, RuntimeError> {
-        let adapter = adapter_for(provider);
+        let adapter = adapter_for(kind);
         let api_key = self.api_key.ok_or_else(|| {
-            RuntimeError::configuration(format!("missing API key for provider {provider:?}"))
+            RuntimeError::configuration(format!("missing API key for provider {kind:?}"))
         })?;
         if api_key.trim().is_empty() {
             return Err(RuntimeError::configuration(format!(
-                "API key is empty for provider {provider:?}"
+                "API key is empty for provider {kind:?}"
             )));
         }
 
@@ -58,7 +63,7 @@ impl BaseClientBuilder {
         };
 
         let mut transport_builder = HttpTransport::builder(reqwest_client);
-        if let Some(retry_policy) = self.retry_policy {
+        if let Some(retry_policy) = self.retry_policy.clone() {
             transport_builder = transport_builder.retry_policy(retry_policy);
         }
         if let Some(timeout) = self.request_timeout {
@@ -69,19 +74,27 @@ impl BaseClientBuilder {
         }
 
         let transport = transport_builder.build();
-        let base_url = self
-            .base_url
-            .unwrap_or_else(|| adapter.default_base_url().to_string());
-        let platform = adapter
-            .platform_config(base_url)
-            .map_err(|error| RuntimeError::configuration(error.message))?;
+        let registered = RegisteredProvider::new(
+            instance_id.clone(),
+            kind,
+            ProviderConfig {
+                api_key,
+                base_url: self.base_url,
+                default_model: self.default_model,
+                request_id_header: self.request_id_header,
+                retry_policy: self.retry_policy,
+                request_timeout: self.request_timeout,
+                stream_timeout: self.stream_timeout,
+            },
+        );
+        let platform = registered.platform_config(adapter.descriptor())?;
 
         Ok(ProviderRuntime {
-            provider,
+            instance_id,
+            kind,
+            registered,
             adapter,
             platform,
-            auth_token: api_key,
-            default_model: self.default_model,
             transport,
             observer: self.observer,
         })
@@ -94,6 +107,7 @@ impl std::fmt::Debug for BaseClientBuilder {
             .field("api_key", &self.api_key.as_ref().map(|_| "<redacted>"))
             .field("base_url", &self.base_url)
             .field("default_model", &self.default_model)
+            .field("request_id_header", &self.request_id_header)
             .field("retry_policy", &self.retry_policy)
             .field("request_timeout", &self.request_timeout)
             .field("stream_timeout", &self.stream_timeout)

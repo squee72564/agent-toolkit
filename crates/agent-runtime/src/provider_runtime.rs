@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use agent_core::{
-    CanonicalStreamEnvelope, PlatformConfig, ProviderId, Request, Response, ResponseFormat,
-    RuntimeWarning,
+    CanonicalStreamEnvelope, PlatformConfig, ProviderId, ProviderInstanceId, ProviderKind, Request,
+    Response, ResponseFormat, RuntimeWarning,
 };
 use agent_providers::error::AdapterOperation;
 use agent_providers::{
@@ -12,6 +12,7 @@ use agent_transport::{HttpJsonResponse, HttpResponseMode, HttpSseResponse, HttpT
 
 use crate::observer::RuntimeObserver;
 use crate::provider_stream_runtime::{ProviderStreamRuntime, StreamRuntimeError};
+use crate::registered_provider::RegisteredProvider;
 use crate::runtime_error::RuntimeError;
 use crate::types::AttemptMeta;
 
@@ -25,11 +26,11 @@ use self::transport::{
 
 #[derive(Clone)]
 pub(crate) struct ProviderRuntime {
-    pub(crate) provider: ProviderId,
+    pub(crate) instance_id: ProviderInstanceId,
+    pub(crate) kind: ProviderKind,
+    pub(crate) registered: RegisteredProvider,
     pub(crate) adapter: &'static dyn ProviderAdapter,
     pub(crate) platform: PlatformConfig,
-    pub(crate) auth_token: String,
-    pub(crate) default_model: Option<String>,
     pub(crate) transport: HttpTransport,
     pub(crate) observer: Option<Arc<dyn RuntimeObserver>>,
 }
@@ -37,10 +38,10 @@ pub(crate) struct ProviderRuntime {
 impl std::fmt::Debug for ProviderRuntime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ProviderRuntime")
-            .field("provider", &self.provider)
+            .field("instance_id", &self.instance_id)
+            .field("kind", &self.kind)
+            .field("registered", &self.registered)
             .field("platform", &self.platform)
-            .field("auth_token", &"<redacted>")
-            .field("default_model", &self.default_model)
             .field("transport", &self.transport)
             .field("observer", &self.observer.as_ref().map(|_| "configured"))
             .finish()
@@ -152,7 +153,7 @@ impl ProviderRuntime {
         match provider_response {
             Ok((response, http_response)) => ProviderAttemptOutcome::Success {
                 meta: attempt::success_meta(
-                    self.provider,
+                    self.kind,
                     selected_model,
                     http_response.head.status.as_u16(),
                     http_response.head.request_id.clone(),
@@ -160,7 +161,7 @@ impl ProviderRuntime {
                 response,
             },
             Err(error) => ProviderAttemptOutcome::Failure {
-                meta: attempt::failure_meta(self.provider, selected_model, &error),
+                meta: attempt::failure_meta(self.kind, selected_model, &error),
                 error,
             },
         }
@@ -185,7 +186,7 @@ impl ProviderRuntime {
         };
 
         let stream = match plan_execution(self, request).and_then(|planned| {
-            validate_streaming_plan(self.provider, &planned.plan)?;
+            validate_streaming_plan(self.kind, &planned.plan)?;
             Ok(planned)
         }) {
             Ok(planned) => open_planned_stream(self, planned, &adapter_context).await,
@@ -195,7 +196,7 @@ impl ProviderRuntime {
         match stream {
             Ok(stream) => ProviderStreamAttemptOutcome::Opened {
                 meta: attempt::success_meta(
-                    self.provider,
+                    self.kind,
                     selected_model,
                     stream.response.head.status.as_u16(),
                     stream.response.head.request_id.clone(),
@@ -203,7 +204,7 @@ impl ProviderRuntime {
                 stream: Box::new(stream),
             },
             Err(error) => ProviderStreamAttemptOutcome::Failure {
-                meta: attempt::failure_meta(self.provider, selected_model, &error),
+                meta: attempt::failure_meta(self.kind, selected_model, &error),
                 error,
             },
         }
@@ -223,13 +224,19 @@ impl ProviderRuntime {
             return Ok(model.to_string());
         }
 
-        if let Some(default_model) = self.default_model.as_deref().and_then(trimmed_non_empty) {
+        if let Some(default_model) = self
+            .registered
+            .config
+            .default_model
+            .as_deref()
+            .and_then(trimmed_non_empty)
+        {
             return Ok(default_model.to_string());
         }
 
         Err(RuntimeError::configuration(format!(
             "no model available for provider {:?}; set a default model or pass one per request",
-            self.provider
+            self.kind
         )))
     }
 

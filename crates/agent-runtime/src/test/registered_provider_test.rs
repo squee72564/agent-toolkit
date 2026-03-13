@@ -1,0 +1,54 @@
+use reqwest::header::HeaderName;
+
+use super::*;
+
+#[test]
+fn registered_provider_platform_config_uses_instance_request_id_override() {
+    let registered = RegisteredProvider::new(
+        Target::default_instance_for(ProviderId::OpenAi),
+        ProviderId::OpenAi,
+        ProviderConfig::new("test-key")
+            .with_base_url("https://api.openai.com")
+            .with_request_id_header(HeaderName::from_static("x-instance-request-id")),
+    );
+
+    let platform = registered
+        .platform_config(adapter_for(ProviderId::OpenAi).descriptor())
+        .expect("platform config should build");
+
+    assert_eq!(
+        platform.request_id_header,
+        HeaderName::from_static("x-instance-request-id")
+    );
+}
+
+#[test]
+fn registered_provider_platform_config_supports_generic_openai_compatible_kind() {
+    let registered = RegisteredProvider::new(
+        Target::default_instance_for(ProviderId::GenericOpenAiCompatible),
+        ProviderId::GenericOpenAiCompatible,
+        ProviderConfig::new("test-key").with_base_url("https://example.test/v1"),
+    );
+
+    let descriptor = adapter_for(ProviderId::GenericOpenAiCompatible).descriptor();
+    let platform = registered
+        .platform_config(descriptor)
+        .expect("generic openai-compatible platform config should build");
+
+    assert_eq!(platform.protocol, agent_core::ProtocolKind::OpenAI);
+    assert_eq!(platform.base_url, "https://example.test/v1");
+}
+
+#[test]
+fn base_client_builder_preserves_request_id_header_from_provider_config() {
+    let builder = crate::base_client_builder::BaseClientBuilder::from_provider_config(
+        ProviderConfig::new("test-key")
+            .with_base_url("https://api.openai.com")
+            .with_request_id_header(HeaderName::from_static("x-instance-request-id")),
+    );
+
+    assert_eq!(
+        builder.request_id_header,
+        Some(HeaderName::from_static("x-instance-request-id"))
+    );
+}

@@ -1,16 +1,28 @@
 //! Provider-agnostic types for requests, responses, messages, tools, and platform metadata.
 
+/// Provider identity and descriptor types shared across runtime and adapters.
+pub mod identity;
 /// Message roles and helper constructors for conversational inputs.
 pub mod message;
 /// Provider and transport configuration shared with HTTP adapters.
 pub mod platform;
-/// Request models sent from the runtime to provider adapters.
-pub mod request;
 /// Normalized response models returned from provider adapters.
 pub mod response;
+/// Task and legacy request models sent from the runtime to provider adapters.
+pub mod task;
 /// Tool definitions and mixed-content message parts.
 pub mod tool;
 
+/// Re-export of [`identity::ProviderDescriptor`].
+pub use identity::ProviderDescriptor;
+/// Re-export of [`identity::ProviderFamilyId`].
+pub use identity::ProviderFamilyId;
+/// Re-export of [`identity::ProviderId`].
+pub use identity::ProviderId;
+/// Re-export of [`identity::ProviderInstanceId`].
+pub use identity::ProviderInstanceId;
+/// Re-export of [`identity::ProviderKind`].
+pub use identity::ProviderKind;
 /// Re-export of [`message::Message`].
 pub use message::Message;
 /// Re-export of [`message::MessageRole`].
@@ -25,12 +37,6 @@ pub use platform::AuthStyle;
 pub use platform::PlatformConfig;
 /// Re-export of [`platform::ProtocolKind`].
 pub use platform::ProtocolKind;
-/// Re-export of [`platform::ProviderId`].
-pub use platform::ProviderId;
-/// Re-export of [`request::Request`].
-pub use request::Request;
-/// Re-export of [`request::ResponseFormat`].
-pub use request::ResponseFormat;
 /// Re-export of [`response::AssistantOutput`].
 pub use response::AssistantOutput;
 /// Re-export of [`response::FinishReason`].
@@ -41,6 +47,12 @@ pub use response::Response;
 pub use response::RuntimeWarning;
 /// Re-export of [`response::Usage`].
 pub use response::Usage;
+/// Re-export of [`task::Request`].
+pub use task::Request;
+/// Re-export of [`task::ResponseFormat`].
+pub use task::ResponseFormat;
+/// Re-export of [`task::TaskRequest`].
+pub use task::TaskRequest;
 /// Re-export of [`tool::ContentPart`].
 pub use tool::ContentPart;
 /// Re-export of [`tool::ToolCall`].
