@@ -1,6 +1,9 @@
 use std::time::Duration;
 
-use agent_core::{AdapterContext, PlatformConfig};
+use agent_core::{
+    AuthCredentials, PlatformConfig, ResolvedTransportOptions, RetryPolicy,
+    TransportTimeoutOverrides,
+};
 use bytes::{Bytes, BytesMut};
 use reqwest::{
     Method,
@@ -14,19 +17,18 @@ use crate::http::builder::HttpTransportBuilder;
 use crate::http::headers::build_header_config;
 use crate::http::request::{
     HeaderConfig, HttpBytesResponse, HttpJsonResponse, HttpRequestBody, HttpRequestOptions,
-    HttpResponse, HttpResponseHead, HttpResponseMode, HttpSendRequest, RequestExecution,
+    HttpResponse, HttpResponseHead, HttpSendRequest, RequestExecution, TransportResponseFraming,
 };
 use crate::http::response::{build_response_head, content_type_matches};
-use crate::http::retry_policy::RetryPolicy;
 use crate::http::sse::{HttpSseResponse, HttpSseStream, PendingSseEvent, SseLimits};
 
 /// Errors produced while building requests or decoding responses.
 #[derive(Debug, Error)]
 pub enum TransportError {
-    /// A header name derived from platform or context metadata was invalid.
+    /// A header name derived from explicit transport inputs was invalid.
     #[error("invalid header name")]
     InvalidHeaderName,
-    /// A header value derived from platform or context metadata was invalid.
+    /// A header value derived from explicit transport inputs was invalid.
     #[error("invalid header value")]
     InvalidHeaderValue,
     /// JSON serialization or deserialization failed.
@@ -156,20 +158,33 @@ impl HttpTransport {
         }
     }
 
-    /// Builds request headers from platform defaults and adapter metadata.
-    ///
-    /// The context may override the response request-id header with
-    /// `transport.request_id_header` and may add custom outbound headers using metadata keys
-    /// prefixed with `transport.header.`.
+    /// Builds request headers from explicit platform, caller, adapter, and auth layers.
     pub fn build_header_config(
         &self,
         platform: &PlatformConfig,
-        ctx: &AdapterContext,
+        auth: Option<&AuthCredentials>,
+        transport: &ResolvedTransportOptions,
+        provider_headers: &reqwest::header::HeaderMap,
     ) -> Result<HeaderConfig, TransportError> {
-        build_header_config(platform, ctx)
+        build_header_config(platform, auth, transport, provider_headers)
     }
 
-    /// Sends a request and decodes the response according to `response_mode`.
+    /// Returns the transport-level default retry policy.
+    pub fn retry_policy(&self) -> &RetryPolicy {
+        &self.retry_policy
+    }
+
+    /// Returns the transport-level default non-streaming request timeout.
+    pub fn request_timeout(&self) -> Duration {
+        self.request_timeout
+    }
+
+    /// Returns the transport-level default stream setup and idle timeout.
+    pub fn stream_timeout(&self) -> Duration {
+        self.stream_timeout
+    }
+
+    /// Sends a request and decodes the response according to `response_framing`.
     ///
     /// Retries are applied only before a response body is handed to the caller. For JSON mode,
     /// non-success statuses can be preserved by setting
@@ -177,28 +192,33 @@ impl HttpTransport {
     pub async fn send(&self, request: HttpSendRequest<'_>) -> Result<HttpResponse, TransportError> {
         let HttpSendRequest {
             platform,
+            auth,
             method,
             url,
             body,
-            ctx,
+            response_framing,
             options,
-            response_mode,
+            transport,
+            provider_headers,
         } = request;
         let (mut response, header_config) = self
             .send_request_with_retry(RequestExecution {
                 platform,
+                auth,
                 method,
                 url,
                 body: &body,
-                ctx,
+                response_framing,
                 options: &options,
-                response_mode,
+                transport: &transport,
+                provider_headers: &provider_headers,
             })
             .await?;
 
         let head = build_response_head(&response, &header_config);
         if !(head.status.is_success()
-            || matches!(response_mode, HttpResponseMode::Json) && options.allow_error_status)
+            || matches!(response_framing, TransportResponseFraming::Json)
+                && options.allow_error_status)
         {
             return Err(TransportError::Status {
                 head: Box::new(head),
@@ -221,18 +241,18 @@ impl HttpTransport {
             });
         }
 
-        match response_mode {
-            HttpResponseMode::Json => {
+        match response_framing {
+            TransportResponseFraming::Json => {
                 let body = response.json::<Value>().await?;
                 Ok(HttpResponse::Json(HttpJsonResponse { head, body }))
             }
-            HttpResponseMode::Bytes => {
+            TransportResponseFraming::Bytes => {
                 let body = response.bytes().await?;
                 Ok(HttpResponse::Bytes(HttpBytesResponse { head, body }))
             }
-            HttpResponseMode::Sse => {
+            TransportResponseFraming::Sse => {
                 let mut buffer = BytesMut::new();
-                let idle_timeout = options.stream_idle_timeout;
+                let idle_timeout = transport.timeouts.stream_idle_timeout;
                 let first_chunk = self
                     .read_stream_chunk(&mut response, &head, idle_timeout, TimeoutStage::FirstByte)
                     .await?;
@@ -271,7 +291,7 @@ impl HttpTransport {
         method: Method,
         url: &str,
         body: &TReq,
-        ctx: &AdapterContext,
+        auth: Option<&AuthCredentials>,
     ) -> Result<TResp, TransportError>
     where
         TReq: Serialize + ?Sized,
@@ -283,7 +303,8 @@ impl HttpTransport {
             method,
             url,
             HttpRequestBody::Json(payload.into()),
-            ctx,
+            auth,
+            self.default_transport_options(),
         )
         .await
     }
@@ -294,20 +315,24 @@ impl HttpTransport {
         method: Method,
         url: &str,
         body: HttpRequestBody,
-        ctx: &AdapterContext,
+        auth: Option<&AuthCredentials>,
+        transport: ResolvedTransportOptions,
     ) -> Result<TResp, TransportError>
     where
         TResp: DeserializeOwned,
     {
+        let provider_headers = reqwest::header::HeaderMap::new();
         match self
             .send(HttpSendRequest {
                 platform,
+                auth,
                 method,
                 url,
                 body,
-                ctx,
+                response_framing: TransportResponseFraming::Json,
                 options: HttpRequestOptions::json_defaults(),
-                response_mode: HttpResponseMode::Json,
+                transport,
+                provider_headers,
             })
             .await?
         {
@@ -323,13 +348,20 @@ impl HttpTransport {
         &self,
         platform: &PlatformConfig,
         url: &str,
-        ctx: &AdapterContext,
+        auth: Option<&AuthCredentials>,
     ) -> Result<TResp, TransportError>
     where
         TResp: DeserializeOwned,
     {
-        self.execute_json_request(platform, Method::GET, url, HttpRequestBody::None, ctx)
-            .await
+        self.execute_json_request(
+            platform,
+            Method::GET,
+            url,
+            HttpRequestBody::None,
+            auth,
+            self.default_transport_options(),
+        )
+        .await
     }
 
     /// Convenience wrapper for [`send_json`](Self::send_json) using `POST`.
@@ -338,13 +370,14 @@ impl HttpTransport {
         platform: &PlatformConfig,
         url: &str,
         body: &TReq,
-        ctx: &AdapterContext,
+        auth: Option<&AuthCredentials>,
     ) -> Result<TResp, TransportError>
     where
         TReq: Serialize + ?Sized,
         TResp: DeserializeOwned,
     {
-        self.send_json(platform, Method::POST, url, body, ctx).await
+        self.send_json(platform, Method::POST, url, body, auth)
+            .await
     }
 
     /// Sends JSON and returns the raw JSON response body with status metadata preserved.
@@ -356,7 +389,7 @@ impl HttpTransport {
         method: Method,
         url: &str,
         body: &TReq,
-        ctx: &AdapterContext,
+        auth: Option<&AuthCredentials>,
     ) -> Result<HttpJsonResponse, TransportError>
     where
         TReq: Serialize + ?Sized,
@@ -366,16 +399,20 @@ impl HttpTransport {
             .into();
         let request_body = HttpRequestBody::Json(payload);
         let options = HttpRequestOptions::json_defaults();
+        let transport = self.default_transport_options();
+        let provider_headers = reqwest::header::HeaderMap::new();
 
         let (response, header_config) = self
             .send_request_with_retry(RequestExecution {
                 platform,
+                auth,
                 method,
                 url,
                 body: &request_body,
-                ctx,
+                response_framing: TransportResponseFraming::Json,
                 options: &options,
-                response_mode: HttpResponseMode::Json,
+                transport: &transport,
+                provider_headers: &provider_headers,
             })
             .await?;
         let head = build_response_head(&response, &header_config);
@@ -390,12 +427,12 @@ impl HttpTransport {
         platform: &PlatformConfig,
         url: &str,
         body: &TReq,
-        ctx: &AdapterContext,
+        auth: Option<&AuthCredentials>,
     ) -> Result<HttpJsonResponse, TransportError>
     where
         TReq: Serialize + ?Sized,
     {
-        self.send_json_response(platform, Method::POST, url, body, ctx)
+        self.send_json_response(platform, Method::POST, url, body, auth)
             .await
     }
 
@@ -406,18 +443,22 @@ impl HttpTransport {
         method: Method,
         url: &str,
         body: HttpRequestBody,
-        ctx: &AdapterContext,
+        auth: Option<&AuthCredentials>,
         options: HttpRequestOptions,
+        transport: ResolvedTransportOptions,
     ) -> Result<HttpBytesResponse, TransportError> {
+        let provider_headers = reqwest::header::HeaderMap::new();
         match self
             .send(HttpSendRequest {
                 platform,
+                auth,
                 method,
                 url,
                 body,
-                ctx,
+                response_framing: TransportResponseFraming::Bytes,
                 options,
-                response_mode: HttpResponseMode::Bytes,
+                transport,
+                provider_headers,
             })
             .await?
         {
@@ -437,8 +478,9 @@ impl HttpTransport {
         method: Method,
         url: &str,
         body: HttpRequestBody,
-        ctx: &AdapterContext,
+        auth: Option<&AuthCredentials>,
         mut options: HttpRequestOptions,
+        transport: ResolvedTransportOptions,
     ) -> Result<HttpSseResponse, TransportError> {
         if options.accept.is_none() {
             options.accept = Some(HeaderValue::from_static("text/event-stream"));
@@ -446,19 +488,19 @@ impl HttpTransport {
         if options.expected_content_type.is_none() {
             options.expected_content_type = Some("text/event-stream".to_string());
         }
-        if options.stream_idle_timeout.is_none() {
-            options.stream_idle_timeout = Some(self.stream_timeout);
-        }
 
+        let provider_headers = reqwest::header::HeaderMap::new();
         match self
             .send(HttpSendRequest {
                 platform,
+                auth,
                 method,
                 url,
                 body,
-                ctx,
+                response_framing: TransportResponseFraming::Sse,
                 options,
-                response_mode: HttpResponseMode::Sse,
+                transport,
+                provider_headers,
             })
             .await?
         {
@@ -472,15 +514,16 @@ impl HttpTransport {
         &self,
         platform: &PlatformConfig,
         url: &str,
-        ctx: &AdapterContext,
+        auth: Option<&AuthCredentials>,
     ) -> Result<HttpSseResponse, TransportError> {
         self.send_sse_request(
             platform,
             Method::GET,
             url,
             HttpRequestBody::None,
-            ctx,
+            auth,
             HttpRequestOptions::default(),
+            self.default_transport_options(),
         )
         .await
     }
@@ -492,7 +535,7 @@ impl HttpTransport {
         method: Method,
         url: &str,
         body: &TReq,
-        ctx: &AdapterContext,
+        auth: Option<&AuthCredentials>,
     ) -> Result<HttpSseResponse, TransportError>
     where
         TReq: Serialize + ?Sized,
@@ -506,8 +549,9 @@ impl HttpTransport {
             method,
             url,
             HttpRequestBody::Json(payload),
-            ctx,
+            auth,
             HttpRequestOptions::sse_defaults(),
+            self.default_transport_options(),
         )
         .await
     }
@@ -518,12 +562,12 @@ impl HttpTransport {
         platform: &PlatformConfig,
         url: &str,
         body: &TReq,
-        ctx: &AdapterContext,
+        auth: Option<&AuthCredentials>,
     ) -> Result<HttpSseResponse, TransportError>
     where
         TReq: Serialize + ?Sized,
     {
-        self.send_sse(platform, Method::POST, url, body, ctx).await
+        self.send_sse(platform, Method::POST, url, body, auth).await
     }
 
     async fn read_stream_chunk(
@@ -551,9 +595,9 @@ impl HttpTransport {
         }
     }
 
-    pub(crate) async fn sleep_before_retry(&self, attempt: u8) {
+    pub(crate) async fn sleep_before_retry(&self, policy: &RetryPolicy, attempt: u8) {
         let retry_index = attempt.saturating_sub(1);
-        let backoff = self.retry_policy.backoff_duration_for_retry(retry_index);
+        let backoff = policy.backoff_duration_for_retry(retry_index);
         tokio::time::sleep(backoff).await;
     }
 
@@ -561,10 +605,16 @@ impl HttpTransport {
         &self,
         request: RequestExecution<'_>,
     ) -> Result<(reqwest::Response, HeaderConfig), TransportError> {
-        let header_config = self.build_header_config(request.platform, request.ctx)?;
-        let max_attempts = self.retry_policy.max_attempts.max(1);
+        let header_config = self.build_header_config(
+            request.platform,
+            request.auth,
+            request.transport,
+            request.provider_headers,
+        )?;
+        let max_attempts = request.transport.retry_policy.max_attempts.max(1);
         let mut attempt: u8 = 0;
-        let uses_stream_timeouts = matches!(request.response_mode, HttpResponseMode::Sse);
+        let uses_stream_timeouts =
+            matches!(request.response_framing, TransportResponseFraming::Sse);
 
         loop {
             attempt += 1;
@@ -576,13 +626,15 @@ impl HttpTransport {
 
             if uses_stream_timeouts {
                 let setup_timeout = request
-                    .options
+                    .transport
+                    .timeouts
                     .stream_setup_timeout
                     .unwrap_or(self.stream_timeout);
                 request_builder = request_builder.timeout(setup_timeout);
             } else {
                 let request_timeout = request
-                    .options
+                    .transport
+                    .timeouts
                     .request_timeout
                     .unwrap_or(self.request_timeout);
                 request_builder = request_builder.timeout(request_timeout);
@@ -612,7 +664,8 @@ impl HttpTransport {
                 Ok(resp) => resp,
                 Err(err) => {
                     if attempt < max_attempts && is_retryable_transport(&err) {
-                        self.sleep_before_retry(attempt).await;
+                        self.sleep_before_retry(&request.transport.retry_policy, attempt)
+                            .await;
                         continue;
                     }
 
@@ -628,13 +681,28 @@ impl HttpTransport {
             let status = response.status();
             if !status.is_success()
                 && attempt < max_attempts
-                && self.retry_policy.should_retry_status(status)
+                && request.transport.retry_policy.should_retry_status(status)
             {
-                self.sleep_before_retry(attempt).await;
+                self.sleep_before_retry(&request.transport.retry_policy, attempt)
+                    .await;
                 continue;
             }
 
             return Ok((response, header_config));
+        }
+    }
+
+    fn default_transport_options(&self) -> ResolvedTransportOptions {
+        ResolvedTransportOptions {
+            request_id_header_override: None,
+            route_extra_headers: Default::default(),
+            attempt_extra_headers: Default::default(),
+            timeouts: TransportTimeoutOverrides {
+                request_timeout: Some(self.request_timeout),
+                stream_setup_timeout: Some(self.stream_timeout),
+                stream_idle_timeout: Some(self.stream_timeout),
+            },
+            retry_policy: self.retry_policy.clone(),
         }
     }
 }

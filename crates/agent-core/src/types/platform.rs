@@ -2,17 +2,18 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-/// Transport-level metadata supplied alongside a request.
+/// REFACTOR-SHIM: legacy metadata carrier retained only for migration.
+///
+/// The typed runtime-to-transport boundary no longer depends on this type.
+/// New transport behavior must be modeled through typed execution inputs
+/// instead of `metadata` keys.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AdapterContext {
-    /// Adapter and transport overrides.
-    ///
-    /// The HTTP transport currently reads keys such as `transport.request_id_header` and
-    /// `transport.header.<name>` from this map.
+    /// Legacy adapter/request metadata preserved for compatibility.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub metadata: BTreeMap<String, String>,
-    /// Optional credentials used by the transport when the platform requires authentication.
+    /// Optional credentials carried by legacy request paths.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auth_token: Option<AuthCredentials>,
 }

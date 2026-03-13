@@ -83,7 +83,8 @@ fn execution_plan(
             request_id_header_override: None,
             route_extra_headers: BTreeMap::new(),
             attempt_extra_headers: BTreeMap::new(),
-            timeout_overrides: TransportTimeoutOverrides::default(),
+            timeouts: TransportTimeoutOverrides::default(),
+            retry_policy: agent_core::RetryPolicy::default(),
         },
         capabilities: ProviderCapabilities {
             supports_streaming: true,
@@ -229,18 +230,6 @@ fn openai_streaming_plan_preserves_family_default_request_contract() {
     assert!(adapter_plan.endpoint_path_override.is_none());
     assert!(adapter_plan.provider_headers.is_empty());
     let expected = agent_transport::HttpRequestOptions::sse_defaults();
-    assert_eq!(
-        adapter_plan.request_options.request_timeout,
-        expected.request_timeout
-    );
-    assert_eq!(
-        adapter_plan.request_options.stream_setup_timeout,
-        expected.stream_setup_timeout
-    );
-    assert_eq!(
-        adapter_plan.request_options.stream_idle_timeout,
-        expected.stream_idle_timeout
-    );
     assert_eq!(
         adapter_plan.request_options.allow_error_status,
         expected.allow_error_status

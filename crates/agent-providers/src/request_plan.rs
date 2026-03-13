@@ -2,19 +2,9 @@
 
 use agent_core::RuntimeWarning;
 use agent_transport::HttpRequestOptions;
+pub use agent_transport::TransportResponseFraming;
 use reqwest::{Method, header::HeaderMap};
 use serde_json::Value;
-
-/// Adapter-selected transport response framing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TransportResponseFraming {
-    /// Expect a complete JSON response body.
-    Json,
-    /// Expect a raw byte response body.
-    Bytes,
-    /// Expect a server-sent event stream.
-    Sse,
-}
 
 /// Family-level intermediate request plan before provider overlay refinement.
 #[derive(Debug, Clone)]

@@ -59,9 +59,11 @@ pub use planning::ResolvedProviderAttempt;
 pub use planning::ResolvedTransportOptions;
 /// Re-export of [`planning::ResponseMode`].
 pub use planning::ResponseMode;
+/// Re-export of [`planning::RetryPolicy`].
+pub use planning::RetryPolicy;
 /// Re-export of [`planning::TransportTimeoutOverrides`].
 pub use planning::TransportTimeoutOverrides;
-/// Re-export of [`platform::AdapterContext`].
+/// REFACTOR-SHIM: re-export of the legacy [`platform::AdapterContext`] surface.
 pub use platform::AdapterContext;
 /// Re-export of [`platform::AuthCredentials`].
 pub use platform::AuthCredentials;

@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use agent_core::{AdapterContext, PlatformConfig};
+use agent_core::{AuthCredentials, PlatformConfig, ResolvedTransportOptions};
 use bytes::Bytes;
 use reqwest::{
     Method, StatusCode,
@@ -57,7 +55,7 @@ pub enum HttpRequestBody {
 
 /// Controls how the transport should decode the response body.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HttpResponseMode {
+pub enum TransportResponseFraming {
     /// Parse the response body as JSON.
     Json,
     /// Parse the response body as server-sent events.
@@ -78,34 +76,42 @@ pub enum HttpResponse {
 }
 
 /// Fully specified request for [`HttpTransport::send`](crate::http::HttpTransport::send).
-pub struct HttpSendRequest<'a> {
+pub struct TransportExecutionInput<'a> {
     /// Platform-level transport configuration, including default headers and auth style.
     pub platform: &'a PlatformConfig,
+    /// Optional auth credentials used for transport-owned auth placement.
+    pub auth: Option<&'a AuthCredentials>,
     /// HTTP method to issue.
     pub method: Method,
     /// Absolute request URL.
     pub url: &'a str,
     /// Request body to send.
     pub body: HttpRequestBody,
-    /// Per-call adapter context used to build auth and metadata headers.
-    pub ctx: &'a AdapterContext,
-    /// Per-call request overrides.
+    /// Transport response framing selected by provider planning.
+    pub response_framing: TransportResponseFraming,
+    /// Adapter-owned protocol-level request/response hints.
     pub options: HttpRequestOptions,
-    /// Desired response decoding mode.
-    pub response_mode: HttpResponseMode,
+    /// Runtime-resolved transport options for this attempt.
+    pub transport: ResolvedTransportOptions,
+    /// Adapter-owned dynamic provider headers.
+    pub provider_headers: HeaderMap,
 }
+
+pub type HttpSendRequest<'a> = TransportExecutionInput<'a>;
 
 pub(crate) struct RequestExecution<'a> {
     pub platform: &'a PlatformConfig,
+    pub auth: Option<&'a AuthCredentials>,
     pub method: Method,
     pub url: &'a str,
     pub body: &'a HttpRequestBody,
-    pub ctx: &'a AdapterContext,
+    pub response_framing: TransportResponseFraming,
     pub options: &'a HttpRequestOptions,
-    pub response_mode: HttpResponseMode,
+    pub transport: &'a ResolvedTransportOptions,
+    pub provider_headers: &'a HeaderMap,
 }
 
-/// Header configuration derived from platform defaults and adapter metadata.
+/// Header configuration derived from explicit platform, caller, adapter, and auth layers.
 pub struct HeaderConfig {
     /// Headers that should be attached to the outbound request.
     pub headers: HeaderMap,
@@ -120,12 +126,6 @@ pub struct HttpRequestOptions {
     pub accept: Option<HeaderValue>,
     /// Expected response content type, compared ignoring parameters such as `charset`.
     pub expected_content_type: Option<String>,
-    /// Overrides the transport default request timeout.
-    pub request_timeout: Option<Duration>,
-    /// Overrides the timeout used while waiting for SSE response headers.
-    pub stream_setup_timeout: Option<Duration>,
-    /// Overrides the timeout between SSE chunks, including the first body bytes.
-    pub stream_idle_timeout: Option<Duration>,
     /// Overrides the transport default SSE parser limits.
     pub sse_limits: Option<SseLimits>,
     /// Allows non-success HTTP statuses to be returned in JSON mode instead of producing
@@ -143,24 +143,6 @@ impl HttpRequestOptions {
     /// Requires the response `content-type` to match `expected`.
     pub fn with_expected_content_type(mut self, expected: impl Into<String>) -> Self {
         self.expected_content_type = Some(expected.into());
-        self
-    }
-
-    /// Overrides the request timeout for this call.
-    pub fn with_request_timeout(mut self, timeout: Duration) -> Self {
-        self.request_timeout = Some(timeout);
-        self
-    }
-
-    /// Overrides the timeout used while waiting for SSE response headers.
-    pub fn with_stream_setup_timeout(mut self, timeout: Duration) -> Self {
-        self.stream_setup_timeout = Some(timeout);
-        self
-    }
-
-    /// Overrides the timeout between SSE chunks once the request is in streaming mode.
-    pub fn with_stream_idle_timeout(mut self, timeout: Duration) -> Self {
-        self.stream_idle_timeout = Some(timeout);
         self
     }
 

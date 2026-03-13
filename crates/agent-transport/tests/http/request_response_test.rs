@@ -1,10 +1,9 @@
-use std::collections::BTreeMap;
 use std::time::Duration;
 
-use agent_core::types::{AdapterContext, AuthStyle};
+use agent_core::types::AuthStyle;
 use agent_transport::{
-    HttpRequestBody, HttpRequestOptions, HttpResponse, HttpResponseMode, HttpSendRequest,
-    RetryPolicy,
+    HttpRequestBody, HttpRequestOptions, HttpResponse, HttpSendRequest, RetryPolicy,
+    TransportResponseFraming,
 };
 use bytes::Bytes;
 use reqwest::StatusCode;
@@ -14,7 +13,9 @@ use serde_json::{Value, json};
 use crate::support::http_server::{
     ScriptedBody, ScriptedResponse, await_server, captured_requests, spawn_scripted_server,
 };
-use crate::support::{ExampleBody, TestResult, default_platform, default_transport, empty_context};
+use crate::support::{
+    ExampleBody, TestResult, default_platform, default_resolved_transport, default_transport,
+};
 
 #[tokio::test]
 async fn post_json_value_preserves_non_success_status_and_extracts_request_id() -> TestResult {
@@ -29,29 +30,31 @@ async fn post_json_value_preserves_non_success_status_and_extracts_request_id() 
     let mut platform = default_platform(AuthStyle::None);
     platform.base_url = base_url.clone();
 
-    let mut metadata = BTreeMap::new();
-    metadata.insert(
-        "transport.request_id_header".to_string(),
-        "x-trace-id".to_string(),
-    );
-    metadata.insert(
-        "transport.header.x-custom".to_string(),
-        "custom".to_string(),
-    );
-    let ctx = AdapterContext {
-        metadata,
-        auth_token: None,
-    };
+    let mut transport_options = default_resolved_transport(RetryPolicy::default());
+    transport_options.request_id_header_override = Some("x-trace-id".to_string());
+    transport_options
+        .route_extra_headers
+        .insert("x-custom".to_string(), "custom".to_string());
 
     let transport = default_transport(RetryPolicy::default());
     let response = transport
-        .post_json_value(
-            &platform,
-            &format!("{base_url}/v1/test"),
-            &ExampleBody { msg: "hello" },
-            &ctx,
-        )
+        .send(HttpSendRequest {
+            platform: &platform,
+            auth: None,
+            method: reqwest::Method::POST,
+            url: &format!("{base_url}/v1/test"),
+            body: HttpRequestBody::Json(Bytes::from_static(br#"{"msg":"hello"}"#)),
+            response_framing: TransportResponseFraming::Json,
+            options: HttpRequestOptions::json_defaults().with_allow_error_status(true),
+            transport: transport_options,
+            provider_headers: reqwest::header::HeaderMap::new(),
+        })
         .await?;
+
+    let response = match response {
+        HttpResponse::Json(response) => response,
+        other => panic!("expected json response, got {other:?}"),
+    };
 
     assert_eq!(response.head.status, StatusCode::BAD_REQUEST);
     assert_eq!(response.head.request_id.as_deref(), Some("trace-42"));
@@ -71,6 +74,7 @@ async fn post_json_value_preserves_non_success_status_and_extracts_request_id() 
         captured[0].headers.get("x-custom").map(String::as_str),
         Some("custom")
     );
+    assert!(!captured[0].headers.contains_key("x-trace-id"));
 
     let body: Value = serde_json::from_slice(&captured[0].body)?;
     assert_eq!(body, json!({"msg": "hello"}));
@@ -107,7 +111,7 @@ async fn get_json_retries_retryable_status_then_succeeds() -> TestResult {
         .get_json(
             &default_platform(AuthStyle::None),
             &format!("{base_url}/retry"),
-            &empty_context(),
+            None,
         )
         .await?;
 
@@ -134,16 +138,17 @@ async fn send_bytes_without_body_does_not_set_content_type() -> TestResult {
 
     let transport = default_transport(RetryPolicy::default());
     let platform = default_platform(AuthStyle::None);
-    let ctx = empty_context();
     let response = transport
         .send(HttpSendRequest {
             platform: &platform,
+            auth: None,
             method: reqwest::Method::GET,
             url: &format!("{base_url}/ping"),
             body: HttpRequestBody::None,
-            ctx: &ctx,
+            response_framing: TransportResponseFraming::Bytes,
             options: HttpRequestOptions::default().with_expected_content_type("text/plain"),
-            response_mode: HttpResponseMode::Bytes,
+            transport: default_resolved_transport(RetryPolicy::default()),
+            provider_headers: reqwest::header::HeaderMap::new(),
         })
         .await?;
 
@@ -178,21 +183,22 @@ async fn send_bytes_preserves_raw_payload_and_explicit_content_type() -> TestRes
 
     let transport = default_transport(RetryPolicy::default());
     let platform = default_platform(AuthStyle::None);
-    let ctx = empty_context();
     let response = transport
         .send(HttpSendRequest {
             platform: &platform,
+            auth: None,
             method: reqwest::Method::POST,
             url: &format!("{base_url}/upload"),
             body: HttpRequestBody::Bytes {
                 content_type: Some(HeaderValue::from_static("application/octet-stream")),
                 body: Bytes::from_static(b"\x00\x01\x02"),
             },
-            ctx: &ctx,
+            response_framing: TransportResponseFraming::Bytes,
             options: HttpRequestOptions::default()
                 .with_accept(HeaderValue::from_static("application/octet-stream"))
                 .with_expected_content_type("application/octet-stream"),
-            response_mode: HttpResponseMode::Bytes,
+            transport: default_resolved_transport(RetryPolicy::default()),
+            provider_headers: reqwest::header::HeaderMap::new(),
         })
         .await?;
 
@@ -231,15 +237,13 @@ async fn send_json_response_supports_non_post_methods_and_preserves_status() -> 
 
     let transport = default_transport(RetryPolicy::default());
     let platform = default_platform(AuthStyle::None);
-    let ctx = empty_context();
-
     let response = transport
         .send_json_response(
             &platform,
             reqwest::Method::PUT,
             &format!("{base_url}/v1/update"),
             &ExampleBody { msg: "hello" },
-            &ctx,
+            None,
         )
         .await?;
 
@@ -267,16 +271,17 @@ async fn send_json_mode_can_preserve_error_status_when_opted_in() -> TestResult 
 
     let transport = default_transport(RetryPolicy::default());
     let platform = default_platform(AuthStyle::None);
-    let ctx = empty_context();
     let response = transport
         .send(HttpSendRequest {
             platform: &platform,
+            auth: None,
             method: reqwest::Method::POST,
             url: &format!("{base_url}/v1/test"),
             body: HttpRequestBody::Json(Bytes::from_static(br#"{"msg":"hello"}"#)),
-            ctx: &ctx,
+            response_framing: TransportResponseFraming::Json,
             options: HttpRequestOptions::json_defaults().with_allow_error_status(true),
-            response_mode: HttpResponseMode::Json,
+            transport: default_resolved_transport(RetryPolicy::default()),
+            provider_headers: reqwest::header::HeaderMap::new(),
         })
         .await?;
 
@@ -307,7 +312,6 @@ async fn send_bytes_request_returns_bytes_helper_result() -> TestResult {
 
     let transport = default_transport(RetryPolicy::default());
     let platform = default_platform(AuthStyle::None);
-    let ctx = empty_context();
     let response = transport
         .send_bytes_request(
             &platform,
@@ -317,10 +321,11 @@ async fn send_bytes_request_returns_bytes_helper_result() -> TestResult {
                 content_type: Some(HeaderValue::from_static("application/octet-stream")),
                 body: Bytes::from_static(b"\xaa\xbb"),
             },
-            &ctx,
+            None,
             HttpRequestOptions::default()
                 .with_accept(HeaderValue::from_static("application/octet-stream"))
                 .with_expected_content_type("application/octet-stream"),
+            default_resolved_transport(RetryPolicy::default()),
         )
         .await?;
 

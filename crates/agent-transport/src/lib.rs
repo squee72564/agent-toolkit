@@ -1,7 +1,8 @@
 //! HTTP transport primitives shared across the agent-toolkit workspace.
 //!
 //! This crate currently exposes an HTTP transport with support for:
-//! - request construction from [`agent_core::PlatformConfig`] and [`agent_core::AdapterContext`]
+//! - request construction from typed runtime-facing transport inputs rooted in
+//!   [`agent_core::PlatformConfig`]
 //! - retrying retryable HTTP responses before a response body is consumed
 //! - JSON, raw-bytes, and server-sent events (SSE) response modes
 //! - configurable request, stream setup, and stream idle timeouts

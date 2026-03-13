@@ -1,7 +1,7 @@
 use agent_core::{
-    AdapterContext, AuthCredentials, ExecutionPlan, ProviderCapabilities, ProviderFamilyId,
-    ProviderInstanceId, ProviderKind, ResolvedAuthContext, ResolvedProviderAttempt,
-    ResolvedTransportOptions, ResponseMode, TaskRequest,
+    AuthCredentials, ExecutionPlan, ProviderCapabilities, ProviderFamilyId, ProviderInstanceId,
+    ProviderKind, ResolvedAuthContext, ResolvedProviderAttempt, ResolvedTransportOptions,
+    ResponseMode, TaskRequest, TransportTimeoutOverrides,
 };
 
 use crate::agent_toolkit::AgentToolkit;
@@ -238,7 +238,8 @@ fn plan_attempt(
         request_id_header_override: execution.transport.request_id_header_override.clone(),
         route_extra_headers: execution.transport.extra_headers.clone(),
         attempt_extra_headers: attempt.execution.extra_headers.clone(),
-        timeout_overrides: attempt.execution.timeout_overrides.clone(),
+        timeouts: resolve_transport_timeouts(client, attempt),
+        retry_policy: resolve_retry_policy(client),
     };
     let resolved_attempt = ResolvedProviderAttempt {
         instance_id: client.runtime.instance_id.clone(),
@@ -441,60 +442,41 @@ fn planning_failure_reason(skipped_history: &[AttemptRecord]) -> RoutePlanningFa
     }
 }
 
-/// REFACTOR-SHIM: temporary bridge that tunnels typed route/attempt transport
-/// ownership through `AdapterContext.metadata` until phase 5 removes it.
-pub(crate) fn build_transport_metadata_shim(
-    transport: &ResolvedTransportOptions,
-) -> std::collections::BTreeMap<String, String> {
-    let mut metadata = std::collections::BTreeMap::new();
+fn resolve_transport_timeouts(
+    client: &ProviderClient,
+    attempt: &AttemptSpec,
+) -> TransportTimeoutOverrides {
+    let config = &client.runtime.registered.config;
+    let defaults = TransportTimeoutOverrides {
+        request_timeout: config
+            .request_timeout
+            .or(Some(client.runtime.transport.request_timeout())),
+        stream_setup_timeout: config
+            .stream_timeout
+            .or(Some(client.runtime.transport.stream_timeout())),
+        stream_idle_timeout: config
+            .stream_timeout
+            .or(Some(client.runtime.transport.stream_timeout())),
+    };
 
-    if let Some(request_id_header_override) = transport.request_id_header_override.as_ref() {
-        metadata.insert(
-            "transport.request_id_header".to_string(),
-            request_id_header_override.clone(),
-        );
-    }
-
-    for (key, value) in &transport.route_extra_headers {
-        metadata.insert(normalize_transport_header_key(key), value.clone());
-    }
-    for (key, value) in &transport.attempt_extra_headers {
-        metadata.insert(normalize_transport_header_key(key), value.clone());
-    }
-
-    if let Some(timeout) = transport.timeout_overrides.request_timeout {
-        metadata.insert(
-            "transport.timeout.request_ms".to_string(),
-            timeout.as_millis().to_string(),
-        );
-    }
-    if let Some(timeout) = transport.timeout_overrides.stream_setup_timeout {
-        metadata.insert(
-            "transport.timeout.stream_setup_ms".to_string(),
-            timeout.as_millis().to_string(),
-        );
-    }
-    if let Some(timeout) = transport.timeout_overrides.stream_idle_timeout {
-        metadata.insert(
-            "transport.timeout.stream_idle_ms".to_string(),
-            timeout.as_millis().to_string(),
-        );
-    }
-
-    metadata
-}
-
-pub(crate) fn adapter_context(execution_plan: &ExecutionPlan) -> AdapterContext {
-    AdapterContext {
-        metadata: build_transport_metadata_shim(&execution_plan.transport),
-        auth_token: execution_plan.auth.credentials.clone(),
+    let overrides = &attempt.execution.timeout_overrides;
+    TransportTimeoutOverrides {
+        request_timeout: overrides.request_timeout.or(defaults.request_timeout),
+        stream_setup_timeout: overrides
+            .stream_setup_timeout
+            .or(defaults.stream_setup_timeout),
+        stream_idle_timeout: overrides
+            .stream_idle_timeout
+            .or(defaults.stream_idle_timeout),
     }
 }
 
-fn normalize_transport_header_key(key: &str) -> String {
-    if key.starts_with("transport.header.") {
-        key.to_string()
-    } else {
-        format!("transport.header.{key}")
-    }
+fn resolve_retry_policy(client: &ProviderClient) -> agent_core::RetryPolicy {
+    client
+        .runtime
+        .registered
+        .config
+        .retry_policy
+        .clone()
+        .unwrap_or_else(|| client.runtime.transport.retry_policy().clone())
 }

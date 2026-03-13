@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use agent_transport::{
     HttpBytesResponse, HttpRequestBody, HttpRequestOptions, HttpResponse, HttpResponseHead,
-    HttpResponseMode, HttpSseResponse, HttpTransport, HttpTransportBuilder, RetryPolicy, SseEvent,
-    SseLimits, StreamTerminationReason, TimeoutStage, TransportError,
+    HttpSseResponse, HttpTransport, HttpTransportBuilder, RetryPolicy, SseEvent, SseLimits,
+    StreamTerminationReason, TimeoutStage, TransportError, TransportResponseFraming,
 };
 
 fn assert_builder_type(_: HttpTransportBuilder) {}
@@ -70,8 +70,8 @@ fn root_reexports_expose_http_json_response_type() {
     let _ = std::mem::size_of::<agent_transport::http::HttpRequestOptions>();
     let _ = std::mem::size_of::<HttpResponse>();
     let _ = std::mem::size_of::<agent_transport::http::HttpResponse>();
-    let _ = std::mem::size_of::<HttpResponseMode>();
-    let _ = std::mem::size_of::<agent_transport::http::HttpResponseMode>();
+    let _ = std::mem::size_of::<TransportResponseFraming>();
+    let _ = std::mem::size_of::<agent_transport::http::TransportResponseFraming>();
     let _ = std::mem::size_of::<StreamTerminationReason>();
     let _ = std::mem::size_of::<agent_transport::http::StreamTerminationReason>();
 

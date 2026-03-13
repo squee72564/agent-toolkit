@@ -1,9 +1,7 @@
-use agent_core::{
-    AdapterContext, ExecutionPlan, ProviderId, Response, ResponseFormat, ResponseMode,
-};
-use agent_providers::request_plan::{ProviderRequestPlan, TransportResponseFraming};
+use agent_core::{ExecutionPlan, ProviderId, Response, ResponseFormat, ResponseMode};
+use agent_providers::request_plan::ProviderRequestPlan;
 use agent_transport::{
-    HttpJsonResponse, HttpRequestBody, HttpResponse, HttpResponseMode, HttpSendRequest,
+    HttpJsonResponse, HttpRequestBody, HttpResponse, HttpSendRequest, TransportResponseFraming,
 };
 
 use crate::provider_runtime::{
@@ -15,7 +13,7 @@ use crate::runtime_error::RuntimeError;
 pub(super) struct PlannedExecution {
     pub(super) plan: ProviderRequestPlan,
     pub(super) response_format: ResponseFormat,
-    pub(super) platform: agent_core::PlatformConfig,
+    pub(super) execution_plan: ExecutionPlan,
     pub(super) url: String,
 }
 
@@ -24,11 +22,10 @@ pub(super) fn plan_execution(
     execution_plan: &ExecutionPlan,
 ) -> Result<PlannedExecution, RuntimeError> {
     let response_format = execution_plan.task.response_format.clone();
-    let mut plan = runtime
+    let plan = runtime
         .adapter
         .plan_request(execution_plan)
         .map_err(RuntimeError::from_adapter)?;
-    apply_timeout_overrides(&mut plan, &execution_plan.transport);
     validate_response_framing(execution_plan, &plan)?;
     let endpoint_path = plan
         .endpoint_path_override
@@ -39,38 +36,18 @@ pub(super) fn plan_execution(
     Ok(PlannedExecution {
         plan,
         response_format,
-        platform: execution_plan.platform.clone(),
+        execution_plan: execution_plan.clone(),
         url,
     })
-}
-
-pub(crate) fn apply_timeout_overrides(
-    plan: &mut ProviderRequestPlan,
-    transport: &agent_core::ResolvedTransportOptions,
-) {
-    if let Some(request_timeout) = transport.timeout_overrides.request_timeout {
-        plan.request_options.request_timeout = Some(request_timeout);
-    }
-    if let Some(stream_setup_timeout) = transport.timeout_overrides.stream_setup_timeout {
-        plan.request_options.stream_setup_timeout = Some(stream_setup_timeout);
-    }
-    if let Some(stream_idle_timeout) = transport.timeout_overrides.stream_idle_timeout {
-        plan.request_options.stream_idle_timeout = Some(stream_idle_timeout);
-    }
 }
 
 pub(super) async fn execute_planned_non_streaming(
     runtime: &ProviderRuntime,
     planned: PlannedExecution,
-    adapter_context: &AdapterContext,
 ) -> Result<(Response, HttpJsonResponse), RuntimeError> {
     match planned.plan.response_framing {
-        TransportResponseFraming::Json => {
-            execute_json_attempt(runtime, planned, adapter_context).await
-        }
-        TransportResponseFraming::Sse => {
-            execute_sse_attempt(runtime, planned, adapter_context).await
-        }
+        TransportResponseFraming::Json => execute_json_attempt(runtime, planned).await,
+        TransportResponseFraming::Sse => execute_sse_attempt(runtime, planned).await,
         TransportResponseFraming::Bytes => Err(RuntimeError::configuration(format!(
             "unsupported provider execution plan for {:?}: response_framing=Bytes",
             runtime.kind
@@ -94,15 +71,13 @@ pub(super) fn validate_streaming_plan(
 pub(super) async fn open_planned_stream(
     runtime: &ProviderRuntime,
     planned: PlannedExecution,
-    adapter_context: &AdapterContext,
 ) -> Result<OpenedProviderStream, RuntimeError> {
     open_sse_stream(
         runtime,
         planned.plan,
         planned.response_format,
-        &planned.platform,
+        &planned.execution_plan,
         &planned.url,
-        adapter_context,
     )
     .await
 }
@@ -110,27 +85,18 @@ pub(super) async fn open_planned_stream(
 async fn execute_json_attempt(
     runtime: &ProviderRuntime,
     planned: PlannedExecution,
-    adapter_context: &AdapterContext,
 ) -> Result<(Response, HttpJsonResponse), RuntimeError> {
     let PlannedExecution {
         plan,
         response_format,
-        platform,
+        execution_plan,
         url,
     } = planned;
     let body = serialize_request_body(&plan)?;
 
     let mut provider_response = match runtime
         .transport
-        .send(HttpSendRequest {
-            platform: &platform,
-            method: plan.method.clone(),
-            url: &url,
-            body,
-            ctx: adapter_context,
-            options: plan.request_options.clone(),
-            response_mode: HttpResponseMode::Json,
-        })
+        .send(transport_request(&execution_plan, &plan, &url, body))
         .await
         .map_err(|error| RuntimeError::from_transport(runtime.kind, error))?
     {
@@ -138,7 +104,7 @@ async fn execute_json_attempt(
         HttpResponse::Sse(response) => {
             return Err(response_mode_mismatch_error(
                 runtime.kind,
-                HttpResponseMode::Json,
+                TransportResponseFraming::Json,
                 "SSE",
                 &response.head,
             ));
@@ -146,7 +112,7 @@ async fn execute_json_attempt(
         HttpResponse::Bytes(response) => {
             return Err(response_mode_mismatch_error(
                 runtime.kind,
-                HttpResponseMode::Json,
+                TransportResponseFraming::Json,
                 "bytes",
                 &response.head,
             ));
@@ -170,9 +136,8 @@ async fn execute_json_attempt(
 async fn execute_sse_attempt(
     runtime: &ProviderRuntime,
     planned: PlannedExecution,
-    adapter_context: &AdapterContext,
 ) -> Result<(Response, HttpJsonResponse), RuntimeError> {
-    let mut stream = open_planned_stream(runtime, planned, adapter_context).await?;
+    let mut stream = open_planned_stream(runtime, planned).await?;
     while stream.next_envelope().await?.is_some() {}
     stream.finish()
 }
@@ -181,23 +146,14 @@ async fn open_sse_stream(
     runtime: &ProviderRuntime,
     plan: ProviderRequestPlan,
     response_format: ResponseFormat,
-    platform: &agent_core::PlatformConfig,
+    execution_plan: &ExecutionPlan,
     url: &str,
-    adapter_context: &AdapterContext,
 ) -> Result<OpenedProviderStream, RuntimeError> {
     let body = serialize_request_body(&plan)?;
 
     let response = match runtime
         .transport
-        .send(HttpSendRequest {
-            platform,
-            method: plan.method.clone(),
-            url,
-            body,
-            ctx: adapter_context,
-            options: plan.request_options.clone(),
-            response_mode: HttpResponseMode::Sse,
-        })
+        .send(transport_request(execution_plan, &plan, url, body))
         .await
         .map_err(|error| RuntimeError::from_transport(runtime.kind, error))?
     {
@@ -205,7 +161,7 @@ async fn open_sse_stream(
         HttpResponse::Json(response) => {
             return Err(response_mode_mismatch_error(
                 runtime.kind,
-                HttpResponseMode::Sse,
+                TransportResponseFraming::Sse,
                 "JSON",
                 &response.head,
             ));
@@ -213,7 +169,7 @@ async fn open_sse_stream(
         HttpResponse::Bytes(response) => {
             return Err(response_mode_mismatch_error(
                 runtime.kind,
-                HttpResponseMode::Sse,
+                TransportResponseFraming::Sse,
                 "bytes",
                 &response.head,
             ));
@@ -240,6 +196,25 @@ fn serialize_request_body(plan: &ProviderRequestPlan) -> Result<HttpRequestBody,
                 "failed to serialize provider request body: {error}"
             ))
         })
+}
+
+fn transport_request<'a>(
+    execution_plan: &'a ExecutionPlan,
+    plan: &'a ProviderRequestPlan,
+    url: &'a str,
+    body: HttpRequestBody,
+) -> HttpSendRequest<'a> {
+    HttpSendRequest {
+        platform: &execution_plan.platform,
+        auth: execution_plan.auth.credentials.as_ref(),
+        method: plan.method.clone(),
+        url,
+        body,
+        response_framing: plan.response_framing,
+        options: plan.request_options.clone(),
+        transport: execution_plan.transport.clone(),
+        provider_headers: plan.provider_headers.clone(),
+    }
 }
 
 fn validate_response_framing(

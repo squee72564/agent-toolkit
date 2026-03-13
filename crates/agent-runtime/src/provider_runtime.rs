@@ -8,7 +8,7 @@ use agent_providers::error::AdapterOperation;
 use agent_providers::{
     adapter::ProviderAdapter, error::AdapterError, streaming::ProviderStreamProjector,
 };
-use agent_transport::{HttpJsonResponse, HttpResponseMode, HttpSseResponse, HttpTransport};
+use agent_transport::{HttpJsonResponse, HttpSseResponse, HttpTransport, TransportResponseFraming};
 
 use crate::observer::RuntimeObserver;
 use crate::provider_stream_runtime::{ProviderStreamRuntime, StreamRuntimeError};
@@ -20,8 +20,6 @@ mod attempt;
 mod transport;
 
 use self::attempt::{PreparedAttempt, prepare_attempt};
-#[cfg(test)]
-pub(crate) use self::transport::apply_timeout_overrides;
 use self::transport::{
     execute_planned_non_streaming, open_planned_stream, plan_execution, validate_streaming_plan,
 };
@@ -134,10 +132,7 @@ impl ProviderRuntime {
         &self,
         execution_plan: ExecutionPlan,
     ) -> ProviderAttemptOutcome {
-        let PreparedAttempt {
-            selected_model,
-            adapter_context,
-        } = prepare_attempt(&execution_plan);
+        let PreparedAttempt { selected_model } = prepare_attempt(&execution_plan);
         let planned = match plan_execution(self, &execution_plan) {
             Ok(planned) => planned,
             Err(error) => {
@@ -147,8 +142,7 @@ impl ProviderRuntime {
                 };
             }
         };
-        let provider_response =
-            execute_planned_non_streaming(self, planned, &adapter_context).await;
+        let provider_response = execute_planned_non_streaming(self, planned).await;
 
         match provider_response {
             Ok((response, http_response)) => ProviderAttemptOutcome::Success {
@@ -171,10 +165,7 @@ impl ProviderRuntime {
         &self,
         execution_plan: ExecutionPlan,
     ) -> ProviderStreamAttemptOutcome {
-        let PreparedAttempt {
-            selected_model,
-            adapter_context,
-        } = prepare_attempt(&execution_plan);
+        let PreparedAttempt { selected_model } = prepare_attempt(&execution_plan);
 
         let planned = match plan_execution(self, &execution_plan) {
             Ok(planned) => planned,
@@ -186,7 +177,7 @@ impl ProviderRuntime {
             }
         };
         let stream = match validate_streaming_plan(self.kind, &planned.plan) {
-            Ok(()) => open_planned_stream(self, planned, &adapter_context).await,
+            Ok(()) => open_planned_stream(self, planned).await,
             Err(error) => Err(error),
         };
 
@@ -261,7 +252,7 @@ fn map_stream_runtime_error(provider: ProviderId, error: StreamRuntimeError) -> 
 
 pub(crate) fn response_mode_mismatch_error(
     provider: ProviderId,
-    expected_mode: HttpResponseMode,
+    expected_mode: TransportResponseFraming,
     actual_response_kind: &'static str,
     head: &agent_transport::HttpResponseHead,
 ) -> RuntimeError {
@@ -279,11 +270,11 @@ pub(crate) fn response_mode_mismatch_error(
     }
 }
 
-fn expected_response_kind_label(mode: HttpResponseMode) -> &'static str {
+fn expected_response_kind_label(mode: TransportResponseFraming) -> &'static str {
     match mode {
-        HttpResponseMode::Json => "JSON",
-        HttpResponseMode::Sse => "SSE",
-        HttpResponseMode::Bytes => "bytes",
+        TransportResponseFraming::Json => "JSON",
+        TransportResponseFraming::Sse => "SSE",
+        TransportResponseFraming::Bytes => "bytes",
     }
 }
 

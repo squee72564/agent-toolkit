@@ -1,4 +1,4 @@
-use agent_core::{AdapterContext, AuthCredentials, AuthStyle, PlatformConfig};
+use agent_core::{AuthCredentials, AuthStyle, PlatformConfig, ResolvedTransportOptions};
 use base64::Engine;
 use reqwest::header::{
     AUTHORIZATION, HeaderMap, HeaderValue, InvalidHeaderName, InvalidHeaderValue,
@@ -7,33 +7,36 @@ use reqwest::header::{
 use crate::http::request::HeaderConfig;
 use crate::http::transport::TransportError;
 
-const REQUEST_ID_HEADER_KEY: &str = "transport.request_id_header";
-const CUSTOM_HEADER_PREFIX: &str = "transport.header.";
-
 pub(crate) fn build_header_config(
     platform: &PlatformConfig,
-    ctx: &AdapterContext,
+    auth: Option<&AuthCredentials>,
+    transport: &ResolvedTransportOptions,
+    provider_headers: &HeaderMap,
 ) -> Result<HeaderConfig, TransportError> {
-    let request_id_header = ctx
-        .metadata
-        .get(REQUEST_ID_HEADER_KEY)
-        .map(|value| parse_header_name(value))
+    let request_id_header = transport
+        .request_id_header_override
+        .as_deref()
+        .map(parse_header_name)
         .transpose()
         .map_err(TransportError::from)?
         .unwrap_or_else(|| platform.request_id_header.clone());
 
     let mut headers = platform.default_headers.clone();
 
-    if let Some(credentials) = &ctx.auth_token {
-        apply_auth(&mut headers, &platform.auth_style, credentials)?;
+    for (key, value) in &transport.route_extra_headers {
+        headers.insert(parse_header_name(key)?, HeaderValue::from_str(value)?);
     }
 
-    for (key, value) in &ctx.metadata {
-        if let Some(raw_name) = key.strip_prefix(CUSTOM_HEADER_PREFIX) {
-            let header_name = parse_header_name(raw_name)?;
-            let header_value = HeaderValue::from_str(value)?;
-            headers.insert(header_name, header_value);
-        }
+    for (key, value) in &transport.attempt_extra_headers {
+        headers.insert(parse_header_name(key)?, HeaderValue::from_str(value)?);
+    }
+
+    for (key, value) in provider_headers {
+        headers.insert(key.clone(), value.clone());
+    }
+
+    if let Some(credentials) = auth {
+        apply_auth(&mut headers, &platform.auth_style, credentials)?;
     }
 
     Ok(HeaderConfig {

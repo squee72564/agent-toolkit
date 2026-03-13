@@ -1,11 +1,10 @@
-use std::collections::BTreeMap;
 use std::io::ErrorKind;
 use std::time::Duration;
 
 use agent_core::types::AuthStyle;
 use agent_transport::{
-    HttpRequestBody, HttpRequestOptions, HttpResponse, HttpResponseMode, HttpSendRequest,
-    RetryPolicy, SseLimits, TimeoutStage, TransportError,
+    HttpRequestBody, HttpRequestOptions, HttpResponse, HttpSendRequest, RetryPolicy, SseLimits,
+    TimeoutStage, TransportError, TransportResponseFraming,
 };
 use reqwest::StatusCode;
 use serde_json::{Value, json};
@@ -13,7 +12,9 @@ use serde_json::{Value, json};
 use crate::support::http_server::{
     ScriptedBody, ScriptedResponse, await_server, captured_requests, spawn_scripted_server,
 };
-use crate::support::{ExampleBody, TestResult, default_platform, default_transport, empty_context};
+use crate::support::{
+    ExampleBody, TestResult, default_platform, default_resolved_transport, default_transport,
+};
 
 #[tokio::test]
 async fn post_sse_streams_events_and_preserves_metadata() -> TestResult {
@@ -36,24 +37,27 @@ async fn post_sse_streams_events_and_preserves_metadata() -> TestResult {
     let mut platform = default_platform(AuthStyle::None);
     platform.base_url = base_url.clone();
 
-    let mut metadata = BTreeMap::new();
-    metadata.insert(
-        "transport.request_id_header".to_string(),
-        "x-trace-id".to_string(),
-    );
+    let mut transport_options = default_resolved_transport(RetryPolicy::default());
+    transport_options.request_id_header_override = Some("x-trace-id".to_string());
 
     let transport = default_transport(RetryPolicy::default());
-    let mut response = transport
-        .post_sse(
-            &platform,
-            &format!("{base_url}/v1/stream"),
-            &ExampleBody { msg: "hello" },
-            &agent_core::AdapterContext {
-                metadata,
-                auth_token: None,
-            },
-        )
-        .await?;
+    let mut response = match transport
+        .send(HttpSendRequest {
+            platform: &platform,
+            auth: None,
+            method: reqwest::Method::POST,
+            url: &format!("{base_url}/v1/stream"),
+            body: HttpRequestBody::Json(serde_json::to_vec(&ExampleBody { msg: "hello" })?.into()),
+            response_framing: TransportResponseFraming::Sse,
+            options: HttpRequestOptions::sse_defaults(),
+            transport: transport_options,
+            provider_headers: reqwest::header::HeaderMap::new(),
+        })
+        .await?
+    {
+        HttpResponse::Sse(response) => *response,
+        other => panic!("expected sse response, got {other:?}"),
+    };
 
     assert_eq!(response.head.status, StatusCode::OK);
     assert_eq!(response.head.request_id.as_deref(), Some("trace-sse-1"));
@@ -135,7 +139,7 @@ async fn post_sse_retries_retryable_status_before_stream_start() -> TestResult {
             &default_platform(AuthStyle::None),
             &format!("{base_url}/retry"),
             &ExampleBody { msg: "hello" },
-            &empty_context(),
+            None,
         )
         .await?;
 
@@ -175,7 +179,7 @@ async fn post_sse_does_not_retry_after_stream_has_started() -> TestResult {
             &default_platform(AuthStyle::None),
             &format!("{base_url}/stream"),
             &ExampleBody { msg: "hello" },
-            &empty_context(),
+            None,
         )
         .await?;
 
@@ -215,7 +219,7 @@ async fn post_sse_rejects_invalid_retry_field() -> TestResult {
             &default_platform(AuthStyle::None),
             &format!("{base_url}/stream"),
             &ExampleBody { msg: "hello" },
-            &empty_context(),
+            None,
         )
         .await?;
 
@@ -253,7 +257,7 @@ async fn post_sse_rejects_non_sse_content_type() -> TestResult {
             &default_platform(AuthStyle::None),
             &format!("{base_url}/stream"),
             &ExampleBody { msg: "hello" },
-            &empty_context(),
+            None,
         )
         .await
         .expect_err("non-SSE response should fail");
@@ -296,7 +300,7 @@ async fn post_sse_accepts_content_type_with_charset() -> TestResult {
             &default_platform(AuthStyle::None),
             &format!("{base_url}/stream"),
             &ExampleBody { msg: "hello" },
-            &empty_context(),
+            None,
         )
         .await?;
 
@@ -333,7 +337,7 @@ async fn post_sse_times_out_before_response_headers() -> TestResult {
             &default_platform(AuthStyle::None),
             &format!("{base_url}/stream"),
             &ExampleBody { msg: "hello" },
-            &empty_context(),
+            None,
         )
         .await
         .expect_err("setup timeout should fail");
@@ -378,7 +382,7 @@ async fn post_sse_rejects_oversized_line() -> TestResult {
             &default_platform(AuthStyle::None),
             &format!("{base_url}/stream"),
             &ExampleBody { msg: "hello" },
-            &empty_context(),
+            None,
         )
         .await?;
 
@@ -417,7 +421,7 @@ async fn post_sse_rejects_invalid_utf8() -> TestResult {
             &default_platform(AuthStyle::None),
             &format!("{base_url}/stream"),
             &ExampleBody { msg: "hello" },
-            &empty_context(),
+            None,
         )
         .await?;
 
@@ -448,7 +452,7 @@ async fn post_sse_reports_disconnect_with_partial_frame() -> TestResult {
             &default_platform(AuthStyle::None),
             &format!("{base_url}/stream"),
             &ExampleBody { msg: "hello" },
-            &empty_context(),
+            None,
         )
         .await?;
 
@@ -478,21 +482,28 @@ async fn send_sse_times_out_waiting_for_first_byte() -> TestResult {
 
     let transport = default_transport(RetryPolicy::default());
     let platform = default_platform(AuthStyle::None);
-    let ctx = empty_context();
     let error = transport
         .send(HttpSendRequest {
             platform: &platform,
+            auth: None,
             method: reqwest::Method::POST,
             url: &format!("{base_url}/stream"),
             body: HttpRequestBody::Json(serde_json::to_vec(&ExampleBody { msg: "hello" })?.into()),
-            ctx: &ctx,
+            response_framing: TransportResponseFraming::Sse,
             options: HttpRequestOptions::default()
                 .with_accept(reqwest::header::HeaderValue::from_static(
                     "text/event-stream",
                 ))
-                .with_expected_content_type("text/event-stream")
-                .with_stream_idle_timeout(Duration::from_millis(20)),
-            response_mode: HttpResponseMode::Sse,
+                .with_expected_content_type("text/event-stream"),
+            transport: agent_core::ResolvedTransportOptions {
+                timeouts: agent_core::TransportTimeoutOverrides {
+                    request_timeout: Some(Duration::from_secs(2)),
+                    stream_setup_timeout: Some(Duration::from_secs(2)),
+                    stream_idle_timeout: Some(Duration::from_millis(20)),
+                },
+                ..default_resolved_transport(RetryPolicy::default())
+            },
+            provider_headers: reqwest::header::HeaderMap::new(),
         })
         .await
         .expect_err("first byte timeout should fail");
@@ -525,21 +536,28 @@ async fn send_sse_times_out_when_stream_goes_idle_after_first_event() -> TestRes
 
     let transport = default_transport(RetryPolicy::default());
     let platform = default_platform(AuthStyle::None);
-    let ctx = empty_context();
     let mut response = match transport
         .send(HttpSendRequest {
             platform: &platform,
+            auth: None,
             method: reqwest::Method::POST,
             url: &format!("{base_url}/stream"),
             body: HttpRequestBody::Json(serde_json::to_vec(&ExampleBody { msg: "hello" })?.into()),
-            ctx: &ctx,
+            response_framing: TransportResponseFraming::Sse,
             options: HttpRequestOptions::default()
                 .with_accept(reqwest::header::HeaderValue::from_static(
                     "text/event-stream",
                 ))
-                .with_expected_content_type("text/event-stream")
-                .with_stream_idle_timeout(Duration::from_millis(20)),
-            response_mode: HttpResponseMode::Sse,
+                .with_expected_content_type("text/event-stream"),
+            transport: agent_core::ResolvedTransportOptions {
+                timeouts: agent_core::TransportTimeoutOverrides {
+                    request_timeout: Some(Duration::from_secs(2)),
+                    stream_setup_timeout: Some(Duration::from_secs(2)),
+                    stream_idle_timeout: Some(Duration::from_millis(20)),
+                },
+                ..default_resolved_transport(RetryPolicy::default())
+            },
+            provider_headers: reqwest::header::HeaderMap::new(),
         })
         .await?
     {
@@ -586,22 +604,31 @@ async fn send_sse_request_options_override_setup_timeout() -> TestResult {
         .stream_timeout(Duration::from_millis(200))
         .build();
     let platform = default_platform(AuthStyle::None);
-    let ctx = empty_context();
-
     let error = transport
         .send(HttpSendRequest {
             platform: &platform,
+            auth: None,
             method: reqwest::Method::POST,
             url: &format!("{base_url}/stream"),
             body: HttpRequestBody::Json(serde_json::to_vec(&ExampleBody { msg: "hello" })?.into()),
-            ctx: &ctx,
+            response_framing: TransportResponseFraming::Sse,
             options: HttpRequestOptions::default()
                 .with_accept(reqwest::header::HeaderValue::from_static(
                     "text/event-stream",
                 ))
-                .with_expected_content_type("text/event-stream")
-                .with_stream_setup_timeout(Duration::from_millis(10)),
-            response_mode: HttpResponseMode::Sse,
+                .with_expected_content_type("text/event-stream"),
+            transport: agent_core::ResolvedTransportOptions {
+                timeouts: agent_core::TransportTimeoutOverrides {
+                    request_timeout: Some(Duration::from_secs(30)),
+                    stream_setup_timeout: Some(Duration::from_millis(10)),
+                    stream_idle_timeout: Some(Duration::from_millis(200)),
+                },
+                ..default_resolved_transport(RetryPolicy {
+                    max_attempts: 1,
+                    ..RetryPolicy::default()
+                })
+            },
+            provider_headers: reqwest::header::HeaderMap::new(),
         })
         .await
         .expect_err("request-scoped setup timeout should win");
@@ -634,7 +661,7 @@ async fn get_sse_supports_bodyless_streams() -> TestResult {
         .get_sse(
             &default_platform(AuthStyle::None),
             &format!("{base_url}/events"),
-            &empty_context(),
+            None,
         )
         .await?;
 
@@ -668,7 +695,6 @@ async fn send_sse_request_supports_raw_bytes_body() -> TestResult {
 
     let transport = default_transport(RetryPolicy::default());
     let platform = default_platform(AuthStyle::None);
-    let ctx = empty_context();
     let mut response = transport
         .send_sse_request(
             &platform,
@@ -680,8 +706,9 @@ async fn send_sse_request_supports_raw_bytes_body() -> TestResult {
                 )),
                 body: bytes::Bytes::from_static(b"\x01\x02"),
             },
-            &ctx,
+            None,
             HttpRequestOptions::default(),
+            default_resolved_transport(RetryPolicy::default()),
         )
         .await?;
 
