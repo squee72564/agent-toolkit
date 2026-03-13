@@ -162,11 +162,7 @@ impl ProviderClient {
         let context = self.begin_direct_request(execution_plan.attempt.model.as_str());
         let stream_observer = context.cloned_observer();
 
-        match self
-            .runtime
-            .open_stream_attempt(execution_plan)
-            .await
-        {
+        match self.runtime.open_stream_attempt(execution_plan).await {
             ProviderStreamAttemptOutcome::Opened { stream, meta } => {
                 Ok(MessageResponseStream::new_direct(
                     context.request_started_at,

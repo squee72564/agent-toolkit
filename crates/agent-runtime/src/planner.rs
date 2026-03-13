@@ -67,6 +67,7 @@ pub(crate) struct ResolvedTransportOptions {
 
 #[derive(Debug, Clone)]
 pub(crate) struct ExecutionPlan {
+    #[allow(dead_code)]
     pub(crate) response_mode: ResponseMode,
     pub(crate) task: TaskRequest,
     pub(crate) provider_request_plan: ProviderRequestPlan,
@@ -74,6 +75,7 @@ pub(crate) struct ExecutionPlan {
     pub(crate) platform: PlatformConfig,
     pub(crate) auth: ResolvedAuthContext,
     pub(crate) transport: ResolvedTransportOptions,
+    #[allow(dead_code)]
     pub(crate) capabilities: ProviderCapabilities,
 }
 
@@ -129,7 +131,7 @@ pub(crate) fn should_skip_planning_rejection(
 #[derive(Debug)]
 pub(crate) enum FallbackPlanResult {
     /// Planning succeeded; the attempt is ready for execution.
-    Executable(ExecutionPlan),
+    Executable(Box<ExecutionPlan>),
     /// Planning was rejected but the policy allows skipping to the next target.
     Skip,
     /// Planning failed or was rejected and no more targets should be tried.
@@ -150,7 +152,7 @@ pub(crate) fn plan_fallback_attempt(
     total_attempts: usize,
 ) -> FallbackPlanResult {
     match plan_routed_attempt(client, attempt_spec, task, execution) {
-        Ok(execution_plan) => FallbackPlanResult::Executable(execution_plan),
+        Ok(execution_plan) => FallbackPlanResult::Executable(Box::new(execution_plan)),
         Err(AttemptPlanningError::Rejected(_rejection)) => {
             if should_skip_planning_rejection(planning_rejection_policy, index, total_attempts) {
                 FallbackPlanResult::Skip
@@ -292,7 +294,10 @@ fn plan_attempt(
             }))
         })?;
 
-    apply_timeout_overrides(&mut provider_request_plan, &attempt.execution.timeout_overrides);
+    apply_timeout_overrides(
+        &mut provider_request_plan,
+        &attempt.execution.timeout_overrides,
+    );
 
     let platform = client
         .runtime

@@ -138,7 +138,7 @@ impl AgentToolkit {
                     index,
                     prepared.attempts.len(),
                 ) {
-                    planner::FallbackPlanResult::Executable(plan) => plan,
+                    planner::FallbackPlanResult::Executable(plan) => *plan,
                     planner::FallbackPlanResult::Skip => continue,
                     planner::FallbackPlanResult::Stop => break,
                 }

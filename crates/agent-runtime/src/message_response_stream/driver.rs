@@ -158,7 +158,7 @@ async fn try_open_fallback_attempt(
             index,
             routed.attempts.len(),
         ) {
-            planner::FallbackPlanResult::Executable(plan) => plan,
+            planner::FallbackPlanResult::Executable(plan) => *plan,
             planner::FallbackPlanResult::Skip => continue,
             planner::FallbackPlanResult::Stop => return None,
         };
