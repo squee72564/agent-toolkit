@@ -1,7 +1,8 @@
 use agent_core::{ContentPart, ResponseFormat};
 use serde_json::json;
 
-use crate::platform::openai::response::decode_response_json;
+use crate::adapter::adapter_for;
+use agent_core::ProviderId;
 
 #[test]
 fn openai_response_decoder_uses_existing_openai_decode_path() {
@@ -25,4 +26,11 @@ fn openai_response_decoder_uses_existing_openai_decode_path() {
 
     assert_eq!(response.model, "gpt-5-mini");
     assert_eq!(response.output.content, vec![ContentPart::text("hello")]);
+}
+
+fn decode_response_json(
+    body: serde_json::Value,
+    requested_format: &ResponseFormat,
+) -> Result<agent_core::Response, crate::error::AdapterError> {
+    adapter_for(ProviderId::OpenAi).decode_response_json(body, requested_format)
 }

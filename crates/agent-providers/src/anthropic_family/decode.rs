@@ -1,5 +1,6 @@
 use serde_json::{Map, Value};
 
+use crate::error::{AdapterErrorKind, ProviderErrorInfo};
 use agent_core::types::{
     AssistantOutput, ContentPart, FinishReason, Response, ResponseFormat, RuntimeWarning, Usage,
 };
@@ -25,9 +26,11 @@ pub(crate) fn decode_anthropic_response(
         .as_object()
         .ok_or_else(|| AnthropicFamilyError::decode("response payload must be a JSON object"))?;
 
-    if let Some(error) = parse_anthropic_error_value(root) {
+    if let Some(error) = decode_anthropic_error(&payload.body) {
         return Err(AnthropicFamilyError::upstream(
-            format_anthropic_error_message(&error),
+            error
+                .message
+                .unwrap_or_else(|| "anthropic response reported an error".to_string()),
         ));
     }
 
@@ -96,6 +99,16 @@ pub(crate) fn decode_anthropic_response(
         raw_provider_response: None,
         finish_reason,
         warnings,
+    })
+}
+
+pub(crate) fn decode_anthropic_error(body: &Value) -> Option<ProviderErrorInfo> {
+    let root = body.as_object()?;
+    let error = parse_anthropic_error_value(root)?;
+    Some(ProviderErrorInfo {
+        provider_code: None,
+        message: Some(format_anthropic_error_message(&error)),
+        kind: Some(AdapterErrorKind::Upstream),
     })
 }
 

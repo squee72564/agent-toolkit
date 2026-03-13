@@ -2,11 +2,12 @@ use std::collections::BTreeMap;
 
 use serde_json::{Map, json};
 
+use crate::adapter::adapter_for;
 use crate::error::{AdapterErrorKind, AdapterOperation};
 use agent_core::types::ProviderId;
 use agent_core::types::{ContentPart, Message, MessageRole, Request, ResponseFormat, ToolChoice};
 
-use super::{request, response};
+use super::request;
 use crate::platform::openrouter::request::OpenRouterOverrides;
 
 fn base_request() -> Request {
@@ -49,23 +50,28 @@ fn openrouter_request_error_maps_into_adapter_error() {
 
 #[test]
 fn openrouter_upstream_error_maps_into_adapter_error() {
-    let adapter_error = response::decode_response_json(
-        json!({"error":{"message":"provider failure","code":401}}),
-        &ResponseFormat::Text,
-    )
-    .expect_err("decode should fail");
+    let adapter_error = adapter_for(ProviderId::OpenRouter)
+        .decode_response_json(
+            json!({"error":{"message":"provider failure","code":"rate_limit_exceeded"}}),
+            &ResponseFormat::Text,
+        )
+        .expect_err("decode should fail");
 
     assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Upstream);
     assert!(adapter_error.message.contains("provider failure"));
+    assert_eq!(
+        adapter_error.provider_code.as_deref(),
+        Some("rate_limit_exceeded")
+    );
 }
 
 #[test]
 fn openrouter_decode_error_maps_into_adapter_error() {
-    let adapter_error =
-        response::decode_response_json(json!("bad response"), &ResponseFormat::Text)
-            .expect_err("decode should fail");
+    let adapter_error = adapter_for(ProviderId::OpenRouter)
+        .decode_response_json(json!("bad response"), &ResponseFormat::Text)
+        .expect_err("decode should fail");
 
     assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
@@ -75,16 +81,17 @@ fn openrouter_decode_error_maps_into_adapter_error() {
 
 #[test]
 fn openrouter_protocol_violation_error_maps_into_adapter_error() {
-    let adapter_error = response::decode_response_json(
-        json!({
-            "id": "chatcmpl-123",
-            "object": "chat.completion",
-            "model": "openai/gpt-4.1-mini",
-            "choices": "bad"
-        }),
-        &ResponseFormat::Text,
-    )
-    .expect_err("decode should fail");
+    let adapter_error = adapter_for(ProviderId::OpenRouter)
+        .decode_response_json(
+            json!({
+                "id": "chatcmpl-123",
+                "object": "chat.completion",
+                "model": "openai/gpt-4.1-mini",
+                "choices": "bad"
+            }),
+            &ResponseFormat::Text,
+        )
+        .expect_err("decode should fail");
 
     assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
@@ -251,26 +258,27 @@ fn openrouter_request_extra_overrides_take_precedence() {
 
 #[test]
 fn openrouter_decode_uses_openai_path_when_payload_is_openai_compatible() {
-    let response = response::decode_response_json(
-        json!({
-            "status": "completed",
-            "model": "openai/gpt-4.1-mini",
-            "output": [{
-                "type": "message",
-                "content": [{
-                    "type": "output_text",
-                    "text": "hello from openai format"
-                }]
-            }],
-            "usage": {
-                "input_tokens": 3,
-                "output_tokens": 4,
-                "total_tokens": 7
-            }
-        }),
-        &ResponseFormat::Text,
-    )
-    .expect("decode should succeed");
+    let response = adapter_for(ProviderId::OpenRouter)
+        .decode_response_json(
+            json!({
+                "status": "completed",
+                "model": "openai/gpt-4.1-mini",
+                "output": [{
+                    "type": "message",
+                    "content": [{
+                        "type": "output_text",
+                        "text": "hello from openai format"
+                    }]
+                }],
+                "usage": {
+                    "input_tokens": 3,
+                    "output_tokens": 4,
+                    "total_tokens": 7
+                }
+            }),
+            &ResponseFormat::Text,
+        )
+        .expect("decode should succeed");
 
     assert_eq!(response.model, "openai/gpt-4.1-mini");
     assert_eq!(
@@ -284,23 +292,24 @@ fn openrouter_decode_uses_openai_path_when_payload_is_openai_compatible() {
 
 #[test]
 fn openrouter_decode_rejects_chat_completions_shape() {
-    let error = response::decode_response_json(
-        json!({
-            "id": "chatcmpl-123",
-            "object": "chat.completion",
-            "model": "openai/gpt-4.1-mini",
-            "choices": [{
-                "index": 0,
-                "finish_reason": "stop",
-                "message": {
-                    "role": "assistant",
-                    "content": "hello from openrouter format"
-                }
-            }]
-        }),
-        &ResponseFormat::Text,
-    )
-    .expect_err("decode should fail");
+    let error = adapter_for(ProviderId::OpenRouter)
+        .decode_response_json(
+            json!({
+                "id": "chatcmpl-123",
+                "object": "chat.completion",
+                "model": "openai/gpt-4.1-mini",
+                "choices": [{
+                    "index": 0,
+                    "finish_reason": "stop",
+                    "message": {
+                        "role": "assistant",
+                        "content": "hello from openrouter format"
+                    }
+                }]
+            }),
+            &ResponseFormat::Text,
+        )
+        .expect_err("decode should fail");
 
     assert_eq!(error.kind, AdapterErrorKind::Decode);
     assert!(!error.message.is_empty());
@@ -308,16 +317,17 @@ fn openrouter_decode_rejects_chat_completions_shape() {
 
 #[test]
 fn openrouter_decode_maps_upstream_error_without_fallback_context() {
-    let error = response::decode_response_json(
-        json!({
-            "error": {
-                "message": "upstream hard failure",
-                "code": 401
-            }
-        }),
-        &ResponseFormat::Text,
-    )
-    .expect_err("decode should fail");
+    let error = adapter_for(ProviderId::OpenRouter)
+        .decode_response_json(
+            json!({
+                "error": {
+                    "message": "upstream hard failure",
+                    "code": 401
+                }
+            }),
+            &ResponseFormat::Text,
+        )
+        .expect_err("decode should fail");
 
     assert_eq!(error.kind, AdapterErrorKind::Upstream);
     assert!(error.message.contains("upstream hard failure"));

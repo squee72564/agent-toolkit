@@ -2,6 +2,7 @@ use serde_json::{Map, Value};
 
 use super::types::{OpenAiErrorEnvelope, OpenAiResponsesBody};
 use super::{OpenAiDecodeEnvelope, OpenAiFamilyError};
+use crate::error::{AdapterErrorKind, ProviderErrorInfo};
 use agent_core::types::{
     AssistantOutput, ContentPart, FinishReason, Response, ResponseFormat, RuntimeWarning, Usage,
 };
@@ -13,11 +14,11 @@ const WARN_INVALID_TOOL_CALL_ARGUMENTS: &str = "openai.decode.invalid_tool_call_
 const WARN_STRUCTURED_OUTPUT_NOT_OBJECT: &str = "openai.decode.structured_output_not_object";
 const WARN_STRUCTURED_OUTPUT_PARSE_FAILED: &str = "openai.decode.structured_output_parse_failed";
 
-struct NormalizedOpenAiErrorEnvelope {
-    message: String,
-    code: Option<String>,
-    error_type: Option<String>,
-    param: Option<String>,
+pub(crate) struct NormalizedOpenAiErrorEnvelope {
+    pub message: String,
+    pub code: Option<String>,
+    pub error_type: Option<String>,
+    pub param: Option<String>,
 }
 
 pub(crate) fn decode_openai_response(
@@ -35,9 +36,9 @@ pub(crate) fn decode_openai_response(
         ));
     }
 
-    if let Some(error) = parsed.error.as_ref().and_then(normalize_error_envelope) {
-        return Err(OpenAiFamilyError::upstream(format_openai_error_message(
-            &error,
+    if let Some(error) = decode_openai_error(&payload.body) {
+        return Err(OpenAiFamilyError::upstream(error.message.unwrap_or_else(
+            || "openai response reported an error".to_string(),
         )));
     }
 
@@ -92,6 +93,15 @@ pub(crate) fn decode_openai_response(
     })
 }
 
+pub(crate) fn decode_openai_error(root: &Value) -> Option<ProviderErrorInfo> {
+    let error = parse_openai_error_value(root)?;
+    Some(ProviderErrorInfo {
+        provider_code: None,
+        message: Some(format_openai_error_message(&error)),
+        kind: Some(AdapterErrorKind::Upstream),
+    })
+}
+
 fn format_openai_error_message(envelope: &NormalizedOpenAiErrorEnvelope) -> String {
     let mut context = Vec::new();
 
@@ -114,6 +124,12 @@ fn format_openai_error_message(envelope: &NormalizedOpenAiErrorEnvelope) -> Stri
             context.join(", ")
         )
     }
+}
+
+pub(crate) fn parse_openai_error_value(root: &Value) -> Option<NormalizedOpenAiErrorEnvelope> {
+    let error_value = root.as_object()?.get("error")?.clone();
+    let error: OpenAiErrorEnvelope = serde_json::from_value(error_value).ok()?;
+    normalize_error_envelope(&error)
 }
 
 fn normalize_error_envelope(error: &OpenAiErrorEnvelope) -> Option<NormalizedOpenAiErrorEnvelope> {

@@ -1,12 +1,14 @@
 use agent_core::{
-    AnthropicOptions, FamilyOptions, NativeOptions, ProviderId, ProviderOptions, Request,
+    AnthropicFamilyOptions, AnthropicOptions, NativeOptions, ProviderOptions, Request,
+    ResponseMode, TaskRequest,
 };
 use agent_transport::HttpRequestOptions;
+use reqwest::{Method, header::HeaderMap};
 use serde_json::Value;
 
 use crate::anthropic_family::{AnthropicFamilyError, AnthropicFamilyErrorKind};
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
-use crate::request_plan::{ProviderRequestPlan, ProviderResponseKind, ProviderTransportKind};
+use crate::request_plan::{EncodedFamilyRequest, TransportResponseFraming};
 
 #[derive(Debug, Clone, Default, PartialEq)]
 struct AnthropicNativeOptionsOverrides {
@@ -15,22 +17,21 @@ struct AnthropicNativeOptionsOverrides {
 }
 
 impl AnthropicNativeOptionsOverrides {
-    fn from_native_options(native_options: Option<&NativeOptions>) -> Result<Self, AdapterError> {
-        let Some(native_options) = native_options else {
-            return Ok(Self::default());
-        };
-
+    fn from_options(
+        family_options: Option<&AnthropicFamilyOptions>,
+        provider_options: Option<&ProviderOptions>,
+    ) -> Result<Self, AdapterError> {
         let mut overrides = Self::default();
 
-        if let Some(FamilyOptions::Anthropic(options)) = native_options.family.as_ref() {
+        if let Some(options) = family_options {
             overrides.thinking = options.thinking.clone();
         }
 
-        if let Some(provider_options) = native_options.provider.as_ref() {
+        if let Some(provider_options) = provider_options {
             let ProviderOptions::Anthropic(AnthropicOptions { top_k }) = provider_options else {
                 return Err(AdapterError::new(
                     AdapterErrorKind::Validation,
-                    ProviderId::Anthropic,
+                    agent_core::ProviderId::Anthropic,
                     AdapterOperation::PlanRequest,
                     format!(
                         "Anthropic adapter received mismatched provider native options for {:?}",
@@ -44,11 +45,11 @@ impl AnthropicNativeOptionsOverrides {
         Ok(overrides)
     }
 
-    fn apply(&self, plan: &mut ProviderRequestPlan) -> Result<(), AdapterError> {
-        let Some(body) = plan.body.as_object_mut() else {
+    fn apply(&self, request: &mut EncodedFamilyRequest) -> Result<(), AdapterError> {
+        let Some(body) = request.body.as_object_mut() else {
             return Err(AdapterError::new(
                 AdapterErrorKind::ProtocolViolation,
-                ProviderId::Anthropic,
+                agent_core::ProviderId::Anthropic,
                 AdapterOperation::PlanRequest,
                 "Anthropic family request body must be an object".to_string(),
             ));
@@ -65,41 +66,72 @@ impl AnthropicNativeOptionsOverrides {
     }
 }
 
-pub(crate) fn plan_request(
-    req: Request,
-    native_options: Option<&NativeOptions>,
-) -> Result<ProviderRequestPlan, AdapterError> {
-    let is_stream = req.stream;
-    let overrides = AnthropicNativeOptionsOverrides::from_native_options(native_options)?;
-    let encoded = crate::anthropic_family::encode::encode_anthropic_request(req)
+pub(crate) fn encode_family_request(
+    task: &TaskRequest,
+    model: &str,
+    response_mode: ResponseMode,
+) -> Result<EncodedFamilyRequest, AdapterError> {
+    let mut request = Request::from(task.clone());
+    request.model_id = model.to_string();
+    request.stream = response_mode == ResponseMode::Streaming;
+
+    let encoded = crate::anthropic_family::encode::encode_anthropic_request(request)
         .map_err(map_anthropic_plan_error)?;
     let mut body = encoded.body;
-    if is_stream {
-        body["stream"] = serde_json::Value::Bool(true);
+    if response_mode == ResponseMode::Streaming {
+        body["stream"] = Value::Bool(true);
     }
 
-    let mut plan = ProviderRequestPlan {
+    Ok(EncodedFamilyRequest {
         body,
         warnings: encoded.warnings,
-        transport_kind: if is_stream {
-            ProviderTransportKind::HttpSse
+        method: Method::POST,
+        response_framing: if response_mode == ResponseMode::Streaming {
+            TransportResponseFraming::Sse
         } else {
-            ProviderTransportKind::HttpJson
-        },
-        response_kind: if is_stream {
-            ProviderResponseKind::RawProviderStream
-        } else {
-            ProviderResponseKind::JsonBody
+            TransportResponseFraming::Json
         },
         endpoint_path_override: None,
-        request_options: if is_stream {
+        provider_headers: HeaderMap::new(),
+        request_options: if response_mode == ResponseMode::Streaming {
             HttpRequestOptions::sse_defaults()
         } else {
             HttpRequestOptions::json_defaults().with_allow_error_status(true)
         },
-    };
-    overrides.apply(&mut plan)?;
-    Ok(plan)
+    })
+}
+
+pub(crate) fn apply_provider_overlay(
+    request: &mut EncodedFamilyRequest,
+    family_options: Option<&AnthropicFamilyOptions>,
+    provider_options: Option<&ProviderOptions>,
+) -> Result<(), AdapterError> {
+    AnthropicNativeOptionsOverrides::from_options(family_options, provider_options)?.apply(request)
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn plan_request(
+    req: Request,
+    native_options: Option<&NativeOptions>,
+) -> Result<crate::request_plan::ProviderRequestPlan, AdapterError> {
+    let mut request = encode_family_request(
+        &req.task_request(),
+        &req.model_id,
+        if req.stream {
+            ResponseMode::Streaming
+        } else {
+            ResponseMode::NonStreaming
+        },
+    )?;
+    let family_options = native_options
+        .and_then(|native| native.family.as_ref())
+        .and_then(|family| match family {
+            agent_core::FamilyOptions::Anthropic(options) => Some(options),
+            _ => None,
+        });
+    let provider_options = native_options.and_then(|native| native.provider.as_ref());
+    apply_provider_overlay(&mut request, family_options, provider_options)?;
+    Ok(request.into())
 }
 
 fn map_anthropic_plan_error(error: AnthropicFamilyError) -> AdapterError {

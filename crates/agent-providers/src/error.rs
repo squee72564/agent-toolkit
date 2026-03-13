@@ -40,6 +40,34 @@ pub enum AdapterErrorKind {
     Transport,
 }
 
+/// Typed provider-layer error details extracted before runtime normalization.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ProviderErrorInfo {
+    /// Provider-specific error code, when available.
+    pub provider_code: Option<String>,
+    /// Human-readable provider error message, when available.
+    pub message: Option<String>,
+    /// Adapter-layer error kind inferred from the provider error payload.
+    pub kind: Option<AdapterErrorKind>,
+}
+
+impl ProviderErrorInfo {
+    /// Merges provider-overlay fields over family-decoded fields.
+    #[must_use]
+    pub fn refined_with(mut self, overlay: Self) -> Self {
+        if overlay.provider_code.is_some() {
+            self.provider_code = overlay.provider_code;
+        }
+        if overlay.message.is_some() {
+            self.message = overlay.message;
+        }
+        if overlay.kind.is_some() {
+            self.kind = overlay.kind;
+        }
+        self
+    }
+}
+
 /// Normalized adapter-layer error used by the runtime.
 #[derive(Debug, Error)]
 #[error("{provider:?}::{operation:?}::{kind:?}: {message}")]

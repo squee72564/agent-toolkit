@@ -3,6 +3,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use serde_json::{Value, json};
 
+use crate::adapter::adapter_for;
 use crate::anthropic_family::AnthropicDecodeEnvelope;
 use crate::platform::test_fixtures::{
     choose_valid_success_fixture, list_decoded_error_fixture_models,
@@ -10,9 +11,8 @@ use crate::platform::test_fixtures::{
     load_decoded_error_fixture_body, load_decoded_success_fixture,
     validate_decoded_error_fixture_shape,
 };
+use agent_core::ProviderId;
 use agent_core::types::{ContentPart, FinishReason, Response, ResponseFormat};
-
-use super::response::decode_response_json;
 
 const PROVIDER: &str = "anthropic";
 const SUCCESS_SCENARIOS: [&str; 3] = ["basic_chat", "tool_call", "tool_call_reasoning"];
@@ -27,6 +27,13 @@ const SMOKE_ERROR_FIXTURES: [(&str, &str); 4] = [
 #[test]
 fn fixture_smoke_anthropic_basic_chat() -> Result<(), String> {
     run_success_smoke_scenario("basic_chat", &SMOKE_MODELS_ANTHROPIC)
+}
+
+fn decode_response_json(
+    body: Value,
+    requested_response_format: &ResponseFormat,
+) -> Result<Response, crate::error::AdapterError> {
+    adapter_for(ProviderId::Anthropic).decode_response_json(body, requested_response_format)
 }
 
 #[test]

@@ -2,14 +2,14 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 
 use agent_core::{
-    FamilyOptions, NativeOptions, OpenRouterOptions, ProviderOptions, Request, RuntimeWarning,
+    OpenAiCompatibleOptions, OpenRouterOptions, ProviderOptions, Request, ResponseMode,
+    RuntimeWarning,
 };
-use agent_transport::HttpRequestOptions;
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
-use crate::openai_family::encode::{OpenAiEncodeInput, encode_openai_request_parts};
 use crate::openai_family::{OpenAiFamilyError, OpenAiFamilyErrorKind};
-use crate::request_plan::{ProviderRequestPlan, ProviderResponseKind, ProviderTransportKind};
+use crate::platform::openai::request::encode_family_request;
+use crate::request_plan::EncodedFamilyRequest;
 
 const WARN_IGNORED_TOP_P: &str = "openai.encode.ignored_top_p";
 const WARN_IGNORED_STOP: &str = "openai.encode.ignored_stop";
@@ -61,25 +61,22 @@ pub(crate) struct OpenRouterOverrides {
 }
 
 impl OpenRouterOverrides {
-    pub(crate) fn from_native_options(
-        native_options: Option<&NativeOptions>,
+    fn from_options(
+        family_options: Option<&OpenAiCompatibleOptions>,
+        provider_options: Option<&ProviderOptions>,
     ) -> Result<Self, AdapterError> {
-        let Some(native_options) = native_options else {
-            return Ok(Self::default());
-        };
-
         let mut overrides = Self::default();
 
-        if let Some(FamilyOptions::OpenAiCompatible(options)) = native_options.family.as_ref() {
+        if let Some(options) = family_options {
             overrides.parallel_tool_calls = options.parallel_tool_calls;
             overrides.reasoning = options.reasoning.clone();
         }
 
-        if let Some(provider) = native_options.provider.as_ref() {
+        if let Some(provider) = provider_options {
             let ProviderOptions::OpenRouter(options) = provider else {
                 return Err(AdapterError::new(
                     AdapterErrorKind::Validation,
-                    agent_core::ProviderId::OpenRouter,
+                    agent_core::ProviderKind::OpenRouter,
                     AdapterOperation::PlanRequest,
                     format!(
                         "OpenRouter adapter received mismatched provider native options for {:?}",
@@ -113,70 +110,54 @@ fn apply_provider_options(overrides: &mut OpenRouterOverrides, options: &OpenRou
     overrides.debug = options.debug.clone();
 }
 
+pub(crate) fn apply_provider_overlay(
+    request: &mut EncodedFamilyRequest,
+    model_id: &str,
+    top_p: Option<f32>,
+    stop: &[String],
+    family_options: Option<&OpenAiCompatibleOptions>,
+    provider_options: Option<&ProviderOptions>,
+) -> Result<(), AdapterError> {
+    let overrides = OpenRouterOverrides::from_options(family_options, provider_options)?;
+    apply_openrouter_overrides(
+        model_id,
+        top_p,
+        stop,
+        &overrides,
+        &mut request.body,
+        &mut request.warnings,
+    )
+    .map_err(map_openrouter_plan_error)
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn plan_request(
     req: Request,
     overrides: &OpenRouterOverrides,
-) -> Result<ProviderRequestPlan, AdapterError> {
-    let Request {
-        model_id,
-        stream,
-        messages,
-        tools,
-        tool_choice,
-        response_format,
-        temperature,
-        top_p,
-        max_output_tokens,
-        stop,
-        metadata,
-    } = req;
-
-    let mut encoded = encode_openai_request_parts(OpenAiEncodeInput {
-        model_id: &model_id,
-        messages,
-        tools,
-        tool_choice,
-        response_format,
-        temperature,
-        top_p,
-        max_output_tokens,
-        stop: &stop,
-        metadata,
-    })
-    .map_err(map_openrouter_plan_error)?;
+) -> Result<crate::request_plan::ProviderRequestPlan, AdapterError> {
+    let mut request = encode_family_request(
+        &req.task_request(),
+        &req.model_id,
+        if req.stream {
+            ResponseMode::Streaming
+        } else {
+            ResponseMode::NonStreaming
+        },
+    )
+    .map_err(|mut error| {
+        error.provider = agent_core::ProviderKind::OpenRouter;
+        error
+    })?;
     apply_openrouter_overrides(
-        &model_id,
-        top_p,
-        &stop,
+        &req.model_id,
+        req.top_p,
+        &req.stop,
         overrides,
-        &mut encoded.body,
-        &mut encoded.warnings,
+        &mut request.body,
+        &mut request.warnings,
     )
     .map_err(map_openrouter_plan_error)?;
-    if stream {
-        encoded.body["stream"] = Value::Bool(true);
-    }
-
-    Ok(ProviderRequestPlan {
-        body: encoded.body,
-        warnings: encoded.warnings,
-        transport_kind: if stream {
-            ProviderTransportKind::HttpSse
-        } else {
-            ProviderTransportKind::HttpJson
-        },
-        response_kind: if stream {
-            ProviderResponseKind::RawProviderStream
-        } else {
-            ProviderResponseKind::JsonBody
-        },
-        endpoint_path_override: None,
-        request_options: if stream {
-            HttpRequestOptions::sse_defaults()
-        } else {
-            HttpRequestOptions::json_defaults().with_allow_error_status(true)
-        },
-    })
+    Ok(request.into())
 }
 
 fn apply_openrouter_overrides(
@@ -260,8 +241,9 @@ fn insert_optional_f32(
     value: Option<f32>,
 ) -> Result<(), OpenAiFamilyError> {
     if let Some(value) = value {
-        let number = serde_json::Number::from_f64(f64::from(value))
-            .ok_or_else(|| OpenAiFamilyError::validation(format!("{key} must be finite")))?;
+        let number = serde_json::Number::from_f64(f64::from(value)).ok_or_else(|| {
+            OpenAiFamilyError::validation(format!("{key} must be finite for OpenRouter"))
+        })?;
         body.insert(key.to_string(), Value::Number(number));
     }
     Ok(())

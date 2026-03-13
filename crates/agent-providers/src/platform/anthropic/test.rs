@@ -1,9 +1,10 @@
+use crate::adapter::adapter_for;
 use crate::error::{AdapterErrorKind, AdapterOperation};
 use agent_core::{
     ContentPart, Message, MessageRole, ProviderId, Request, ResponseFormat, ToolChoice,
 };
 
-use super::{request, response};
+use super::request;
 
 fn base_request() -> Request {
     Request {
@@ -44,11 +45,12 @@ fn anthropic_request_error_maps_into_adapter_error() {
 
 #[test]
 fn anthropic_response_error_maps_into_adapter_error() {
-    let adapter_error = response::decode_response_json(
-        serde_json::json!({"model":"claude-sonnet-4-6"}),
-        &agent_core::ResponseFormat::Text,
-    )
-    .expect_err("decode should fail");
+    let adapter_error = adapter_for(ProviderId::Anthropic)
+        .decode_response_json(
+            serde_json::json!({"model":"claude-sonnet-4-6"}),
+            &agent_core::ResponseFormat::Text,
+        )
+        .expect_err("decode should fail");
 
     assert_eq!(adapter_error.provider, ProviderId::Anthropic);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
@@ -78,24 +80,35 @@ fn anthropic_request_error_preserves_source_chain() {
 
 #[test]
 fn anthropic_upstream_error_maps_into_adapter_error() {
-    let adapter_error = response::decode_response_json(
-        serde_json::json!({"type":"error","error":{"message":"provider said no"}}),
-        &agent_core::ResponseFormat::Text,
-    )
-    .expect_err("decode should fail");
+    let adapter_error = adapter_for(ProviderId::Anthropic)
+        .decode_response_json(
+            serde_json::json!({
+                "type":"error",
+                "request_id":"req_test_123",
+                "error":{"message":"provider said no","type":"invalid_request_error"}
+            }),
+            &agent_core::ResponseFormat::Text,
+        )
+        .expect_err("decode should fail");
 
     assert_eq!(adapter_error.provider, ProviderId::Anthropic);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Upstream);
     assert!(adapter_error.message.contains("provider said no"));
+    assert_eq!(
+        adapter_error.provider_code.as_deref(),
+        Some("invalid_request_error")
+    );
+    assert_eq!(adapter_error.request_id.as_deref(), Some("req_test_123"));
 }
 
 #[test]
 fn anthropic_protocol_violation_error_maps_into_adapter_error() {
-    let adapter_error = response::decode_response_json(
-        serde_json::json!({"content":[],"role":"assistant","model":"claude-sonnet-4-6","stop_reason":"end_turn","usage":"bad"}),
-        &agent_core::ResponseFormat::Text,
-    )
+    let adapter_error = adapter_for(ProviderId::Anthropic)
+        .decode_response_json(
+            serde_json::json!({"content":[],"role":"assistant","model":"claude-sonnet-4-6","stop_reason":"end_turn","usage":"bad"}),
+            &agent_core::ResponseFormat::Text,
+        )
     .expect_err("decode should fail");
 
     assert_eq!(adapter_error.provider, ProviderId::Anthropic);

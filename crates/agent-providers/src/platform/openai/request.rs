@@ -1,13 +1,15 @@
 use agent_core::{
-    FamilyOptions, NativeOptions, OpenAiOptions, ProviderId, ProviderKind, ProviderOptions, Request,
+    NativeOptions, OpenAiCompatibleOptions, OpenAiOptions, ProviderKind, ProviderOptions, Request,
+    ResponseMode, TaskRequest,
 };
 use agent_transport::HttpRequestOptions;
+use reqwest::{Method, header::HeaderMap};
 use serde_json::Value;
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
 use crate::openai_family::encode::encode_openai_request;
 use crate::openai_family::{OpenAiFamilyError, OpenAiFamilyErrorKind};
-use crate::request_plan::{ProviderRequestPlan, ProviderResponseKind, ProviderTransportKind};
+use crate::request_plan::{EncodedFamilyRequest, TransportResponseFraming};
 
 #[derive(Debug, Clone, Default, PartialEq)]
 struct OpenAiNativeOptionsOverrides {
@@ -18,22 +20,19 @@ struct OpenAiNativeOptionsOverrides {
 }
 
 impl OpenAiNativeOptionsOverrides {
-    fn from_native_options(
+    fn from_options(
         provider: ProviderKind,
-        native_options: Option<&NativeOptions>,
+        family_options: Option<&OpenAiCompatibleOptions>,
+        provider_options: Option<&ProviderOptions>,
     ) -> Result<Self, AdapterError> {
-        let Some(native_options) = native_options else {
-            return Ok(Self::default());
-        };
-
         let mut overrides = Self::default();
 
-        if let Some(FamilyOptions::OpenAiCompatible(options)) = native_options.family.as_ref() {
+        if let Some(options) = family_options {
             overrides.parallel_tool_calls = options.parallel_tool_calls;
             overrides.reasoning = options.reasoning.clone();
         }
 
-        if let Some(provider_options) = native_options.provider.as_ref() {
+        if let Some(provider_options) = provider_options {
             match (provider, provider_options) {
                 (
                     ProviderKind::OpenAi,
@@ -48,7 +47,7 @@ impl OpenAiNativeOptionsOverrides {
                 (ProviderKind::GenericOpenAiCompatible, _) => {
                     return Err(AdapterError::new(
                         AdapterErrorKind::Validation,
-                        ProviderId::GenericOpenAiCompatible,
+                        ProviderKind::GenericOpenAiCompatible,
                         AdapterOperation::PlanRequest,
                         "generic OpenAI-compatible adapter does not support provider-scoped native options"
                             .to_string(),
@@ -74,9 +73,9 @@ impl OpenAiNativeOptionsOverrides {
     fn apply(
         &self,
         provider: ProviderKind,
-        plan: &mut ProviderRequestPlan,
+        request: &mut EncodedFamilyRequest,
     ) -> Result<(), AdapterError> {
-        let Some(body) = plan.body.as_object_mut() else {
+        let Some(body) = request.body.as_object_mut() else {
             return Err(AdapterError::new(
                 AdapterErrorKind::ProtocolViolation,
                 provider,
@@ -108,41 +107,78 @@ impl OpenAiNativeOptionsOverrides {
     }
 }
 
-pub(crate) fn plan_request(
-    req: Request,
-    provider: ProviderKind,
-    native_options: Option<&NativeOptions>,
-) -> Result<ProviderRequestPlan, AdapterError> {
-    let is_stream = req.stream;
-    let overrides = OpenAiNativeOptionsOverrides::from_native_options(provider, native_options)?;
-    let encoded = encode_openai_request(req).map_err(map_openai_plan_error)?;
+pub(crate) fn encode_family_request(
+    task: &TaskRequest,
+    model: &str,
+    response_mode: ResponseMode,
+) -> Result<EncodedFamilyRequest, AdapterError> {
+    let mut request = Request::from(task.clone());
+    request.model_id = model.to_string();
+    request.stream = response_mode == ResponseMode::Streaming;
+
+    let encoded = encode_openai_request(request).map_err(map_openai_plan_error)?;
     let mut body = encoded.body;
-    if is_stream {
-        body["stream"] = serde_json::Value::Bool(true);
+    if response_mode == ResponseMode::Streaming {
+        body["stream"] = Value::Bool(true);
     }
 
-    let mut plan = ProviderRequestPlan {
+    Ok(EncodedFamilyRequest {
         body,
         warnings: encoded.warnings,
-        transport_kind: if is_stream {
-            ProviderTransportKind::HttpSse
+        method: Method::POST,
+        response_framing: if response_mode == ResponseMode::Streaming {
+            TransportResponseFraming::Sse
         } else {
-            ProviderTransportKind::HttpJson
-        },
-        response_kind: if is_stream {
-            ProviderResponseKind::RawProviderStream
-        } else {
-            ProviderResponseKind::JsonBody
+            TransportResponseFraming::Json
         },
         endpoint_path_override: None,
-        request_options: if is_stream {
+        provider_headers: HeaderMap::new(),
+        request_options: if response_mode == ResponseMode::Streaming {
             HttpRequestOptions::sse_defaults()
         } else {
             HttpRequestOptions::json_defaults().with_allow_error_status(true)
         },
-    };
-    overrides.apply(provider, &mut plan)?;
-    Ok(plan)
+    })
+}
+
+pub(crate) fn apply_provider_overlay(
+    provider: ProviderKind,
+    request: &mut EncodedFamilyRequest,
+    family_options: Option<&OpenAiCompatibleOptions>,
+    provider_options: Option<&ProviderOptions>,
+) -> Result<(), AdapterError> {
+    OpenAiNativeOptionsOverrides::from_options(provider, family_options, provider_options)?
+        .apply(provider, request)
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn plan_request(
+    req: Request,
+    provider: ProviderKind,
+    native_options: Option<&NativeOptions>,
+) -> Result<crate::request_plan::ProviderRequestPlan, AdapterError> {
+    let mut request = encode_family_request(
+        &req.task_request(),
+        &req.model_id,
+        if req.stream {
+            ResponseMode::Streaming
+        } else {
+            ResponseMode::NonStreaming
+        },
+    )
+    .map_err(|mut error| {
+        error.provider = provider;
+        error
+    })?;
+    let family_options = native_options
+        .and_then(|native| native.family.as_ref())
+        .and_then(|family| match family {
+            agent_core::FamilyOptions::OpenAiCompatible(options) => Some(options),
+            _ => None,
+        });
+    let provider_options = native_options.and_then(|native| native.provider.as_ref());
+    apply_provider_overlay(provider, &mut request, family_options, provider_options)?;
+    Ok(request.into())
 }
 
 fn map_openai_plan_error(error: OpenAiFamilyError) -> AdapterError {

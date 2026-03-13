@@ -1,5 +1,6 @@
 use serde_json::{Value, json};
 
+use crate::adapter::adapter_for;
 use crate::openai_family::OpenAiDecodeEnvelope;
 use crate::platform::test_fixtures::{
     choose_valid_success_fixture, list_decoded_error_fixture_models,
@@ -7,9 +8,8 @@ use crate::platform::test_fixtures::{
     load_decoded_error_fixture_body, load_decoded_success_fixture,
     validate_decoded_error_fixture_shape,
 };
+use agent_core::ProviderId;
 use agent_core::types::{ContentPart, FinishReason, Response, ResponseFormat};
-
-use super::response::decode_response_json;
 
 const PROVIDER: &str = "openai";
 const SUCCESS_SCENARIOS: [&str; 3] = ["basic_chat", "tool_call", "tool_call_reasoning"];
@@ -29,6 +29,13 @@ const QUARANTINED_ERROR_FIXTURES: [(&str, &str, &str); 1] = [(
 #[test]
 fn fixture_smoke_openai_basic_chat() {
     run_success_smoke_scenario("basic_chat", &SMOKE_MODELS_OPENAI);
+}
+
+fn decode_response_json(
+    body: Value,
+    requested_response_format: &ResponseFormat,
+) -> Result<Response, crate::error::AdapterError> {
+    adapter_for(ProviderId::OpenAi).decode_response_json(body, requested_response_format)
 }
 
 #[test]

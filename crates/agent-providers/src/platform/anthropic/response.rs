@@ -1,40 +1,39 @@
 use agent_core::{Response, ResponseFormat};
 use serde_json::Value;
 
-use crate::anthropic_family::{
-    AnthropicDecodeEnvelope, AnthropicFamilyError, AnthropicFamilyErrorKind,
-};
-use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
+use crate::anthropic_family::decode::parse_anthropic_error_value;
+use crate::error::{AdapterError, ProviderErrorInfo};
 
-pub(crate) fn decode_response_json(
-    body: Value,
-    requested_format: &ResponseFormat,
-) -> Result<Response, AdapterError> {
-    crate::anthropic_family::decode::decode_anthropic_response(&AnthropicDecodeEnvelope {
-        body,
-        requested_response_format: requested_format.clone(),
-    })
-    .map_err(map_anthropic_decode_error)
+pub(crate) fn decode_response_override(
+    _body: Value,
+    _requested_format: &ResponseFormat,
+) -> Option<Result<Response, AdapterError>> {
+    None
 }
 
-fn map_anthropic_decode_error(error: AnthropicFamilyError) -> AdapterError {
-    let message = error.message().to_string();
-    AdapterError::with_source(
-        map_spec_error_kind(error.kind()),
-        agent_core::ProviderId::Anthropic,
-        AdapterOperation::DecodeResponse,
-        message,
-        error,
-    )
-}
+pub(crate) fn refine_family_decode_error(body: &Value, mut error: AdapterError) -> AdapterError {
+    let Some(root) = body.as_object() else {
+        return error;
+    };
 
-fn map_spec_error_kind(kind: AnthropicFamilyErrorKind) -> AdapterErrorKind {
-    match kind {
-        AnthropicFamilyErrorKind::Validation => AdapterErrorKind::Validation,
-        AnthropicFamilyErrorKind::Encode => AdapterErrorKind::Encode,
-        AnthropicFamilyErrorKind::Decode => AdapterErrorKind::Decode,
-        AnthropicFamilyErrorKind::Upstream => AdapterErrorKind::Upstream,
-        AnthropicFamilyErrorKind::ProtocolViolation => AdapterErrorKind::ProtocolViolation,
-        AnthropicFamilyErrorKind::UnsupportedFeature => AdapterErrorKind::UnsupportedFeature,
+    if let Some(envelope) = parse_anthropic_error_value(root) {
+        if let Some(provider_code) = envelope.error_type.as_deref() {
+            error = error.with_provider_code(provider_code);
+        }
+        if let Some(request_id) = envelope.request_id.as_deref() {
+            error = error.with_request_id(request_id);
+        }
     }
+
+    error
+}
+
+pub(crate) fn decode_provider_error(body: &Value) -> Option<ProviderErrorInfo> {
+    let root = body.as_object()?;
+    let envelope = parse_anthropic_error_value(root)?;
+    Some(ProviderErrorInfo {
+        provider_code: envelope.error_type,
+        message: None,
+        kind: None,
+    })
 }

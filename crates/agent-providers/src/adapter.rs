@@ -1,15 +1,18 @@
 //! Built-in provider adapter implementations and adapter selection.
 
-use reqwest::Url;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde_json::Value;
 
 use agent_core::{
-    AuthStyle, NativeOptions, ProviderCapabilities, ProviderDescriptor, ProviderFamilyId,
-    ProviderKind, Request, Response, ResponseFormat,
+    AuthStyle, ExecutionPlan, ProviderCapabilities, ProviderDescriptor, ProviderFamilyId,
+    ProviderKind, Response, ResponseFormat,
 };
 
-use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
+use crate::anthropic_family::{
+    AnthropicDecodeEnvelope, AnthropicFamilyError, AnthropicFamilyErrorKind,
+};
+use crate::error::{AdapterError, ProviderErrorInfo};
+use crate::openai_family::{OpenAiDecodeEnvelope, OpenAiFamilyError, OpenAiFamilyErrorKind};
 use crate::platform::anthropic::{
     request as anthropic_request, response as anthropic_response, stream as anthropic_stream,
 };
@@ -22,51 +25,24 @@ use crate::platform::openrouter::{
 use crate::request_plan::ProviderRequestPlan;
 use crate::streaming::ProviderStreamProjector;
 
-/// Provider-specific translation contract used by the runtime layer.
-///
-/// A `ProviderAdapter` is responsible for:
-///
-/// - exposing adapter-owned static provider metadata,
-/// - translating provider-agnostic [`Request`] values into a
-///   [`ProviderRequestPlan`],
-/// - decoding provider JSON responses back into [`Response`], and
-/// - projecting raw streaming events into canonical stream events.
 pub trait ProviderAdapter: Sync + std::fmt::Debug {
-    /// Returns the concrete provider kind implemented by this adapter.
     fn kind(&self) -> ProviderKind;
-    /// Returns static metadata for this provider kind.
     fn descriptor(&self) -> &ProviderDescriptor;
-    /// REFACTOR-SHIM: legacy accessor preserved while runtime callers migrate.
-    fn default_base_url(&self) -> &'static str {
-        self.descriptor().default_base_url
+    fn capabilities(&self) -> &ProviderCapabilities {
+        &self.descriptor().capabilities
     }
-    /// REFACTOR-SHIM: legacy accessor preserved while runtime callers migrate.
-    fn endpoint_path(&self) -> &'static str {
-        self.descriptor().endpoint_path
-    }
-    /// REFACTOR-SHIM: legacy helper preserved for tests and migration paths.
-    fn platform_config(
-        &self,
-        base_url: String,
-    ) -> Result<agent_core::PlatformConfig, AdapterError> {
-        build_platform_config(self.kind(), self.descriptor(), base_url)
-    }
-    /// Translates a provider-agnostic request into a provider-specific request
-    /// plan for the transport layer.
-    fn plan_request(
-        &self,
-        req: Request,
-        native_options: Option<&NativeOptions>,
-    ) -> Result<ProviderRequestPlan, AdapterError>;
-    /// Decodes a provider JSON response into the canonical response type.
+    fn plan_request(&self, execution: &ExecutionPlan) -> Result<ProviderRequestPlan, AdapterError>;
     fn decode_response_json(
         &self,
         body: Value,
         requested_format: &ResponseFormat,
     ) -> Result<Response, AdapterError>;
-    /// Creates a streaming projector for this provider.
+    fn decode_error(&self, body: &Value) -> Option<ProviderErrorInfo>;
     fn create_stream_projector(&self) -> Box<dyn ProviderStreamProjector>;
 }
+
+#[cfg(test)]
+mod test;
 
 const OPENAI_BASE_URL: &str = "https://api.openai.com";
 const ANTHROPIC_BASE_URL: &str = "https://api.anthropic.com";
@@ -154,19 +130,12 @@ fn generic_openai_compatible_descriptor() -> ProviderDescriptor {
     }
 }
 
-/// Built-in adapter for OpenAI-compatible response endpoints.
 #[derive(Debug, Clone, Copy)]
 pub struct OpenAiAdapter;
-
-/// Built-in adapter for Anthropic message endpoints.
 #[derive(Debug, Clone, Copy)]
 pub struct AnthropicAdapter;
-
-/// Built-in adapter for OpenRouter's OpenAI-compatible response endpoints.
 #[derive(Debug, Clone, Copy)]
 pub struct OpenRouterAdapter;
-
-/// Built-in adapter for self-hosted OpenAI-compatible response endpoints.
 #[derive(Debug, Clone, Copy)]
 pub struct GenericOpenAiCompatibleAdapter;
 
@@ -176,9 +145,6 @@ static OPENROUTER_ADAPTER: OpenRouterAdapter = OpenRouterAdapter;
 static GENERIC_OPENAI_COMPATIBLE_ADAPTER: GenericOpenAiCompatibleAdapter =
     GenericOpenAiCompatibleAdapter;
 
-/// Returns the built-in adapter for a provider kind.
-///
-/// The returned adapter is a shared `'static` singleton.
 pub fn adapter_for(kind: ProviderKind) -> &'static dyn ProviderAdapter {
     match kind {
         ProviderKind::OpenAi => &OPENAI_ADAPTER,
@@ -200,35 +166,425 @@ pub(crate) fn all_builtin_adapters() -> &'static [&'static dyn ProviderAdapter] 
     &ADAPTERS
 }
 
+fn openai_compatible_plan(
+    execution: &ExecutionPlan,
+    provider: ProviderKind,
+) -> Result<ProviderRequestPlan, AdapterError> {
+    let family_options = execution
+        .provider_attempt
+        .native_options
+        .as_ref()
+        .and_then(|native| native.family.as_ref())
+        .and_then(|family| match family {
+            agent_core::FamilyOptions::OpenAiCompatible(options) => Some(options),
+            _ => None,
+        });
+    let provider_options = execution
+        .provider_attempt
+        .native_options
+        .as_ref()
+        .and_then(|native| native.provider.as_ref());
+    let mut encoded = openai_request::encode_family_request(
+        &execution.task,
+        &execution.provider_attempt.model,
+        execution.response_mode,
+    )
+    .map_err(|error| rebind_adapter_error_provider(error, provider))?;
+    openai_request::apply_provider_overlay(
+        provider,
+        &mut encoded,
+        family_options,
+        provider_options,
+    )?;
+
+    Ok(encoded.into())
+}
+
+fn anthropic_plan(execution: &ExecutionPlan) -> Result<ProviderRequestPlan, AdapterError> {
+    let family_options = execution
+        .provider_attempt
+        .native_options
+        .as_ref()
+        .and_then(|native| native.family.as_ref())
+        .and_then(|family| match family {
+            agent_core::FamilyOptions::Anthropic(options) => Some(options),
+            _ => None,
+        });
+    let provider_options = execution
+        .provider_attempt
+        .native_options
+        .as_ref()
+        .and_then(|native| native.provider.as_ref());
+    let mut encoded = anthropic_request::encode_family_request(
+        &execution.task,
+        &execution.provider_attempt.model,
+        execution.response_mode,
+    )?;
+    anthropic_request::apply_provider_overlay(&mut encoded, family_options, provider_options)?;
+
+    Ok(encoded.into())
+}
+
+fn openrouter_plan(execution: &ExecutionPlan) -> Result<ProviderRequestPlan, AdapterError> {
+    let family_options = execution
+        .provider_attempt
+        .native_options
+        .as_ref()
+        .and_then(|native| native.family.as_ref())
+        .and_then(|family| match family {
+            agent_core::FamilyOptions::OpenAiCompatible(options) => Some(options),
+            _ => None,
+        });
+    let provider_options = execution
+        .provider_attempt
+        .native_options
+        .as_ref()
+        .and_then(|native| native.provider.as_ref());
+    let mut encoded = openai_request::encode_family_request(
+        &execution.task,
+        &execution.provider_attempt.model,
+        execution.response_mode,
+    )
+    .map_err(|error| rebind_adapter_error_provider(error, ProviderKind::OpenRouter))?;
+    openrouter_request::apply_provider_overlay(
+        &mut encoded,
+        &execution.provider_attempt.model,
+        execution.task.top_p,
+        &execution.task.stop,
+        family_options,
+        provider_options,
+    )?;
+
+    Ok(encoded.into())
+}
+
+fn plan_request_with_layering(
+    provider: ProviderKind,
+    family: ProviderFamilyId,
+    execution: &ExecutionPlan,
+) -> Result<ProviderRequestPlan, AdapterError> {
+    match (family, provider) {
+        (ProviderFamilyId::OpenAiCompatible, ProviderKind::OpenAi)
+        | (ProviderFamilyId::OpenAiCompatible, ProviderKind::GenericOpenAiCompatible) => {
+            openai_compatible_plan(execution, provider)
+        }
+        (ProviderFamilyId::OpenAiCompatible, ProviderKind::OpenRouter) => {
+            openrouter_plan(execution)
+        }
+        (ProviderFamilyId::Anthropic, ProviderKind::Anthropic) => anthropic_plan(execution),
+        (family, provider) => Err(AdapterError::new(
+            crate::error::AdapterErrorKind::ProtocolViolation,
+            provider,
+            crate::error::AdapterOperation::PlanRequest,
+            format!(
+                "adapter {:?} does not support planning with provider family {:?}",
+                provider, family
+            ),
+        )),
+    }
+}
+
+fn decode_response_with_layering(
+    provider: ProviderKind,
+    family: ProviderFamilyId,
+    body: Value,
+    requested_format: &ResponseFormat,
+) -> Result<Response, AdapterError> {
+    if let Some(result) = decode_response_override(provider, body.clone(), requested_format) {
+        return result;
+    }
+
+    match family {
+        ProviderFamilyId::OpenAiCompatible => {
+            crate::openai_family::decode::decode_openai_response(&OpenAiDecodeEnvelope {
+                body: body.clone(),
+                requested_response_format: requested_format.clone(),
+            })
+            .map_err(|error| refine_openai_family_decode_error(provider, family, &body, error))
+        }
+        ProviderFamilyId::Anthropic => {
+            crate::anthropic_family::decode::decode_anthropic_response(&AnthropicDecodeEnvelope {
+                body: body.clone(),
+                requested_response_format: requested_format.clone(),
+            })
+            .map_err(|error| refine_anthropic_family_decode_error(provider, family, &body, error))
+        }
+    }
+}
+
+fn decode_response_override(
+    provider: ProviderKind,
+    body: Value,
+    requested_format: &ResponseFormat,
+) -> Option<Result<Response, AdapterError>> {
+    match provider {
+        ProviderKind::OpenAi | ProviderKind::GenericOpenAiCompatible => {
+            openai_response::decode_response_override(provider, body, requested_format)
+        }
+        ProviderKind::Anthropic => {
+            anthropic_response::decode_response_override(body, requested_format)
+        }
+        ProviderKind::OpenRouter => {
+            openrouter_response::decode_response_override(body, requested_format)
+        }
+    }
+}
+
+fn refine_openai_family_decode_error(
+    provider: ProviderKind,
+    family: ProviderFamilyId,
+    body: &Value,
+    error: OpenAiFamilyError,
+) -> AdapterError {
+    let message = error.message().to_string();
+    apply_layered_error_info(
+        provider,
+        family,
+        body,
+        AdapterError::with_source(
+            map_openai_family_error_kind(error.kind()),
+            provider,
+            crate::error::AdapterOperation::DecodeResponse,
+            message,
+            error,
+        ),
+    )
+}
+
+fn refine_anthropic_family_decode_error(
+    provider: ProviderKind,
+    family: ProviderFamilyId,
+    body: &Value,
+    error: AnthropicFamilyError,
+) -> AdapterError {
+    let message = error.message().to_string();
+    apply_layered_error_info(
+        provider,
+        family,
+        body,
+        AdapterError::with_source(
+            map_anthropic_family_error_kind(error.kind()),
+            provider,
+            crate::error::AdapterOperation::DecodeResponse,
+            message,
+            error,
+        ),
+    )
+}
+
+fn decode_error_with_layering(
+    provider: ProviderKind,
+    family: ProviderFamilyId,
+    body: &Value,
+) -> Option<ProviderErrorInfo> {
+    let family_info = match family {
+        ProviderFamilyId::OpenAiCompatible => {
+            crate::openai_family::decode::decode_openai_error(body)
+        }
+        ProviderFamilyId::Anthropic => {
+            crate::anthropic_family::decode::decode_anthropic_error(body)
+        }
+    };
+    let overlay_info = decode_provider_error_override(provider, body);
+
+    match (family_info, overlay_info) {
+        (Some(family_info), Some(overlay_info)) => Some(family_info.refined_with(overlay_info)),
+        (Some(family_info), None) => Some(family_info),
+        (None, Some(overlay_info)) => Some(overlay_info),
+        (None, None) => None,
+    }
+}
+
+fn decode_provider_error_override(
+    provider: ProviderKind,
+    body: &Value,
+) -> Option<ProviderErrorInfo> {
+    match provider {
+        ProviderKind::OpenAi | ProviderKind::GenericOpenAiCompatible => {
+            openai_response::decode_provider_error(body)
+        }
+        ProviderKind::Anthropic => anthropic_response::decode_provider_error(body),
+        ProviderKind::OpenRouter => openrouter_response::decode_provider_error(body),
+    }
+}
+
+fn apply_layered_error_info(
+    provider: ProviderKind,
+    family: ProviderFamilyId,
+    body: &Value,
+    mut error: AdapterError,
+) -> AdapterError {
+    if let Some(info) = decode_error_with_layering(provider, family, body) {
+        if let Some(kind) = info.kind {
+            error.kind = kind;
+        }
+        if let Some(message) = info.message {
+            error.message = message;
+        }
+        if let Some(provider_code) = info.provider_code {
+            error.provider_code = Some(provider_code);
+        }
+    }
+
+    match provider {
+        ProviderKind::OpenAi | ProviderKind::GenericOpenAiCompatible => {
+            openai_response::refine_family_decode_error(body, error)
+        }
+        ProviderKind::Anthropic => anthropic_response::refine_family_decode_error(body, error),
+        ProviderKind::OpenRouter => openrouter_response::refine_family_decode_error(body, error),
+    }
+}
+
+fn map_openai_family_error_kind(kind: OpenAiFamilyErrorKind) -> crate::error::AdapterErrorKind {
+    match kind {
+        OpenAiFamilyErrorKind::Validation => crate::error::AdapterErrorKind::Validation,
+        OpenAiFamilyErrorKind::Encode => crate::error::AdapterErrorKind::Encode,
+        OpenAiFamilyErrorKind::Decode => crate::error::AdapterErrorKind::Decode,
+        OpenAiFamilyErrorKind::Upstream => crate::error::AdapterErrorKind::Upstream,
+        OpenAiFamilyErrorKind::ProtocolViolation => {
+            crate::error::AdapterErrorKind::ProtocolViolation
+        }
+        OpenAiFamilyErrorKind::UnsupportedFeature => {
+            crate::error::AdapterErrorKind::UnsupportedFeature
+        }
+    }
+}
+
+fn map_anthropic_family_error_kind(
+    kind: AnthropicFamilyErrorKind,
+) -> crate::error::AdapterErrorKind {
+    match kind {
+        AnthropicFamilyErrorKind::Validation => crate::error::AdapterErrorKind::Validation,
+        AnthropicFamilyErrorKind::Encode => crate::error::AdapterErrorKind::Encode,
+        AnthropicFamilyErrorKind::Decode => crate::error::AdapterErrorKind::Decode,
+        AnthropicFamilyErrorKind::Upstream => crate::error::AdapterErrorKind::Upstream,
+        AnthropicFamilyErrorKind::ProtocolViolation => {
+            crate::error::AdapterErrorKind::ProtocolViolation
+        }
+        AnthropicFamilyErrorKind::UnsupportedFeature => {
+            crate::error::AdapterErrorKind::UnsupportedFeature
+        }
+    }
+}
+
+fn rebind_adapter_error_provider(mut error: AdapterError, provider: ProviderKind) -> AdapterError {
+    error.provider = provider;
+    error
+}
+
+fn create_stream_projector_with_layering(
+    provider: ProviderKind,
+    family: ProviderFamilyId,
+) -> Box<dyn ProviderStreamProjector> {
+    if let Some(projector) = create_stream_projector_override(provider) {
+        return projector;
+    }
+
+    match family {
+        ProviderFamilyId::OpenAiCompatible => {
+            Box::<openai_stream::OpenAiStreamProjector>::default()
+        }
+        ProviderFamilyId::Anthropic => Box::<anthropic_stream::AnthropicStreamProjector>::default(),
+    }
+}
+
+fn create_stream_projector_override(
+    provider: ProviderKind,
+) -> Option<Box<dyn ProviderStreamProjector>> {
+    match provider {
+        ProviderKind::OpenRouter => {
+            Some(Box::<openrouter_stream::OpenRouterStreamProjector>::default())
+        }
+        ProviderKind::OpenAi | ProviderKind::Anthropic | ProviderKind::GenericOpenAiCompatible => {
+            None
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+fn decode_response_with_composition_test_hook<Overlay, Family, Refine>(
+    body: Value,
+    requested_format: &ResponseFormat,
+    overlay_decode: Overlay,
+    family_decode: Family,
+    refine_family_error: Refine,
+) -> Result<Response, AdapterError>
+where
+    Overlay: FnOnce(Value, &ResponseFormat) -> Option<Result<Response, AdapterError>>,
+    Family: FnOnce(Value, &ResponseFormat) -> Result<Response, AdapterError>,
+    Refine: FnOnce(AdapterError) -> AdapterError,
+{
+    if let Some(result) = overlay_decode(body.clone(), requested_format) {
+        return result;
+    }
+
+    family_decode(body, requested_format).map_err(refine_family_error)
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+fn decode_error_with_composition_test_hook<Family, Overlay>(
+    family_decode: Family,
+    overlay_decode: Overlay,
+) -> Option<ProviderErrorInfo>
+where
+    Family: FnOnce() -> Option<ProviderErrorInfo>,
+    Overlay: FnOnce() -> Option<ProviderErrorInfo>,
+{
+    let family_info = family_decode();
+    let overlay_info = overlay_decode();
+
+    match (family_info, overlay_info) {
+        (Some(family_info), Some(overlay_info)) => Some(family_info.refined_with(overlay_info)),
+        (Some(family_info), None) => Some(family_info),
+        (None, Some(overlay_info)) => Some(overlay_info),
+        (None, None) => None,
+    }
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+fn create_stream_projector_with_composition_test_hook<Overlay, Family>(
+    overlay_projector: Overlay,
+    family_projector: Family,
+) -> Box<dyn ProviderStreamProjector>
+where
+    Overlay: FnOnce() -> Option<Box<dyn ProviderStreamProjector>>,
+    Family: FnOnce() -> Box<dyn ProviderStreamProjector>,
+{
+    overlay_projector().unwrap_or_else(family_projector)
+}
+
 impl ProviderAdapter for OpenAiAdapter {
     fn kind(&self) -> ProviderKind {
         ProviderKind::OpenAi
     }
-
     fn descriptor(&self) -> &ProviderDescriptor {
         static DESCRIPTOR: std::sync::LazyLock<ProviderDescriptor> =
             std::sync::LazyLock::new(openai_descriptor);
         &DESCRIPTOR
     }
-
-    fn plan_request(
-        &self,
-        req: Request,
-        native_options: Option<&NativeOptions>,
-    ) -> Result<ProviderRequestPlan, AdapterError> {
-        openai_request::plan_request(req, self.kind(), native_options)
+    fn plan_request(&self, execution: &ExecutionPlan) -> Result<ProviderRequestPlan, AdapterError> {
+        plan_request_with_layering(self.kind(), self.descriptor().family, execution)
     }
-
     fn decode_response_json(
         &self,
         body: Value,
         requested_format: &ResponseFormat,
     ) -> Result<Response, AdapterError> {
-        openai_response::decode_response_json(body, requested_format)
+        decode_response_with_layering(
+            self.kind(),
+            self.descriptor().family,
+            body,
+            requested_format,
+        )
     }
-
+    fn decode_error(&self, body: &Value) -> Option<ProviderErrorInfo> {
+        decode_error_with_layering(self.kind(), self.descriptor().family, body)
+    }
     fn create_stream_projector(&self) -> Box<dyn ProviderStreamProjector> {
-        Box::<openai_stream::OpenAiStreamProjector>::default()
+        create_stream_projector_with_layering(self.kind(), self.descriptor().family)
     }
 }
 
@@ -236,31 +592,31 @@ impl ProviderAdapter for AnthropicAdapter {
     fn kind(&self) -> ProviderKind {
         ProviderKind::Anthropic
     }
-
     fn descriptor(&self) -> &ProviderDescriptor {
         static DESCRIPTOR: std::sync::LazyLock<ProviderDescriptor> =
             std::sync::LazyLock::new(anthropic_descriptor);
         &DESCRIPTOR
     }
-
-    fn plan_request(
-        &self,
-        req: Request,
-        native_options: Option<&NativeOptions>,
-    ) -> Result<ProviderRequestPlan, AdapterError> {
-        anthropic_request::plan_request(req, native_options)
+    fn plan_request(&self, execution: &ExecutionPlan) -> Result<ProviderRequestPlan, AdapterError> {
+        plan_request_with_layering(self.kind(), self.descriptor().family, execution)
     }
-
     fn decode_response_json(
         &self,
         body: Value,
         requested_format: &ResponseFormat,
     ) -> Result<Response, AdapterError> {
-        anthropic_response::decode_response_json(body, requested_format)
+        decode_response_with_layering(
+            self.kind(),
+            self.descriptor().family,
+            body,
+            requested_format,
+        )
     }
-
+    fn decode_error(&self, body: &Value) -> Option<ProviderErrorInfo> {
+        decode_error_with_layering(self.kind(), self.descriptor().family, body)
+    }
     fn create_stream_projector(&self) -> Box<dyn ProviderStreamProjector> {
-        Box::<anthropic_stream::AnthropicStreamProjector>::default()
+        create_stream_projector_with_layering(self.kind(), self.descriptor().family)
     }
 }
 
@@ -268,33 +624,31 @@ impl ProviderAdapter for OpenRouterAdapter {
     fn kind(&self) -> ProviderKind {
         ProviderKind::OpenRouter
     }
-
     fn descriptor(&self) -> &ProviderDescriptor {
         static DESCRIPTOR: std::sync::LazyLock<ProviderDescriptor> =
             std::sync::LazyLock::new(openrouter_descriptor);
         &DESCRIPTOR
     }
-
-    fn plan_request(
-        &self,
-        req: Request,
-        native_options: Option<&NativeOptions>,
-    ) -> Result<ProviderRequestPlan, AdapterError> {
-        let overrides =
-            openrouter_request::OpenRouterOverrides::from_native_options(native_options)?;
-        openrouter_request::plan_request(req, &overrides)
+    fn plan_request(&self, execution: &ExecutionPlan) -> Result<ProviderRequestPlan, AdapterError> {
+        plan_request_with_layering(self.kind(), self.descriptor().family, execution)
     }
-
     fn decode_response_json(
         &self,
         body: Value,
         requested_format: &ResponseFormat,
     ) -> Result<Response, AdapterError> {
-        openrouter_response::decode_response_json(body, requested_format)
+        decode_response_with_layering(
+            self.kind(),
+            self.descriptor().family,
+            body,
+            requested_format,
+        )
     }
-
+    fn decode_error(&self, body: &Value) -> Option<ProviderErrorInfo> {
+        decode_error_with_layering(self.kind(), self.descriptor().family, body)
+    }
     fn create_stream_projector(&self) -> Box<dyn ProviderStreamProjector> {
-        Box::<openrouter_stream::OpenRouterStreamProjector>::default()
+        create_stream_projector_with_layering(self.kind(), self.descriptor().family)
     }
 }
 
@@ -302,76 +656,30 @@ impl ProviderAdapter for GenericOpenAiCompatibleAdapter {
     fn kind(&self) -> ProviderKind {
         ProviderKind::GenericOpenAiCompatible
     }
-
     fn descriptor(&self) -> &ProviderDescriptor {
         static DESCRIPTOR: std::sync::LazyLock<ProviderDescriptor> =
             std::sync::LazyLock::new(generic_openai_compatible_descriptor);
         &DESCRIPTOR
     }
-
-    fn plan_request(
-        &self,
-        req: Request,
-        native_options: Option<&NativeOptions>,
-    ) -> Result<ProviderRequestPlan, AdapterError> {
-        openai_request::plan_request(req, self.kind(), native_options)
+    fn plan_request(&self, execution: &ExecutionPlan) -> Result<ProviderRequestPlan, AdapterError> {
+        plan_request_with_layering(self.kind(), self.descriptor().family, execution)
     }
-
     fn decode_response_json(
         &self,
         body: Value,
         requested_format: &ResponseFormat,
     ) -> Result<Response, AdapterError> {
-        openai_response::decode_response_json(body, requested_format)
-    }
-
-    fn create_stream_projector(&self) -> Box<dyn ProviderStreamProjector> {
-        Box::<openai_stream::OpenAiStreamProjector>::default()
-    }
-}
-
-fn build_platform_config(
-    provider: ProviderKind,
-    descriptor: &ProviderDescriptor,
-    base_url: String,
-) -> Result<agent_core::PlatformConfig, AdapterError> {
-    let trimmed_base_url = base_url.trim().to_string();
-    if trimmed_base_url.is_empty() {
-        return Err(AdapterError::new(
-            AdapterErrorKind::Validation,
-            provider,
-            AdapterOperation::BuildHttpRequest,
-            format!("base_url is empty for provider {provider:?}"),
-        ));
-    }
-    let parsed_base_url = Url::parse(trimmed_base_url.as_str()).map_err(|error| {
-        AdapterError::new(
-            AdapterErrorKind::Validation,
-            provider,
-            AdapterOperation::BuildHttpRequest,
-            format!("base_url is not a valid URL for provider {provider:?}: {error}"),
+        decode_response_with_layering(
+            self.kind(),
+            self.descriptor().family,
+            body,
+            requested_format,
         )
-    })?;
-    if !matches!(parsed_base_url.scheme(), "http" | "https") {
-        return Err(AdapterError::new(
-            AdapterErrorKind::Validation,
-            provider,
-            AdapterOperation::BuildHttpRequest,
-            format!(
-                "base_url must use http or https for provider {provider:?}, got scheme {}",
-                parsed_base_url.scheme()
-            ),
-        ));
     }
-
-    Ok(agent_core::PlatformConfig {
-        protocol: descriptor.protocol.clone(),
-        base_url: parsed_base_url
-            .to_string()
-            .trim_end_matches('/')
-            .to_string(),
-        auth_style: descriptor.default_auth_style.clone(),
-        request_id_header: descriptor.default_request_id_header.clone(),
-        default_headers: descriptor.default_headers.clone(),
-    })
+    fn decode_error(&self, body: &Value) -> Option<ProviderErrorInfo> {
+        decode_error_with_layering(self.kind(), self.descriptor().family, body)
+    }
+    fn create_stream_projector(&self) -> Box<dyn ProviderStreamProjector> {
+        create_stream_projector_with_layering(self.kind(), self.descriptor().family)
+    }
 }

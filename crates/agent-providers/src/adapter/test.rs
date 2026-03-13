@@ -1,20 +1,29 @@
+use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::rc::Rc;
 
+use reqwest::Method;
 use reqwest::header::{HeaderName, HeaderValue};
 use serde_json::json;
 
 use agent_core::types::{
-    AnthropicFamilyOptions, AnthropicOptions, AuthStyle, ContentPart, FamilyOptions, Message,
-    MessageRole, NativeOptions, OpenAiCompatibleOptions, OpenAiOptions, ProtocolKind, ProviderId,
-    ProviderOptions, Request, ResponseFormat, ToolChoice,
+    AssistantOutput, AuthCredentials, AuthStyle, ContentPart, ExecutionPlan, FinishReason, Message,
+    MessageRole, NativeOptions, PlatformConfig, ProtocolKind, ProviderCapabilities, ProviderId,
+    ProviderInstanceId, ProviderKind, Request, ResolvedAuthContext, ResolvedProviderAttempt,
+    ResolvedTransportOptions, Response, ResponseFormat, ResponseMode, ToolChoice,
+    TransportTimeoutOverrides, Usage,
 };
 
 use crate::anthropic_family::AnthropicDecodeEnvelope;
+use crate::anthropic_family::decode::decode_anthropic_response;
+use crate::error::{AdapterErrorKind, ProviderErrorInfo};
 use crate::openai_family::OpenAiDecodeEnvelope;
-use crate::platform::anthropic::{request as anthropic_request, response as anthropic_response};
-use crate::platform::openai::{request as openai_request, response as openai_response};
-use crate::platform::openrouter::{request as openrouter_request, response as openrouter_response};
-use crate::request_plan::{ProviderResponseKind, ProviderTransportKind};
+use crate::openai_family::decode::decode_openai_response;
+use crate::platform::anthropic::request as anthropic_request;
+use crate::platform::openai::request as openai_request;
+use crate::platform::openrouter::request as openrouter_request;
+use crate::request_plan::TransportResponseFraming;
+use crate::streaming::ProviderStreamProjector;
 
 use super::*;
 
@@ -39,31 +48,64 @@ fn base_request() -> Request {
     }
 }
 
-fn assert_adapter_error(
-    error: AdapterError,
-    provider: ProviderId,
-    operation: AdapterOperation,
-    kind: AdapterErrorKind,
-) {
-    assert_eq!(error.provider, provider);
-    assert_eq!(error.operation, operation);
-    assert_eq!(error.kind, kind);
-    assert!(error.source_ref().is_some());
+fn execution_plan(
+    provider: ProviderKind,
+    request: &Request,
+    native_options: Option<NativeOptions>,
+) -> ExecutionPlan {
+    let adapter = adapter_for(provider);
+    ExecutionPlan {
+        response_mode: if request.stream {
+            ResponseMode::Streaming
+        } else {
+            ResponseMode::NonStreaming
+        },
+        task: request.task_request(),
+        provider_attempt: ResolvedProviderAttempt {
+            instance_id: ProviderInstanceId::from(provider),
+            provider_kind: provider,
+            family: adapter.descriptor().family,
+            model: request.model_id.clone(),
+            capabilities: *adapter.capabilities(),
+            native_options,
+        },
+        platform: PlatformConfig {
+            protocol: adapter.descriptor().protocol.clone(),
+            base_url: adapter.descriptor().default_base_url.to_string(),
+            auth_style: adapter.descriptor().default_auth_style.clone(),
+            request_id_header: adapter.descriptor().default_request_id_header.clone(),
+            default_headers: adapter.descriptor().default_headers.clone(),
+        },
+        auth: ResolvedAuthContext {
+            credentials: Some(AuthCredentials::Token("test-key".to_string())),
+        },
+        transport: ResolvedTransportOptions {
+            request_id_header_override: None,
+            route_extra_headers: BTreeMap::new(),
+            attempt_extra_headers: BTreeMap::new(),
+            timeout_overrides: TransportTimeoutOverrides::default(),
+        },
+        capabilities: ProviderCapabilities {
+            supports_streaming: true,
+            supports_family_native_options: true,
+            supports_provider_native_options: true,
+        },
+    }
 }
 
 #[test]
-fn adapter_lookup_returns_expected_ids() {
-    assert_eq!(adapter_for(ProviderId::OpenAi).id(), ProviderId::OpenAi);
+fn adapter_lookup_returns_expected_kinds() {
+    assert_eq!(adapter_for(ProviderId::OpenAi).kind(), ProviderId::OpenAi);
     assert_eq!(
-        adapter_for(ProviderId::Anthropic).id(),
+        adapter_for(ProviderId::Anthropic).kind(),
         ProviderId::Anthropic
     );
     assert_eq!(
-        adapter_for(ProviderId::OpenRouter).id(),
+        adapter_for(ProviderId::OpenRouter).kind(),
         ProviderId::OpenRouter
     );
     assert_eq!(
-        adapter_for(ProviderId::GenericOpenAiCompatible).id(),
+        adapter_for(ProviderId::GenericOpenAiCompatible).kind(),
         ProviderId::GenericOpenAiCompatible
     );
 }
@@ -72,7 +114,7 @@ fn adapter_lookup_returns_expected_ids() {
 fn all_builtin_adapters_contains_all_known_providers() {
     let ids: Vec<ProviderId> = all_builtin_adapters()
         .iter()
-        .map(|adapter| adapter.id())
+        .map(|adapter| adapter.kind())
         .collect();
     assert_eq!(ids.len(), 4);
     assert!(ids.contains(&ProviderId::OpenAi));
@@ -82,399 +124,469 @@ fn all_builtin_adapters_contains_all_known_providers() {
 }
 
 #[test]
-fn openai_platform_config_is_correct() {
-    let config = adapter_for(ProviderId::OpenAi)
-        .platform_config("https://api.openai.com".to_string())
-        .expect("platform config should succeed");
-    assert_eq!(config.protocol, ProtocolKind::OpenAI);
-    assert_eq!(config.auth_style, AuthStyle::Bearer);
-    assert_eq!(
-        config.request_id_header,
-        HeaderName::from_static("x-request-id")
-    );
-    assert!(config.default_headers.is_empty());
-}
+fn descriptors_expose_expected_static_metadata() {
+    let openai = adapter_for(ProviderId::OpenAi).descriptor();
+    assert_eq!(openai.protocol, ProtocolKind::OpenAI);
+    assert_eq!(openai.default_auth_style, AuthStyle::Bearer);
+    assert_eq!(openai.default_base_url, "https://api.openai.com");
+    assert_eq!(openai.endpoint_path, "/v1/responses");
 
-#[test]
-fn anthropic_platform_config_is_correct() {
-    let config = adapter_for(ProviderId::Anthropic)
-        .platform_config("https://api.anthropic.com".to_string())
-        .expect("platform config should succeed");
-    assert_eq!(config.protocol, ProtocolKind::Anthropic);
+    let anthropic = adapter_for(ProviderId::Anthropic).descriptor();
+    assert_eq!(anthropic.protocol, ProtocolKind::Anthropic);
     assert_eq!(
-        config.auth_style,
+        anthropic.default_auth_style,
         AuthStyle::ApiKeyHeader(HeaderName::from_static("x-api-key"))
     );
     assert_eq!(
-        config.request_id_header,
-        HeaderName::from_static("request-id")
-    );
-    assert_eq!(
-        config
+        anthropic
             .default_headers
-            .get(HeaderName::from_static("anthropic-version"))
-            .expect("anthropic-version header must exist"),
-        &HeaderValue::from_static("2023-06-01")
+            .get(HeaderName::from_static("anthropic-version")),
+        Some(&HeaderValue::from_static("2023-06-01"))
     );
 }
 
 #[test]
-fn openrouter_platform_config_is_correct() {
-    let config = adapter_for(ProviderId::OpenRouter)
-        .platform_config("https://openrouter.ai/api".to_string())
-        .expect("platform config should succeed");
-    assert_eq!(config.protocol, ProtocolKind::OpenAI);
-    assert_eq!(config.auth_style, AuthStyle::Bearer);
-    assert_eq!(
-        config.request_id_header,
-        HeaderName::from_static("x-request-id")
-    );
-}
-
-#[test]
-fn generic_openai_compatible_platform_config_is_correct() {
-    let config = adapter_for(ProviderId::GenericOpenAiCompatible)
-        .platform_config("https://example.test/v1".to_string())
-        .expect("platform config should succeed");
-    assert_eq!(config.protocol, ProtocolKind::OpenAI);
-    assert_eq!(config.auth_style, AuthStyle::Bearer);
-    assert_eq!(
-        config.request_id_header,
-        HeaderName::from_static("x-request-id")
-    );
-}
-
-#[test]
-fn platform_config_rejects_empty_base_url() {
-    let error = adapter_for(ProviderId::OpenAi)
-        .platform_config("  ".to_string())
-        .expect_err("empty base url must fail");
-    assert_eq!(error.provider, ProviderId::OpenAi);
-    assert_eq!(error.operation, AdapterOperation::BuildHttpRequest);
-    assert_eq!(error.kind, AdapterErrorKind::Validation);
-}
-
-#[test]
-fn platform_config_trims_base_url() {
-    let config = adapter_for(ProviderId::OpenAi)
-        .platform_config("  https://api.openai.com  ".to_string())
-        .expect("platform config should succeed");
-    assert_eq!(config.base_url, "https://api.openai.com");
-}
-
-#[test]
-fn platform_config_rejects_malformed_url() {
-    let error = adapter_for(ProviderId::OpenAi)
-        .platform_config("not a valid url".to_string())
-        .expect_err("malformed base url must fail");
-    assert_eq!(error.provider, ProviderId::OpenAi);
-    assert_eq!(error.operation, AdapterOperation::BuildHttpRequest);
-    assert_eq!(error.kind, AdapterErrorKind::Validation);
-}
-
-#[test]
-fn platform_config_rejects_non_http_scheme() {
-    let error = adapter_for(ProviderId::OpenAi)
-        .platform_config("ftp://api.openai.com".to_string())
-        .expect_err("non-http scheme must fail");
-    assert_eq!(error.provider, ProviderId::OpenAi);
-    assert_eq!(error.operation, AdapterOperation::BuildHttpRequest);
-    assert_eq!(error.kind, AdapterErrorKind::Validation);
-}
-
-#[test]
-fn default_base_url_and_endpoint_path_are_expected() {
-    let openai = adapter_for(ProviderId::OpenAi);
-    assert_eq!(openai.default_base_url(), "https://api.openai.com");
-    assert_eq!(openai.endpoint_path(), "/v1/responses");
-
-    let anthropic = adapter_for(ProviderId::Anthropic);
-    assert_eq!(anthropic.default_base_url(), "https://api.anthropic.com");
-    assert_eq!(anthropic.endpoint_path(), "/v1/messages");
-
-    let openrouter = adapter_for(ProviderId::OpenRouter);
-    assert_eq!(openrouter.default_base_url(), "https://openrouter.ai/api");
-    assert_eq!(openrouter.endpoint_path(), "/v1/responses");
-}
-
-#[test]
-fn openai_adapter_plan_request_and_decode_match_translator() {
+fn openai_adapter_plan_request_matches_family_overlay_translation() {
     let request = base_request();
-    let adapter = adapter_for(ProviderId::OpenAi);
+    let execution = execution_plan(ProviderId::OpenAi, &request, None);
 
-    let translated_encoded = openai_request::plan_request(request.clone(), ProviderId::OpenAi, None)
+    let translated = openai_request::plan_request(request.clone(), ProviderId::OpenAi, None)
         .expect("request planning should succeed");
-    let adapter_plan = adapter
-        .plan_request(request, None)
+    let adapter_plan = adapter_for(ProviderId::OpenAi)
+        .plan_request(&execution)
         .expect("adapter planning should succeed");
-    assert_eq!(adapter_plan.body, translated_encoded.body);
-    assert_eq!(adapter_plan.warnings, translated_encoded.warnings);
-    assert_eq!(adapter_plan.transport_kind, ProviderTransportKind::HttpJson);
-    assert_eq!(adapter_plan.response_kind, ProviderResponseKind::JsonBody);
 
-    let body = json!({
-        "status": "completed",
-        "model": "gpt-5-mini",
-        "output": [{
-            "type": "message",
-            "content": [{ "type": "output_text", "text": "hello" }]
-        }],
-        "usage": {
-            "input_tokens": 1,
-            "output_tokens": 2,
-            "total_tokens": 3
-        }
-    });
-    let requested_format = ResponseFormat::Text;
-    let translated_decoded = openai_response::decode_response_json(
-        OpenAiDecodeEnvelope {
-            body: body.clone(),
-            requested_response_format: requested_format.clone(),
-        }
-        .body,
-        &requested_format,
-    )
-    .expect("response decode should succeed");
-    let adapter_decoded = adapter
-        .decode_response_json(body, &requested_format)
-        .expect("adapter decode should succeed");
-    assert_eq!(adapter_decoded, translated_decoded);
+    assert_eq!(adapter_plan.body, translated.body);
+    assert_eq!(adapter_plan.warnings, translated.warnings);
+    assert_eq!(adapter_plan.method, Method::POST);
+    assert_eq!(
+        adapter_plan.response_framing,
+        TransportResponseFraming::Json
+    );
 }
 
 #[test]
-fn anthropic_adapter_plan_request_and_decode_match_translator() {
+fn anthropic_adapter_plan_request_matches_family_overlay_translation() {
     let mut request = base_request();
     request.model_id = "claude-sonnet-4-6".to_string();
-    let adapter = adapter_for(ProviderId::Anthropic);
+    let execution = execution_plan(ProviderId::Anthropic, &request, None);
 
-    let translated_encoded = anthropic_request::plan_request(request.clone(), None)
-        .expect("request planning should succeed");
-    let adapter_plan = adapter
-        .plan_request(request, None)
+    let translated =
+        anthropic_request::plan_request(request.clone(), None).expect("planning should succeed");
+    let adapter_plan = adapter_for(ProviderId::Anthropic)
+        .plan_request(&execution)
         .expect("adapter planning should succeed");
-    assert_eq!(adapter_plan.body, translated_encoded.body);
-    assert_eq!(adapter_plan.warnings, translated_encoded.warnings);
-    assert_eq!(adapter_plan.transport_kind, ProviderTransportKind::HttpJson);
-    assert_eq!(adapter_plan.response_kind, ProviderResponseKind::JsonBody);
 
-    let body = json!({
+    assert_eq!(adapter_plan.body, translated.body);
+    assert_eq!(adapter_plan.warnings, translated.warnings);
+    assert_eq!(adapter_plan.method, Method::POST);
+    assert_eq!(
+        adapter_plan.response_framing,
+        TransportResponseFraming::Json
+    );
+}
+
+#[test]
+fn openrouter_adapter_plan_request_matches_family_overlay_translation() {
+    let mut request = base_request();
+    request.top_p = Some(0.5);
+    request.stop = vec!["done".to_string()];
+    let execution = execution_plan(ProviderId::OpenRouter, &request, None);
+
+    let translated = openrouter_request::plan_request(
+        request.clone(),
+        &openrouter_request::OpenRouterOverrides::default(),
+    )
+    .expect("planning should succeed");
+    let adapter_plan = adapter_for(ProviderId::OpenRouter)
+        .plan_request(&execution)
+        .expect("adapter planning should succeed");
+
+    assert_eq!(adapter_plan.body, translated.body);
+    assert_eq!(adapter_plan.warnings, translated.warnings);
+    assert_eq!(adapter_plan.method, Method::POST);
+    assert_eq!(
+        adapter_plan.response_framing,
+        TransportResponseFraming::Json
+    );
+    assert!(adapter_plan.endpoint_path_override.is_none());
+    assert!(adapter_plan.provider_headers.is_empty());
+    assert!(adapter_plan.request_options.allow_error_status);
+}
+
+#[test]
+fn openai_streaming_plan_preserves_family_default_request_contract() {
+    let mut request = base_request();
+    request.stream = true;
+
+    let execution = execution_plan(ProviderId::OpenAi, &request, None);
+    let adapter_plan = adapter_for(ProviderId::OpenAi)
+        .plan_request(&execution)
+        .expect("adapter planning should succeed");
+
+    assert_eq!(adapter_plan.method, Method::POST);
+    assert_eq!(adapter_plan.response_framing, TransportResponseFraming::Sse);
+    assert!(adapter_plan.endpoint_path_override.is_none());
+    assert!(adapter_plan.provider_headers.is_empty());
+    let expected = agent_transport::HttpRequestOptions::sse_defaults();
+    assert_eq!(
+        adapter_plan.request_options.request_timeout,
+        expected.request_timeout
+    );
+    assert_eq!(
+        adapter_plan.request_options.stream_setup_timeout,
+        expected.stream_setup_timeout
+    );
+    assert_eq!(
+        adapter_plan.request_options.stream_idle_timeout,
+        expected.stream_idle_timeout
+    );
+    assert_eq!(
+        adapter_plan.request_options.allow_error_status,
+        expected.allow_error_status
+    );
+}
+
+#[test]
+fn anthropic_non_streaming_plan_preserves_family_default_request_contract() {
+    let mut request = base_request();
+    request.model_id = "claude-sonnet-4-6".to_string();
+
+    let execution = execution_plan(ProviderId::Anthropic, &request, None);
+    let adapter_plan = adapter_for(ProviderId::Anthropic)
+        .plan_request(&execution)
+        .expect("adapter planning should succeed");
+
+    assert_eq!(adapter_plan.method, Method::POST);
+    assert_eq!(
+        adapter_plan.response_framing,
+        TransportResponseFraming::Json
+    );
+    assert!(adapter_plan.endpoint_path_override.is_none());
+    assert!(adapter_plan.provider_headers.is_empty());
+    assert!(adapter_plan.request_options.allow_error_status);
+}
+
+#[test]
+fn adapters_decode_responses_with_existing_translators() {
+    let openai_body = json!({
+        "status": "completed",
+        "model": "gpt-5-mini",
+        "output": [{ "type": "message", "content": [{ "type": "output_text", "text": "hello" }] }],
+        "usage": { "input_tokens": 1, "output_tokens": 2, "total_tokens": 3 }
+    });
+    let format = ResponseFormat::Text;
+    assert_eq!(
+        adapter_for(ProviderId::OpenAi)
+            .decode_response_json(openai_body.clone(), &format)
+            .expect("decode should succeed"),
+        decode_openai_response(&OpenAiDecodeEnvelope {
+            body: openai_body,
+            requested_response_format: format.clone(),
+        })
+        .expect("decode should succeed")
+    );
+
+    let anthropic_body = json!({
+        "id": "msg_123",
+        "type": "message",
         "role": "assistant",
         "model": "claude-sonnet-4-6",
         "stop_reason": "end_turn",
-        "content": [{"type":"text","text":"hello"}],
-        "usage": {"input_tokens": 1, "output_tokens": 1}
+        "content": [{ "type": "text", "text": "hello" }],
+        "usage": { "input_tokens": 1, "output_tokens": 2 }
     });
-    let requested_format = ResponseFormat::Text;
-    let translated_decoded = anthropic_response::decode_response_json(
-        AnthropicDecodeEnvelope {
-            body: body.clone(),
-            requested_response_format: requested_format.clone(),
-        }
-        .body,
-        &requested_format,
-    )
-    .expect("response decode should succeed");
-    let adapter_decoded = adapter
-        .decode_response_json(body, &requested_format)
-        .expect("adapter decode should succeed");
-    assert_eq!(adapter_decoded, translated_decoded);
-}
+    assert_eq!(
+        adapter_for(ProviderId::Anthropic)
+            .decode_response_json(anthropic_body.clone(), &format)
+            .expect("decode should succeed"),
+        decode_anthropic_response(&AnthropicDecodeEnvelope {
+            body: anthropic_body,
+            requested_response_format: format.clone(),
+        })
+        .expect("decode should succeed")
+    );
 
-#[test]
-fn openrouter_adapter_matches_direct_responses_decode() {
-    let adapter = adapter_for(ProviderId::OpenRouter);
-    let payload = json!({
+    let openrouter_body = json!({
         "status": "completed",
-        "model": "openai/gpt-5-mini",
-        "output": [{
-            "type": "message",
-            "content": [{
-                "type": "output_text",
-                "text": "hello from openrouter format"
-            }]
-        }],
-        "usage": {
-            "input_tokens": 5,
-            "output_tokens": 6,
-            "total_tokens": 11
-        }
+        "model": "openrouter/model",
+        "output": [{ "type": "message", "content": [{ "type": "output_text", "text": "hello" }] }]
     });
-
-    let response = adapter
-        .decode_response_json(payload.clone(), &ResponseFormat::Text)
-        .expect("decode should succeed");
-    assert!(response.warnings.is_empty());
-
-    let direct_response = openrouter_response::decode_response_json(payload, &ResponseFormat::Text)
-        .expect("response decode should succeed");
-    assert_eq!(response, direct_response);
+    assert_eq!(
+        adapter_for(ProviderId::OpenRouter)
+            .decode_response_json(openrouter_body.clone(), &format)
+            .expect("decode should succeed"),
+        decode_openai_response(&OpenAiDecodeEnvelope {
+            body: openrouter_body,
+            requested_response_format: format.clone(),
+        })
+        .expect("decode should succeed")
+    );
 }
 
 #[test]
-fn openai_adapter_applies_family_and_provider_native_options() {
-    let adapter = adapter_for(ProviderId::OpenAi);
-    let native_options = NativeOptions {
-        family: Some(FamilyOptions::OpenAiCompatible(OpenAiCompatibleOptions {
-            parallel_tool_calls: Some(true),
-            reasoning: Some(json!({"effort":"medium"})),
-        })),
-        provider: Some(ProviderOptions::OpenAi(OpenAiOptions {
-            service_tier: Some("priority".to_string()),
-            store: Some(true),
-        })),
-    };
+fn decode_response_uses_overlay_override_before_family_fallback() {
+    let format = ResponseFormat::Text;
+    let call_order = Rc::new(RefCell::new(Vec::new()));
+    let overlay_order = Rc::clone(&call_order);
+    let family_order = Rc::clone(&call_order);
 
-    let plan = adapter
-        .plan_request(base_request(), Some(&native_options))
-        .expect("adapter planning should succeed");
-
-    assert_eq!(plan.body["parallel_tool_calls"], true);
-    assert_eq!(plan.body["reasoning"], json!({"effort":"medium"}));
-    assert_eq!(plan.body["service_tier"], "priority");
-    assert_eq!(plan.body["store"], true);
-}
-
-#[test]
-fn generic_openai_compatible_adapter_applies_family_native_options() {
-    let adapter = adapter_for(ProviderId::GenericOpenAiCompatible);
-    let native_options = NativeOptions {
-        family: Some(FamilyOptions::OpenAiCompatible(OpenAiCompatibleOptions {
-            parallel_tool_calls: Some(false),
-            reasoning: Some(json!({"effort":"low"})),
-        })),
-        provider: None,
-    };
-
-    let plan = adapter
-        .plan_request(base_request(), Some(&native_options))
-        .expect("adapter planning should succeed");
-
-    assert_eq!(plan.body["parallel_tool_calls"], false);
-    assert_eq!(plan.body["reasoning"], json!({"effort":"low"}));
-}
-
-#[test]
-fn anthropic_adapter_applies_family_and_provider_native_options() {
-    let adapter = adapter_for(ProviderId::Anthropic);
-    let mut request = base_request();
-    request.model_id = "claude-sonnet-4-6".to_string();
-    let native_options = NativeOptions {
-        family: Some(FamilyOptions::Anthropic(AnthropicFamilyOptions {
-            thinking: Some(json!({"type":"enabled","budget_tokens":128})),
-        })),
-        provider: Some(ProviderOptions::Anthropic(AnthropicOptions { top_k: Some(17) })),
-    };
-
-    let plan = adapter
-        .plan_request(request, Some(&native_options))
-        .expect("adapter planning should succeed");
+    let response = super::decode_response_with_composition_test_hook(
+        json!({ "ignored": true }),
+        &format,
+        move |_body, _requested_format| {
+            overlay_order.borrow_mut().push("overlay");
+            Some(Ok(Response {
+                output: AssistantOutput {
+                    content: vec![ContentPart::Text {
+                        text: "overlay".to_string(),
+                    }],
+                    structured_output: None,
+                },
+                usage: Usage::default(),
+                model: "overlay-model".to_string(),
+                raw_provider_response: None,
+                finish_reason: FinishReason::Stop,
+                warnings: Vec::new(),
+            }))
+        },
+        move |_body, _requested_format| {
+            family_order.borrow_mut().push("family");
+            Ok(Response {
+                output: AssistantOutput {
+                    content: vec![ContentPart::Text {
+                        text: "family".to_string(),
+                    }],
+                    structured_output: None,
+                },
+                usage: Usage::default(),
+                model: "family-model".to_string(),
+                raw_provider_response: None,
+                finish_reason: FinishReason::Stop,
+                warnings: Vec::new(),
+            })
+        },
+        |error| error,
+    )
+    .expect("decode should succeed");
 
     assert_eq!(
-        plan.body["thinking"],
-        json!({"type":"enabled","budget_tokens":128})
+        response.output.content,
+        vec![ContentPart::Text {
+            text: "overlay".to_string(),
+        }]
     );
-    assert_eq!(plan.body["top_k"], 17);
+    assert_eq!(&*call_order.borrow(), &["overlay"]);
 }
 
 #[test]
-fn openai_adapter_decode_error_maps_provider_operation_and_kind() {
-    let adapter = adapter_for(ProviderId::OpenAi);
-    let error = adapter
-        .decode_response_json(json!("invalid"), &ResponseFormat::Text)
-        .expect_err("decode should fail for non-object payload");
+fn decode_response_refines_family_error_after_family_decode_runs() {
+    let format = ResponseFormat::Text;
+    let call_order = Rc::new(RefCell::new(Vec::new()));
+    let family_order = Rc::clone(&call_order);
+    let refine_order = Rc::clone(&call_order);
 
-    assert_adapter_error(
-        error,
-        ProviderId::OpenAi,
-        AdapterOperation::DecodeResponse,
-        AdapterErrorKind::Decode,
+    let error = super::decode_response_with_composition_test_hook(
+        json!({ "error": true }),
+        &format,
+        |_body, _requested_format| None,
+        move |_body, _requested_format| {
+            family_order.borrow_mut().push("family");
+            Err(crate::error::AdapterError::new(
+                crate::error::AdapterErrorKind::Upstream,
+                ProviderId::OpenAi,
+                crate::error::AdapterOperation::DecodeResponse,
+                "family failure",
+            ))
+        },
+        move |mut error| {
+            refine_order.borrow_mut().push("overlay-refine");
+            error.message = format!("refined: {}", error.message);
+            error
+        },
+    )
+    .expect_err("decode should fail");
+
+    assert_eq!(error.message, "refined: family failure");
+    assert_eq!(&*call_order.borrow(), &["family", "overlay-refine"]);
+}
+
+#[test]
+fn decode_error_runs_family_before_overlay_refinement() {
+    let call_order = Rc::new(RefCell::new(Vec::new()));
+    let family_order = Rc::clone(&call_order);
+    let overlay_order = Rc::clone(&call_order);
+
+    let info = super::decode_error_with_composition_test_hook(
+        move || {
+            family_order.borrow_mut().push("family");
+            Some(ProviderErrorInfo {
+                provider_code: Some("family_code".to_string()),
+                message: Some("family message".to_string()),
+                kind: Some(AdapterErrorKind::Upstream),
+            })
+        },
+        move || {
+            overlay_order.borrow_mut().push("overlay");
+            Some(ProviderErrorInfo {
+                provider_code: Some("overlay_code".to_string()),
+                message: None,
+                kind: None,
+            })
+        },
+    )
+    .expect("error info should be present");
+
+    assert_eq!(&*call_order.borrow(), &["family", "overlay"]);
+    assert_eq!(info.provider_code.as_deref(), Some("overlay_code"));
+    assert_eq!(info.message.as_deref(), Some("family message"));
+    assert_eq!(info.kind, Some(AdapterErrorKind::Upstream));
+}
+
+#[test]
+fn decode_error_overlay_fields_win_on_collision() {
+    let info = super::decode_error_with_composition_test_hook(
+        || {
+            Some(ProviderErrorInfo {
+                provider_code: Some("family_code".to_string()),
+                message: Some("family message".to_string()),
+                kind: Some(AdapterErrorKind::Decode),
+            })
+        },
+        || {
+            Some(ProviderErrorInfo {
+                provider_code: Some("overlay_code".to_string()),
+                message: Some("overlay message".to_string()),
+                kind: Some(AdapterErrorKind::Upstream),
+            })
+        },
+    )
+    .expect("error info should be present");
+
+    assert_eq!(info.provider_code.as_deref(), Some("overlay_code"));
+    assert_eq!(info.message.as_deref(), Some("overlay message"));
+    assert_eq!(info.kind, Some(AdapterErrorKind::Upstream));
+}
+
+#[test]
+fn adapters_expose_layered_error_decode_contract() {
+    let openai_error = adapter_for(ProviderId::OpenAi)
+        .decode_error(&json!({
+            "error": {
+                "message": "rate limited",
+                "code": "rate_limit_exceeded",
+                "type": "rate_limit"
+            }
+        }))
+        .expect("error info should decode");
+    assert_eq!(
+        openai_error.provider_code.as_deref(),
+        Some("rate_limit_exceeded")
+    );
+    assert_eq!(openai_error.kind, Some(AdapterErrorKind::Upstream));
+    assert!(
+        openai_error
+            .message
+            .as_deref()
+            .is_some_and(|message| message.contains("rate limited"))
+    );
+
+    let anthropic_error = adapter_for(ProviderId::Anthropic)
+        .decode_error(&json!({
+            "type": "error",
+            "error": {
+                "type": "invalid_request_error",
+                "message": "bad input"
+            },
+            "request_id": "req_123"
+        }))
+        .expect("error info should decode");
+    assert_eq!(
+        anthropic_error.provider_code.as_deref(),
+        Some("invalid_request_error")
+    );
+    assert_eq!(anthropic_error.kind, Some(AdapterErrorKind::Upstream));
+    assert!(
+        anthropic_error
+            .message
+            .as_deref()
+            .is_some_and(|message| message.contains("bad input"))
+    );
+}
+
+#[derive(Default)]
+struct MarkerProjector {
+    marker: &'static str,
+}
+
+impl ProviderStreamProjector for MarkerProjector {
+    fn project(
+        &mut self,
+        _raw: agent_core::ProviderRawStreamEvent,
+    ) -> Result<Vec<agent_core::CanonicalStreamEvent>, crate::error::AdapterError> {
+        Ok(vec![agent_core::CanonicalStreamEvent::ResponseStarted {
+            model: Some(self.marker.to_string()),
+            response_id: None,
+        }])
+    }
+}
+
+#[test]
+fn create_stream_projector_uses_overlay_override_before_family_fallback() {
+    let call_order = Rc::new(RefCell::new(Vec::new()));
+    let overlay_order = Rc::clone(&call_order);
+    let family_order = Rc::clone(&call_order);
+
+    let mut projector = super::create_stream_projector_with_composition_test_hook(
+        move || {
+            overlay_order.borrow_mut().push("overlay");
+            Some(Box::new(MarkerProjector { marker: "overlay" }))
+        },
+        move || {
+            family_order.borrow_mut().push("family");
+            Box::new(MarkerProjector { marker: "family" })
+        },
+    );
+
+    let events = projector
+        .project(agent_core::ProviderRawStreamEvent::from_sse(
+            ProviderId::OpenRouter,
+            1,
+            None,
+            None,
+            None,
+            "[DONE]",
+        ))
+        .expect("projection should succeed");
+
+    assert_eq!(&*call_order.borrow(), &["overlay"]);
+    assert_eq!(
+        events,
+        vec![agent_core::CanonicalStreamEvent::ResponseStarted {
+            model: Some("overlay".to_string()),
+            response_id: None,
+        }]
     );
 }
 
 #[test]
-fn anthropic_adapter_decode_error_maps_provider_operation_and_kind() {
-    let adapter = adapter_for(ProviderId::Anthropic);
-    let error = adapter
-        .decode_response_json(
-            json!({ "model": "claude-sonnet-4-6" }),
-            &ResponseFormat::Text,
-        )
-        .expect_err("decode should fail for malformed anthropic payload");
+fn openrouter_adapter_stream_projector_uses_overlay_override() {
+    let mut projector = adapter_for(ProviderId::OpenRouter).create_stream_projector();
+    let events = projector
+        .project(agent_core::ProviderRawStreamEvent::from_sse(
+            ProviderId::OpenRouter,
+            1,
+            None,
+            None,
+            None,
+            "[DONE]",
+        ))
+        .expect("projection should succeed");
 
-    assert_adapter_error(
-        error,
-        ProviderId::Anthropic,
-        AdapterOperation::DecodeResponse,
-        AdapterErrorKind::Decode,
-    );
-}
-
-#[test]
-fn openrouter_adapter_decode_error_maps_provider_operation_and_kind() {
-    let adapter = adapter_for(ProviderId::OpenRouter);
-    let error = adapter
-        .decode_response_json(json!("invalid"), &ResponseFormat::Text)
-        .expect_err("decode should fail for non-object payload");
-
-    assert_adapter_error(
-        error,
-        ProviderId::OpenRouter,
-        AdapterOperation::DecodeResponse,
-        AdapterErrorKind::Decode,
-    );
-}
-
-#[test]
-fn openai_adapter_plan_validation_error_maps_provider_operation_and_kind() {
-    let adapter = adapter_for(ProviderId::OpenAi);
-    let mut request = base_request();
-    request.messages.clear();
-
-    let error = adapter
-        .plan_request(request, None)
-        .expect_err("planning should fail for empty messages");
-
-    assert_adapter_error(
-        error,
-        ProviderId::OpenAi,
-        AdapterOperation::PlanRequest,
-        AdapterErrorKind::Validation,
-    );
-}
-
-#[test]
-fn anthropic_adapter_plan_validation_error_maps_provider_operation_and_kind() {
-    let adapter = adapter_for(ProviderId::Anthropic);
-    let mut request = base_request();
-    request.model_id = "claude-sonnet-4-6".to_string();
-    request.temperature = Some(1.5);
-
-    let error = adapter
-        .plan_request(request, None)
-        .expect_err("planning should fail for out-of-range temperature");
-
-    assert_adapter_error(
-        error,
-        ProviderId::Anthropic,
-        AdapterOperation::PlanRequest,
-        AdapterErrorKind::Validation,
-    );
-}
-
-#[test]
-fn openrouter_adapter_plan_validation_error_maps_provider_operation_and_kind() {
-    let adapter = adapter_for(ProviderId::OpenRouter);
-    let mut request = base_request();
-    request.messages.clear();
-
-    let error = adapter
-        .plan_request(request, None)
-        .expect_err("planning should fail for empty messages");
-
-    assert_adapter_error(
-        error,
-        ProviderId::OpenRouter,
-        AdapterOperation::PlanRequest,
-        AdapterErrorKind::Validation,
+    assert_eq!(
+        events,
+        vec![agent_core::CanonicalStreamEvent::Completed {
+            finish_reason: agent_core::FinishReason::Other,
+        }]
     );
 }
