@@ -8,8 +8,8 @@ use crate::message_response_stream::state::{
     StreamDriverState,
 };
 use crate::observer::resolve_observer_for_request;
+use crate::planner;
 use crate::provider_runtime::ProviderStreamAttemptOutcome;
-use crate::route_planning::{self, PrepareAttemptError};
 use crate::runtime_error::RuntimeError;
 use crate::types::AttemptMeta;
 
@@ -149,30 +149,18 @@ async fn try_open_fallback_attempt(
         let attempt = routed.attempts[index].clone();
         let target = attempt.target.clone();
         let client = routed.toolkit.clients.get(&target.instance)?;
-        let request = routed.request.clone();
-        let prepared_attempt = match route_planning::prepare_route_attempt(
+        let execution_plan = match planner::plan_fallback_attempt(
             client,
             &attempt,
-            routed.execution.response_mode,
-            &request,
+            &routed.task,
+            &routed.execution,
+            routed.planning_rejection_policy,
+            index,
+            routed.attempts.len(),
         ) {
-            Ok(prepared_attempt) => prepared_attempt,
-            Err(PrepareAttemptError::Rejected(rejection)) => {
-                let should_continue = route_planning::should_skip_planning_rejection(
-                    routed.planning_rejection_policy,
-                    index,
-                    routed.attempts.len(),
-                );
-                if should_continue {
-                    continue;
-                }
-                state.terminal_error = Some(rejection.error);
-                return None;
-            }
-            Err(PrepareAttemptError::Fatal(error)) => {
-                state.terminal_error = Some(error);
-                return None;
-            }
+            planner::FallbackPlanResult::Executable(plan) => plan,
+            planner::FallbackPlanResult::Skip => continue,
+            planner::FallbackPlanResult::Stop => return None,
         };
         let observer = resolve_observer_for_request(
             client.runtime.observer.as_ref(),
@@ -184,19 +172,14 @@ async fn try_open_fallback_attempt(
         emit_attempt_start(
             observer.as_ref(),
             client.runtime.kind,
-            Some(prepared_attempt.selected_model.clone()),
+            Some(execution_plan.attempt.model.clone()),
             index,
             index,
             attempt_started_at,
         );
         match client
             .runtime
-            .open_stream_attempt(
-                request,
-                target.model.as_deref(),
-                &routed.execution.transport,
-                &attempt.execution,
-            )
+            .open_stream_attempt(execution_plan.clone())
             .await
         {
             ProviderStreamAttemptOutcome::Opened { stream, meta } => {
@@ -223,7 +206,7 @@ async fn try_open_fallback_attempt(
                 let should_continue = routed.next_target_index < routed.attempts.len()
                     && routed.fallback_policy.should_fallback(&attempt_error);
                 let provider = client.runtime.kind;
-                let model = prepared_attempt.selected_model;
+                let model = execution_plan.attempt.model;
                 let request_id = attempt_error.request_id.clone();
                 let status_code = attempt_error.status_code;
                 let observer_for_end = observer.clone();

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use agent_core::{Request, Response};
+use agent_core::{Response, TaskRequest};
 
 use crate::AgentToolkit;
 use crate::attempt_spec::AttemptSpec;
@@ -27,7 +27,6 @@ pub(super) struct StreamDriverState {
 
 impl StreamDriverState {
     pub(super) fn new_direct(
-        _request: Request,
         request_started_at: Instant,
         request_observer: Option<Arc<dyn RuntimeObserver>>,
         attempt: LiveAttempt,
@@ -53,7 +52,7 @@ impl StreamDriverState {
             current_attempt: Some(init.current_attempt),
             routing: RoutingState::Routed(Box::new(RoutedState {
                 toolkit: init.toolkit.clone(),
-                request: init.request,
+                task: init.task,
                 execution: init.execution,
                 fallback_policy: init.fallback_policy,
                 planning_rejection_policy: init.planning_rejection_policy,
@@ -75,7 +74,7 @@ pub(super) enum RoutingState {
 
 pub(super) struct RoutedState {
     pub(super) toolkit: AgentToolkit,
-    pub(super) request: Request,
+    pub(super) task: TaskRequest,
     pub(super) execution: ExecutionOptions,
     pub(super) fallback_policy: FallbackPolicy,
     pub(super) planning_rejection_policy: PlanningRejectionPolicy,
@@ -84,7 +83,7 @@ pub(super) struct RoutedState {
 }
 
 pub(crate) struct RoutedStreamInit<'a> {
-    pub(crate) request: Request,
+    pub(crate) task: TaskRequest,
     pub(crate) toolkit: &'a AgentToolkit,
     pub(crate) execution: ExecutionOptions,
     pub(crate) fallback_policy: FallbackPolicy,

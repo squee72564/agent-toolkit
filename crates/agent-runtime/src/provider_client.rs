@@ -1,14 +1,14 @@
 use std::{sync::Arc, time::Instant};
 
-use agent_core::{Request, Response, TaskRequest};
+use agent_core::{Response, TaskRequest};
 
-use crate::attempt_execution_options::AttemptExecutionOptions;
 use crate::direct_messages_api::DirectMessagesApi;
 use crate::direct_streaming_api::DirectStreamingApi;
 use crate::execution_options::{ExecutionOptions, ResponseMode};
 use crate::message_create_input::MessageCreateInput;
 use crate::message_response_stream::{LiveAttempt, MessageResponseStream};
 use crate::observer::{resolve_observer_for_request, safe_call_observer};
+use crate::planner;
 use crate::provider_runtime::{
     ProviderAttemptOutcome, ProviderRuntime, ProviderStreamAttemptOutcome,
 };
@@ -97,18 +97,11 @@ impl ProviderClient {
                 "messages() requires ExecutionOptions.response_mode = ResponseMode::NonStreaming",
             ));
         }
-        let request = self.request_from_task(task, model_override, false)?;
-        let context = self.begin_direct_request(&request);
+        let execution_plan =
+            planner::plan_direct_attempt(self, &task, model_override.as_deref(), &execution)?;
+        let context = self.begin_direct_request(execution_plan.attempt.model.as_str());
 
-        let attempt = self
-            .runtime
-            .execute_attempt(
-                request,
-                None,
-                &execution.transport,
-                &AttemptExecutionOptions::default(),
-            )
-            .await;
+        let attempt = self.runtime.execute_attempt(execution_plan).await;
 
         match attempt {
             ProviderAttemptOutcome::Success { response, meta } => {
@@ -164,24 +157,18 @@ impl ProviderClient {
                 "streaming() requires ExecutionOptions.response_mode = ResponseMode::Streaming",
             ));
         }
-        let request = self.request_from_task(task, model_override, true)?;
-
-        let context = self.begin_direct_request(&request);
+        let execution_plan =
+            planner::plan_direct_attempt(self, &task, model_override.as_deref(), &execution)?;
+        let context = self.begin_direct_request(execution_plan.attempt.model.as_str());
         let stream_observer = context.cloned_observer();
 
         match self
             .runtime
-            .open_stream_attempt(
-                request.clone(),
-                None,
-                &execution.transport,
-                &AttemptExecutionOptions::default(),
-            )
+            .open_stream_attempt(execution_plan)
             .await
         {
             ProviderStreamAttemptOutcome::Opened { stream, meta } => {
                 Ok(MessageResponseStream::new_direct(
-                    request,
                     context.request_started_at,
                     stream_observer,
                     LiveAttempt {
@@ -217,10 +204,10 @@ impl ProviderClient {
         }
     }
 
-    fn begin_direct_request<'a>(&'a self, request: &Request) -> DirectRequestContext<'a> {
+    fn begin_direct_request<'a>(&'a self, model_id: &str) -> DirectRequestContext<'a> {
         let request_started_at = Instant::now();
         let observer = resolve_observer_for_request(self.runtime.observer.as_ref(), None, None);
-        let request_model = request_model(&request.model_id);
+        let request_model = request_model(model_id);
         let request_start_event = request_start_event(
             Some(self.runtime.kind),
             request_model.clone(),
@@ -315,37 +302,6 @@ impl ProviderClient {
             runtime_observer.on_request_end(&event);
         });
     }
-
-    fn request_from_task(
-        &self,
-        task: TaskRequest,
-        model_override: Option<String>,
-        stream: bool,
-    ) -> Result<Request, RuntimeError> {
-        let model_id = model_override
-            .as_deref()
-            .and_then(trimmed_model)
-            .or_else(|| {
-                self.runtime
-                    .registered
-                    .config
-                    .default_model
-                    .as_deref()
-                    .and_then(trimmed_model)
-            })
-            .ok_or_else(|| {
-                RuntimeError::configuration(
-                    "no model was provided and no default model is configured",
-                )
-            })?
-            .to_string();
-
-        Ok(Request {
-            model_id,
-            stream,
-            ..Request::from(task)
-        })
-    }
 }
 
 impl DirectRequestContext<'_> {
@@ -356,9 +312,4 @@ impl DirectRequestContext<'_> {
 
 fn request_model(model_id: &str) -> Option<String> {
     (!model_id.is_empty()).then(|| model_id.to_string())
-}
-
-fn trimmed_model(model_id: &str) -> Option<&str> {
-    let trimmed = model_id.trim();
-    (!trimmed.is_empty()).then_some(trimmed)
 }

@@ -1,4 +1,4 @@
-use agent_core::{AdapterContext, ProviderId, Request, Response, ResponseFormat};
+use agent_core::{AdapterContext, ProviderId, Response, ResponseFormat};
 use agent_providers::request_plan::{
     ProviderRequestPlan, ProviderResponseKind, ProviderTransportKind,
 };
@@ -7,7 +7,8 @@ use agent_transport::{
 };
 use reqwest::Method;
 
-use crate::attempt_execution_options::{AttemptExecutionOptions, TransportTimeoutOverrides};
+use crate::attempt_execution_options::TransportTimeoutOverrides;
+use crate::planner::ExecutionPlan;
 use crate::provider_runtime::{
     OpenedProviderStream, ProviderRuntime, extract_provider_code, join_url,
     prepend_encode_warnings, response_mode_mismatch_error,
@@ -17,31 +18,31 @@ use crate::runtime_error::RuntimeError;
 pub(super) struct PlannedExecution {
     pub(super) plan: ProviderRequestPlan,
     pub(super) response_format: ResponseFormat,
+    pub(super) platform: agent_core::PlatformConfig,
     pub(super) url: String,
 }
 
+/// Extracts the planner-resolved adapter output from an `ExecutionPlan` and
+/// resolves the final outbound URL.  The adapter is never re-called here;
+/// all planning happened when the `ExecutionPlan` was created.
 pub(super) fn plan_execution(
     runtime: &ProviderRuntime,
-    request: Request,
-    execution: &AttemptExecutionOptions,
-) -> Result<PlannedExecution, RuntimeError> {
-    let response_format = request.response_format.clone();
-    let mut plan = runtime
-        .adapter
-        .plan_request(request, execution.native.as_ref())
-        .map_err(RuntimeError::from_adapter)?;
-    apply_timeout_overrides(&mut plan, &execution.timeout_overrides);
+    execution_plan: &ExecutionPlan,
+) -> PlannedExecution {
+    let response_format = execution_plan.task.response_format.clone();
+    let plan = execution_plan.provider_request_plan.clone();
     let endpoint_path = plan
         .endpoint_path_override
         .as_deref()
         .unwrap_or(runtime.adapter.descriptor().endpoint_path);
-    let url = join_url(&runtime.platform.base_url, endpoint_path);
+    let url = join_url(&execution_plan.platform.base_url, endpoint_path);
 
-    Ok(PlannedExecution {
+    PlannedExecution {
         plan,
         response_format,
+        platform: execution_plan.platform.clone(),
         url,
-    })
+    }
 }
 
 pub(crate) fn apply_timeout_overrides(
@@ -100,6 +101,7 @@ pub(super) async fn open_planned_stream(
         runtime,
         planned.plan,
         planned.response_format,
+        &planned.platform,
         &planned.url,
         adapter_context,
     )
@@ -114,6 +116,7 @@ async fn execute_json_attempt(
     let PlannedExecution {
         plan,
         response_format,
+        platform,
         url,
     } = planned;
     let body = serialize_request_body(&plan)?;
@@ -121,7 +124,7 @@ async fn execute_json_attempt(
     let mut provider_response = match runtime
         .transport
         .send(HttpSendRequest {
-            platform: &runtime.platform,
+            platform: &platform,
             method: Method::POST,
             url: &url,
             body,
@@ -179,6 +182,7 @@ async fn open_sse_stream(
     runtime: &ProviderRuntime,
     plan: ProviderRequestPlan,
     response_format: ResponseFormat,
+    platform: &agent_core::PlatformConfig,
     url: &str,
     adapter_context: &AdapterContext,
 ) -> Result<OpenedProviderStream, RuntimeError> {
@@ -187,7 +191,7 @@ async fn open_sse_stream(
     let response = match runtime
         .transport
         .send(HttpSendRequest {
-            platform: &runtime.platform,
+            platform,
             method: Method::POST,
             url,
             body,

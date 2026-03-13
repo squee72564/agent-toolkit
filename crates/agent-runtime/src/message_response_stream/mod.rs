@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Instant;
 
-use agent_core::{CanonicalStreamEnvelope, Request, Response};
+use agent_core::{CanonicalStreamEnvelope, Response};
 use futures_core::Stream;
 
 use crate::message_text_stream::MessageTextStream;
@@ -57,14 +57,12 @@ impl MessageResponseStream {
     }
 
     pub(crate) fn new_direct(
-        request: Request,
         request_started_at: Instant,
         request_observer: Option<Arc<dyn RuntimeObserver>>,
         attempt: LiveAttempt,
     ) -> Self {
         Self {
             state: Some(StreamDriverState::new_direct(
-                request,
                 request_started_at,
                 request_observer,
                 attempt,

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use agent_core::{
-    CanonicalStreamEnvelope, PlatformConfig, ProviderId, ProviderInstanceId, ProviderKind, Request,
+    CanonicalStreamEnvelope, PlatformConfig, ProviderId, ProviderInstanceId, ProviderKind,
     Response, ResponseFormat, RuntimeWarning,
 };
 use agent_providers::error::AdapterOperation;
@@ -10,9 +10,8 @@ use agent_providers::{
 };
 use agent_transport::{HttpJsonResponse, HttpResponseMode, HttpSseResponse, HttpTransport};
 
-use crate::attempt_execution_options::AttemptExecutionOptions;
-use crate::execution_options::TransportOptions;
 use crate::observer::RuntimeObserver;
+use crate::planner::ExecutionPlan;
 use crate::provider_stream_runtime::{ProviderStreamRuntime, StreamRuntimeError};
 use crate::registered_provider::RegisteredProvider;
 use crate::runtime_error::RuntimeError;
@@ -22,11 +21,10 @@ mod attempt;
 mod transport;
 
 use self::attempt::{PreparedAttempt, prepare_attempt};
+pub(crate) use self::transport::apply_timeout_overrides;
 use self::transport::{
     execute_planned_non_streaming, open_planned_stream, plan_execution, validate_streaming_plan,
 };
-#[allow(unused_imports)]
-pub(crate) use self::{attempt::build_transport_metadata_shim, transport::apply_timeout_overrides};
 
 #[derive(Clone)]
 pub(crate) struct ProviderRuntime {
@@ -134,26 +132,15 @@ impl OpenedProviderStream {
 impl ProviderRuntime {
     pub(crate) async fn execute_attempt(
         &self,
-        request: Request,
-        model_override: Option<&str>,
-        transport: &TransportOptions,
-        execution: &AttemptExecutionOptions,
+        execution_plan: ExecutionPlan,
     ) -> ProviderAttemptOutcome {
         let PreparedAttempt {
-            request,
             selected_model,
             adapter_context,
-        } = match prepare_attempt(self, request, model_override, transport, execution) {
-            Ok(prepared) => prepared,
-            Err(error_and_meta) => {
-                let (error, meta) = *error_and_meta;
-                return ProviderAttemptOutcome::Failure { error, meta };
-            }
-        };
-        let provider_response = match plan_execution(self, request, execution) {
-            Ok(planned) => execute_planned_non_streaming(self, planned, &adapter_context).await,
-            Err(error) => Err(error),
-        };
+        } = prepare_attempt(&execution_plan);
+        let planned = plan_execution(self, &execution_plan);
+        let provider_response =
+            execute_planned_non_streaming(self, planned, &adapter_context).await;
 
         match provider_response {
             Ok((response, http_response)) => ProviderAttemptOutcome::Success {
@@ -174,28 +161,16 @@ impl ProviderRuntime {
 
     pub(crate) async fn open_stream_attempt(
         &self,
-        request: Request,
-        model_override: Option<&str>,
-        transport: &TransportOptions,
-        execution: &AttemptExecutionOptions,
+        execution_plan: ExecutionPlan,
     ) -> ProviderStreamAttemptOutcome {
         let PreparedAttempt {
-            request,
             selected_model,
             adapter_context,
-        } = match prepare_attempt(self, request, model_override, transport, execution) {
-            Ok(prepared) => prepared,
-            Err(error_and_meta) => {
-                let (error, meta) = *error_and_meta;
-                return ProviderStreamAttemptOutcome::Failure { error, meta };
-            }
-        };
+        } = prepare_attempt(&execution_plan);
 
-        let stream = match plan_execution(self, request, execution).and_then(|planned| {
-            validate_streaming_plan(self.kind, &planned.plan)?;
-            Ok(planned)
-        }) {
-            Ok(planned) => open_planned_stream(self, planned, &adapter_context).await,
+        let planned = plan_execution(self, &execution_plan);
+        let stream = match validate_streaming_plan(self.kind, &planned.plan) {
+            Ok(()) => open_planned_stream(self, planned, &adapter_context).await,
             Err(error) => Err(error),
         };
 
@@ -214,36 +189,6 @@ impl ProviderRuntime {
                 error,
             },
         }
-    }
-
-    pub(crate) fn resolve_model(
-        &self,
-        request_model: &str,
-        model_override: Option<&str>,
-    ) -> Result<String, RuntimeError> {
-        let trimmed_override = model_override.and_then(trimmed_non_empty);
-        if let Some(model) = trimmed_override {
-            return Ok(model.to_string());
-        }
-
-        if let Some(model) = trimmed_non_empty(request_model) {
-            return Ok(model.to_string());
-        }
-
-        if let Some(default_model) = self
-            .registered
-            .config
-            .default_model
-            .as_deref()
-            .and_then(trimmed_non_empty)
-        {
-            return Ok(default_model.to_string());
-        }
-
-        Err(RuntimeError::configuration(format!(
-            "no model available for provider {:?}; set a default model or pass one per request",
-            self.kind
-        )))
     }
 
     fn runtime_error_from_adapter(
@@ -349,15 +294,6 @@ fn value_to_string(value: &serde_json::Value) -> Option<String> {
         serde_json::Value::Number(value) => Some(value.to_string()),
         serde_json::Value::Bool(value) => Some(value.to_string()),
         _ => None,
-    }
-}
-
-fn trimmed_non_empty(value: &str) -> Option<&str> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed)
     }
 }
 
