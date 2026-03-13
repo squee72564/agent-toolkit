@@ -7,11 +7,11 @@ use crate::message_response_stream::state::{
     AttemptContext, CompletedAttemptContext, LiveAttempt, PendingCompletion, RoutingState,
     StreamDriverState,
 };
-use crate::observer::resolve_observer_for_request;
+use crate::observer::{resolve_observer_for_request, safe_call_observer};
 use crate::planner;
 use crate::provider_runtime::ProviderStreamAttemptOutcome;
 use crate::runtime_error::RuntimeError;
-use crate::types::AttemptMeta;
+use crate::types::{attempt_skipped_event, succeeded_attempt_record};
 
 pub(super) enum DriveNextOutcome {
     Envelope(agent_core::CanonicalStreamEnvelope),
@@ -36,21 +36,17 @@ pub(super) async fn drive_next(
 
         match attempt.stream.next_envelope().await {
             Ok(Some(envelope)) => {
-                state.first_envelope_emitted = true;
+                state.note_emitted_envelope(&envelope);
                 state.current_attempt = Some(attempt);
                 return (state, DriveNextOutcome::Envelope(envelope));
             }
             Ok(None) => match attempt.stream.finish() {
                 Ok((response, http_response)) => {
-                    let attempt_meta = AttemptMeta {
-                        provider: attempt.context.provider,
-                        model: attempt.context.model.clone(),
-                        success: true,
-                        status_code: Some(http_response.head.status.as_u16()),
-                        request_id: http_response.head.request_id.clone(),
-                        error_kind: None,
-                        error_message: None,
-                    };
+                    let status_code = Some(http_response.head.status.as_u16());
+                    let request_id = http_response.head.request_id.clone();
+                    state.note_attempt_success(&attempt.context, status_code, request_id.clone());
+                    let success_meta =
+                        state.success_meta(&attempt.context, status_code, request_id.clone());
                     state.pending_completion = Some(PendingCompletion {
                         response,
                         attempt: CompletedAttemptContext {
@@ -58,17 +54,23 @@ pub(super) async fn drive_next(
                             attempt_index: attempt.context.attempt_index,
                             started_at: attempt.context.started_at,
                             observer: attempt.context.observer.clone(),
-                            meta: attempt_meta,
+                            record: succeeded_attempt_record(
+                                attempt.context.provider_instance.clone(),
+                                attempt.context.provider,
+                                attempt.context.model.clone(),
+                                attempt.context.target_index,
+                                attempt.context.attempt_index,
+                                status_code,
+                                request_id,
+                            ),
                         },
-                        selected_provider: attempt.context.provider,
-                        selected_model: attempt.context.model.clone(),
-                        status_code: Some(http_response.head.status.as_u16()),
-                        request_id: http_response.head.request_id.clone(),
+                        success_meta,
                     });
                     return (state, DriveNextOutcome::Exhausted);
                 }
                 Err(error) => {
-                    if let Some(next_attempt) = try_open_fallback_attempt(&mut state, &error).await
+                    if let Some(next_attempt) =
+                        try_open_fallback_attempt(&mut state, &attempt.context, &error).await
                     {
                         let failure_meta = attempt_failure_meta(&attempt.context, &error);
                         emit_attempt_failure(
@@ -78,7 +80,7 @@ pub(super) async fn drive_next(
                             attempt.context.attempt_index,
                             attempt.context.started_at,
                         );
-                        state.attempts.push(failure_meta);
+                        state.note_attempt_failure(&attempt.context, &error);
                         state.current_attempt = Some(next_attempt);
                         continue;
                     }
@@ -90,14 +92,18 @@ pub(super) async fn drive_next(
                         attempt.context.attempt_index,
                         attempt.context.started_at,
                     );
-                    state.attempts.push(failure_meta);
+                    state.note_attempt_failure(&attempt.context, &error);
                     emit_request_end_failure(&state, &attempt.context, &error);
+                    let failure_meta = state.executed_failure_meta(&attempt.context, &error);
+                    let error = error.with_executed_failure_meta(failure_meta);
                     state.terminal_error = Some(error.clone());
                     return (state, DriveNextOutcome::TerminalError(error));
                 }
             },
             Err(error) => {
-                if let Some(next_attempt) = try_open_fallback_attempt(&mut state, &error).await {
+                if let Some(next_attempt) =
+                    try_open_fallback_attempt(&mut state, &attempt.context, &error).await
+                {
                     let failure_meta = attempt_failure_meta(&attempt.context, &error);
                     emit_attempt_failure(
                         attempt.context.observer.as_ref(),
@@ -106,7 +112,7 @@ pub(super) async fn drive_next(
                         attempt.context.attempt_index,
                         attempt.context.started_at,
                     );
-                    state.attempts.push(failure_meta);
+                    state.note_attempt_failure(&attempt.context, &error);
                     state.current_attempt = Some(next_attempt);
                     continue;
                 }
@@ -118,8 +124,10 @@ pub(super) async fn drive_next(
                     attempt.context.attempt_index,
                     attempt.context.started_at,
                 );
-                state.attempts.push(failure_meta);
+                state.note_attempt_failure(&attempt.context, &error);
                 emit_request_end_failure(&state, &attempt.context, &error);
+                let failure_meta = state.executed_failure_meta(&attempt.context, &error);
+                let error = error.with_executed_failure_meta(failure_meta);
                 state.terminal_error = Some(error.clone());
                 return (state, DriveNextOutcome::TerminalError(error));
             }
@@ -129,43 +137,89 @@ pub(super) async fn drive_next(
 
 async fn try_open_fallback_attempt(
     state: &mut StreamDriverState,
+    current_attempt: &AttemptContext,
     error: &RuntimeError,
 ) -> Option<LiveAttempt> {
-    if state.first_envelope_emitted {
+    if !state.can_fallback() {
         return None;
     }
 
-    let RoutingState::Routed(routed) = &mut state.routing else {
+    let RoutingState::Routed(routed) = &state.routing else {
         return None;
     };
 
-    while routed.next_target_index < routed.attempts.len() {
-        if !routed.fallback_policy.should_fallback(error) {
-            return None;
-        }
+    if !routed.fallback_policy.should_retry_next_target(
+        error,
+        current_attempt.provider,
+        &current_attempt.provider_instance,
+    ) {
+        return None;
+    }
 
-        let index = routed.next_target_index;
-        routed.next_target_index = routed.next_target_index.saturating_add(1);
-        let attempt = routed.attempts[index].clone();
+    loop {
+        let (
+            index,
+            attempt,
+            toolkit,
+            task,
+            execution,
+            fallback_policy,
+            planning_rejection_policy,
+            total_attempts,
+        ) = {
+            let RoutingState::Routed(routed) = &mut state.routing else {
+                return None;
+            };
+
+            if routed.next_target_index >= routed.attempts.len() {
+                return None;
+            }
+
+            let index = routed.next_target_index;
+            routed.next_target_index = routed.next_target_index.saturating_add(1);
+            (
+                index,
+                routed.attempts[index].clone(),
+                routed.toolkit.clone(),
+                routed.task.clone(),
+                routed.execution.clone(),
+                routed.fallback_policy.clone(),
+                routed.planning_rejection_policy,
+                routed.attempts.len(),
+            )
+        };
         let target = attempt.target.clone();
-        let client = routed.toolkit.clients.get(&target.instance)?;
+        let client = toolkit.clients.get(&target.instance)?;
         let execution_plan = match planner::plan_fallback_attempt(
             client,
             &attempt,
-            &routed.task,
-            &routed.execution,
-            routed.planning_rejection_policy,
+            &task,
+            &execution,
+            planning_rejection_policy,
             index,
-            routed.attempts.len(),
+            total_attempts,
         ) {
             planner::FallbackPlanResult::Executable(plan) => *plan,
-            planner::FallbackPlanResult::Skip => continue,
+            planner::FallbackPlanResult::Skip(skipped) => {
+                let provider_instance = skipped.record.provider_instance.clone();
+                let event = attempt_skipped_event(&skipped.record, skipped.elapsed);
+                state.note_attempt_skipped(skipped.record.clone());
+                emit_attempt_skipped(&toolkit, &execution, &provider_instance, &event);
+                continue;
+            }
+            planner::FallbackPlanResult::Rejected(skipped) => {
+                let provider_instance = skipped.record.provider_instance.clone();
+                let event = attempt_skipped_event(&skipped.record, skipped.elapsed);
+                state.note_attempt_skipped(skipped.record.clone());
+                emit_attempt_skipped(&toolkit, &execution, &provider_instance, &event);
+                return None;
+            }
             planner::FallbackPlanResult::Stop => return None,
         };
         let observer = resolve_observer_for_request(
             client.runtime.observer.as_ref(),
-            routed.toolkit.observer.as_ref(),
-            routed.execution.observer.as_ref(),
+            toolkit.observer.as_ref(),
+            execution.observer.as_ref(),
         )
         .cloned();
         let attempt_started_at = Instant::now();
@@ -190,6 +244,7 @@ async fn try_open_fallback_attempt(
                         attempt_index: index,
                         started_at: attempt_started_at,
                         observer,
+                        provider_instance: target.instance.clone(),
                         provider: meta.provider,
                         model: meta.model,
                         request_id: meta.request_id,
@@ -202,27 +257,50 @@ async fn try_open_fallback_attempt(
                 meta,
             } => {
                 emit_attempt_failure(observer.as_ref(), &meta, index, index, attempt_started_at);
-                state.attempts.push(meta);
-                let should_continue = routed.next_target_index < routed.attempts.len()
-                    && routed.fallback_policy.should_fallback(&attempt_error);
                 let provider = client.runtime.kind;
                 let model = execution_plan.provider_attempt.model;
                 let request_id = attempt_error.request_id.clone();
                 let status_code = attempt_error.status_code;
+                let provider_instance = target.instance.clone();
                 let observer_for_end = observer.clone();
-                let _ = routed;
+                state.note_failed_open_attempt(
+                    provider_instance.clone(),
+                    provider,
+                    model.clone(),
+                    index,
+                    index,
+                    &attempt_error,
+                );
+                let has_more_targets = matches!(
+                    &state.routing,
+                    RoutingState::Routed(routed) if routed.next_target_index < routed.attempts.len()
+                );
+                let should_continue = has_more_targets
+                    && fallback_policy.should_retry_next_target(
+                        &attempt_error,
+                        client.runtime.kind,
+                        &target.instance,
+                    );
                 if !should_continue {
+                    let failed_attempt = AttemptContext {
+                        target_index: index,
+                        attempt_index: index,
+                        started_at: attempt_started_at,
+                        observer: observer_for_end.clone(),
+                        provider_instance: provider_instance.clone(),
+                        provider,
+                        model: model.clone(),
+                        request_id,
+                        status_code,
+                    };
+                    let failure_meta = state.executed_failure_meta(&failed_attempt, &attempt_error);
+                    let attempt_error = attempt_error.with_executed_failure_meta(failure_meta);
                     emit_request_end_failure(
                         state,
                         &AttemptContext {
-                            target_index: index,
-                            attempt_index: index,
-                            started_at: attempt_started_at,
                             observer: observer_for_end,
-                            provider,
-                            model,
-                            request_id,
-                            status_code,
+                            request_id: attempt_error.request_id.clone(),
+                            ..failed_attempt
                         },
                         &attempt_error,
                     );
@@ -232,6 +310,16 @@ async fn try_open_fallback_attempt(
             }
         }
     }
+}
 
-    None
+fn emit_attempt_skipped(
+    toolkit: &crate::AgentToolkit,
+    execution: &crate::ExecutionOptions,
+    provider_instance: &agent_core::ProviderInstanceId,
+    event: &crate::AttemptSkippedEvent,
+) {
+    let observer = toolkit.resolve_attempt_observer(execution, provider_instance.clone());
+    safe_call_observer(observer.as_ref(), |runtime_observer| {
+        runtime_observer.on_attempt_skipped(event);
+    });
 }

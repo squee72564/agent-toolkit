@@ -7,12 +7,13 @@ use super::AgentToolkit;
 use crate::attempt_spec::AttemptSpec;
 use crate::execution_options::ExecutionOptions;
 use crate::observer::{RuntimeObserver, resolve_observer_for_request, safe_call_observer};
+use crate::planner::SkippedPlannedAttempt;
 use crate::route::Route;
 use crate::runtime_error::RuntimeError;
 use crate::target::Target;
 use crate::types::{
-    AttemptMeta, RequestEndContext, ResponseMeta, attempt_failure_event, attempt_start_event,
-    attempt_success_event, normalized_event_model, request_end_failure_event,
+    AttemptMeta, RequestEndContext, ResponseMeta, attempt_failure_event, attempt_skipped_event,
+    attempt_start_event, attempt_success_event, normalized_event_model, request_end_failure_event,
     request_end_success_event, request_start_event, response_meta, terminal_failure_error,
 };
 
@@ -174,6 +175,20 @@ impl PreparedExecution {
         );
         safe_call_observer(request_observer.as_ref(), |observer| {
             observer.on_request_end(&event);
+        });
+    }
+
+    pub(super) fn emit_attempt_skipped(
+        &self,
+        toolkit: &AgentToolkit,
+        execution: &ExecutionOptions,
+        skipped: &SkippedPlannedAttempt,
+    ) {
+        let observer =
+            toolkit.resolve_attempt_observer(execution, skipped.record.provider_instance.clone());
+        let event = attempt_skipped_event(&skipped.record, skipped.elapsed);
+        safe_call_observer(observer.as_ref(), |runtime_observer| {
+            runtime_observer.on_attempt_skipped(&event);
         });
     }
 }

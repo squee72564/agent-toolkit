@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use crate::types::{
-    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, RequestEndEvent, RequestStartEvent,
+    AttemptFailureEvent, AttemptSkippedEvent, AttemptStartEvent, AttemptSuccessEvent,
+    RequestEndEvent, RequestStartEvent,
 };
 
 /// Best-effort runtime lifecycle observer.
@@ -18,6 +19,8 @@ pub trait RuntimeObserver: Send + Sync {
     fn on_attempt_success(&self, _event: &AttemptSuccessEvent) {}
     /// Called when an individual provider attempt fails.
     fn on_attempt_failure(&self, _event: &AttemptFailureEvent) {}
+    /// Called when planning skips an attempt before provider execution begins.
+    fn on_attempt_skipped(&self, _event: &AttemptSkippedEvent) {}
     /// Called once when the overall request completes.
     fn on_request_end(&self, _event: &RequestEndEvent) {}
 }

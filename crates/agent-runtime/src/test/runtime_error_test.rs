@@ -10,6 +10,7 @@ fn runtime_error_clone_preserves_source_chain() {
         status_code: Some(503),
         request_id: Some("req_terminal".to_string()),
         provider_code: Some("rate_limit_exceeded".to_string()),
+        executed_failure_meta: None,
         source: None,
     };
 
@@ -31,6 +32,7 @@ fn terminal_failure_error_returns_underlying_for_fallback_exhausted() {
         status_code: Some(503),
         request_id: Some("req_terminal".to_string()),
         provider_code: Some("rate_limit_exceeded".to_string()),
+        executed_failure_meta: None,
         source: None,
     };
 

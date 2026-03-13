@@ -356,7 +356,7 @@ fn routed_planning_failure_tracks_static_skip_history_and_reason() {
     );
 
     match result {
-        planner::RoutedPlanningResult::PlanningFailure(failure) => {
+        planner::RoutedPlanningResult::PlanningFailure { failure, .. } => {
             assert_eq!(
                 failure.reason,
                 crate::RoutePlanningFailureReason::NoCompatibleAttempts
@@ -447,7 +447,7 @@ fn routed_planning_failure_uses_adapter_rejection_reason_when_any_attempt_reache
     );
 
     match result {
-        planner::RoutedPlanningResult::PlanningFailure(failure) => {
+        planner::RoutedPlanningResult::PlanningFailure { failure, .. } => {
             assert_eq!(
                 failure.reason,
                 crate::RoutePlanningFailureReason::AllAttemptsRejectedDuringPlanning
@@ -547,7 +547,7 @@ fn skipped_planning_records_never_carry_request_id_or_status_metadata() {
     );
 
     let failure = match result {
-        planner::RoutedPlanningResult::PlanningFailure(failure) => failure,
+        planner::RoutedPlanningResult::PlanningFailure { failure, .. } => failure,
         other => panic!("expected route planning failure, got {other:?}"),
     };
 

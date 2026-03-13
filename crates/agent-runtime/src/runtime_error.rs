@@ -5,7 +5,7 @@ use std::error::Error as StdError;
 use std::sync::Arc;
 use thiserror::Error;
 
-use crate::types::RoutePlanningFailure;
+use crate::types::{ExecutedFailureMeta, RoutePlanningFailure};
 
 /// Category of error surfaced by the runtime layer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,6 +43,8 @@ pub struct RuntimeError {
     pub request_id: Option<String>,
     /// Provider-specific error code, when available.
     pub provider_code: Option<String>,
+    /// Typed executed-failure metadata for terminal execution errors, when available.
+    pub(crate) executed_failure_meta: Option<ExecutedFailureMeta>,
     #[source]
     /// Underlying source error preserved for inspection and downcasting.
     pub source: Option<Arc<dyn StdError + Send + Sync>>,
@@ -58,6 +60,7 @@ impl RuntimeError {
             status_code: None,
             request_id: None,
             provider_code: None,
+            executed_failure_meta: None,
             source: None,
         }
     }
@@ -71,6 +74,7 @@ impl RuntimeError {
             status_code: None,
             request_id: None,
             provider_code: None,
+            executed_failure_meta: None,
             source: None,
         }
     }
@@ -84,6 +88,7 @@ impl RuntimeError {
             status_code: None,
             request_id: None,
             provider_code: None,
+            executed_failure_meta: None,
             source: Some(Arc::new(failure)),
         }
     }
@@ -97,6 +102,7 @@ impl RuntimeError {
             status_code: last_error.status_code,
             request_id: last_error.request_id.clone(),
             provider_code: last_error.provider_code.clone(),
+            executed_failure_meta: last_error.executed_failure_meta.clone(),
             source: Some(Arc::new(last_error)),
         }
     }
@@ -115,6 +121,7 @@ impl RuntimeError {
             status_code,
             request_id,
             provider_code,
+            executed_failure_meta: None,
             source: Some(Arc::new(error)),
         }
     }
@@ -183,6 +190,7 @@ impl RuntimeError {
             status_code,
             request_id,
             provider_code: None,
+            executed_failure_meta: None,
             source: Some(Arc::new(error)),
         }
     }
@@ -190,6 +198,17 @@ impl RuntimeError {
     /// Returns the source error as a trait object for further inspection.
     pub fn source_ref(&self) -> Option<&(dyn StdError + Send + Sync + 'static)> {
         self.source.as_deref()
+    }
+
+    /// Attaches typed executed-failure metadata to this runtime error.
+    pub fn with_executed_failure_meta(mut self, meta: ExecutedFailureMeta) -> Self {
+        self.executed_failure_meta = Some(meta);
+        self
+    }
+
+    /// Returns typed executed-failure metadata when this error represents an executed failure.
+    pub fn executed_failure_meta(&self) -> Option<&ExecutedFailureMeta> {
+        self.executed_failure_meta.as_ref()
     }
 }
 

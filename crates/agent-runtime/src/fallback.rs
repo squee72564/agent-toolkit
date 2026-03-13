@@ -1,25 +1,22 @@
-use agent_core::ProviderId;
+use agent_core::{ProviderInstanceId, ProviderKind};
 
 use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
-/// Strategy for combining legacy fallback toggles with explicit rules.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum FallbackMode {
-    /// Evaluate only legacy transport/status fallback settings and ignore rules.
-    LegacyOnly,
-    /// Evaluate only explicit rules and ignore legacy transport/status fallback settings.
-    RulesOnly,
-    /// Retry if either legacy settings or explicit rules allow fallback.
-    #[default]
-    LegacyOrRules,
-}
 
 /// Action taken when a [`FallbackRule`] matches.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FallbackAction {
     /// Continue routed execution with the next configured target.
     RetryNextTarget,
     /// Stop fallback evaluation and surface the current error.
     Stop,
+}
+
+/// Normalized executed-failure context used for rule-driven fallback.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ExecutedFailureContext<'a> {
+    pub(crate) error: &'a RuntimeError,
+    pub(crate) provider_kind: ProviderKind,
+    pub(crate) provider_instance: &'a ProviderInstanceId,
 }
 
 /// Match criteria for fallback rule evaluation.
@@ -33,18 +30,20 @@ pub struct FallbackMatch {
     pub status_codes: Vec<u16>,
     /// Accepted provider-specific error codes after trimming whitespace.
     pub provider_codes: Vec<String>,
-    /// Accepted providers.
-    pub providers: Vec<ProviderId>,
+    /// Accepted concrete provider kinds.
+    pub provider_kinds: Vec<ProviderKind>,
+    /// Accepted registered provider instances.
+    pub provider_instances: Vec<ProviderInstanceId>,
 }
 
 impl FallbackMatch {
-    fn matches(&self, error: &RuntimeError) -> bool {
-        if !self.error_kinds.is_empty() && !self.error_kinds.contains(&error.kind) {
+    fn matches(&self, failure: &ExecutedFailureContext<'_>) -> bool {
+        if !self.error_kinds.is_empty() && !self.error_kinds.contains(&failure.error.kind) {
             return false;
         }
 
         if !self.status_codes.is_empty() {
-            let Some(status_code) = error.status_code else {
+            let Some(status_code) = failure.error.status_code else {
                 return false;
             };
             if !self.status_codes.contains(&status_code) {
@@ -53,7 +52,11 @@ impl FallbackMatch {
         }
 
         if !self.provider_codes.is_empty() {
-            let Some(provider_code) = error.provider_code.as_deref().and_then(trimmed_non_empty)
+            let Some(provider_code) = failure
+                .error
+                .provider_code
+                .as_deref()
+                .and_then(trimmed_non_empty)
             else {
                 return false;
             };
@@ -67,20 +70,22 @@ impl FallbackMatch {
             }
         }
 
-        if !self.providers.is_empty() {
-            let Some(provider) = error.provider else {
-                return false;
-            };
-            if !self.providers.contains(&provider) {
-                return false;
-            }
+        if !self.provider_kinds.is_empty() && !self.provider_kinds.contains(&failure.provider_kind)
+        {
+            return false;
+        }
+
+        if !self.provider_instances.is_empty()
+            && !self.provider_instances.contains(failure.provider_instance)
+        {
+            return false;
         }
 
         true
     }
 }
 
-/// Ordered fallback rule evaluated against a [`RuntimeError`].
+/// Ordered fallback rule evaluated against a normalized executed failure.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FallbackRule {
     /// Match criteria for the rule.
@@ -134,38 +139,34 @@ impl FallbackRule {
         }
     }
 
-    /// Restricts the rule to errors originating from a specific provider.
-    pub fn for_provider(mut self, provider: ProviderId) -> Self {
-        if !self.when.providers.contains(&provider) {
-            self.when.providers.push(provider);
+    /// Restricts the rule to a concrete provider kind.
+    pub fn for_provider_kind(mut self, provider_kind: ProviderKind) -> Self {
+        if !self.when.provider_kinds.contains(&provider_kind) {
+            self.when.provider_kinds.push(provider_kind);
+        }
+        self
+    }
+
+    /// Restricts the rule to a registered provider instance.
+    pub fn for_provider_instance(mut self, provider_instance: ProviderInstanceId) -> Self {
+        if !self.when.provider_instances.contains(&provider_instance) {
+            self.when.provider_instances.push(provider_instance);
         }
         self
     }
 }
 
 /// Ordered fallback configuration for routed execution.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FallbackPolicy {
-    /// Legacy HTTP status codes that trigger fallback.
-    pub retry_on_status_codes: Vec<u16>,
-    /// Whether transport errors trigger fallback under legacy behavior.
-    pub retry_on_transport_error: bool,
     /// Explicit ordered rules.
     pub rules: Vec<FallbackRule>,
-    /// How legacy settings and rules are combined.
-    pub mode: FallbackMode,
 }
 
 impl FallbackPolicy {
-    /// Creates a fallback policy with default retry settings.
+    /// Creates a fallback policy with no implicit retry behavior.
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Sets how legacy fallback settings and explicit rules are combined.
-    pub fn with_mode(mut self, mode: FallbackMode) -> Self {
-        self.mode = mode;
-        self
     }
 
     /// Appends a fallback rule.
@@ -174,53 +175,28 @@ impl FallbackPolicy {
         self
     }
 
-    /// Decide whether the given error should advance to the next fallback target.
-    ///
-    /// Legacy transport/status settings and explicit rules are evaluated according
-    /// to [`FallbackMode`]. Rule evaluation is insertion-ordered: the first rule
-    /// whose `when` matcher fully matches the error decides the rule-based outcome.
-    pub fn should_fallback(&self, error: &RuntimeError) -> bool {
-        let legacy_decision = self.should_fallback_legacy(error);
-        let rules_decision = self.should_fallback_rules(error);
-
-        match self.mode {
-            FallbackMode::LegacyOnly => legacy_decision,
-            FallbackMode::RulesOnly => rules_decision,
-            FallbackMode::LegacyOrRules => legacy_decision || rules_decision,
-        }
+    pub(crate) fn should_retry_next_target(
+        &self,
+        error: &RuntimeError,
+        provider_kind: ProviderKind,
+        provider_instance: &ProviderInstanceId,
+    ) -> bool {
+        matches!(
+            self.action_for(&ExecutedFailureContext {
+                error,
+                provider_kind,
+                provider_instance,
+            }),
+            FallbackAction::RetryNextTarget
+        )
     }
 
-    fn should_fallback_legacy(&self, error: &RuntimeError) -> bool {
-        if self.retry_on_transport_error && error.kind == RuntimeErrorKind::Transport {
-            return true;
-        }
-
-        if let Some(status_code) = error.status_code {
-            return self.retry_on_status_codes.contains(&status_code);
-        }
-
-        false
-    }
-
-    fn should_fallback_rules(&self, error: &RuntimeError) -> bool {
-        for rule in &self.rules {
-            if rule.when.matches(error) {
-                return matches!(rule.action, FallbackAction::RetryNextTarget);
-            }
-        }
-
-        false
-    }
-}
-
-impl Default for FallbackPolicy {
-    fn default() -> Self {
-        Self {
-            retry_on_status_codes: vec![429, 500, 502, 503, 504],
-            retry_on_transport_error: true,
-            rules: Vec::new(),
-            mode: FallbackMode::LegacyOrRules,
-        }
+    fn action_for(&self, failure: &ExecutedFailureContext<'_>) -> FallbackAction {
+        self.rules
+            .iter()
+            .find(|rule| rule.when.matches(failure))
+            .map(|rule| rule.action)
+            .unwrap_or(FallbackAction::Stop)
     }
 }
 

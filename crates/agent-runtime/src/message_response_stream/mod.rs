@@ -26,6 +26,8 @@ type InFlightFuture = Pin<Box<dyn Future<Output = (StreamDriverState, DriveNextO
 ///
 /// `MessageResponseStream` iteration yields only stream envelopes or terminal errors. Successful
 /// completion metadata is retrieved explicitly by calling [`MessageResponseStream::finish`].
+/// Terminal executed failures surface as [`RuntimeError`] values; when available, typed failure
+/// metadata can be inspected via [`RuntimeError::executed_failure_meta`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct StreamCompletion {
     pub response: Response,
@@ -82,7 +84,8 @@ impl MessageResponseStream {
     ///
     /// This method must be called to retrieve successful completion details, even if the stream
     /// has already been fully drained via iteration. If a terminal error was already surfaced
-    /// during iteration, this returns that same error.
+    /// during iteration, this returns that same error, including any attached executed-failure
+    /// metadata.
     pub async fn finish(mut self) -> Result<StreamCompletion, RuntimeError> {
         let mut state = self.take_state().await?;
 
@@ -91,7 +94,7 @@ impl MessageResponseStream {
                 events::emit_attempt_success(&state.request_observer, &completion.attempt);
                 events::emit_request_end_success(&state, &completion.attempt);
                 let response = completion.response.clone();
-                let meta = completion.meta(state.attempts);
+                let meta = completion.meta();
                 return Ok(StreamCompletion { response, meta });
             }
 

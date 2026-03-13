@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use agent_core::{
     AuthCredentials, ExecutionPlan, ProviderCapabilities, ProviderFamilyId, ProviderInstanceId,
     ProviderKind, ResolvedAuthContext, ResolvedProviderAttempt, ResolvedTransportOptions,
@@ -42,12 +44,22 @@ pub(crate) enum AttemptPlanningError {
 pub(crate) struct PlannedRoutedAttempt {
     pub(crate) execution_plan: ExecutionPlan,
     pub(crate) target_index: usize,
+    pub(crate) skipped_attempts: Vec<SkippedPlannedAttempt>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct SkippedPlannedAttempt {
+    pub(crate) record: AttemptRecord,
+    pub(crate) elapsed: Duration,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum RoutedPlanningResult {
     Executable(Box<PlannedRoutedAttempt>),
-    PlanningFailure(RoutePlanningFailure),
+    PlanningFailure {
+        failure: RoutePlanningFailure,
+        skipped_attempts: Vec<SkippedPlannedAttempt>,
+    },
     Fatal(RuntimeError),
 }
 
@@ -83,9 +95,11 @@ pub(crate) enum FallbackPlanResult {
     /// Planning succeeded; the attempt is ready for execution.
     Executable(Box<ExecutionPlan>),
     /// Planning was rejected but the policy allows skipping to the next target.
-    Skip,
+    Skip(Box<SkippedPlannedAttempt>),
     /// Planning failed or was rejected and no more targets should be tried.
     Stop,
+    /// Planning was rejected and must terminate route advancement.
+    Rejected(Box<SkippedPlannedAttempt>),
 }
 
 /// Plans a single fallback attempt using the same validation and rejection
@@ -101,13 +115,20 @@ pub(crate) fn plan_fallback_attempt(
     index: usize,
     total_attempts: usize,
 ) -> FallbackPlanResult {
+    let planning_started_at = Instant::now();
     match plan_routed_attempt(client, attempt_spec, task, execution) {
         Ok(execution_plan) => FallbackPlanResult::Executable(Box::new(execution_plan)),
-        Err(AttemptPlanningError::Rejected(_rejection)) => {
+        Err(AttemptPlanningError::Rejected(rejection)) => {
+            let skipped = Box::new(planning_rejection_attempt(
+                &rejection,
+                index,
+                index,
+                planning_started_at.elapsed(),
+            ));
             if should_skip_planning_rejection(planning_rejection_policy, index, total_attempts) {
-                FallbackPlanResult::Skip
+                FallbackPlanResult::Skip(skipped)
             } else {
-                FallbackPlanResult::Stop
+                FallbackPlanResult::Rejected(skipped)
             }
         }
         Err(AttemptPlanningError::Fatal(_error)) => FallbackPlanResult::Stop,
@@ -122,8 +143,10 @@ pub(crate) fn plan_routed_execution(
     planning_rejection_policy: PlanningRejectionPolicy,
 ) -> RoutedPlanningResult {
     let mut skipped_history = Vec::new();
+    let mut skipped_attempts = Vec::new();
 
     for (index, attempt_spec) in attempts.iter().enumerate() {
+        let planning_started_at = Instant::now();
         let target = &attempt_spec.target;
         let Some(client) = toolkit.clients.get(&target.instance) else {
             return RoutedPlanningResult::Fatal(RuntimeError::target_resolution(format!(
@@ -137,20 +160,31 @@ pub(crate) fn plan_routed_execution(
                 return RoutedPlanningResult::Executable(Box::new(PlannedRoutedAttempt {
                     execution_plan,
                     target_index: index,
+                    skipped_attempts,
                 }));
             }
             Err(AttemptPlanningError::Rejected(rejection)) => {
-                skipped_history.push(planning_rejection_attempt_record(&rejection, index, index));
+                let skipped = planning_rejection_attempt(
+                    &rejection,
+                    index,
+                    index,
+                    planning_started_at.elapsed(),
+                );
+                skipped_history.push(skipped.record.clone());
+                skipped_attempts.push(skipped);
 
                 if should_skip_planning_rejection(planning_rejection_policy, index, attempts.len())
                 {
                     continue;
                 }
 
-                return RoutedPlanningResult::PlanningFailure(RoutePlanningFailure {
-                    reason: planning_failure_reason(&skipped_history),
-                    attempts: skipped_history,
-                });
+                return RoutedPlanningResult::PlanningFailure {
+                    failure: RoutePlanningFailure {
+                        reason: planning_failure_reason(&skipped_history),
+                        attempts: skipped_history,
+                    },
+                    skipped_attempts,
+                };
             }
             Err(AttemptPlanningError::Fatal(error)) => {
                 return RoutedPlanningResult::Fatal(*error);
@@ -163,10 +197,13 @@ pub(crate) fn plan_routed_execution(
             "no target providers were resolved for this request",
         ))
     } else {
-        RoutedPlanningResult::PlanningFailure(RoutePlanningFailure {
-            reason: planning_failure_reason(&skipped_history),
-            attempts: skipped_history,
-        })
+        RoutedPlanningResult::PlanningFailure {
+            failure: RoutePlanningFailure {
+                reason: planning_failure_reason(&skipped_history),
+                attempts: skipped_history,
+            },
+            skipped_attempts,
+        }
     }
 }
 
@@ -401,29 +438,35 @@ fn static_incompatibility(
     })
 }
 
-fn planning_rejection_attempt_record(
+fn planning_rejection_attempt(
     rejection: &PlanningRejection,
     target_index: usize,
     attempt_index: usize,
-) -> AttemptRecord {
-    AttemptRecord {
-        provider_instance: rejection.provider_instance.clone(),
-        provider_kind: rejection.provider_kind,
-        model: rejection.model.clone(),
-        target_index,
-        attempt_index,
-        disposition: AttemptDisposition::Skipped {
-            reason: match rejection.kind {
-                PlanningRejectionKind::StaticIncompatibility => SkipReason::StaticIncompatibility {
-                    message: rejection.error.message.clone(),
-                },
-                PlanningRejectionKind::AdapterPlanningRejected => {
-                    SkipReason::AdapterPlanningRejected {
-                        message: rejection.error.message.clone(),
+    elapsed: Duration,
+) -> SkippedPlannedAttempt {
+    SkippedPlannedAttempt {
+        record: AttemptRecord {
+            provider_instance: rejection.provider_instance.clone(),
+            provider_kind: rejection.provider_kind,
+            model: rejection.model.clone(),
+            target_index,
+            attempt_index,
+            disposition: AttemptDisposition::Skipped {
+                reason: match rejection.kind {
+                    PlanningRejectionKind::StaticIncompatibility => {
+                        SkipReason::StaticIncompatibility {
+                            message: rejection.error.message.clone(),
+                        }
                     }
-                }
+                    PlanningRejectionKind::AdapterPlanningRejected => {
+                        SkipReason::AdapterPlanningRejected {
+                            message: rejection.error.message.clone(),
+                        }
+                    }
+                },
             },
         },
+        elapsed,
     }
 }
 

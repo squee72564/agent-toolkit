@@ -7,8 +7,8 @@ use std::time::Duration;
 use agent_core::types::ProviderId;
 use agent_runtime::{
     AgentToolkit, AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
-    FallbackMode, FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig,
-    RequestEndEvent, RequestStartEvent, Route, RuntimeErrorKind, RuntimeObserver, Target, openai,
+    FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig, RequestEndEvent,
+    RequestStartEvent, Route, RuntimeErrorKind, RuntimeObserver, Target, openai,
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -323,9 +323,8 @@ async fn router_fallback_ordered_attempts_with_indices() {
         .build()
         .expect("build toolkit");
 
-    let fallback_policy = FallbackPolicy::new()
-        .with_mode(FallbackMode::RulesOnly)
-        .with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Transport));
+    let fallback_policy =
+        FallbackPolicy::new().with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Transport));
 
     let (_response, meta) = with_timeout(
         toolkit.messages().create_with_meta(
@@ -419,9 +418,8 @@ async fn fallback_exhausted_request_end_uses_terminal_failure_context() {
         .build()
         .expect("build toolkit");
 
-    let fallback_policy = FallbackPolicy::new()
-        .with_mode(FallbackMode::RulesOnly)
-        .with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Transport));
+    let fallback_policy =
+        FallbackPolicy::new().with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Transport));
 
     let error = with_timeout(
         toolkit.messages().create_with_meta(

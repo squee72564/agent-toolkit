@@ -51,6 +51,7 @@ fn runtime_error(
         status_code,
         request_id: None,
         provider_code: provider_code.map(ToString::to_string),
+        executed_failure_meta: None,
         source: None,
     }
 }
@@ -68,6 +69,38 @@ fn test_provider_client(provider: ProviderId) -> ProviderClient {
         provider,
         ProviderConfig::new("test-key"),
     );
+    let platform = registered
+        .platform_config(adapter.descriptor())
+        .expect("test platform should build");
+
+    ProviderClient::new(ProviderRuntime {
+        instance_id,
+        kind: provider,
+        registered,
+        adapter,
+        platform,
+        transport,
+        observer: None,
+    })
+}
+
+fn test_provider_client_with_base_url(
+    provider: ProviderId,
+    base_url: &str,
+    default_model: Option<&str>,
+) -> ProviderClient {
+    let adapter = adapter_for(provider);
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .expect("test client should build");
+    let transport = HttpTransport::builder(client).build();
+    let instance_id = Target::default_instance_for(provider);
+    let mut config = ProviderConfig::new("test-key").with_base_url(base_url);
+    if let Some(default_model) = default_model {
+        config = config.with_default_model(default_model);
+    }
+    let registered = RegisteredProvider::new(instance_id.clone(), provider, config);
     let platform = registered
         .platform_config(adapter.descriptor())
         .expect("test platform should build");
@@ -146,6 +179,12 @@ fn route_planning_failure(error: &RuntimeError) -> &RoutePlanningFailure {
         .source_ref()
         .and_then(|source| source.downcast_ref::<RoutePlanningFailure>())
         .expect("runtime error should wrap RoutePlanningFailure")
+}
+
+fn executed_failure_meta(error: &RuntimeError) -> &ExecutedFailureMeta {
+    error
+        .executed_failure_meta()
+        .expect("runtime error should carry ExecutedFailureMeta")
 }
 
 #[derive(Debug)]

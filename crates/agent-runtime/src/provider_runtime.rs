@@ -266,6 +266,7 @@ pub(crate) fn response_mode_mismatch_error(
         status_code: Some(head.status.as_u16()),
         request_id: head.request_id.clone(),
         provider_code: None,
+        executed_failure_meta: None,
         source: None,
     }
 }

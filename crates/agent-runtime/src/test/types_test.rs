@@ -2,8 +2,9 @@ use std::time::Duration;
 
 use super::*;
 use crate::types::{
-    RequestEndContext, attempt_failure_event, attempt_success_event, normalized_event_model,
-    request_end_failure_event, request_end_success_event, response_meta,
+    RequestEndContext, attempt_failure_event, attempt_success_event, legacy_attempt_history,
+    legacy_attempt_meta, normalized_event_model, request_end_failure_event,
+    request_end_success_event, response_meta,
 };
 
 fn attempt_meta(success: bool) -> AttemptMeta {
@@ -115,4 +116,81 @@ fn response_meta_helper_preserves_selected_attempt_and_order() {
     assert_eq!(meta.selected_model, "gpt-5-mini");
     assert_eq!(meta.request_id.as_deref(), Some("req_123"));
     assert_eq!(meta.attempts, vec![first, second]);
+}
+
+#[test]
+fn legacy_attempt_meta_filters_skips_and_preserves_executed_attempt_order() {
+    let skipped = AttemptRecord {
+        provider_instance: Target::default_instance_for(ProviderId::OpenAi),
+        provider_kind: ProviderId::OpenAi,
+        model: "gpt-5-mini".to_string(),
+        target_index: 0,
+        attempt_index: 0,
+        disposition: AttemptDisposition::Skipped {
+            reason: SkipReason::StaticIncompatibility {
+                message: "streaming unsupported".to_string(),
+            },
+        },
+    };
+    let succeeded = AttemptRecord {
+        provider_instance: Target::default_instance_for(ProviderId::OpenRouter),
+        provider_kind: ProviderId::OpenRouter,
+        model: "openai/gpt-5-mini".to_string(),
+        target_index: 1,
+        attempt_index: 1,
+        disposition: AttemptDisposition::Succeeded {
+            status_code: Some(200),
+            request_id: Some("req_success".to_string()),
+        },
+    };
+    let failed = AttemptRecord {
+        provider_instance: Target::default_instance_for(ProviderId::Anthropic),
+        provider_kind: ProviderId::Anthropic,
+        model: "claude".to_string(),
+        target_index: 2,
+        attempt_index: 2,
+        disposition: AttemptDisposition::Failed {
+            error_kind: RuntimeErrorKind::Upstream,
+            error_message: "rate limit".to_string(),
+            status_code: Some(429),
+            request_id: Some("req_fail".to_string()),
+        },
+    };
+
+    assert_eq!(legacy_attempt_meta(&skipped), None);
+    assert_eq!(
+        legacy_attempt_meta(&succeeded),
+        Some(AttemptMeta {
+            provider: ProviderId::OpenRouter,
+            model: "openai/gpt-5-mini".to_string(),
+            success: true,
+            status_code: Some(200),
+            request_id: Some("req_success".to_string()),
+            error_kind: None,
+            error_message: None,
+        })
+    );
+    assert_eq!(
+        legacy_attempt_history(&[skipped, succeeded, failed]),
+        vec![
+            AttemptMeta {
+                provider: ProviderId::OpenRouter,
+                model: "openai/gpt-5-mini".to_string(),
+                success: true,
+                status_code: Some(200),
+                request_id: Some("req_success".to_string()),
+                error_kind: None,
+                error_message: None,
+            },
+            AttemptMeta {
+                provider: ProviderId::Anthropic,
+                model: "claude".to_string(),
+                success: false,
+                status_code: Some(429),
+                request_id: Some("req_fail".to_string()),
+                error_kind: Some(RuntimeErrorKind::Upstream),
+                error_message: Some("rate limit".to_string()),
+            }
+        ]
+    );
 }

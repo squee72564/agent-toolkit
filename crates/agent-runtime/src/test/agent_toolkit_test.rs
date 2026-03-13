@@ -1,6 +1,125 @@
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use super::*;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpListener;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum RecordedEvent {
+    RequestStart(RequestStartEvent),
+    AttemptStart(AttemptStartEvent),
+    AttemptSkipped(AttemptSkippedEvent),
+    AttemptFailure(AttemptFailureEvent),
+    AttemptSuccess(AttemptSuccessEvent),
+    RequestEnd(RequestEndEvent),
+}
+
+impl RecordedEvent {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::RequestStart(_) => "request_start",
+            Self::AttemptStart(_) => "attempt_start",
+            Self::AttemptSkipped(_) => "attempt_skipped",
+            Self::AttemptFailure(_) => "attempt_failure",
+            Self::AttemptSuccess(_) => "attempt_success",
+            Self::RequestEnd(_) => "request_end",
+        }
+    }
+}
+
+#[derive(Debug)]
+struct RecordingObserver {
+    events: Mutex<Vec<RecordedEvent>>,
+}
+
+impl RecordingObserver {
+    fn new() -> Self {
+        Self {
+            events: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn snapshot(&self) -> Vec<RecordedEvent> {
+        self.events
+            .lock()
+            .expect("observer event mutex poisoned")
+            .clone()
+    }
+
+    fn record(&self, event: RecordedEvent) {
+        self.events
+            .lock()
+            .expect("observer event mutex poisoned")
+            .push(event);
+    }
+}
+
+impl RuntimeObserver for RecordingObserver {
+    fn on_request_start(&self, event: &RequestStartEvent) {
+        self.record(RecordedEvent::RequestStart(event.clone()));
+    }
+
+    fn on_attempt_start(&self, event: &AttemptStartEvent) {
+        self.record(RecordedEvent::AttemptStart(event.clone()));
+    }
+
+    fn on_attempt_skipped(&self, event: &AttemptSkippedEvent) {
+        self.record(RecordedEvent::AttemptSkipped(event.clone()));
+    }
+
+    fn on_attempt_failure(&self, event: &AttemptFailureEvent) {
+        self.record(RecordedEvent::AttemptFailure(event.clone()));
+    }
+
+    fn on_attempt_success(&self, event: &AttemptSuccessEvent) {
+        self.record(RecordedEvent::AttemptSuccess(event.clone()));
+    }
+
+    fn on_request_end(&self, event: &RequestEndEvent) {
+        self.record(RecordedEvent::RequestEnd(event.clone()));
+    }
+}
+
+fn event_names(events: &[RecordedEvent]) -> Vec<&'static str> {
+    events.iter().map(RecordedEvent::name).collect()
+}
+
+fn as_attempt_skipped(event: &RecordedEvent) -> &AttemptSkippedEvent {
+    match event {
+        RecordedEvent::AttemptSkipped(inner) => inner,
+        other => panic!("expected attempt_skipped event, got {}", other.name()),
+    }
+}
+
+async fn spawn_json_success_stub(request_id: &str) -> String {
+    const OPENAI_SUCCESS_BODY: &str = include_str!(
+        "../../../agent-providers/data/openai/responses/decoded/basic_chat/gpt-5-mini.json"
+    );
+
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind test listener");
+    let addr = listener.local_addr().expect("local addr");
+    let request_id = request_id.to_string();
+
+    tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.expect("accept test stream");
+        let mut scratch = [0_u8; 8192];
+        let _ = stream.read(&mut scratch).await;
+
+        let http = format!(
+            "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nx-request-id: {}\r\nconnection: close\r\n\r\n{}",
+            OPENAI_SUCCESS_BODY.len(),
+            request_id,
+            OPENAI_SUCCESS_BODY
+        );
+        let _ = stream.write_all(http.as_bytes()).await;
+        let _ = stream.shutdown().await;
+    });
+
+    format!("http://{addr}")
+}
 
 #[test]
 fn builder_requires_at_least_one_provider() {
@@ -247,5 +366,87 @@ async fn routed_messages_fail_fast_surfaces_typed_route_planning_failure() {
         AttemptDisposition::Skipped {
             reason: SkipReason::AdapterPlanningRejected { .. }
         }
+    ));
+}
+
+#[tokio::test]
+async fn routed_messages_emit_attempt_skipped_without_execution_events_for_planning_rejection() {
+    let base_url = spawn_json_success_stub("req_routed_skip_success").await;
+    let observer = Arc::new(RecordingObserver::new());
+    let toolkit = AgentToolkit {
+        clients: HashMap::from([
+            (
+                Target::default_instance_for(ProviderId::Anthropic),
+                test_provider_client(ProviderId::Anthropic),
+            ),
+            (
+                Target::default_instance_for(ProviderId::OpenAi),
+                test_provider_client_with_base_url(
+                    ProviderId::OpenAi,
+                    &base_url,
+                    Some("gpt-5-mini"),
+                ),
+            ),
+        ]),
+        observer: Some(observer.clone()),
+    };
+
+    let task = agent_core::Request {
+        model_id: String::new(),
+        stream: false,
+        messages: vec![
+            Message::user_text("hello"),
+            Message::system_text("late system"),
+        ],
+        tools: Vec::new(),
+        tool_choice: ToolChoice::Auto,
+        response_format: ResponseFormat::Text,
+        temperature: None,
+        top_p: None,
+        max_output_tokens: None,
+        stop: Vec::new(),
+        metadata: std::collections::BTreeMap::new(),
+    }
+    .task_request();
+
+    let (_response, meta) = toolkit
+        .messages()
+        .create_task_with_meta(
+            task,
+            Route::to(Target::new(ProviderId::Anthropic).with_model("claude-sonnet-4-6"))
+                .with_fallback(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
+                .with_planning_rejection_policy(PlanningRejectionPolicy::SkipRejectedTargets),
+            ExecutionOptions::default(),
+        )
+        .await
+        .expect("route should skip rejected attempt and succeed");
+
+    assert_eq!(meta.selected_provider, ProviderId::OpenAi);
+
+    let events = observer.snapshot();
+    assert_eq!(
+        event_names(&events),
+        vec![
+            "request_start",
+            "attempt_skipped",
+            "attempt_start",
+            "attempt_success",
+            "request_end",
+        ]
+    );
+
+    let skipped = as_attempt_skipped(&events[1]);
+    assert_eq!(
+        skipped.provider_instance,
+        Target::default_instance_for(ProviderId::Anthropic)
+    );
+    assert_eq!(skipped.provider_kind, ProviderId::Anthropic);
+    assert_eq!(skipped.model, "claude-sonnet-4-6");
+    assert_eq!(skipped.target_index, 0);
+    assert_eq!(skipped.attempt_index, 0);
+    assert!(skipped.elapsed >= std::time::Duration::ZERO);
+    assert!(matches!(
+        skipped.reason,
+        SkipReason::AdapterPlanningRejected { .. }
     ));
 }

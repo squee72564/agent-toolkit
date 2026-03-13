@@ -7,7 +7,7 @@ use crate::message_response_stream::state::{
 use crate::observer::{RuntimeObserver, safe_call_observer};
 use crate::runtime_error::RuntimeError;
 use crate::types::{
-    AttemptMeta, RequestEndContext, attempt_failure_event, attempt_start_event,
+    AttemptDisposition, AttemptMeta, RequestEndContext, attempt_failure_event, attempt_start_event,
     attempt_success_event, request_end_failure_event, request_end_success_event,
     terminal_failure_error,
 };
@@ -51,8 +51,23 @@ pub(super) fn emit_attempt_success(
     request_observer: &Option<Arc<dyn RuntimeObserver>>,
     attempt: &CompletedAttemptContext,
 ) {
+    let AttemptDisposition::Succeeded {
+        status_code,
+        request_id,
+    } = &attempt.record.disposition
+    else {
+        panic!("completed stream attempt must carry AttemptDisposition::Succeeded");
+    };
     let event = attempt_success_event(
-        &attempt.meta,
+        &AttemptMeta {
+            provider: attempt.record.provider_kind,
+            model: attempt.record.model.clone(),
+            success: true,
+            status_code: *status_code,
+            request_id: request_id.clone(),
+            error_kind: None,
+            error_message: None,
+        },
         attempt.target_index,
         attempt.attempt_index,
         attempt.started_at.elapsed(),
@@ -82,14 +97,21 @@ pub(super) fn emit_request_end_success(
     state: &StreamDriverState,
     attempt: &CompletedAttemptContext,
 ) {
+    let AttemptDisposition::Succeeded {
+        status_code,
+        request_id,
+    } = &attempt.record.disposition
+    else {
+        panic!("completed stream attempt must carry AttemptDisposition::Succeeded");
+    };
     let event = request_end_success_event(RequestEndContext {
-        request_id: attempt.meta.request_id.clone(),
-        provider: Some(attempt.meta.provider),
-        model: Some(attempt.meta.model.clone()),
+        request_id: request_id.clone(),
+        provider: Some(attempt.record.provider_kind),
+        model: Some(attempt.record.model.clone()),
         target_index: Some(attempt.target_index),
         attempt_index: Some(attempt.attempt_index),
         elapsed: state.request_started_at.elapsed(),
-        status_code: attempt.meta.status_code,
+        status_code: *status_code,
     });
     safe_call_observer(state.request_observer.as_ref(), |observer| {
         observer.on_request_end(&event);

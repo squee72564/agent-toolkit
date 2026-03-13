@@ -15,7 +15,7 @@ use crate::route::Route;
 use crate::routed_messages_api::RoutedMessagesApi;
 use crate::routed_streaming_api::RoutedStreamingApi;
 use crate::runtime_error::RuntimeError;
-use crate::types::ResponseMeta;
+use crate::types::{AttemptRecord, ResponseMeta, failed_attempt_record};
 
 mod builder;
 mod execution;
@@ -100,7 +100,13 @@ impl AgentToolkit {
             route.planning_rejection_policy,
         ) {
             planner::RoutedPlanningResult::Executable(plan) => plan,
-            planner::RoutedPlanningResult::PlanningFailure(failure) => {
+            planner::RoutedPlanningResult::PlanningFailure {
+                failure,
+                skipped_attempts,
+            } => {
+                for skipped in &skipped_attempts {
+                    prepared.emit_attempt_skipped(self, &execution, skipped);
+                }
                 let error = RuntimeError::route_planning_failure(failure);
                 prepared.emit_request_end_failure(None, None, None, None, &error);
                 return Err(error);
@@ -110,6 +116,9 @@ impl AgentToolkit {
                 return Err(error);
             }
         };
+        for skipped in &initial_plan.skipped_attempts {
+            prepared.emit_attempt_skipped(self, &execution, skipped);
+        }
 
         for (index, attempt_spec) in prepared
             .attempts
@@ -139,7 +148,14 @@ impl AgentToolkit {
                     prepared.attempts.len(),
                 ) {
                     planner::FallbackPlanResult::Executable(plan) => *plan,
-                    planner::FallbackPlanResult::Skip => continue,
+                    planner::FallbackPlanResult::Skip(skipped) => {
+                        prepared.emit_attempt_skipped(self, &execution, &skipped);
+                        continue;
+                    }
+                    planner::FallbackPlanResult::Rejected(skipped) => {
+                        prepared.emit_attempt_skipped(self, &execution, &skipped);
+                        break;
+                    }
                     planner::FallbackPlanResult::Stop => break,
                 }
             };
@@ -175,7 +191,11 @@ impl AgentToolkit {
 
                     attempts.push(meta);
                     let should_continue = index + 1 < prepared.attempts.len()
-                        && fallback_policy.should_fallback(&error);
+                        && fallback_policy.should_retry_next_target(
+                            &error,
+                            client.runtime.kind,
+                            &target.instance,
+                        );
                     last_error = Some(error);
                     if !should_continue {
                         break;
@@ -215,6 +235,9 @@ impl AgentToolkit {
         let prepared = PreparedExecution::new(self, &route, &execution)?;
         prepared.emit_request_start(None);
         let fallback_policy = route.fallback_policy.clone();
+        let mut attempts = Vec::new();
+        let mut attempt_history: Vec<AttemptRecord> = Vec::new();
+        let mut last_error: Option<RuntimeError> = None;
 
         let initial_plan = match planner::plan_routed_execution(
             self,
@@ -224,85 +247,148 @@ impl AgentToolkit {
             route.planning_rejection_policy,
         ) {
             planner::RoutedPlanningResult::Executable(plan) => plan,
-            planner::RoutedPlanningResult::PlanningFailure(failure) => {
-                return Err(RuntimeError::route_planning_failure(failure));
+            planner::RoutedPlanningResult::PlanningFailure {
+                failure,
+                skipped_attempts,
+            } => {
+                for skipped in &skipped_attempts {
+                    prepared.emit_attempt_skipped(self, &execution, skipped);
+                }
+                let error = RuntimeError::route_planning_failure(failure);
+                prepared.emit_request_end_failure(None, None, None, None, &error);
+                return Err(error);
             }
-            planner::RoutedPlanningResult::Fatal(error) => return Err(error),
+            planner::RoutedPlanningResult::Fatal(error) => {
+                prepared.emit_request_end_failure(None, None, None, None, &error);
+                return Err(error);
+            }
         };
-        let planner::PlannedRoutedAttempt {
-            execution_plan,
-            target_index: index,
-        } = *initial_plan;
-        let attempt_spec = &prepared.attempts[index];
-        let target = &attempt_spec.target;
-        let Some(client) = self.clients.get(&target.instance) else {
-            return Err(RuntimeError::target_resolution(format!(
-                "provider instance {} is not registered",
-                target.instance
-            )));
-        };
-        let attempt_execution = prepared.attempt(
-            self,
-            &execution,
-            Some(execution_plan.provider_attempt.model.as_str()),
-            target,
-            index,
-        );
+        for skipped in &initial_plan.skipped_attempts {
+            prepared.emit_attempt_skipped(self, &execution, skipped);
+            attempt_history.push(skipped.record.clone());
+        }
+        let initial_plan = *initial_plan;
 
-        match client
-            .runtime
-            .open_stream_attempt(execution_plan.clone())
-            .await
+        for (index, attempt_spec) in prepared
+            .attempts
+            .iter()
+            .enumerate()
+            .skip(initial_plan.target_index)
         {
-            ProviderStreamAttemptOutcome::Opened { stream, meta } => {
-                return Ok(MessageResponseStream::new_routed(RoutedStreamInit {
-                    task: task.clone(),
-                    toolkit: self,
-                    execution: execution.clone(),
-                    fallback_policy,
-                    planning_rejection_policy: route.planning_rejection_policy,
-                    request_started_at: prepared.request_started_at,
-                    request_observer: prepared.request_observer.clone(),
-                    attempts: prepared.attempts.clone(),
-                    current_attempt: LiveAttempt {
-                        stream: *stream,
-                        context: AttemptContext {
-                            target_index: index,
-                            attempt_index: index,
-                            started_at: attempt_execution.started_at,
-                            observer: attempt_execution.observer,
-                            provider: meta.provider,
-                            model: meta.model,
-                            request_id: meta.request_id,
-                            status_code: meta.status_code,
+            let target = &attempt_spec.target;
+            let Some(client) = self.clients.get(&target.instance) else {
+                let error = RuntimeError::target_resolution(format!(
+                    "provider instance {} is not registered",
+                    target.instance
+                ));
+                prepared.emit_request_end_failure(None, None, None, None, &error);
+                return Err(error);
+            };
+            let execution_plan = if index == initial_plan.target_index {
+                initial_plan.execution_plan.clone()
+            } else {
+                match planner::plan_fallback_attempt(
+                    client,
+                    attempt_spec,
+                    &task,
+                    &execution,
+                    route.planning_rejection_policy,
+                    index,
+                    prepared.attempts.len(),
+                ) {
+                    planner::FallbackPlanResult::Executable(plan) => *plan,
+                    planner::FallbackPlanResult::Skip(skipped) => {
+                        prepared.emit_attempt_skipped(self, &execution, &skipped);
+                        attempt_history.push(skipped.record);
+                        continue;
+                    }
+                    planner::FallbackPlanResult::Rejected(skipped) => {
+                        prepared.emit_attempt_skipped(self, &execution, &skipped);
+                        attempt_history.push(skipped.record);
+                        break;
+                    }
+                    planner::FallbackPlanResult::Stop => break,
+                }
+            };
+            let attempt_execution = prepared.attempt(
+                self,
+                &execution,
+                Some(execution_plan.provider_attempt.model.as_str()),
+                target,
+                index,
+            );
+            let selected_model = execution_plan.provider_attempt.model.clone();
+
+            match client.runtime.open_stream_attempt(execution_plan).await {
+                ProviderStreamAttemptOutcome::Opened { stream, meta } => {
+                    return Ok(MessageResponseStream::new_routed(RoutedStreamInit {
+                        task: task.clone(),
+                        toolkit: self,
+                        execution: execution.clone(),
+                        fallback_policy,
+                        planning_rejection_policy: route.planning_rejection_policy,
+                        request_started_at: prepared.request_started_at,
+                        request_observer: prepared.request_observer.clone(),
+                        attempts: prepared.attempts.clone(),
+                        attempt_history,
+                        current_attempt: LiveAttempt {
+                            stream: *stream,
+                            context: AttemptContext {
+                                target_index: index,
+                                attempt_index: index,
+                                started_at: attempt_execution.started_at,
+                                observer: attempt_execution.observer,
+                                provider_instance: target.instance.clone(),
+                                provider: meta.provider,
+                                model: meta.model,
+                                request_id: meta.request_id,
+                                status_code: meta.status_code,
+                            },
                         },
-                    },
-                    next_target_index: index + 1,
-                }));
-            }
-            ProviderStreamAttemptOutcome::Failure { error, meta } => {
-                attempt_execution.emit_failure(&meta, index);
-                let should_continue =
-                    index + 1 < prepared.attempts.len() && fallback_policy.should_fallback(&error);
-                if !should_continue {
-                    prepared.emit_request_end_failure(
-                        Some(meta.provider),
-                        Some(meta.model),
-                        Some(index),
-                        Some(index),
+                        next_target_index: index + 1,
+                    }));
+                }
+                ProviderStreamAttemptOutcome::Failure { error, meta } => {
+                    attempt_execution.emit_failure(&meta, index);
+                    attempts.push(meta);
+                    attempt_history.push(failed_attempt_record(
+                        target.instance.clone(),
+                        client.runtime.kind,
+                        selected_model,
+                        index,
+                        index,
                         &error,
-                    );
-                    return Err(error);
+                    ));
+                    let should_continue = index + 1 < prepared.attempts.len()
+                        && fallback_policy.should_retry_next_target(
+                            &error,
+                            client.runtime.kind,
+                            &target.instance,
+                        );
+                    last_error = Some(error);
+                    if !should_continue {
+                        break;
+                    }
                 }
             }
         }
 
-        Err(RuntimeError::target_resolution(
-            "no target providers were resolved for this request",
-        ))
+        let result = match last_error {
+            Some(error) if attempts.len() > 1 => Err(RuntimeError::fallback_exhausted(error)),
+            Some(error) => Err(error),
+            None => Err(RuntimeError::target_resolution(
+                "no target providers were resolved for this request",
+            )),
+        };
+
+        if let Err(error) = &result {
+            prepared.emit_terminal_request_end(self, &execution, &attempts, error);
+        }
+
+        result
     }
 
-    fn resolve_attempt_observer(
+    pub(crate) fn resolve_attempt_observer(
         &self,
         execution: &ExecutionOptions,
         provider: ProviderInstanceId,

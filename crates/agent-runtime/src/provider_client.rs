@@ -174,6 +174,7 @@ impl ProviderClient {
                             attempt_index: 0,
                             started_at: context.attempt_started_at,
                             observer: context.cloned_observer(),
+                            provider_instance: self.runtime.instance_id.clone(),
                             provider: meta.provider,
                             model: meta.model,
                             request_id: meta.request_id,

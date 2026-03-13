@@ -85,6 +85,26 @@ pub struct AttemptFailureEvent {
     pub error_message: Option<String>,
 }
 
+/// Observer payload emitted when planning rejects a route attempt before
+/// provider execution begins.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttemptSkippedEvent {
+    /// Registered provider instance selected for the skipped attempt.
+    pub provider_instance: ProviderInstanceId,
+    /// Concrete provider kind resolved for the skipped attempt.
+    pub provider_kind: ProviderKind,
+    /// Model selected for the skipped attempt.
+    pub model: String,
+    /// Zero-based target index for the skipped attempt.
+    pub target_index: usize,
+    /// Zero-based attempt index for the skipped attempt.
+    pub attempt_index: usize,
+    /// Elapsed wall-clock time spent planning this attempt.
+    pub elapsed: Duration,
+    /// Planning-only reason the attempt was skipped.
+    pub reason: SkipReason,
+}
+
 /// Observer payload emitted once when a request terminates.
 ///
 /// On success, `error_kind` and `error_message` are `None`. On failure,
@@ -220,6 +240,23 @@ pub struct ResponseMeta {
     pub attempts: Vec<AttemptMeta>,
 }
 
+/// Metadata describing the terminal executed failure for a call.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExecutedFailureMeta {
+    /// Registered provider instance selected for the failed attempt.
+    pub selected_provider_instance: ProviderInstanceId,
+    /// Concrete provider kind selected for the failed attempt.
+    pub selected_provider_kind: ProviderKind,
+    /// Model that produced the terminal executed failure.
+    pub selected_model: String,
+    /// HTTP status code from the failed attempt, when available.
+    pub status_code: Option<u16>,
+    /// Provider request identifier from the failed attempt, when available.
+    pub request_id: Option<String>,
+    /// Ordered route-attempt history for the failed call.
+    pub attempts: Vec<AttemptRecord>,
+}
+
 pub(crate) struct RequestEndContext {
     pub(crate) request_id: Option<String>,
     pub(crate) provider: Option<ProviderId>,
@@ -301,6 +338,25 @@ pub(crate) fn attempt_failure_event(
     }
 }
 
+pub(crate) fn attempt_skipped_event(
+    attempt: &AttemptRecord,
+    elapsed: Duration,
+) -> AttemptSkippedEvent {
+    let AttemptDisposition::Skipped { reason } = &attempt.disposition else {
+        panic!("attempt_skipped_event requires AttemptDisposition::Skipped");
+    };
+
+    AttemptSkippedEvent {
+        provider_instance: attempt.provider_instance.clone(),
+        provider_kind: attempt.provider_kind,
+        model: attempt.model.clone(),
+        target_index: attempt.target_index,
+        attempt_index: attempt.attempt_index,
+        elapsed,
+        reason: reason.clone(),
+    }
+}
+
 pub(crate) fn request_end_success_event(context: RequestEndContext) -> RequestEndEvent {
     RequestEndEvent {
         request_id: context.request_id,
@@ -346,6 +402,109 @@ pub(crate) fn response_meta(
         status_code,
         request_id,
         attempts,
+    }
+}
+
+// REFACTOR-SHIM: convert typed AttemptRecord history into the legacy ResponseMeta.attempts shape
+// until phase 09 replaces ResponseMeta.attempts with Vec<AttemptRecord>.
+pub(crate) fn legacy_attempt_meta(record: &AttemptRecord) -> Option<AttemptMeta> {
+    match &record.disposition {
+        AttemptDisposition::Skipped { .. } => None,
+        AttemptDisposition::Succeeded {
+            status_code,
+            request_id,
+        } => Some(AttemptMeta {
+            provider: record.provider_kind,
+            model: record.model.clone(),
+            success: true,
+            status_code: *status_code,
+            request_id: request_id.clone(),
+            error_kind: None,
+            error_message: None,
+        }),
+        AttemptDisposition::Failed {
+            error_kind,
+            error_message,
+            status_code,
+            request_id,
+        } => Some(AttemptMeta {
+            provider: record.provider_kind,
+            model: record.model.clone(),
+            success: false,
+            status_code: *status_code,
+            request_id: request_id.clone(),
+            error_kind: Some(*error_kind),
+            error_message: Some(error_message.clone()),
+        }),
+    }
+}
+
+// REFACTOR-SHIM: preserve the legacy ResponseMeta.attempts contract while streaming runtime state
+// is already normalized to ordered AttemptRecord history.
+pub(crate) fn legacy_attempt_history(records: &[AttemptRecord]) -> Vec<AttemptMeta> {
+    records.iter().filter_map(legacy_attempt_meta).collect()
+}
+
+pub(crate) fn executed_failure_meta(
+    selected_provider_instance: ProviderInstanceId,
+    selected_provider_kind: ProviderKind,
+    selected_model: String,
+    status_code: Option<u16>,
+    request_id: Option<String>,
+    attempts: Vec<AttemptRecord>,
+) -> ExecutedFailureMeta {
+    ExecutedFailureMeta {
+        selected_provider_instance,
+        selected_provider_kind,
+        selected_model,
+        status_code,
+        request_id,
+        attempts,
+    }
+}
+
+pub(crate) fn succeeded_attempt_record(
+    provider_instance: ProviderInstanceId,
+    provider_kind: ProviderKind,
+    model: String,
+    target_index: usize,
+    attempt_index: usize,
+    status_code: Option<u16>,
+    request_id: Option<String>,
+) -> AttemptRecord {
+    AttemptRecord {
+        provider_instance,
+        provider_kind,
+        model,
+        target_index,
+        attempt_index,
+        disposition: AttemptDisposition::Succeeded {
+            status_code,
+            request_id,
+        },
+    }
+}
+
+pub(crate) fn failed_attempt_record(
+    provider_instance: ProviderInstanceId,
+    provider_kind: ProviderKind,
+    model: String,
+    target_index: usize,
+    attempt_index: usize,
+    error: &RuntimeError,
+) -> AttemptRecord {
+    AttemptRecord {
+        provider_instance,
+        provider_kind,
+        model,
+        target_index,
+        attempt_index,
+        disposition: AttemptDisposition::Failed {
+            error_kind: error.kind,
+            error_message: error.message.clone(),
+            status_code: error.status_code,
+            request_id: error.request_id.clone(),
+        },
     }
 }
 

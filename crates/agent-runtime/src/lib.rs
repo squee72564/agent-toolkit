@@ -51,9 +51,7 @@ pub use crate::conversation::Conversation;
 pub use crate::direct_messages_api::DirectMessagesApi;
 pub use crate::direct_streaming_api::DirectStreamingApi;
 pub use crate::execution_options::{ExecutionOptions, ResponseMode, TransportOptions};
-pub use crate::fallback::{
-    FallbackAction, FallbackMatch, FallbackMode, FallbackPolicy, FallbackRule,
-};
+pub use crate::fallback::{FallbackAction, FallbackMatch, FallbackPolicy, FallbackRule};
 pub use crate::message_create_input::MessageCreateInput;
 pub use crate::message_response_stream::{MessageResponseStream, StreamCompletion};
 pub use crate::message_text_stream::MessageTextStream;
@@ -67,9 +65,9 @@ pub use crate::routed_streaming_api::RoutedStreamingApi;
 pub use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
 pub use crate::target::Target;
 pub use crate::types::{
-    AttemptDisposition, AttemptFailureEvent, AttemptMeta, AttemptRecord, AttemptStartEvent,
-    AttemptSuccessEvent, RequestEndEvent, RequestStartEvent, ResponseMeta, RoutePlanningFailure,
-    RoutePlanningFailureReason, SkipReason,
+    AttemptDisposition, AttemptFailureEvent, AttemptMeta, AttemptRecord, AttemptSkippedEvent,
+    AttemptStartEvent, AttemptSuccessEvent, ExecutedFailureMeta, RequestEndEvent,
+    RequestStartEvent, ResponseMeta, RoutePlanningFailure, RoutePlanningFailureReason, SkipReason,
 };
 pub use agent_core::{
     AnthropicFamilyOptions, AnthropicOptions, FamilyOptions, NativeOptions,
