@@ -1,35 +1,39 @@
+use crate::attempt_spec::AttemptSpec;
 use crate::fallback::FallbackPolicy;
-use crate::target::Target;
+use crate::planning_rejection_policy::PlanningRejectionPolicy;
 
 /// Ordered routed attempt chain for one logical call.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Route {
     /// Primary target attempted first.
-    pub primary: Target,
+    pub primary: AttemptSpec,
     /// Ordered fallback targets attempted after the primary target.
-    pub fallbacks: Vec<Target>,
+    pub fallbacks: Vec<AttemptSpec>,
     /// Fallback decision policy evaluated between attempts.
     pub fallback_policy: FallbackPolicy,
+    /// Planning-time behavior for skipped/rejected attempts.
+    pub planning_rejection_policy: PlanningRejectionPolicy,
 }
 
 impl Route {
     /// Creates a route with one primary target.
-    pub fn to(primary: Target) -> Self {
+    pub fn to(primary: impl Into<AttemptSpec>) -> Self {
         Self {
-            primary,
+            primary: primary.into(),
             fallbacks: Vec::new(),
             fallback_policy: FallbackPolicy::default(),
+            planning_rejection_policy: PlanningRejectionPolicy::FailFast,
         }
     }
 
     /// Appends one fallback target.
-    pub fn with_fallback(mut self, target: Target) -> Self {
-        self.fallbacks.push(target);
+    pub fn with_fallback(mut self, target: impl Into<AttemptSpec>) -> Self {
+        self.fallbacks.push(target.into());
         self
     }
 
     /// Replaces the fallback target list.
-    pub fn with_fallbacks(mut self, fallbacks: Vec<Target>) -> Self {
+    pub fn with_fallbacks(mut self, fallbacks: Vec<AttemptSpec>) -> Self {
         self.fallbacks = fallbacks;
         self
     }
@@ -40,10 +44,19 @@ impl Route {
         self
     }
 
-    pub(crate) fn targets(&self) -> Vec<Target> {
-        let mut targets = Vec::with_capacity(1 + self.fallbacks.len());
-        targets.push(self.primary.clone());
-        targets.extend(self.fallbacks.clone());
-        targets
+    /// Replaces the planning-rejection policy.
+    pub fn with_planning_rejection_policy(
+        mut self,
+        planning_rejection_policy: PlanningRejectionPolicy,
+    ) -> Self {
+        self.planning_rejection_policy = planning_rejection_policy;
+        self
+    }
+
+    pub(crate) fn attempts(&self) -> Vec<AttemptSpec> {
+        let mut attempts = Vec::with_capacity(1 + self.fallbacks.len());
+        attempts.push(self.primary.clone());
+        attempts.extend(self.fallbacks.clone());
+        attempts
     }
 }

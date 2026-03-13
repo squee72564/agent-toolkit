@@ -117,7 +117,8 @@ async fn runtime_executes_openai_sse_plan_and_builds_response() {
                 metadata: BTreeMap::new(),
             },
             None,
-            BTreeMap::new(),
+            &crate::TransportOptions::default(),
+            &crate::AttemptExecutionOptions::default(),
         )
         .await;
 

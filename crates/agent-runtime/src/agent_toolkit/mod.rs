@@ -2,6 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use agent_core::{ProviderInstanceId, Request, Response, TaskRequest};
 
+use crate::attempt_spec::AttemptSpec;
 use crate::execution_options::{ExecutionOptions, ResponseMode};
 use crate::message_response_stream::{
     AttemptContext, LiveAttempt, MessageResponseStream, RoutedStreamInit,
@@ -10,10 +11,10 @@ use crate::observer::RuntimeObserver;
 use crate::provider_client::ProviderClient;
 use crate::provider_runtime::{ProviderAttemptOutcome, ProviderStreamAttemptOutcome};
 use crate::route::Route;
+use crate::route_planning;
 use crate::routed_messages_api::RoutedMessagesApi;
 use crate::routed_streaming_api::RoutedStreamingApi;
 use crate::runtime_error::RuntimeError;
-use crate::target::Target;
 use crate::types::ResponseMeta;
 
 mod builder;
@@ -25,7 +26,7 @@ use self::execution::PreparedExecution;
 /// Multi-provider runtime for routed request execution.
 ///
 /// `AgentToolkit` is the high-level entry point when a request may need an
-/// explicit [`Target`], a [`crate::FallbackPolicy`], or request-scoped
+/// explicit [`crate::Target`], a [`crate::FallbackPolicy`], or request-scoped
 /// observability through [`RuntimeObserver`].
 #[derive(Clone)]
 pub struct AgentToolkit {
@@ -92,7 +93,8 @@ impl AgentToolkit {
         let mut attempts = Vec::new();
         let mut last_error: Option<RuntimeError> = None;
 
-        for (index, target) in prepared.targets.iter().enumerate() {
+        for (index, attempt_spec) in prepared.attempts.iter().enumerate() {
+            let target = &attempt_spec.target;
             let Some(client) = self.clients.get(&target.instance) else {
                 let error = RuntimeError::target_resolution(format!(
                     "provider instance {} is not registered",
@@ -107,15 +109,58 @@ impl AgentToolkit {
                 );
                 return Err(error);
             };
-            let attempt_execution = prepared.attempt(self, &execution, None, target, index);
             let attempt_request = Request::from(task.clone());
+            let prepared_attempt = match route_planning::prepare_route_attempt(
+                client,
+                attempt_spec,
+                execution.response_mode,
+                &attempt_request,
+            ) {
+                Ok(prepared_attempt) => prepared_attempt,
+                Err(route_planning::PrepareAttemptError::Rejected(rejection)) => {
+                    if route_planning::should_skip_planning_rejection(
+                        route.planning_rejection_policy,
+                        index,
+                        prepared.attempts.len(),
+                    ) {
+                        last_error = Some(rejection.error);
+                        continue;
+                    }
+                    prepared.emit_request_end_failure(
+                        None,
+                        execution::event_model(target.model.as_deref(), None),
+                        Some(index),
+                        Some(index),
+                        &rejection.error,
+                    );
+                    return Err(rejection.error);
+                }
+                Err(route_planning::PrepareAttemptError::Fatal(error)) => {
+                    prepared.emit_request_end_failure(
+                        None,
+                        execution::event_model(target.model.as_deref(), None),
+                        Some(index),
+                        Some(index),
+                        &error,
+                    );
+                    return Err(error);
+                }
+            };
+            let attempt_execution = prepared.attempt(
+                self,
+                &execution,
+                Some(prepared_attempt.selected_model.as_str()),
+                target,
+                index,
+            );
 
             let attempt = client
                 .runtime
                 .execute_attempt(
                     attempt_request,
                     target.model.as_deref(),
-                    execution.transport.extra_headers.clone(),
+                    &execution.transport,
+                    &attempt_spec.execution,
                 )
                 .await;
 
@@ -140,7 +185,7 @@ impl AgentToolkit {
                     attempt_execution.emit_failure(&meta, index);
 
                     attempts.push(meta);
-                    let should_continue = index + 1 < prepared.targets.len()
+                    let should_continue = index + 1 < prepared.attempts.len()
                         && fallback_policy.should_fallback(&error);
                     last_error = Some(error);
                     if !should_continue {
@@ -187,21 +232,50 @@ impl AgentToolkit {
 
         let fallback_policy = route.fallback_policy.clone();
 
-        for (index, target) in prepared.targets.iter().enumerate() {
+        for (index, attempt_spec) in prepared.attempts.iter().enumerate() {
+            let target = &attempt_spec.target;
             let Some(client) = self.clients.get(&target.instance) else {
                 return Err(RuntimeError::target_resolution(format!(
                     "provider instance {} is not registered",
                     target.instance
                 )));
             };
-            let attempt_execution = prepared.attempt(self, &execution, None, target, index);
+            let prepared_attempt = match route_planning::prepare_route_attempt(
+                client,
+                attempt_spec,
+                execution.response_mode,
+                &request,
+            ) {
+                Ok(prepared_attempt) => prepared_attempt,
+                Err(route_planning::PrepareAttemptError::Rejected(rejection)) => {
+                    if route_planning::should_skip_planning_rejection(
+                        route.planning_rejection_policy,
+                        index,
+                        prepared.attempts.len(),
+                    ) {
+                        continue;
+                    }
+                    return Err(rejection.error);
+                }
+                Err(route_planning::PrepareAttemptError::Fatal(error)) => {
+                    return Err(error);
+                }
+            };
+            let attempt_execution = prepared.attempt(
+                self,
+                &execution,
+                Some(prepared_attempt.selected_model.as_str()),
+                target,
+                index,
+            );
 
             match client
                 .runtime
                 .open_stream_attempt(
                     request.clone(),
                     target.model.as_deref(),
-                    execution.transport.extra_headers.clone(),
+                    &execution.transport,
+                    &attempt_spec.execution,
                 )
                 .await
             {
@@ -211,9 +285,10 @@ impl AgentToolkit {
                         toolkit: self,
                         execution: execution.clone(),
                         fallback_policy: route.fallback_policy.clone(),
+                        planning_rejection_policy: route.planning_rejection_policy,
                         request_started_at: prepared.request_started_at,
                         request_observer: prepared.request_observer.clone(),
-                        targets: prepared.targets.clone(),
+                        attempts: prepared.attempts.clone(),
                         current_attempt: LiveAttempt {
                             stream: *stream,
                             context: AttemptContext {
@@ -232,7 +307,7 @@ impl AgentToolkit {
                 }
                 ProviderStreamAttemptOutcome::Failure { error, meta } => {
                     attempt_execution.emit_failure(&meta, index);
-                    let should_continue = index + 1 < prepared.targets.len()
+                    let should_continue = index + 1 < prepared.attempts.len()
                         && fallback_policy.should_fallback(&error);
                     if !should_continue {
                         prepared.emit_request_end_failure(
@@ -268,23 +343,7 @@ impl AgentToolkit {
         })
     }
 
-    pub fn resolve_route_targets(&self, route: &Route) -> Result<Vec<Target>, RuntimeError> {
-        let mut targets = Vec::new();
-        for target in route.targets() {
-            if !targets.contains(&target) {
-                targets.push(target);
-            }
-        }
-
-        for target in &targets {
-            if !self.clients.contains_key(&target.instance) {
-                return Err(RuntimeError::target_resolution(format!(
-                    "provider instance {} is not registered",
-                    target.instance
-                )));
-            }
-        }
-
-        Ok(targets)
+    pub fn resolve_route_targets(&self, route: &Route) -> Result<Vec<AttemptSpec>, RuntimeError> {
+        route_planning::resolve_route_targets(self, route)
     }
 }

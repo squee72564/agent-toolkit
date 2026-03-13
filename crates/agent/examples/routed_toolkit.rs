@@ -29,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .build()?;
 
-    let fallback_policy = FallbackPolicy::new(vec![Target::new(ProviderId::OpenRouter)])
+    let fallback_policy = FallbackPolicy::new()
         .with_mode(FallbackMode::RulesOnly)
         .with_rule(FallbackRule::retry_on_status(429))
         .with_rule(FallbackRule::retry_on_provider_code("rate_limit_exceeded"));

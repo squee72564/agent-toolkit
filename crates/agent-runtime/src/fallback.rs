@@ -1,8 +1,6 @@
 use agent_core::ProviderId;
 
 use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
-use crate::target::Target;
-
 /// Strategy for combining legacy fallback toggles with explicit rules.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FallbackMode {
@@ -146,12 +144,8 @@ impl FallbackRule {
 }
 
 /// Ordered fallback configuration for routed execution.
-///
-/// `targets` supplies the fallback destinations after the primary target.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FallbackPolicy {
-    /// Additional targets attempted after the primary target fails.
-    pub targets: Vec<Target>,
     /// Legacy HTTP status codes that trigger fallback.
     pub retry_on_status_codes: Vec<u16>,
     /// Whether transport errors trigger fallback under legacy behavior.
@@ -163,12 +157,9 @@ pub struct FallbackPolicy {
 }
 
 impl FallbackPolicy {
-    /// Creates a fallback policy with the supplied fallback targets.
-    pub fn new(targets: Vec<Target>) -> Self {
-        Self {
-            targets,
-            ..Self::default()
-        }
+    /// Creates a fallback policy with default retry settings.
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Sets how legacy fallback settings and explicit rules are combined.
@@ -225,7 +216,6 @@ impl FallbackPolicy {
 impl Default for FallbackPolicy {
     fn default() -> Self {
         Self {
-            targets: Vec::new(),
             retry_on_status_codes: vec![429, 500, 502, 503, 504],
             retry_on_transport_error: true,
             rules: Vec::new(),

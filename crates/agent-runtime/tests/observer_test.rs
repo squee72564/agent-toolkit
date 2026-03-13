@@ -309,22 +309,29 @@ async fn router_fallback_ordered_attempts_with_indices() {
     let observer = Arc::new(RecordingObserver::new());
 
     let toolkit = AgentToolkit::builder()
-        .with_openai(ProviderConfig::new("test-key").with_base_url(base_url))
+        .with_openai(
+            ProviderConfig::new("test-key")
+                .with_base_url("http://127.0.0.1:1")
+                .with_default_model("gpt-5-mini"),
+        )
+        .with_openrouter(
+            ProviderConfig::new("test-key")
+                .with_base_url(base_url)
+                .with_default_model("openai/gpt-5-mini"),
+        )
         .observer(observer.clone())
         .build()
         .expect("build toolkit");
 
-    let fallback_policy = FallbackPolicy::new(vec![
-        Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"),
-    ])
-    .with_mode(FallbackMode::RulesOnly)
-    .with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Configuration));
+    let fallback_policy = FallbackPolicy::new()
+        .with_mode(FallbackMode::RulesOnly)
+        .with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Transport));
 
     let (_response, meta) = with_timeout(
         toolkit.messages().create_with_meta(
             MessageCreateInput::user("hello"),
-            Route::to(Target::new(ProviderId::OpenAi).with_model(" "))
-                .with_fallbacks(fallback_policy.targets.clone())
+            Route::to(Target::new(ProviderId::OpenAi))
+                .with_fallback(Target::new(ProviderId::OpenRouter))
                 .with_fallback_policy(fallback_policy),
             ExecutionOptions::default(),
         ),
@@ -361,7 +368,11 @@ async fn toolkit_observer_and_execution_override_precedence() {
     let send_observer = Arc::new(RecordingObserver::new());
 
     let toolkit = AgentToolkit::builder()
-        .with_openai(ProviderConfig::new("test-key").with_base_url("http://127.0.0.1:1"))
+        .with_openai(
+            ProviderConfig::new("test-key")
+                .with_base_url("http://127.0.0.1:1")
+                .with_default_model("gpt-5-mini"),
+        )
         .observer(toolkit_observer.clone())
         .build()
         .expect("build toolkit");
@@ -394,21 +405,29 @@ async fn fallback_exhausted_request_end_uses_terminal_failure_context() {
     let observer = Arc::new(RecordingObserver::new());
 
     let toolkit = AgentToolkit::builder()
-        .with_openai(ProviderConfig::new("test-key").with_base_url("http://127.0.0.1:1"))
+        .with_openai(
+            ProviderConfig::new("test-key")
+                .with_base_url("http://127.0.0.1:1")
+                .with_default_model("gpt-5-mini"),
+        )
+        .with_openrouter(
+            ProviderConfig::new("test-key")
+                .with_base_url("http://127.0.0.1:2")
+                .with_default_model("openai/gpt-5-mini"),
+        )
         .observer(observer.clone())
         .build()
         .expect("build toolkit");
 
-    let fallback_policy =
-        FallbackPolicy::new(vec![Target::new(ProviderId::OpenAi).with_model("  ")])
-            .with_mode(FallbackMode::RulesOnly)
-            .with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Configuration));
+    let fallback_policy = FallbackPolicy::new()
+        .with_mode(FallbackMode::RulesOnly)
+        .with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Transport));
 
     let error = with_timeout(
         toolkit.messages().create_with_meta(
             MessageCreateInput::user("hello"),
-            Route::to(Target::new(ProviderId::OpenAi).with_model(" "))
-                .with_fallbacks(fallback_policy.targets.clone())
+            Route::to(Target::new(ProviderId::OpenAi))
+                .with_fallback(Target::new(ProviderId::OpenRouter))
                 .with_fallback_policy(fallback_policy),
             ExecutionOptions::default(),
         ),
@@ -432,10 +451,7 @@ async fn fallback_exhausted_request_end_uses_terminal_failure_context() {
     );
 
     let request_end = as_request_end(event_at(&events, 5));
-    assert_eq!(
-        request_end.error_kind,
-        Some(RuntimeErrorKind::Configuration)
-    );
+    assert_eq!(request_end.error_kind, Some(RuntimeErrorKind::Transport));
     assert_ne!(
         request_end.error_kind,
         Some(RuntimeErrorKind::FallbackExhausted)

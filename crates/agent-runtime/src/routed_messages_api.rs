@@ -73,10 +73,12 @@ pub(crate) fn apply_model_override(route: Route, model_override: Option<String>)
         return route;
     };
 
-    let primary = route.primary.with_model(model_override);
+    let primary = crate::AttemptSpec::to(route.primary.target.with_model(model_override))
+        .with_execution(route.primary.execution);
     Route::to(primary)
         .with_fallbacks(route.fallbacks)
         .with_fallback_policy(route.fallback_policy)
+        .with_planning_rejection_policy(route.planning_rejection_policy)
 }
 
 pub(crate) fn merge_execution_options(

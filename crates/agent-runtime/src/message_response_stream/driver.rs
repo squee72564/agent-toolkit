@@ -2,7 +2,6 @@ use std::time::Instant;
 
 use crate::message_response_stream::events::{
     attempt_failure_meta, emit_attempt_failure, emit_attempt_start, emit_request_end_failure,
-    event_model,
 };
 use crate::message_response_stream::state::{
     AttemptContext, CompletedAttemptContext, LiveAttempt, PendingCompletion, RoutingState,
@@ -10,6 +9,7 @@ use crate::message_response_stream::state::{
 };
 use crate::observer::resolve_observer_for_request;
 use crate::provider_runtime::ProviderStreamAttemptOutcome;
+use crate::route_planning::{self, PrepareAttemptError};
 use crate::runtime_error::RuntimeError;
 use crate::types::AttemptMeta;
 
@@ -139,15 +139,41 @@ async fn try_open_fallback_attempt(
         return None;
     };
 
-    while routed.next_target_index < routed.targets.len() {
+    while routed.next_target_index < routed.attempts.len() {
         if !routed.fallback_policy.should_fallback(error) {
             return None;
         }
 
         let index = routed.next_target_index;
         routed.next_target_index = routed.next_target_index.saturating_add(1);
-        let target = routed.targets[index].clone();
+        let attempt = routed.attempts[index].clone();
+        let target = attempt.target.clone();
         let client = routed.toolkit.clients.get(&target.instance)?;
+        let request = routed.request.clone();
+        let prepared_attempt = match route_planning::prepare_route_attempt(
+            client,
+            &attempt,
+            routed.execution.response_mode,
+            &request,
+        ) {
+            Ok(prepared_attempt) => prepared_attempt,
+            Err(PrepareAttemptError::Rejected(rejection)) => {
+                let should_continue = route_planning::should_skip_planning_rejection(
+                    routed.planning_rejection_policy,
+                    index,
+                    routed.attempts.len(),
+                );
+                if should_continue {
+                    continue;
+                }
+                state.terminal_error = Some(rejection.error);
+                return None;
+            }
+            Err(PrepareAttemptError::Fatal(error)) => {
+                state.terminal_error = Some(error);
+                return None;
+            }
+        };
         let observer = resolve_observer_for_request(
             client.runtime.observer.as_ref(),
             routed.toolkit.observer.as_ref(),
@@ -158,18 +184,18 @@ async fn try_open_fallback_attempt(
         emit_attempt_start(
             observer.as_ref(),
             client.runtime.kind,
-            event_model(target.model.as_deref(), &state.request_model_id),
+            Some(prepared_attempt.selected_model.clone()),
             index,
             index,
             attempt_started_at,
         );
-        let request = routed.request.clone();
         match client
             .runtime
             .open_stream_attempt(
                 request,
                 target.model.as_deref(),
-                routed.execution.transport.extra_headers.clone(),
+                &routed.execution.transport,
+                &attempt.execution,
             )
             .await
         {
@@ -194,10 +220,10 @@ async fn try_open_fallback_attempt(
             } => {
                 emit_attempt_failure(observer.as_ref(), &meta, index, index, attempt_started_at);
                 state.attempts.push(meta);
-                let should_continue = routed.next_target_index < routed.targets.len()
+                let should_continue = routed.next_target_index < routed.attempts.len()
                     && routed.fallback_policy.should_fallback(&attempt_error);
                 let provider = client.runtime.kind;
-                let model = target.model.unwrap_or_default();
+                let model = prepared_attempt.selected_model;
                 let request_id = attempt_error.request_id.clone();
                 let status_code = attempt_error.status_code;
                 let observer_for_end = observer.clone();

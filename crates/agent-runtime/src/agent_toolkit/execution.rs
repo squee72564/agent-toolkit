@@ -4,6 +4,7 @@ use std::time::Instant;
 use agent_core::ProviderId;
 
 use super::AgentToolkit;
+use crate::attempt_spec::AttemptSpec;
 use crate::execution_options::ExecutionOptions;
 use crate::observer::{RuntimeObserver, resolve_observer_for_request, safe_call_observer};
 use crate::route::Route;
@@ -17,7 +18,7 @@ use crate::types::{
 
 pub(super) struct PreparedExecution {
     pub(super) request_started_at: Instant,
-    pub(super) targets: Vec<Target>,
+    pub(super) attempts: Vec<AttemptSpec>,
     pub(super) request_observer: Option<Arc<dyn RuntimeObserver>>,
 }
 
@@ -33,10 +34,10 @@ impl PreparedExecution {
         execution: &ExecutionOptions,
     ) -> Result<Self, RuntimeError> {
         let request_started_at = Instant::now();
-        let targets = toolkit.resolve_route_targets(route)?;
-        let first_client_observer = targets
+        let attempts = toolkit.resolve_route_targets(route)?;
+        let first_client_observer = attempts
             .first()
-            .and_then(|target| toolkit.clients.get(&target.instance))
+            .and_then(|attempt| toolkit.clients.get(&attempt.target.instance))
             .and_then(|client| client.runtime.observer.as_ref());
         let request_observer = resolve_observer_for_request(
             first_client_observer,
@@ -47,7 +48,7 @@ impl PreparedExecution {
 
         Ok(Self {
             request_started_at,
-            targets,
+            attempts,
             request_observer,
         })
     }
@@ -55,12 +56,12 @@ impl PreparedExecution {
     pub(super) fn emit_request_start(&self, request_model: Option<&str>) {
         let event = request_start_event(
             None,
-            self.targets
+            self.attempts
                 .first()
-                .and_then(|target| event_model(target.model.as_deref(), request_model)),
+                .and_then(|attempt| event_model(attempt.target.model.as_deref(), request_model)),
             self.request_started_at.elapsed(),
             None,
-            self.targets.len(),
+            self.attempts.len(),
         );
         safe_call_observer(self.request_observer.as_ref(), |observer| {
             observer.on_request_start(&event);
@@ -71,7 +72,7 @@ impl PreparedExecution {
         &self,
         toolkit: &AgentToolkit,
         execution: &ExecutionOptions,
-        request_model: Option<&str>,
+        effective_model: Option<&str>,
         target: &Target,
         index: usize,
     ) -> AttemptExecution {
@@ -80,7 +81,7 @@ impl PreparedExecution {
         let started_at = Instant::now();
         let event = attempt_start_event(
             provider,
-            event_model(target.model.as_deref(), request_model),
+            effective_model.map(ToString::to_string),
             index,
             index,
             started_at.elapsed(),

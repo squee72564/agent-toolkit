@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use agent_core::{CanonicalStreamEnvelope, CanonicalStreamEvent, ProviderId};
 use agent_providers::adapter::adapter_for;
 use agent_transport::HttpTransport;
@@ -197,6 +199,49 @@ async fn routed_streaming_explicit_task_api_uses_route_and_execution_options() {
     assert_eq!(
         completion.response.output.content,
         vec![agent_core::ContentPart::text("explicit route stream")]
+    );
+}
+
+#[tokio::test]
+async fn routed_streaming_fail_fast_stops_on_planning_rejection_before_fallback() {
+    let toolkit = AgentToolkit {
+        clients: HashMap::from([
+            (
+                Target::default_instance_for(ProviderId::OpenAi),
+                test_provider_client_with_streaming_support(
+                    ProviderId::OpenAi,
+                    Some("gpt-5-mini"),
+                    false,
+                ),
+            ),
+            (
+                Target::default_instance_for(ProviderId::OpenRouter),
+                test_provider_client(ProviderId::OpenRouter),
+            ),
+        ]),
+        observer: None,
+    };
+
+    let error = toolkit
+        .streaming()
+        .create(
+            MessageCreateInput::user("hello"),
+            Route::to(Target::new(ProviderId::OpenAi))
+                .with_fallback(Target::new(ProviderId::OpenRouter))
+                .with_planning_rejection_policy(crate::PlanningRejectionPolicy::FailFast),
+            ExecutionOptions {
+                response_mode: crate::ResponseMode::Streaming,
+                ..ExecutionOptions::default()
+            },
+        )
+        .await
+        .expect_err("planning rejection must stop before fallback");
+
+    assert_eq!(error.kind, crate::RuntimeErrorKind::Configuration);
+    assert!(
+        error.message.contains("does not support streaming"),
+        "unexpected message: {}",
+        error.message
     );
 }
 

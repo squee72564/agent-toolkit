@@ -21,7 +21,7 @@ fn base_request(stream: bool) -> Request {
 
 #[test]
 fn anthropic_request_plan_uses_json_defaults_for_non_streaming_requests() {
-    let plan = plan_request(base_request(false)).expect("planning should succeed");
+    let plan = plan_request(base_request(false), None).expect("planning should succeed");
 
     assert_eq!(plan.transport_kind, ProviderTransportKind::HttpJson);
     assert_eq!(plan.response_kind, ProviderResponseKind::JsonBody);
@@ -31,7 +31,7 @@ fn anthropic_request_plan_uses_json_defaults_for_non_streaming_requests() {
 
 #[test]
 fn anthropic_request_plan_enables_sse_for_streaming_requests() {
-    let plan = plan_request(base_request(true)).expect("planning should succeed");
+    let plan = plan_request(base_request(true), None).expect("planning should succeed");
 
     assert_eq!(plan.transport_kind, ProviderTransportKind::HttpSse);
     assert_eq!(plan.response_kind, ProviderResponseKind::RawProviderStream);

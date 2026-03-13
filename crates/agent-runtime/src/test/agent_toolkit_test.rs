@@ -80,9 +80,10 @@ fn router_requires_explicit_target_without_policy() {
     };
     let error = toolkit
         .resolve_route_targets(&Route {
-            primary: Target::new(ProviderId::OpenAi),
+            primary: Target::new(ProviderId::OpenAi).into(),
             fallbacks: Vec::new(),
             fallback_policy: FallbackPolicy::default(),
+            planning_rejection_policy: PlanningRejectionPolicy::FailFast,
         })
         .expect_err("target resolution should fail");
     assert_eq!(error.kind, RuntimeErrorKind::TargetResolution);
@@ -124,9 +125,13 @@ fn resolve_route_targets_deduplicates_primary_and_fallback_targets() {
 
     let route = crate::Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5"))
         .with_fallbacks(vec![
-            Target::new(ProviderId::OpenAi).with_model("gpt-5"),
-            Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"),
-            Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"),
+            Target::new(ProviderId::OpenAi).with_model("gpt-5").into(),
+            Target::new(ProviderId::OpenRouter)
+                .with_model("openai/gpt-5")
+                .into(),
+            Target::new(ProviderId::OpenRouter)
+                .with_model("openai/gpt-5")
+                .into(),
         ]);
 
     let targets = toolkit
@@ -134,16 +139,21 @@ fn resolve_route_targets_deduplicates_primary_and_fallback_targets() {
         .expect("target resolution should succeed");
 
     assert_eq!(
-        targets,
+        targets
+            .into_iter()
+            .map(|attempt| attempt.target)
+            .collect::<Vec<_>>(),
         vec![
             Target::new(ProviderId::OpenAi).with_model("gpt-5"),
+            Target::new(ProviderId::OpenAi).with_model("gpt-5"),
+            Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"),
             Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"),
         ]
     );
 }
 
 #[test]
-fn resolve_route_targets_preserves_fallback_policy_targets_when_deduplicating() {
+fn resolve_route_targets_preserves_attempt_order() {
     let toolkit = AgentToolkit {
         clients: HashMap::from([
             (
@@ -167,8 +177,12 @@ fn resolve_route_targets_preserves_fallback_policy_targets_when_deduplicating() 
         .expect("route target resolution should succeed");
 
     assert_eq!(
-        targets,
+        targets
+            .into_iter()
+            .map(|attempt| attempt.target)
+            .collect::<Vec<_>>(),
         vec![
+            Target::new(ProviderId::OpenAi).with_model("gpt-5"),
             Target::new(ProviderId::OpenAi).with_model("gpt-5"),
             Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"),
         ]

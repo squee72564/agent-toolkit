@@ -4,6 +4,8 @@
 pub mod identity;
 /// Message roles and helper constructors for conversational inputs.
 pub mod message;
+/// Layered family-scoped and provider-scoped native request controls.
+pub mod native_options;
 /// Provider and transport configuration shared with HTTP adapters.
 pub mod platform;
 /// Normalized response models returned from provider adapters.
@@ -13,6 +15,8 @@ pub mod task;
 /// Tool definitions and mixed-content message parts.
 pub mod tool;
 
+/// Re-export of [`identity::ProviderCapabilities`].
+pub use identity::ProviderCapabilities;
 /// Re-export of [`identity::ProviderDescriptor`].
 pub use identity::ProviderDescriptor;
 /// Re-export of [`identity::ProviderFamilyId`].
@@ -27,6 +31,22 @@ pub use identity::ProviderKind;
 pub use message::Message;
 /// Re-export of [`message::MessageRole`].
 pub use message::MessageRole;
+/// Re-export of [`native_options::AnthropicFamilyOptions`].
+pub use native_options::AnthropicFamilyOptions;
+/// Re-export of [`native_options::AnthropicOptions`].
+pub use native_options::AnthropicOptions;
+/// Re-export of [`native_options::FamilyOptions`].
+pub use native_options::FamilyOptions;
+/// Re-export of [`native_options::NativeOptions`].
+pub use native_options::NativeOptions;
+/// Re-export of [`native_options::OpenAiCompatibleOptions`].
+pub use native_options::OpenAiCompatibleOptions;
+/// Re-export of [`native_options::OpenAiOptions`].
+pub use native_options::OpenAiOptions;
+/// Re-export of [`native_options::OpenRouterOptions`].
+pub use native_options::OpenRouterOptions;
+/// Re-export of [`native_options::ProviderOptions`].
+pub use native_options::ProviderOptions;
 /// Re-export of [`platform::AdapterContext`].
 pub use platform::AdapterContext;
 /// Re-export of [`platform::AuthCredentials`].

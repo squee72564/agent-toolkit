@@ -4,8 +4,9 @@ use reqwest::header::{HeaderName, HeaderValue};
 use serde_json::json;
 
 use agent_core::types::{
-    AuthStyle, ContentPart, Message, MessageRole, ProtocolKind, ProviderId, Request,
-    ResponseFormat, ToolChoice,
+    AnthropicFamilyOptions, AnthropicOptions, AuthStyle, ContentPart, FamilyOptions, Message,
+    MessageRole, NativeOptions, OpenAiCompatibleOptions, OpenAiOptions, ProtocolKind, ProviderId,
+    ProviderOptions, Request, ResponseFormat, ToolChoice,
 };
 
 use crate::anthropic_family::AnthropicDecodeEnvelope;
@@ -201,10 +202,10 @@ fn openai_adapter_plan_request_and_decode_match_translator() {
     let request = base_request();
     let adapter = adapter_for(ProviderId::OpenAi);
 
-    let translated_encoded = openai_request::plan_request(request.clone())
+    let translated_encoded = openai_request::plan_request(request.clone(), ProviderId::OpenAi, None)
         .expect("request planning should succeed");
     let adapter_plan = adapter
-        .plan_request(request)
+        .plan_request(request, None)
         .expect("adapter planning should succeed");
     assert_eq!(adapter_plan.body, translated_encoded.body);
     assert_eq!(adapter_plan.warnings, translated_encoded.warnings);
@@ -246,10 +247,10 @@ fn anthropic_adapter_plan_request_and_decode_match_translator() {
     request.model_id = "claude-sonnet-4-6".to_string();
     let adapter = adapter_for(ProviderId::Anthropic);
 
-    let translated_encoded = anthropic_request::plan_request(request.clone())
+    let translated_encoded = anthropic_request::plan_request(request.clone(), None)
         .expect("request planning should succeed");
     let adapter_plan = adapter
-        .plan_request(request)
+        .plan_request(request, None)
         .expect("adapter planning should succeed");
     assert_eq!(adapter_plan.body, translated_encoded.body);
     assert_eq!(adapter_plan.warnings, translated_encoded.warnings);
@@ -310,6 +311,72 @@ fn openrouter_adapter_matches_direct_responses_decode() {
 }
 
 #[test]
+fn openai_adapter_applies_family_and_provider_native_options() {
+    let adapter = adapter_for(ProviderId::OpenAi);
+    let native_options = NativeOptions {
+        family: Some(FamilyOptions::OpenAiCompatible(OpenAiCompatibleOptions {
+            parallel_tool_calls: Some(true),
+            reasoning: Some(json!({"effort":"medium"})),
+        })),
+        provider: Some(ProviderOptions::OpenAi(OpenAiOptions {
+            service_tier: Some("priority".to_string()),
+            store: Some(true),
+        })),
+    };
+
+    let plan = adapter
+        .plan_request(base_request(), Some(&native_options))
+        .expect("adapter planning should succeed");
+
+    assert_eq!(plan.body["parallel_tool_calls"], true);
+    assert_eq!(plan.body["reasoning"], json!({"effort":"medium"}));
+    assert_eq!(plan.body["service_tier"], "priority");
+    assert_eq!(plan.body["store"], true);
+}
+
+#[test]
+fn generic_openai_compatible_adapter_applies_family_native_options() {
+    let adapter = adapter_for(ProviderId::GenericOpenAiCompatible);
+    let native_options = NativeOptions {
+        family: Some(FamilyOptions::OpenAiCompatible(OpenAiCompatibleOptions {
+            parallel_tool_calls: Some(false),
+            reasoning: Some(json!({"effort":"low"})),
+        })),
+        provider: None,
+    };
+
+    let plan = adapter
+        .plan_request(base_request(), Some(&native_options))
+        .expect("adapter planning should succeed");
+
+    assert_eq!(plan.body["parallel_tool_calls"], false);
+    assert_eq!(plan.body["reasoning"], json!({"effort":"low"}));
+}
+
+#[test]
+fn anthropic_adapter_applies_family_and_provider_native_options() {
+    let adapter = adapter_for(ProviderId::Anthropic);
+    let mut request = base_request();
+    request.model_id = "claude-sonnet-4-6".to_string();
+    let native_options = NativeOptions {
+        family: Some(FamilyOptions::Anthropic(AnthropicFamilyOptions {
+            thinking: Some(json!({"type":"enabled","budget_tokens":128})),
+        })),
+        provider: Some(ProviderOptions::Anthropic(AnthropicOptions { top_k: Some(17) })),
+    };
+
+    let plan = adapter
+        .plan_request(request, Some(&native_options))
+        .expect("adapter planning should succeed");
+
+    assert_eq!(
+        plan.body["thinking"],
+        json!({"type":"enabled","budget_tokens":128})
+    );
+    assert_eq!(plan.body["top_k"], 17);
+}
+
+#[test]
 fn openai_adapter_decode_error_maps_provider_operation_and_kind() {
     let adapter = adapter_for(ProviderId::OpenAi);
     let error = adapter
@@ -364,7 +431,7 @@ fn openai_adapter_plan_validation_error_maps_provider_operation_and_kind() {
     request.messages.clear();
 
     let error = adapter
-        .plan_request(request)
+        .plan_request(request, None)
         .expect_err("planning should fail for empty messages");
 
     assert_adapter_error(
@@ -383,7 +450,7 @@ fn anthropic_adapter_plan_validation_error_maps_provider_operation_and_kind() {
     request.temperature = Some(1.5);
 
     let error = adapter
-        .plan_request(request)
+        .plan_request(request, None)
         .expect_err("planning should fail for out-of-range temperature");
 
     assert_adapter_error(
@@ -401,7 +468,7 @@ fn openrouter_adapter_plan_validation_error_maps_provider_operation_and_kind() {
     request.messages.clear();
 
     let error = adapter
-        .plan_request(request)
+        .plan_request(request, None)
         .expect_err("planning should fail for empty messages");
 
     assert_adapter_error(

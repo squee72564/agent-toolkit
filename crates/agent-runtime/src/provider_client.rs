@@ -1,7 +1,8 @@
-use std::{collections::BTreeMap, sync::Arc, time::Instant};
+use std::{sync::Arc, time::Instant};
 
 use agent_core::{Request, Response, TaskRequest};
 
+use crate::attempt_execution_options::AttemptExecutionOptions;
 use crate::direct_messages_api::DirectMessagesApi;
 use crate::direct_streaming_api::DirectStreamingApi;
 use crate::execution_options::{ExecutionOptions, ResponseMode};
@@ -101,7 +102,12 @@ impl ProviderClient {
 
         let attempt = self
             .runtime
-            .execute_attempt(request, None, BTreeMap::new())
+            .execute_attempt(
+                request,
+                None,
+                &execution.transport,
+                &AttemptExecutionOptions::default(),
+            )
             .await;
 
         match attempt {
@@ -165,7 +171,12 @@ impl ProviderClient {
 
         match self
             .runtime
-            .open_stream_attempt(request.clone(), None, BTreeMap::new())
+            .open_stream_attempt(
+                request.clone(),
+                None,
+                &execution.transport,
+                &AttemptExecutionOptions::default(),
+            )
             .await
         {
             ProviderStreamAttemptOutcome::Opened { stream, meta } => {

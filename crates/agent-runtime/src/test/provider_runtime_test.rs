@@ -1,6 +1,10 @@
 use std::collections::BTreeMap;
+use std::time::Duration;
 
 use agent_core::{Message, ProviderId, Request, ResponseFormat, ToolChoice};
+use agent_providers::request_plan::{
+    ProviderRequestPlan, ProviderResponseKind, ProviderTransportKind,
+};
 use agent_transport::{HttpResponseHead, HttpResponseMode};
 use reqwest::{StatusCode, header::HeaderMap};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -64,7 +68,8 @@ async fn execute_attempt_uses_override_model_in_meta() {
         .execute_attempt(
             test_request("request-model", false),
             Some("override-model"),
-            BTreeMap::new(),
+            &crate::TransportOptions::default(),
+            &crate::AttemptExecutionOptions::default(),
         )
         .await;
 
@@ -86,7 +91,12 @@ async fn execute_attempt_uses_default_model_when_request_blank() {
     );
 
     let attempt = runtime
-        .execute_attempt(test_request(" ", false), None, BTreeMap::new())
+        .execute_attempt(
+            test_request(" ", false),
+            None,
+            &crate::TransportOptions::default(),
+            &crate::AttemptExecutionOptions::default(),
+        )
         .await;
 
     match attempt {
@@ -103,7 +113,12 @@ async fn execute_attempt_reports_unset_model_when_no_model_available() {
     let runtime = test_provider_runtime(ProviderId::OpenAi, "http://127.0.0.1:1", None);
 
     let attempt = runtime
-        .execute_attempt(test_request("", false), None, BTreeMap::new())
+        .execute_attempt(
+            test_request("", false),
+            None,
+            &crate::TransportOptions::default(),
+            &crate::AttemptExecutionOptions::default(),
+        )
         .await;
 
     match attempt {
@@ -135,7 +150,8 @@ async fn open_stream_attempt_reports_selected_model_and_response_meta() {
         .open_stream_attempt(
             test_request("", true),
             Some("override-model"),
-            BTreeMap::new(),
+            &crate::TransportOptions::default(),
+            &crate::AttemptExecutionOptions::default(),
         )
         .await;
 
@@ -160,6 +176,85 @@ async fn open_stream_attempt_reports_selected_model_and_response_meta() {
             panic!("expected opened stream, got error: {error}")
         }
     }
+}
+
+#[test]
+fn timeout_overrides_only_replace_attempt_local_timeout_fields() {
+    let mut plan = ProviderRequestPlan {
+        body: serde_json::json!({}),
+        warnings: Vec::new(),
+        transport_kind: ProviderTransportKind::HttpJson,
+        response_kind: ProviderResponseKind::JsonBody,
+        endpoint_path_override: None,
+        request_options: agent_transport::HttpRequestOptions::json_defaults()
+            .with_request_timeout(Duration::from_secs(10))
+            .with_stream_setup_timeout(Duration::from_secs(11))
+            .with_stream_idle_timeout(Duration::from_secs(12)),
+    };
+
+    crate::provider_runtime::apply_timeout_overrides(
+        &mut plan,
+        &crate::TransportTimeoutOverrides {
+            request_timeout: Some(Duration::from_secs(3)),
+            stream_setup_timeout: Some(Duration::from_secs(4)),
+            stream_idle_timeout: Some(Duration::from_secs(5)),
+        },
+    );
+
+    assert_eq!(
+        plan.request_options.request_timeout,
+        Some(Duration::from_secs(3))
+    );
+    assert_eq!(
+        plan.request_options.stream_setup_timeout,
+        Some(Duration::from_secs(4))
+    );
+    assert_eq!(
+        plan.request_options.stream_idle_timeout,
+        Some(Duration::from_secs(5))
+    );
+}
+
+#[test]
+fn transport_metadata_shim_preserves_route_then_attempt_header_precedence() {
+    let transport = crate::TransportOptions {
+        request_id_header_override: Some("x-route-request-id".to_string()),
+        extra_headers: BTreeMap::from([
+            ("x-shared".to_string(), "route".to_string()),
+            ("x-route-only".to_string(), "route-only".to_string()),
+        ]),
+    };
+    let execution = crate::AttemptExecutionOptions::default().with_extra_headers(BTreeMap::from([
+        ("x-shared".to_string(), "attempt".to_string()),
+        ("x-attempt-only".to_string(), "attempt-only".to_string()),
+    ]));
+
+    let metadata = crate::provider_runtime::build_transport_metadata_shim(&transport, &execution);
+
+    assert_eq!(
+        metadata
+            .get("transport.request_id_header")
+            .map(String::as_str),
+        Some("x-route-request-id")
+    );
+    assert_eq!(
+        metadata
+            .get("transport.header.x-shared")
+            .map(String::as_str),
+        Some("attempt")
+    );
+    assert_eq!(
+        metadata
+            .get("transport.header.x-route-only")
+            .map(String::as_str),
+        Some("route-only")
+    );
+    assert_eq!(
+        metadata
+            .get("transport.header.x-attempt-only")
+            .map(String::as_str),
+        Some("attempt-only")
+    );
 }
 
 fn response_head(status: StatusCode, request_id: Option<&str>) -> HttpResponseHead {

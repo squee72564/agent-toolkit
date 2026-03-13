@@ -30,10 +30,14 @@ fn base_request() -> Request {
 
 #[test]
 fn openai_request_error_maps_into_adapter_error() {
-    let adapter_error = request::plan_request(Request {
-        model_id: String::new(),
-        ..base_request()
-    })
+    let adapter_error = request::plan_request(
+        Request {
+            model_id: String::new(),
+            ..base_request()
+        },
+        ProviderId::OpenAi,
+        None,
+    )
     .expect_err("planning should fail");
 
     assert_eq!(adapter_error.provider, ProviderId::OpenAi);
@@ -57,10 +61,14 @@ fn openai_response_error_maps_into_adapter_error() {
 
 #[test]
 fn openai_request_error_preserves_source_chain() {
-    let adapter_error = request::plan_request(Request {
-        model_id: String::new(),
-        ..base_request()
-    })
+    let adapter_error = request::plan_request(
+        Request {
+            model_id: String::new(),
+            ..base_request()
+        },
+        ProviderId::OpenAi,
+        None,
+    )
     .expect_err("planning should fail");
 
     let spec_source = adapter_error
@@ -110,7 +118,8 @@ fn openai_translator_is_constructible() {
 
 #[test]
 fn openai_request_plan_passes_through_openai_encoder() {
-    let encoded = request::plan_request(base_request()).expect("planning should succeed");
+    let encoded = request::plan_request(base_request(), ProviderId::OpenAi, None)
+        .expect("planning should succeed");
 
     assert_eq!(encoded.body["model"], "gpt-4.1-mini");
     assert!(encoded.body["input"].is_array());

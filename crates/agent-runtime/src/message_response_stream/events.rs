@@ -8,8 +8,8 @@ use crate::observer::{RuntimeObserver, safe_call_observer};
 use crate::runtime_error::RuntimeError;
 use crate::types::{
     AttemptMeta, RequestEndContext, attempt_failure_event, attempt_start_event,
-    attempt_success_event, normalized_event_model, request_end_failure_event,
-    request_end_success_event, terminal_failure_error,
+    attempt_success_event, request_end_failure_event, request_end_success_event,
+    terminal_failure_error,
 };
 
 pub(super) fn attempt_failure_meta(context: &AttemptContext, error: &RuntimeError) -> AttemptMeta {
@@ -121,8 +121,4 @@ pub(super) fn emit_request_end_failure(
     safe_call_observer(state.request_observer.as_ref(), |observer| {
         observer.on_request_end(&event);
     });
-}
-
-pub(crate) fn event_model(target_model: Option<&str>, request_model: &str) -> Option<String> {
-    normalized_event_model(target_model, request_model)
 }

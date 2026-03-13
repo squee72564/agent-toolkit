@@ -26,10 +26,13 @@ fn base_request() -> Request {
 
 #[test]
 fn anthropic_request_error_maps_into_adapter_error() {
-    let adapter_error = request::plan_request(agent_core::Request {
-        model_id: String::new(),
-        ..base_request()
-    })
+    let adapter_error = request::plan_request(
+        agent_core::Request {
+            model_id: String::new(),
+            ..base_request()
+        },
+        None,
+    )
     .expect_err("planning should fail");
 
     assert_eq!(adapter_error.provider, ProviderId::Anthropic);
@@ -55,10 +58,13 @@ fn anthropic_response_error_maps_into_adapter_error() {
 
 #[test]
 fn anthropic_request_error_preserves_source_chain() {
-    let adapter_error = request::plan_request(agent_core::Request {
-        model_id: String::new(),
-        ..base_request()
-    })
+    let adapter_error = request::plan_request(
+        agent_core::Request {
+            model_id: String::new(),
+            ..base_request()
+        },
+        None,
+    )
     .expect_err("planning should fail");
 
     let spec_source = adapter_error

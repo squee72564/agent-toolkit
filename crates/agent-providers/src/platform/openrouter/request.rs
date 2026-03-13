@@ -1,7 +1,9 @@
 use serde::Serialize;
 use serde_json::{Map, Value};
 
-use agent_core::{Request, RuntimeWarning};
+use agent_core::{
+    FamilyOptions, NativeOptions, OpenRouterOptions, ProviderOptions, Request, RuntimeWarning,
+};
 use agent_transport::HttpRequestOptions;
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
@@ -56,6 +58,59 @@ pub(crate) struct OpenRouterOverrides {
     pub stream_options: Option<Value>,
     #[serde(skip_serializing)]
     pub extra: Map<String, Value>,
+}
+
+impl OpenRouterOverrides {
+    pub(crate) fn from_native_options(
+        native_options: Option<&NativeOptions>,
+    ) -> Result<Self, AdapterError> {
+        let Some(native_options) = native_options else {
+            return Ok(Self::default());
+        };
+
+        let mut overrides = Self::default();
+
+        if let Some(FamilyOptions::OpenAiCompatible(options)) = native_options.family.as_ref() {
+            overrides.parallel_tool_calls = options.parallel_tool_calls;
+            overrides.reasoning = options.reasoning.clone();
+        }
+
+        if let Some(provider) = native_options.provider.as_ref() {
+            let ProviderOptions::OpenRouter(options) = provider else {
+                return Err(AdapterError::new(
+                    AdapterErrorKind::Validation,
+                    agent_core::ProviderId::OpenRouter,
+                    AdapterOperation::PlanRequest,
+                    format!(
+                        "OpenRouter adapter received mismatched provider native options for {:?}",
+                        provider.provider_kind()
+                    ),
+                ));
+            };
+            apply_provider_options(&mut overrides, options);
+        }
+
+        Ok(overrides)
+    }
+}
+
+fn apply_provider_options(overrides: &mut OpenRouterOverrides, options: &OpenRouterOptions) {
+    overrides.fallback_models = options.fallback_models.clone();
+    overrides.provider_preferences = options.provider_preferences.clone();
+    overrides.plugins = options.plugins.clone();
+    overrides.frequency_penalty = options.frequency_penalty;
+    overrides.presence_penalty = options.presence_penalty;
+    overrides.logit_bias = options.logit_bias.clone();
+    overrides.logprobs = options.logprobs;
+    overrides.top_logprobs = options.top_logprobs;
+    overrides.seed = options.seed;
+    overrides.user = options.user.clone();
+    overrides.session_id = options.session_id.clone();
+    overrides.trace = options.trace.clone();
+    overrides.route = options.route.clone();
+    overrides.modalities = options.modalities.clone();
+    overrides.image_config = options.image_config.clone();
+    overrides.debug = options.debug.clone();
 }
 
 pub(crate) fn plan_request(

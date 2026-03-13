@@ -5,8 +5,8 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde_json::Value;
 
 use agent_core::{
-    AuthStyle, ProviderDescriptor, ProviderFamilyId, ProviderKind, Request, Response,
-    ResponseFormat,
+    AuthStyle, NativeOptions, ProviderCapabilities, ProviderDescriptor, ProviderFamilyId,
+    ProviderKind, Request, Response, ResponseFormat,
 };
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
@@ -53,7 +53,11 @@ pub trait ProviderAdapter: Sync + std::fmt::Debug {
     }
     /// Translates a provider-agnostic request into a provider-specific request
     /// plan for the transport layer.
-    fn plan_request(&self, req: Request) -> Result<ProviderRequestPlan, AdapterError>;
+    fn plan_request(
+        &self,
+        req: Request,
+        native_options: Option<&NativeOptions>,
+    ) -> Result<ProviderRequestPlan, AdapterError>;
     /// Decodes a provider JSON response into the canonical response type.
     fn decode_response_json(
         &self,
@@ -82,6 +86,11 @@ fn openai_descriptor() -> ProviderDescriptor {
         default_auth_style: AuthStyle::Bearer,
         default_request_id_header: HeaderName::from_static("x-request-id"),
         default_headers: HeaderMap::new(),
+        capabilities: ProviderCapabilities {
+            supports_streaming: true,
+            supports_family_native_options: true,
+            supports_provider_native_options: true,
+        },
     }
 }
 
@@ -101,6 +110,11 @@ fn anthropic_descriptor() -> ProviderDescriptor {
         default_auth_style: AuthStyle::ApiKeyHeader(HeaderName::from_static("x-api-key")),
         default_request_id_header: HeaderName::from_static("request-id"),
         default_headers,
+        capabilities: ProviderCapabilities {
+            supports_streaming: true,
+            supports_family_native_options: true,
+            supports_provider_native_options: true,
+        },
     }
 }
 
@@ -114,6 +128,11 @@ fn openrouter_descriptor() -> ProviderDescriptor {
         default_auth_style: AuthStyle::Bearer,
         default_request_id_header: HeaderName::from_static("x-request-id"),
         default_headers: HeaderMap::new(),
+        capabilities: ProviderCapabilities {
+            supports_streaming: true,
+            supports_family_native_options: true,
+            supports_provider_native_options: true,
+        },
     }
 }
 
@@ -127,6 +146,11 @@ fn generic_openai_compatible_descriptor() -> ProviderDescriptor {
         default_auth_style: AuthStyle::Bearer,
         default_request_id_header: HeaderName::from_static("x-request-id"),
         default_headers: HeaderMap::new(),
+        capabilities: ProviderCapabilities {
+            supports_streaming: true,
+            supports_family_native_options: true,
+            supports_provider_native_options: false,
+        },
     }
 }
 
@@ -187,8 +211,12 @@ impl ProviderAdapter for OpenAiAdapter {
         &DESCRIPTOR
     }
 
-    fn plan_request(&self, req: Request) -> Result<ProviderRequestPlan, AdapterError> {
-        openai_request::plan_request(req)
+    fn plan_request(
+        &self,
+        req: Request,
+        native_options: Option<&NativeOptions>,
+    ) -> Result<ProviderRequestPlan, AdapterError> {
+        openai_request::plan_request(req, self.kind(), native_options)
     }
 
     fn decode_response_json(
@@ -215,8 +243,12 @@ impl ProviderAdapter for AnthropicAdapter {
         &DESCRIPTOR
     }
 
-    fn plan_request(&self, req: Request) -> Result<ProviderRequestPlan, AdapterError> {
-        anthropic_request::plan_request(req)
+    fn plan_request(
+        &self,
+        req: Request,
+        native_options: Option<&NativeOptions>,
+    ) -> Result<ProviderRequestPlan, AdapterError> {
+        anthropic_request::plan_request(req, native_options)
     }
 
     fn decode_response_json(
@@ -243,8 +275,14 @@ impl ProviderAdapter for OpenRouterAdapter {
         &DESCRIPTOR
     }
 
-    fn plan_request(&self, req: Request) -> Result<ProviderRequestPlan, AdapterError> {
-        openrouter_request::plan_request(req, &openrouter_request::OpenRouterOverrides::default())
+    fn plan_request(
+        &self,
+        req: Request,
+        native_options: Option<&NativeOptions>,
+    ) -> Result<ProviderRequestPlan, AdapterError> {
+        let overrides =
+            openrouter_request::OpenRouterOverrides::from_native_options(native_options)?;
+        openrouter_request::plan_request(req, &overrides)
     }
 
     fn decode_response_json(
@@ -271,8 +309,12 @@ impl ProviderAdapter for GenericOpenAiCompatibleAdapter {
         &DESCRIPTOR
     }
 
-    fn plan_request(&self, req: Request) -> Result<ProviderRequestPlan, AdapterError> {
-        openai_request::plan_request(req)
+    fn plan_request(
+        &self,
+        req: Request,
+        native_options: Option<&NativeOptions>,
+    ) -> Result<ProviderRequestPlan, AdapterError> {
+        openai_request::plan_request(req, self.kind(), native_options)
     }
 
     fn decode_response_json(

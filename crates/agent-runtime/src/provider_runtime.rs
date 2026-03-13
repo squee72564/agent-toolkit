@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
 use agent_core::{
     CanonicalStreamEnvelope, PlatformConfig, ProviderId, ProviderInstanceId, ProviderKind, Request,
@@ -10,6 +10,8 @@ use agent_providers::{
 };
 use agent_transport::{HttpJsonResponse, HttpResponseMode, HttpSseResponse, HttpTransport};
 
+use crate::attempt_execution_options::AttemptExecutionOptions;
+use crate::execution_options::TransportOptions;
 use crate::observer::RuntimeObserver;
 use crate::provider_stream_runtime::{ProviderStreamRuntime, StreamRuntimeError};
 use crate::registered_provider::RegisteredProvider;
@@ -23,6 +25,8 @@ use self::attempt::{PreparedAttempt, prepare_attempt};
 use self::transport::{
     execute_planned_non_streaming, open_planned_stream, plan_execution, validate_streaming_plan,
 };
+#[allow(unused_imports)]
+pub(crate) use self::{attempt::build_transport_metadata_shim, transport::apply_timeout_overrides};
 
 #[derive(Clone)]
 pub(crate) struct ProviderRuntime {
@@ -132,20 +136,21 @@ impl ProviderRuntime {
         &self,
         request: Request,
         model_override: Option<&str>,
-        metadata: BTreeMap<String, String>,
+        transport: &TransportOptions,
+        execution: &AttemptExecutionOptions,
     ) -> ProviderAttemptOutcome {
         let PreparedAttempt {
             request,
             selected_model,
             adapter_context,
-        } = match prepare_attempt(self, request, model_override, metadata) {
+        } = match prepare_attempt(self, request, model_override, transport, execution) {
             Ok(prepared) => prepared,
             Err(error_and_meta) => {
                 let (error, meta) = *error_and_meta;
                 return ProviderAttemptOutcome::Failure { error, meta };
             }
         };
-        let provider_response = match plan_execution(self, request) {
+        let provider_response = match plan_execution(self, request, execution) {
             Ok(planned) => execute_planned_non_streaming(self, planned, &adapter_context).await,
             Err(error) => Err(error),
         };
@@ -171,13 +176,14 @@ impl ProviderRuntime {
         &self,
         request: Request,
         model_override: Option<&str>,
-        metadata: BTreeMap<String, String>,
+        transport: &TransportOptions,
+        execution: &AttemptExecutionOptions,
     ) -> ProviderStreamAttemptOutcome {
         let PreparedAttempt {
             request,
             selected_model,
             adapter_context,
-        } = match prepare_attempt(self, request, model_override, metadata) {
+        } = match prepare_attempt(self, request, model_override, transport, execution) {
             Ok(prepared) => prepared,
             Err(error_and_meta) => {
                 let (error, meta) = *error_and_meta;
@@ -185,7 +191,7 @@ impl ProviderRuntime {
             }
         };
 
-        let stream = match plan_execution(self, request).and_then(|planned| {
+        let stream = match plan_execution(self, request, execution).and_then(|planned| {
             validate_streaming_plan(self.kind, &planned.plan)?;
             Ok(planned)
         }) {
@@ -210,7 +216,7 @@ impl ProviderRuntime {
         }
     }
 
-    fn resolve_model(
+    pub(crate) fn resolve_model(
         &self,
         request_model: &str,
         model_override: Option<&str>,

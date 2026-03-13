@@ -82,6 +82,17 @@ impl From<ProviderKind> for ProviderInstanceId {
     }
 }
 
+/// Narrow static capability surface used during route planning.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProviderCapabilities {
+    /// Whether the provider may be selected for `ResponseMode::Streaming`.
+    pub supports_streaming: bool,
+    /// Whether family-scoped native options are accepted for this provider.
+    pub supports_family_native_options: bool,
+    /// Whether provider-scoped native options are accepted for this provider.
+    pub supports_provider_native_options: bool,
+}
+
 /// Adapter-owned static provider metadata keyed by [`ProviderKind`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderDescriptor {
@@ -101,4 +112,6 @@ pub struct ProviderDescriptor {
     pub default_request_id_header: HeaderName,
     /// Default headers attached to every request for this provider kind.
     pub default_headers: HeaderMap,
+    /// Narrow static capabilities used by route planning.
+    pub capabilities: ProviderCapabilities,
 }

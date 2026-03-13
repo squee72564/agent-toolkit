@@ -13,6 +13,8 @@
 //! canonical stream envelopes or text deltas.
 
 mod agent_toolkit;
+mod attempt_execution_options;
+mod attempt_spec;
 mod base_client_builder;
 mod clients;
 mod conversation;
@@ -24,12 +26,14 @@ mod message_create_input;
 mod message_response_stream;
 mod message_text_stream;
 mod observer;
+mod planning_rejection_policy;
 mod provider_client;
 mod provider_config;
 mod provider_runtime;
 mod provider_stream_runtime;
 mod registered_provider;
 mod route;
+mod route_planning;
 mod routed_messages_api;
 mod routed_streaming_api;
 mod runtime_error;
@@ -37,6 +41,8 @@ mod target;
 mod types;
 
 pub use crate::agent_toolkit::{AgentToolkit, AgentToolkitBuilder};
+pub use crate::attempt_execution_options::{AttemptExecutionOptions, TransportTimeoutOverrides};
+pub use crate::attempt_spec::AttemptSpec;
 pub use crate::clients::{
     AnthropicClient, AnthropicClientBuilder, OpenAiClient, OpenAiClientBuilder, OpenRouterClient,
     OpenRouterClientBuilder, anthropic, openai, openrouter,
@@ -52,6 +58,7 @@ pub use crate::message_create_input::MessageCreateInput;
 pub use crate::message_response_stream::{MessageResponseStream, StreamCompletion};
 pub use crate::message_text_stream::MessageTextStream;
 pub use crate::observer::RuntimeObserver;
+pub use crate::planning_rejection_policy::PlanningRejectionPolicy;
 pub use crate::provider_config::ProviderConfig;
 pub use crate::registered_provider::RegisteredProvider;
 pub use crate::route::Route;
@@ -62,6 +69,10 @@ pub use crate::target::Target;
 pub use crate::types::{
     AttemptFailureEvent, AttemptMeta, AttemptStartEvent, AttemptSuccessEvent, RequestEndEvent,
     RequestStartEvent, ResponseMeta,
+};
+pub use agent_core::{
+    AnthropicFamilyOptions, AnthropicOptions, FamilyOptions, NativeOptions,
+    OpenAiCompatibleOptions, OpenAiOptions, OpenRouterOptions, ProviderOptions,
 };
 
 #[cfg(test)]

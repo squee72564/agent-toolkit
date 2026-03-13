@@ -96,12 +96,12 @@ async fn fallback_retries_next_provider_on_status_rule_then_succeeds() {
         .build()
         .expect("build toolkit");
 
-    let fallback = FallbackPolicy::new(vec![Target::new(ProviderId::Anthropic)])
+    let fallback = FallbackPolicy::new()
         .with_mode(FallbackMode::RulesOnly)
         .with_rule(FallbackRule::retry_on_status(401));
 
     let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
-        .with_fallbacks(fallback.targets.clone())
+        .with_fallback(Target::new(ProviderId::Anthropic))
         .with_fallback_policy(fallback);
 
     let (_response, meta) = with_test_timeout(
@@ -154,12 +154,12 @@ async fn fallback_exhaustion_returns_terminal_error_kind() {
         .build()
         .expect("build toolkit");
 
-    let fallback = FallbackPolicy::new(vec![Target::new(ProviderId::Anthropic)])
+    let fallback = FallbackPolicy::new()
         .with_mode(FallbackMode::RulesOnly)
         .with_rule(FallbackRule::retry_on_status(401));
 
     let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
-        .with_fallbacks(fallback.targets.clone())
+        .with_fallback(Target::new(ProviderId::Anthropic))
         .with_fallback_policy(fallback);
 
     let error = with_test_timeout(
@@ -220,12 +220,12 @@ async fn fallback_rule_retry_on_provider_code_is_honored() {
         .build()
         .expect("build toolkit");
 
-    let fallback = FallbackPolicy::new(vec![Target::new(ProviderId::OpenRouter)])
+    let fallback = FallbackPolicy::new()
         .with_mode(FallbackMode::RulesOnly)
         .with_rule(FallbackRule::retry_on_provider_code("rate_limit_exceeded"));
 
     let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
-        .with_fallbacks(fallback.targets.clone())
+        .with_fallback(Target::new(ProviderId::OpenRouter))
         .with_fallback_policy(fallback);
 
     let (_response, meta) = with_test_timeout(

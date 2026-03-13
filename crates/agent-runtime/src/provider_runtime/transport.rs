@@ -7,6 +7,7 @@ use agent_transport::{
 };
 use reqwest::Method;
 
+use crate::attempt_execution_options::{AttemptExecutionOptions, TransportTimeoutOverrides};
 use crate::provider_runtime::{
     OpenedProviderStream, ProviderRuntime, extract_provider_code, join_url,
     prepend_encode_warnings, response_mode_mismatch_error,
@@ -22,12 +23,14 @@ pub(super) struct PlannedExecution {
 pub(super) fn plan_execution(
     runtime: &ProviderRuntime,
     request: Request,
+    execution: &AttemptExecutionOptions,
 ) -> Result<PlannedExecution, RuntimeError> {
     let response_format = request.response_format.clone();
-    let plan = runtime
+    let mut plan = runtime
         .adapter
-        .plan_request(request)
+        .plan_request(request, execution.native.as_ref())
         .map_err(RuntimeError::from_adapter)?;
+    apply_timeout_overrides(&mut plan, &execution.timeout_overrides);
     let endpoint_path = plan
         .endpoint_path_override
         .as_deref()
@@ -39,6 +42,21 @@ pub(super) fn plan_execution(
         response_format,
         url,
     })
+}
+
+pub(crate) fn apply_timeout_overrides(
+    plan: &mut ProviderRequestPlan,
+    timeout_overrides: &TransportTimeoutOverrides,
+) {
+    if let Some(request_timeout) = timeout_overrides.request_timeout {
+        plan.request_options.request_timeout = Some(request_timeout);
+    }
+    if let Some(stream_setup_timeout) = timeout_overrides.stream_setup_timeout {
+        plan.request_options.stream_setup_timeout = Some(stream_setup_timeout);
+    }
+    if let Some(stream_idle_timeout) = timeout_overrides.stream_idle_timeout {
+        plan.request_options.stream_idle_timeout = Some(stream_idle_timeout);
+    }
 }
 
 pub(super) async fn execute_planned_non_streaming(
