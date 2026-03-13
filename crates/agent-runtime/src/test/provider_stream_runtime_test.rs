@@ -12,6 +12,8 @@ use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
+use crate::planner;
+use crate::provider_client::ProviderClient;
 use crate::provider_runtime::{ProviderAttemptOutcome, ProviderRuntime};
 use crate::provider_stream_runtime::ProviderStreamRuntime;
 use crate::{MessageCreateInput, RuntimeErrorKind};
@@ -103,22 +105,29 @@ async fn runtime_executes_openai_sse_plan_and_builds_response() {
 
     let attempt = runtime
         .execute_attempt(
-            Request {
-                model_id: String::new(),
-                stream: true,
-                messages: vec![Message::user_text("hello")],
-                tools: Vec::new(),
-                tool_choice: ToolChoice::Auto,
-                response_format: ResponseFormat::Text,
-                temperature: None,
-                top_p: None,
-                max_output_tokens: None,
-                stop: Vec::new(),
-                metadata: BTreeMap::new(),
-            },
-            None,
-            &crate::TransportOptions::default(),
-            &crate::AttemptExecutionOptions::default(),
+            planner::plan_direct_attempt(
+                &ProviderClient::new(runtime.clone()),
+                &Request {
+                    model_id: String::new(),
+                    stream: true,
+                    messages: vec![Message::user_text("hello")],
+                    tools: Vec::new(),
+                    tool_choice: ToolChoice::Auto,
+                    response_format: ResponseFormat::Text,
+                    temperature: None,
+                    top_p: None,
+                    max_output_tokens: None,
+                    stop: Vec::new(),
+                    metadata: BTreeMap::new(),
+                }
+                .task_request(),
+                None,
+                &crate::ExecutionOptions {
+                    response_mode: crate::ResponseMode::Streaming,
+                    ..crate::ExecutionOptions::default()
+                },
+            )
+            .expect("planning should succeed"),
         )
         .await;
 

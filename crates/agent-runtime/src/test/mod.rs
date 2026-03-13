@@ -27,13 +27,13 @@ mod conversation_test;
 mod fallback_test;
 mod message_create_input_test;
 mod observer_test;
+mod planner_test;
 mod provider_client_test;
 mod provider_config_test;
 mod provider_runtime_test;
 mod provider_stream_runtime_test;
 mod registered_provider_test;
 mod route_attempts_test;
-mod route_planning_test;
 mod runtime_error_test;
 mod streaming_api_test;
 mod types_test;
@@ -139,6 +139,13 @@ impl RuntimeObserver for ObserverStub {}
 
 fn terminal_failure_error(error: &RuntimeError) -> &RuntimeError {
     crate::types::terminal_failure_error(error)
+}
+
+fn route_planning_failure(error: &RuntimeError) -> &RoutePlanningFailure {
+    error
+        .source_ref()
+        .and_then(|source| source.downcast_ref::<RoutePlanningFailure>())
+        .expect("runtime error should wrap RoutePlanningFailure")
 }
 
 #[derive(Debug)]

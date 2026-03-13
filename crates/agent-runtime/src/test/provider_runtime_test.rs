@@ -11,6 +11,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
 use crate::RuntimeErrorKind;
+use crate::planner;
+use crate::provider_client::ProviderClient;
 use crate::provider_runtime::{
     ProviderAttemptOutcome, ProviderRuntime, ProviderStreamAttemptOutcome,
     response_mode_mismatch_error,
@@ -65,12 +67,12 @@ async fn execute_attempt_uses_override_model_in_meta() {
     );
 
     let attempt = runtime
-        .execute_attempt(
-            test_request("request-model", false),
+        .execute_attempt(direct_execution_plan(
+            &runtime,
+            test_request("request-model", false).task_request(),
             Some("override-model"),
-            &crate::TransportOptions::default(),
-            &crate::AttemptExecutionOptions::default(),
-        )
+            crate::ExecutionOptions::default(),
+        ))
         .await;
 
     match attempt {
@@ -91,12 +93,12 @@ async fn execute_attempt_uses_default_model_when_request_blank() {
     );
 
     let attempt = runtime
-        .execute_attempt(
-            test_request(" ", false),
+        .execute_attempt(direct_execution_plan(
+            &runtime,
+            test_request(" ", false).task_request(),
             None,
-            &crate::TransportOptions::default(),
-            &crate::AttemptExecutionOptions::default(),
-        )
+            crate::ExecutionOptions::default(),
+        ))
         .await;
 
     match attempt {
@@ -108,28 +110,19 @@ async fn execute_attempt_uses_default_model_when_request_blank() {
     }
 }
 
-#[tokio::test]
-async fn execute_attempt_reports_unset_model_when_no_model_available() {
+#[test]
+fn direct_planner_fails_when_no_model_available() {
     let runtime = test_provider_runtime(ProviderId::OpenAi, "http://127.0.0.1:1", None);
+    let error = planner::plan_direct_attempt(
+        &ProviderClient::new(runtime),
+        &test_request("", false).task_request(),
+        None,
+        &crate::ExecutionOptions::default(),
+    )
+    .expect_err("missing model must fail during planning");
 
-    let attempt = runtime
-        .execute_attempt(
-            test_request("", false),
-            None,
-            &crate::TransportOptions::default(),
-            &crate::AttemptExecutionOptions::default(),
-        )
-        .await;
-
-    match attempt {
-        ProviderAttemptOutcome::Failure { meta, error } => {
-            assert_eq!(meta.model, "<unset-model>");
-            assert_eq!(meta.error_kind, Some(RuntimeErrorKind::Configuration));
-            assert_eq!(meta.error_message.as_deref(), Some(error.message.as_str()));
-            assert_eq!(error.kind, RuntimeErrorKind::Configuration);
-        }
-        ProviderAttemptOutcome::Success { .. } => panic!("expected configuration failure"),
-    }
+    assert_eq!(error.kind, RuntimeErrorKind::Configuration);
+    assert!(error.message.contains("no model available"));
 }
 
 #[tokio::test]
@@ -147,12 +140,15 @@ async fn open_stream_attempt_reports_selected_model_and_response_meta() {
     let runtime = test_provider_runtime(ProviderId::OpenAi, &base_url, Some("default-model"));
 
     let attempt = runtime
-        .open_stream_attempt(
-            test_request("", true),
+        .open_stream_attempt(direct_execution_plan(
+            &runtime,
+            test_request("", true).task_request(),
             Some("override-model"),
-            &crate::TransportOptions::default(),
-            &crate::AttemptExecutionOptions::default(),
-        )
+            crate::ExecutionOptions {
+                response_mode: crate::ResponseMode::Streaming,
+                ..crate::ExecutionOptions::default()
+            },
+        ))
         .await;
 
     match attempt {
@@ -229,7 +225,12 @@ fn transport_metadata_shim_preserves_route_then_attempt_header_precedence() {
         ("x-attempt-only".to_string(), "attempt-only".to_string()),
     ]));
 
-    let metadata = crate::provider_runtime::build_transport_metadata_shim(&transport, &execution);
+    let metadata = planner::build_transport_metadata_shim(&planner::ResolvedTransportOptions {
+        request_id_header_override: transport.request_id_header_override.clone(),
+        route_extra_headers: transport.extra_headers.clone(),
+        attempt_extra_headers: execution.extra_headers.clone(),
+        timeout_overrides: execution.timeout_overrides.clone(),
+    });
 
     assert_eq!(
         metadata
@@ -255,6 +256,21 @@ fn transport_metadata_shim_preserves_route_then_attempt_header_precedence() {
             .map(String::as_str),
         Some("attempt-only")
     );
+}
+
+fn direct_execution_plan(
+    runtime: &ProviderRuntime,
+    task: agent_core::TaskRequest,
+    model_override: Option<&str>,
+    execution: crate::ExecutionOptions,
+) -> planner::ExecutionPlan {
+    planner::plan_direct_attempt(
+        &ProviderClient::new(runtime.clone()),
+        &task,
+        model_override,
+        &execution,
+    )
+    .expect("planning should succeed")
 }
 
 fn response_head(status: StatusCode, request_id: Option<&str>) -> HttpResponseHead {

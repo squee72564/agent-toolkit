@@ -188,3 +188,64 @@ fn resolve_route_targets_preserves_attempt_order() {
         ]
     );
 }
+
+#[tokio::test]
+async fn routed_messages_fail_fast_surfaces_typed_route_planning_failure() {
+    let toolkit = AgentToolkit {
+        clients: HashMap::from([
+            (
+                Target::default_instance_for(ProviderId::Anthropic),
+                test_provider_client(ProviderId::Anthropic),
+            ),
+            (
+                Target::default_instance_for(ProviderId::OpenRouter),
+                test_provider_client(ProviderId::OpenRouter),
+            ),
+        ]),
+        observer: None,
+    };
+    let task = agent_core::Request {
+        model_id: String::new(),
+        stream: false,
+        messages: vec![
+            Message::user_text("hello"),
+            Message::system_text("late system"),
+        ],
+        tools: Vec::new(),
+        tool_choice: ToolChoice::Auto,
+        response_format: ResponseFormat::Text,
+        temperature: None,
+        top_p: None,
+        max_output_tokens: None,
+        stop: Vec::new(),
+        metadata: std::collections::BTreeMap::new(),
+    }
+    .task_request();
+
+    let error = toolkit
+        .messages()
+        .create_task(
+            task,
+            Route::to(Target::new(ProviderId::Anthropic).with_model("claude-sonnet-4-6"))
+                .with_fallback(Target::new(ProviderId::OpenRouter))
+                .with_planning_rejection_policy(PlanningRejectionPolicy::FailFast),
+            ExecutionOptions::default(),
+        )
+        .await
+        .expect_err("planning rejection must stop before fallback");
+
+    assert_eq!(error.kind, RuntimeErrorKind::TargetResolution);
+    let failure = route_planning_failure(&error);
+    assert_eq!(
+        failure.reason,
+        RoutePlanningFailureReason::AllAttemptsRejectedDuringPlanning
+    );
+    assert_eq!(failure.attempts.len(), 1);
+    assert_eq!(failure.attempts[0].model, "claude-sonnet-4-6");
+    assert!(matches!(
+        failure.attempts[0].disposition,
+        AttemptDisposition::Skipped {
+            reason: SkipReason::AdapterPlanningRejected { .. }
+        }
+    ));
+}

@@ -237,12 +237,20 @@ async fn routed_streaming_fail_fast_stops_on_planning_rejection_before_fallback(
         .await
         .expect_err("planning rejection must stop before fallback");
 
-    assert_eq!(error.kind, crate::RuntimeErrorKind::Configuration);
-    assert!(
-        error.message.contains("does not support streaming"),
-        "unexpected message: {}",
-        error.message
+    assert_eq!(error.kind, crate::RuntimeErrorKind::TargetResolution);
+    let failure = route_planning_failure(&error);
+    assert_eq!(
+        failure.reason,
+        crate::RoutePlanningFailureReason::NoCompatibleAttempts
     );
+    assert_eq!(failure.attempts.len(), 1);
+    assert_eq!(failure.attempts[0].model, "gpt-5-mini");
+    assert!(matches!(
+        failure.attempts[0].disposition,
+        crate::AttemptDisposition::Skipped {
+            reason: crate::SkipReason::StaticIncompatibility { .. }
+        }
+    ));
 }
 
 #[tokio::test]
