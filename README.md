@@ -1,5 +1,7 @@
 # agent_toolkit (WIP)
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/squee72564/agent-toolkit)
+
 Minimal Rust workspace for providing basic agent building primitives.
 
 This is an educational repository and is not intended to be used for production code.

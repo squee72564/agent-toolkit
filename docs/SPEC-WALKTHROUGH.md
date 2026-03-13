@@ -1,38 +1,22 @@
-# SPEC Walkthrough: REFACTOR2 Multi-Provider Runtime Architecture
+# SPEC Walkthrough: docs/REFACTOR Multi-Provider Runtime Architecture
 
-This document turns `REFACTOR2.md` into a consumer-and-implementer walkthrough.
-It focuses on three things:
+This document is a guided reading of [REFACTOR.md](/Users/arod183/ProgrammingProjects/Rust/agent-toolkit/docs/REFACTOR.md).
+It is not a second source of truth. Its job is to restate the current spec in a more operational
+way for people implementing or reviewing the architecture.
 
-- what the new public API shape feels like
-- how data moves through the runtime
-- where each subsystem owns behavior, validation, and decisions
-
-The target architecture replaces the old "request + send options" mental model with three first-class inputs:
+The current design is organized around one hard split:
 
 - `TaskRequest`: what the model should do
-- `Route`: where it may run
+- `Route`: where the call may run
 - `ExecutionOptions`: how the call should execute
 
-Everything else in the spec exists to preserve that split across planning, provider mapping, transport execution, and fallback.
+Everything else in the spec exists to preserve that split through planning, adapter request
+construction, transport execution, streaming, fallback, and metadata reporting.
 
 ## 1. Core Mental Model
 
-### The old problem
-
-The current design mixes together:
-
-- semantic task content
-- provider/model selection
-- streaming mode
-- fallback behavior
-- transport metadata
-- provider-specific native knobs
-
-That makes routed multi-provider execution awkward, especially when each fallback attempt needs different native options, different timeouts, or different provider overlays.
-
-### The new split
-
-The new design separates the call into three orthogonal inputs:
+The refactor replaces the old "request plus send options plus provider overrides" model with a
+route-oriented attempt model.
 
 ```rust
 pub struct TaskRequest {
@@ -51,7 +35,7 @@ pub struct Route {
     pub primary: AttemptSpec,
     pub fallbacks: Vec<AttemptSpec>,
     pub fallback_policy: FallbackPolicy,
-    pub capability_mismatch_policy: CapabilityMismatchPolicy,
+    pub planning_rejection_policy: PlanningRejectionPolicy,
 }
 
 pub struct ExecutionOptions {
@@ -61,15 +45,17 @@ pub struct ExecutionOptions {
 }
 ```
 
-The key consequences are:
+The important boundary rules are:
 
-- `TaskRequest` no longer owns model, stream, fallback, transport, or native provider controls.
-- `Route` no longer owns semantic task content or observer/transport-wide execution behavior.
-- `ExecutionOptions` no longer owns routing topology or provider-native request controls.
+- `TaskRequest` owns semantic request content only.
+- `Route` owns target ordering and routing policy only.
+- `ExecutionOptions` owns route-wide execution behavior only.
+- provider-native controls are attempt-local, not task-wide or route-wide.
+- transport execution is driven by a typed runtime-to-transport contract, not metadata tunneling.
 
-## 2. Identity Model
+## 2. Identity and Layering
 
-The spec deliberately splits provider identity into three layers:
+Provider identity is split deliberately into three different concepts:
 
 ```rust
 pub enum ProviderFamilyId {
@@ -89,224 +75,108 @@ pub struct ProviderInstanceId(String);
 
 Use them like this:
 
-- `ProviderFamilyId`: shared wire behavior and shared family-native controls
+- `ProviderFamilyId`: shared protocol-family behavior and family codecs
 - `ProviderKind`: concrete adapter and overlay behavior
-- `ProviderInstanceId`: one registered runtime destination with its own auth, base URL, retry policy, and timeout defaults
+- `ProviderInstanceId`: one registered runtime destination with concrete config
 
-That means two self-hosted OpenAI-compatible backends can share:
+That means two self-hosted OpenAI-compatible endpoints can share a family codec and even share
+`ProviderKind::GenericOpenAiCompatible`, while still being different runtime targets because they
+have different instance IDs and different `ProviderConfig` values.
 
-- family codec: `OpenAiCompatible`
-- provider kind: `GenericOpenAiCompatible`
+This is also why routes target `ProviderInstanceId`, not `ProviderKind`.
 
-while still being different runtime targets because they have different `ProviderInstanceId`s.
+The config split is just as important as the identity split:
 
-## 3. High-Level API Examples
+- `ProviderDescriptor` is adapter-owned static metadata keyed by `ProviderKind`
+- `ProviderConfig` is runtime-owned per-instance configuration keyed by `ProviderInstanceId`
+- runtime composes `PlatformConfig` from `ProviderDescriptor + ProviderConfig`
 
-### 3.1 Direct client, default non-streaming
+That composition is where runtime resolves the effective base URL, auth style, default headers, and
+default response request-id header for the selected concrete provider instance.
 
-```rust
-let input = MessageCreateInput::user("Write one sentence about Rust.");
+## 3. Public Core Types
 
-let response = openai_client
-    .messages()
-    .create(input)
-    .await?;
-```
-
-Conceptually this normalizes into:
-
-- `TaskRequest` from `MessageCreateInput`
-- a single-attempt `Route`
-- inferred `ExecutionOptions { response_mode: NonStreaming, observer: None, transport: default }`
-
-### 3.2 Direct client with model override
+### 3.1 Response delivery
 
 ```rust
-let response = openai_client
-    .messages()
-    .model("gpt-5")
-    .create(MessageCreateInput::user("Summarize Rust ownership in one paragraph."))
-    .await?;
-```
-
-Important detail:
-
-- `.model("gpt-5")` does not mutate `TaskRequest`
-- it becomes `AttemptSpec.target.model` on the generated single-attempt route
-
-### 3.3 Direct client with layered native options
-
-```rust
-let response = openrouter_client
-    .messages()
-    .create_with_options(
-        MessageCreateInput::user("Use tools if useful."),
-        NativeOptions {
-            family: Some(FamilyOptions::OpenAiCompatible(
-                OpenAiCompatibleOptions {
-                    parallel_tool_calls: Some(true),
-                    ..Default::default()
-                }
-            )),
-            provider: Some(ProviderOptions::OpenRouter(
-                OpenRouterOptions::new().with_route("fallback")
-            )),
-        },
-    )
-    .await?;
-```
-
-This expresses the intended layering:
-
-- OpenAI-family shared controls go in `family`
-- OpenRouter-only controls go in `provider`
-
-### 3.4 Routed toolkit, default execution behavior
-
-```rust
-let route = Route::to(
-    AttemptSpec::to(
-        Target::new(ProviderInstanceId::new("openai-default"))
-            .with_model("gpt-5")
-    )
-)
-.with_fallback(
-    AttemptSpec::to(
-        Target::new(ProviderInstanceId::new("openrouter-default"))
-            .with_model("openai/gpt-5")
-    )
-)
-.with_policy(FallbackPolicy::default());
-
-let response = toolkit
-    .messages()
-    .create(
-        MessageCreateInput::user("Write one short sentence about Rust."),
-        route,
-    )
-    .await?;
-```
-
-The ergonomic routed methods infer:
-
-```rust
-ExecutionOptions {
-    response_mode: ResponseMode::NonStreaming,
-    observer: None,
-    transport: TransportOptions::default(),
+pub enum ResponseMode {
+    NonStreaming,
+    Streaming,
 }
 ```
 
-### 3.5 Routed toolkit with explicit execution options
+`ResponseMode` is route-wide. It cannot vary per attempt.
+
+The spec now locks streaming as a two-phase contract:
+
+- canonical stream events are delivered incrementally
+- one terminal completion outcome follows for the same attempt
+
+Important consequences:
+
+- fallback is allowed only before the first canonical stream event is emitted
+- once the first canonical stream event is emitted, the streaming attempt is committed
+- committed streaming failures stay on the current stream/finalization path
+- streaming APIs must provide a terminal completion path such as `finalize()`, `await`, or an
+  equivalent handle-level operation
+- stream events themselves do not carry `ResponseMeta` or partial/live attempt-history metadata
+
+### 3.2 Route-wide transport controls
 
 ```rust
-let route = Route::to(
-    AttemptSpec::to(
-        Target::new(ProviderInstanceId::new("openai-default"))
-            .with_model("gpt-5")
-    )
-)
-.with_fallback(
-    AttemptSpec::to(
-        Target::new(ProviderInstanceId::new("openrouter-default"))
-            .with_model("openai/gpt-5")
-    )
-    .with_native_options(NativeOptions {
-        family: Some(FamilyOptions::OpenAiCompatible(
-            OpenAiCompatibleOptions {
-                parallel_tool_calls: Some(true),
-                ..Default::default()
-            }
-        )),
-        provider: Some(ProviderOptions::OpenRouter(
-            OpenRouterOptions::new().with_route("fallback")
-        )),
-    })
-    .with_timeout_overrides(TransportTimeoutOverrides {
-        request_timeout: Some(Duration::from_secs(20)),
-        stream_setup_timeout: None,
-        stream_idle_timeout: None,
-    })
-    .with_extra_header("x-attempt", "fallback-1")
-);
-
-let execution = ExecutionOptions {
-    response_mode: ResponseMode::NonStreaming,
-    observer: None,
-    transport: TransportOptions {
-        request_id_header_override: Some("x-request-id".into()),
-        extra_headers: BTreeMap::from([("x-trace-id".into(), "abc123".into())]),
-    },
-};
-
-let (response, meta) = toolkit
-    .messages()
-    .create_with_meta_and_execution(
-        MessageCreateInput::user("Write one short sentence about Rust."),
-        route,
-        execution,
-    )
-    .await?;
+pub struct TransportOptions {
+    pub request_id_header_override: Option<String>,
+    pub extra_headers: BTreeMap<String, String>,
+}
 ```
 
-This is the clean split in one example:
+This is the public route-wide transport control surface.
 
-- task semantics live in `MessageCreateInput` / `TaskRequest`
-- target chain lives in `Route`
-- route-wide execution behavior lives in `ExecutionOptions`
-- target-local native options, headers, and timeout overrides live in `AttemptExecutionOptions`
+It does not own:
 
-### 3.6 Low-level explicit API
+- HTTP method
+- endpoint path selection
+- response framing
+- auth placement
+- timeout overrides
+- retry policy
+- protocol-specific request hints
+
+`request_id_header_override` affects response request-id extraction only. It does not emit or rename
+an outbound header.
+
+If no route-wide override is present, transport uses the per-instance
+`PlatformConfig.request_id_header`. Runtime resolves that field from:
+
+1. `ProviderConfig.request_id_header`, when present
+2. otherwise `ProviderDescriptor.default_request_id_header`
+
+### 3.3 Attempt-local overrides
 
 ```rust
-let task = TaskRequest {
-    messages: vec![Message::user("Return JSON only.")],
-    tools: vec![],
-    tool_choice: ToolChoice::None,
-    response_format: ResponseFormat::Json,
-    temperature: None,
-    top_p: None,
-    max_output_tokens: Some(200),
-    stop: vec![],
-    metadata: BTreeMap::new(),
-};
+pub struct TransportTimeoutOverrides {
+    pub request_timeout: Option<Duration>,
+    pub stream_setup_timeout: Option<Duration>,
+    pub stream_idle_timeout: Option<Duration>,
+}
 
-let response = client
-    .messages()
-    .create_task_with_attempt(
-        task,
-        AttemptExecutionOptions {
-            native: Some(NativeOptions {
-                family: Some(FamilyOptions::OpenAiCompatible(
-                    OpenAiCompatibleOptions {
-                        reasoning: Some(OpenAiReasoning::default()),
-                        ..Default::default()
-                    }
-                )),
-                provider: Some(ProviderOptions::OpenAi(
-                    OpenAiOptions {
-                        service_tier: Some("priority".into()),
-                        ..Default::default()
-                    }
-                )),
-            }),
-            timeout_overrides: TransportTimeoutOverrides::default(),
-            extra_headers: BTreeMap::new(),
-        },
-        ExecutionOptions {
-            response_mode: ResponseMode::NonStreaming,
-            observer: None,
-            transport: TransportOptions::default(),
-        },
-    )
-    .await?;
+pub struct AttemptExecutionOptions {
+    pub native: Option<NativeOptions>,
+    pub timeout_overrides: TransportTimeoutOverrides,
+    pub extra_headers: BTreeMap<String, String>,
+}
 ```
 
-This is the replacement for the old monolithic low-level request API.
+Attempt-local controls are intentionally narrow:
 
-## 4. Native Options: Family vs Provider Layer
+- layered native request options
+- attempt-local timeout overrides
+- attempt-local extra headers
 
-The spec makes native controls explicit and attempt-local:
+They do not own response mode, observer override, route-wide transport settings, or protocol-level
+adapter hints.
+
+### 3.4 Native options
 
 ```rust
 pub enum FamilyOptions {
@@ -326,210 +196,325 @@ pub struct NativeOptions {
 }
 ```
 
-Rules:
+The layering model is strict:
 
-- family options are shared protocol-family knobs
-- provider options are concrete-provider knobs
-- both are target-scoped and attempt-local
-- mismatched native options are static incompatibilities, not ignored inputs
+- family-scoped options belong to the family codec
+- provider-scoped options belong to the provider overlay
+- mismatched native options are planning-time incompatibilities, not silently ignored inputs
 
-Examples:
-
-Family-only:
+### 3.5 Targets, attempts, and routes
 
 ```rust
-NativeOptions {
-    family: Some(FamilyOptions::OpenAiCompatible(
-        OpenAiCompatibleOptions {
-            parallel_tool_calls: Some(true),
-            ..Default::default()
-        }
-    )),
-    provider: None,
+pub struct Target {
+    pub instance: ProviderInstanceId,
+    pub model: Option<String>,
+}
+
+pub struct AttemptSpec {
+    pub target: Target,
+    pub execution: AttemptExecutionOptions,
+}
+
+pub enum PlanningRejectionPolicy {
+    FailFast,
+    SkipRejectedTargets,
 }
 ```
 
-Family + provider:
+The effective model is resolved during planning:
+
+1. `Target.model`, when present
+2. `ProviderConfig.default_model`, when present
+
+If neither source provides a model, planning fails before adapter planning or transport execution.
+The runtime must not rely on provider-side implicit model defaults.
+
+## 4. Attempt Metadata and Failure Surfaces
+
+The current spec makes route attempt history first-class.
 
 ```rust
-NativeOptions {
-    family: Some(FamilyOptions::OpenAiCompatible(
-        OpenAiCompatibleOptions {
-            reasoning: Some(OpenAiReasoning::default()),
-            ..Default::default()
-        }
-    )),
-    provider: Some(ProviderOptions::OpenAi(
-        OpenAiOptions {
-            service_tier: Some("priority".into()),
-            ..Default::default()
-        }
-    )),
+pub enum SkipReason {
+    StaticIncompatibility { message: String },
+    AdapterPlanningRejected { message: String },
+}
+
+pub enum AttemptDisposition {
+    Skipped { reason: SkipReason },
+    Succeeded { status_code: Option<u16>, request_id: Option<String> },
+    Failed {
+        error_kind: RuntimeErrorKind,
+        error_message: String,
+        status_code: Option<u16>,
+        request_id: Option<String>,
+    },
+}
+
+pub struct AttemptRecord {
+    pub provider_instance: ProviderInstanceId,
+    pub provider_kind: ProviderKind,
+    pub model: String,
+    pub target_index: usize,
+    pub attempt_index: usize,
+    pub disposition: AttemptDisposition,
+}
+
+pub struct ResponseMeta {
+    pub selected_provider_instance: ProviderInstanceId,
+    pub selected_provider_kind: ProviderKind,
+    pub selected_model: String,
+    pub status_code: Option<u16>,
+    pub request_id: Option<String>,
+    pub attempts: Vec<AttemptRecord>,
+}
+
+pub struct ExecutedFailureMeta {
+    pub selected_provider_instance: ProviderInstanceId,
+    pub selected_provider_kind: ProviderKind,
+    pub selected_model: String,
+    pub status_code: Option<u16>,
+    pub request_id: Option<String>,
+    pub attempts: Vec<AttemptRecord>,
+}
+
+pub struct RoutePlanningFailure {
+    pub reason: RoutePlanningFailureReason,
+    pub attempts: Vec<AttemptRecord>,
 }
 ```
 
-The design intent is:
+Read the three metadata surfaces this way:
 
-- family codecs validate and encode family options
-- provider overlays validate and encode provider options
+- `ResponseMeta`: success-only metadata for a completed successful call
+- `ExecutedFailureMeta`: failure-side metadata for executed failures normalized into `RuntimeError`
+- `RoutePlanningFailure`: failure-side metadata when routing terminates during planning before any
+  executed success or executed failure
 
-## 5. Runtime vs Adapter vs Transport
+Important locked semantics:
 
-This is the most important ownership boundary in the spec.
+- `AttemptRecord` is the ordered route history format used everywhere
+- skipped attempts are recorded, not discarded
+- `AttemptRecord.model` is always the resolved effective model for that attempt
+- `ResponseMeta.selected_model` is always the concrete effective model of the successful attempt
+- `ExecutedFailureMeta.selected_*` identifies the concrete executed attempt that failed
+- `RoutePlanningFailure` must not invent success-only or executed-failure-only fields
+
+## 5. Observer Semantics
+
+Skipped attempts are not executed failures and do not emit execution lifecycle events that imply
+provider execution started.
+
+```rust
+pub struct AttemptSkippedEvent {
+    pub provider_instance: ProviderInstanceId,
+    pub provider_kind: ProviderKind,
+    pub model: String,
+    pub target_index: usize,
+    pub attempt_index: usize,
+    pub elapsed: Duration,
+    pub reason: SkipReason,
+}
+```
+
+Observer rules:
+
+- `on_attempt_start` means provider execution is about to begin
+- `on_attempt_success` means an executed attempt succeeded
+- `on_attempt_failure` means an executed attempt failed after execution began
+- `on_attempt_skipped` means planning rejected the attempt before provider execution
+
+For skipped attempts specifically:
+
+- the event is emitted only after runtime resolves concrete attempt identity and effective model
+- the event fields must match the corresponding `AttemptRecord`
+- skipped attempts do not emit `on_attempt_start`
+- skipped attempts do not emit `on_attempt_failure`
+
+## 6. Fallback vs Planning Rejection
+
+The walkthrough used to blur these. The refactor does not.
+
+### Planning rejection
+
+Planning rejections happen before any provider request is sent.
+
+They include:
+
+- static incompatibility such as unsupported streaming
+- native-option family/provider mismatches
+- requesting family/provider native options for a provider that does not support them
+- deterministic local adapter-planning validation failures returned by `ProviderAdapter::plan_request`
+
+`PlanningRejectionPolicy` governs those outcomes:
+
+- `FailFast`: stop immediately with planning failure
+- `SkipRejectedTargets`: record a skipped attempt and continue to the next target
+
+When all remaining attempts are rejected during planning, the runtime returns
+`RoutePlanningFailure`.
+
+The two planning-time skipped-attempt reasons are:
+
+- `SkipReason::StaticIncompatibility`
+- `SkipReason::AdapterPlanningRejected`
+
+### Executed failure
+
+Executed failures happen after provider execution begins and are normalized into `RuntimeError`.
+
+Fallback rules evaluate only against those normalized executed failures.
+
+This separation is strict:
+
+- planning rejections do not enter fallback evaluation
+- fallback does not inspect raw transport responses
+- committed streaming failures are executed failures, but they are not fallback-eligible once the
+  stream is committed
+
+## 7. FallbackPolicy
+
+`FallbackPolicy` now answers only one question: should routing advance to the next attempt after an
+executed failure?
+
+```rust
+pub enum FallbackAction {
+    RetryNextTarget,
+    Stop,
+}
+
+pub struct FallbackMatch {
+    pub error_kinds: Vec<RuntimeErrorKind>,
+    pub status_codes: Vec<u16>,
+    pub provider_codes: Vec<String>,
+    pub provider_kinds: Vec<ProviderKind>,
+    pub provider_instances: Vec<ProviderInstanceId>,
+}
+
+pub struct FallbackRule {
+    pub when: FallbackMatch,
+    pub action: FallbackAction,
+}
+
+pub struct FallbackPolicy {
+    pub rules: Vec<FallbackRule>,
+}
+```
+
+Locked behavior:
+
+- targets live on `Route`, not on `FallbackPolicy`
+- rules are evaluated in insertion order
+- first match wins
+- `FallbackMatch` uses AND semantics across non-empty fields
+- provider-code matching is meaningful only after family/provider error decode and runtime
+  normalization populated a provider code
+- `RetryNextTarget` advances to the next attempt already present on the route
+- `Stop`, or no matching rule, surfaces the current error
+
+## 8. Runtime, Adapter, Codec, Overlay, and Transport
 
 ### Runtime owns
 
-- converting `MessageCreateInput` into `TaskRequest`
-- constructing or iterating `Route`
-- selecting the attempt
-- resolving `ProviderInstanceId` into `RegisteredProvider`
-- selecting the adapter by `ProviderKind`
-- resolving `ProviderFamilyId`
-- resolving `PlatformConfig` from `ProviderDescriptor + ProviderConfig`
-- resolving transport defaults and attempt-local overrides into `ResolvedTransportOptions`
-- validating static capability mismatches
-- applying `CapabilityMismatchPolicy`
-- building `ExecutionPlan`
-- building the final typed transport input
-- normalizing failures into `RuntimeError`
-- evaluating fallback after executed failures
+- input normalization into `TaskRequest`
+- route iteration
+- model resolution
+- `ProviderInstanceId` resolution into `RegisteredProvider`
+- adapter selection by `ProviderKind`
+- `PlatformConfig` composition from `ProviderDescriptor` and `ProviderConfig`
+- capability validation and planning-rejection handling
+- `ExecutionPlan` construction
+- normalization of route-wide and attempt-local transport inputs
+- runtime classification of streaming commit and fallback eligibility
+- error normalization and fallback orchestration
+
+### Family codec owns
+
+- shared family request encoding
+- family-scoped native options
+- family response decode
+- family error decode
+- default family stream projector
+
+### Provider overlay owns
+
+- provider-specific request augmentation
+- provider-scoped native options
+- provider-specific error refinement
+- optional success-decode overrides
+- optional stream-projector overrides
+- provider-specific endpoint override when needed
+- provider-generated dynamic headers
 
 ### Provider adapter owns
 
-- converting `ExecutionPlan` into `ProviderRequestPlan`
-- using family codecs for shared family request mapping
-- using provider overlays for concrete-provider augmentation
-- consuming family and provider native options in the correct layer
-- emitting protocol-specific `HttpRequestOptions`
-- emitting provider-generated dynamic headers
-- selecting non-default endpoint path only via `endpoint_path_override`
-- decoding successful provider responses
-- exposing family/provider error decode hooks
-- exposing or overriding streaming projection
+- orchestration of codec plus overlay into `ProviderRequestPlan`
+- deterministic request-shape validation during planning
+- success decode entry point
+- stream-projector selection entry point
+
+The orchestration rules are:
+
+- on non-streaming success, the provider overlay gets first chance to override decode
+- if the overlay does not override, the family codec success decode runs
+- on streaming success, the provider overlay gets first chance to override stream-projector
+  creation
+- if the overlay does not override, the family codec default projector is used
 
 ### Transport owns
 
-- final HTTP/SSE execution
-- final header materialization
-- auth header placement
-- retry within an attempt
-- request/stream timeout enforcement
-- response framing
-- request-id extraction from the selected response header
+- outbound HTTP/SSE execution
+- auth placement
+- header materialization
+- retries within a single attempt
+- request and stream timeout enforcement
+- JSON/bytes/SSE framing mechanics
+- SSE parsing and limit enforcement without provider semantics
 
-Transport does not:
+The transport does not decide fallback, decode provider-specific error bodies, or invent methods,
+URLs, or response framing.
 
-- evaluate fallback
-- decode provider-specific error bodies
-- decide capability mismatch
-- invent endpoint paths
+## 9. Typed Runtime-to-Transport Boundary
 
-## 6. Family Codec vs Provider Overlay
-
-The provider layer is intentionally split in two.
-
-### Family codec
-
-The family codec handles shared wire behavior for a protocol family.
+The runtime-to-transport handoff is typed and explicit.
 
 ```rust
-pub trait ProviderFamilyCodec {
-    fn encode_task(
-        &self,
-        task: &TaskRequest,
-        model: &str,
-        response_mode: ResponseMode,
-        family_options: Option<&FamilyOptions>,
-    ) -> Result<EncodedFamilyRequest, AdapterError>;
-
-    fn decode_response(
-        &self,
-        body: Value,
-        format: &ResponseFormat,
-    ) -> Result<Response, AdapterError>;
-
-    fn decode_error(&self, body: &Value) -> Option<ProviderErrorInfo>;
+pub enum TransportResponseFraming {
+    Json,
+    Bytes,
+    Sse,
 }
-```
 
-It owns:
-
-- shared task-to-wire mapping
-- family-scoped native option encoding
-- family-default request hints
-- family response decode
-- family error decode
-
-### Provider overlay
-
-The provider overlay handles provider-specific quirks on top of the family contract.
-
-```rust
-pub trait ProviderOverlay {
-    fn apply_provider_overlay(
-        &self,
-        request: &mut EncodedFamilyRequest,
-        provider_options: Option<&ProviderOptions>,
-    ) -> Result<(), AdapterError>;
-
-    fn decode_provider_error(&self, body: &Value) -> Option<ProviderErrorInfo>;
-}
-```
-
-It owns:
-
-- provider-specific request augmentation
-- provider-scoped native option encoding and validation
-- provider-generated dynamic headers
-- provider-specific endpoint override
-- provider-specific response/error quirks
-
-The composition model is:
-
-- OpenAI = OpenAI-compatible codec + OpenAI overlay
-- OpenRouter = OpenAI-compatible codec + OpenRouter overlay
-- Anthropic = Anthropic codec + Anthropic overlay
-- GenericOpenAiCompatible = OpenAI-compatible codec + generic overlay
-
-## 7. Runtime-to-Transport Boundary
-
-The spec locks in a typed runtime-to-transport boundary:
-
-```rust
 pub struct TransportExecutionInput {
     pub platform: PlatformConfig,
     pub auth_token: Option<AuthCredentials>,
     pub method: Method,
     pub url: String,
     pub body: HttpRequestBody,
-    pub response_mode: HttpResponseMode,
+    pub response_framing: TransportResponseFraming,
     pub request_options: HttpRequestOptions,
     pub transport: ResolvedTransportOptions,
     pub provider_headers: HeaderMap,
 }
 ```
 
-This means:
+This boundary is one of the most important changes in the spec.
 
-- no metadata-driven transport control
-- no `AdapterContext.metadata` in the target architecture
-- no stringly-typed request-id override channel
+Key rules:
 
-### Typed request construction flow
-
-1. runtime resolves `PlatformConfig`
-2. runtime resolves `ResolvedTransportOptions`
-3. adapter emits `ProviderRequestPlan`
-4. runtime resolves endpoint path:
-   - `ProviderRequestPlan.endpoint_path_override`, else
-   - `ProviderDescriptor.endpoint_path`
-5. runtime joins path with `PlatformConfig.base_url`
-6. runtime builds `TransportExecutionInput`
-7. transport materializes headers and executes the request
+- the final URL is runtime-resolved before transport execution
+- `ProviderRequestPlan.method` is the single source of truth for outbound HTTP method
+- `ProviderRequestPlan.response_framing` is the single source of truth for transport response
+  framing
+- runtime validates adapter-produced framing against `ExecutionOptions.response_mode`
+- `ResponseMode::NonStreaming` must not produce `TransportResponseFraming::Sse`
+- `ResponseMode::Streaming` must produce `TransportResponseFraming::Sse`
+- transport receives caller-owned transport headers separately from adapter-produced provider headers
+- metadata-based transport override conventions are retired
+- `AdapterContext` is not part of the long-term transport contract
 
 ### Header layering
 
-Header precedence is fixed:
+Transport materializes headers in this exact order:
 
 1. platform default headers
 2. route-wide extra headers
@@ -537,412 +522,244 @@ Header precedence is fixed:
 4. adapter/provider-generated dynamic headers
 5. auth headers
 
-Later layers override earlier ones except auth placement, which remains transport-owned.
+`request_id_header_override` is not part of that merge order. It only changes response request-id
+extraction precedence.
 
-### Request-id extraction semantics
+Request-id extraction precedence is:
 
-`request_id_header_override` affects only response metadata extraction.
+1. `ResolvedTransportOptions.request_id_header_override`, when present
+2. otherwise `PlatformConfig.request_id_header`
 
-It does not:
+### Timeouts and retries
 
-- emit an outbound request header
-- rename a header in the outbound request
-- participate in header merge order
+Typed runtime-facing timeout control includes:
 
-If the caller wants to send an outbound header with the same name, they must add it through normal extra headers.
+- request timeout
+- stream-setup timeout
+- stream-idle timeout
 
-## 8. Execution Flow
+There is no separate public first-byte timeout field. First-byte behavior remains transport-internal
+and is governed by resolved `stream_idle_timeout`.
 
-### 8.1 Direct client flow
+Transport retry remains intra-attempt behavior. It is distinct from routed fallback.
 
-1. user creates `MessageCreateInput`
-2. direct client normalizes it to `TaskRequest`
-3. direct client creates a single `AttemptSpec`
-4. direct client wraps that in a single-attempt `Route`
-5. direct client infers `ExecutionOptions`
-6. runtime resolves the attempt into `ExecutionPlan`
-7. adapter creates `ProviderRequestPlan`
-8. runtime builds `TransportExecutionInput`
-9. transport executes
-10. runtime decodes success into canonical response or stream
+## 10. Planning and Execution Flow
 
-### 8.2 Routed toolkit flow
+### 10.1 Direct client normalization
 
-1. user creates `MessageCreateInput`
-2. user creates `Route`
-3. toolkit converts input into `TaskRequest`
-4. toolkit resolves or infers `ExecutionOptions`
-5. runtime iterates route attempts in order
-6. for each attempt:
-   - resolve `ProviderInstanceId` to `RegisteredProvider`
-   - resolve `ProviderKind`
-   - resolve `ProviderFamilyId`
-   - resolve model
-   - resolve `PlatformConfig`
-   - resolve transport options
-   - validate static mismatches
-   - if compatible, build `ExecutionPlan`
-   - adapter produces `ProviderRequestPlan`
-   - runtime builds `TransportExecutionInput`
-   - transport executes
-7. on success, runtime returns response plus attempt history
-8. on executed failure, runtime normalizes the error and evaluates fallback
-
-## 9. Static Capability Mismatch vs Real-Time Validation
-
-The spec is intentionally conservative about what is checked statically.
-
-### Static capability mismatch
-
-This is only for high-confidence checks before any provider call is made:
-
-- streaming requested but provider does not support streaming
-- family native options do not match the target family
-- provider native options do not match the target provider kind
-- provider does not support family-native options at all
-- provider does not support provider-native options at all
-
-This is governed by:
+Direct concrete clients still preserve ergonomic usage:
 
 ```rust
-pub enum CapabilityMismatchPolicy {
-    FailFast,
-    SkipIncompatibleTargets,
-}
+openai_client.messages().create(input).await?;
+openai_client.messages().model("gpt-5").create(input).await?;
+openai_client.streaming().create(input).await?;
+openrouter_client.messages().create_with_options(input, native_options).await?;
 ```
 
-Behavior:
+Internally, a direct client call normalizes into:
 
-- `FailFast`: planning fails immediately
-- `SkipIncompatibleTargets`: attempt is recorded as skipped and routing advances
+1. `TaskRequest`
+2. a single-attempt `Route` targeting the client's configured `ProviderInstanceId`
+3. inferred `ExecutionOptions`
 
-### Real-time validation
+Direct fluent `.model(...)` configuration does not mutate `TaskRequest`. It becomes
+`AttemptSpec.target.model` on the generated single-attempt route.
 
-These are not treated as static capability checks:
+### 10.2 Routed toolkit usage
 
-- tools
-- structured output
-- `top_p`
-- stop sequences
-- reasoning controls
-- model/deployment-specific feature support
-
-Those are handled by:
-
-- deterministic adapter validation where possible
-- upstream provider rejection where necessary
-- normalization into `RuntimeError`
-
-So the architecture prefers:
-
-- narrow static validation
-- strong runtime normalization
-
-instead of broad but unreliable provider capability claims.
-
-## 10. Fallback Behavior
-
-Fallback is now only about executed failures.
+High-level routed APIs remain the main multi-provider entry point:
 
 ```rust
-pub struct FallbackPolicy {
-    pub rules: Vec<FallbackRule>,
-}
+toolkit.messages().create(input, route).await?;
+toolkit.messages().create_with_meta(input, route).await?;
+toolkit.messages().create_with_execution(input, route, execution_options).await?;
+toolkit.streaming().create(input, route).await?;
+toolkit.streaming().create_with_execution(input, route, execution_options).await?;
 ```
+
+Semantics:
+
+- `.messages()` implies `ResponseMode::NonStreaming`
+- `.streaming()` implies `ResponseMode::Streaming`
+- ergonomic routed methods infer default `ExecutionOptions`
+- explicit routed methods accept per-call `ExecutionOptions`
+
+### 10.3 Routed execution flow
+
+The routed flow is:
+
+1. normalize input into `TaskRequest`
+2. iterate ordered `AttemptSpec`s from `Route`
+3. for each attempt:
+   - resolve target instance into `RegisteredProvider`
+   - resolve effective model
+   - resolve adapter by `ProviderKind`
+   - resolve provider config from the registered instance
+   - compose `PlatformConfig` from `ProviderDescriptor + ProviderConfig`
+   - validate static capabilities
+   - apply `PlanningRejectionPolicy`
+   - if planning rejects and skipping is enabled, record a skipped `AttemptRecord`, emit
+     `on_attempt_skipped`, and continue
+   - otherwise build `ResolvedProviderAttempt`
+   - build `ExecutionPlan`
+   - ask the adapter to produce `ProviderRequestPlan`
+   - build `TransportExecutionInput`
+   - execute transport request
+4. after an executed failure, evaluate `FallbackPolicy` against normalized `RuntimeError`
+5. on success, return `ResponseMeta`
+6. on executed failure, return normalized `RuntimeError` plus `ExecutedFailureMeta`
+
+## 11. Streaming Commit and Finalization
+
+The current spec is explicit about the streaming cutoff.
+
+Pre-commit streaming failures are fallback-eligible executed failures, including:
+
+- SSE setup failure before any canonical stream event
+- malformed SSE framing before any canonical stream event
+- projector failure before any canonical stream event
+- abnormal termination before any canonical stream event
+- stream finalization failure before any canonical stream event
+
+Post-commit streaming failures are not fallback-eligible, including:
+
+- malformed SSE framing after at least one canonical event
+- projector failure after at least one canonical event
+- abnormal termination after at least one canonical event
+- stream finalization failure after at least one canonical event
+
+The caller-visible consequence is:
+
+- stream events are incremental delivery only
+- terminal success yields a completed canonical `Response` with normal `ResponseMeta`
+- terminal executed failure yields normalized `RuntimeError` plus `ExecutedFailureMeta`
+
+## 12. Error Decoding and Normalization
+
+When execution fails after transport begins, the runtime owns normalization.
+
+The locked non-success path is:
+
+1. transport returns a non-success response or transport/status failure
+2. if the adapter enabled `preserve_error_body_for_adapter_decode`, runtime preserves the body
+3. runtime invokes family-codec error decode
+4. runtime invokes provider-overlay error decode
+5. runtime merges results with provider-overlay fields taking precedence on collision
+6. runtime normalizes the merged result into `RuntimeError`
+7. `FallbackPolicy` evaluates the normalized executed failure
+
+The successful path follows the same adapter-orchestrated layering:
+
+1. in non-streaming mode, adapter success decode checks provider-overlay override first
+2. if the overlay does not override, family-codec success decode runs
+3. in streaming mode, adapter stream-projector selection checks provider-overlay override first
+4. if the overlay does not override, the family-codec projector is used
+5. runtime, not the adapter or projector, still owns streaming commit classification and fallback
+   eligibility
 
 Important consequences:
 
-- fallback targets live on `Route`, not on `FallbackPolicy`
-- fallback is rule-driven
-- fallback never evaluates raw HTTP bodies
-- fallback never runs on skipped static mismatches
+- fallback never runs against raw HTTP bodies
+- provider-code matching happens only after decode plus normalization
+- family decode runs before provider overlay decode
+- transport does not interpret provider-specific error payloads for fallback purposes
 
-### Matching semantics
+## 13. Public API Examples
 
-The first matching rule wins.
+### 13.1 Routed non-streaming
 
-`FallbackMatch` uses AND semantics:
+```rust
+let route = Route::to(
+    AttemptSpec::to(
+        Target::new(ProviderInstanceId::new("openai-default")).with_model("gpt-5")
+    )
+)
+.with_fallback(
+    AttemptSpec::to(
+        Target::new(ProviderInstanceId::new("openrouter-default"))
+            .with_model("openai/gpt-5")
+    )
+    .with_native_options(
+        NativeOptions {
+            family: Some(FamilyOptions::OpenAiCompatible(
+                OpenAiCompatibleOptions {
+                    parallel_tool_calls: Some(true),
+                    ..Default::default()
+                }
+            )),
+            provider: Some(ProviderOptions::OpenRouter(
+                OpenRouterOptions::new().with_route("fallback")
+            )),
+        }
+    )
+)
+.with_policy(FallbackPolicy::default())
+.with_planning_rejection_policy(PlanningRejectionPolicy::FailFast);
 
-- every non-empty field must match
-- empty fields are ignored
-- no match means no fallback
-
-It can match on:
-
-- normalized runtime error kind
-- normalized status code
-- normalized provider code
-- `ProviderKind`
-- `ProviderInstanceId`
-
-### Attempt history semantics
-
-Skipped attempts are first-class:
-
-- recorded in `ResponseMeta.attempts`
-- exposed through `AttemptRecord`
-- reported via `on_attempt_skipped`
-- not treated as failed executions
-
-## 11. Error Decoding and Normalization
-
-This path is one of the most important spec clarifications.
-
-### Non-success response path
-
-1. transport returns a non-success framed response
-2. if adapter requested `preserve_error_body_for_adapter_decode`, runtime keeps the body
-3. runtime invokes family codec error decode
-4. runtime invokes provider overlay error decode
-5. runtime merges both results, with provider overlay taking precedence
-6. runtime normalizes the merged result into `RuntimeError`
-7. fallback evaluates the normalized error
-
-If the adapter did not request error-body preservation:
-
-- the failure remains transport/status-derived
-- fallback evaluates that normalized transport error instead
-
-### Why this split matters
-
-It prevents these responsibilities from blurring:
-
-- adapter decode: extract provider-shaped error meaning
-- runtime normalization: create the stable public error surface
-- fallback evaluation: decide whether to continue routing
-
-## 12. System Diagrams
-
-### 12.1 Architecture ownership
-
-```mermaid
-graph TD
-    A[Caller] --> B[MessageCreateInput]
-    A --> C[Route]
-    A --> D[ExecutionOptions]
-
-    B --> E[TaskRequest]
-    C --> F[AttemptSpec]
-    D --> G[Route-wide execution behavior]
-
-    E --> H[Runtime Planner]
-    F --> H
-    G --> H
-
-    H --> I[ExecutionPlan]
-    I --> J[Provider Adapter]
-    J --> K[Family Codec]
-    J --> L[Provider Overlay]
-    K --> M[EncodedFamilyRequest]
-    L --> N[ProviderRequestPlan]
-
-    I --> O[Runtime Transport Normalization]
-    N --> O
-    O --> P[TransportExecutionInput]
-    P --> Q[agent-transport]
-    Q --> R[Provider API]
-
-    R --> Q
-    Q --> S[Framed Response]
-    S --> H
-    H --> T[Canonical Response or Stream]
+let response = toolkit.messages().create(input, route).await?;
 ```
 
-### 12.2 Core type relationships
+### 13.2 Routed with explicit execution overrides
 
-```mermaid
-classDiagram
-    class TaskRequest
-    class Route
-    class AttemptSpec
-    class AttemptExecutionOptions
-    class ExecutionOptions
-    class ResolvedProviderAttempt
-    class ExecutionPlan
-    class ProviderRequestPlan
-    class TransportExecutionInput
+```rust
+let execution = ExecutionOptions {
+    response_mode: ResponseMode::NonStreaming,
+    observer: None,
+    transport: TransportOptions {
+        request_id_header_override: Some("x-request-id".into()),
+        extra_headers: BTreeMap::from([("x-trace-id".into(), "abc123".into())]),
+    },
+};
 
-    Route --> AttemptSpec
-    AttemptSpec --> AttemptExecutionOptions
-    ExecutionPlan --> TaskRequest
-    ExecutionPlan --> ResolvedProviderAttempt
-    ExecutionPlan --> ExecutionOptions : resolved from
-    ProviderRequestPlan --> TransportExecutionInput
+let (response, meta) = toolkit
+    .messages()
+    .create_with_meta_and_execution(input, route, execution)
+    .await?;
 ```
 
-### 12.3 Direct client sequence
+### 13.3 Direct client with native options
 
-```mermaid
-sequenceDiagram
-    participant U as Caller
-    participant C as Direct Client
-    participant RT as Runtime
-    participant AD as Adapter
-    participant TX as Transport
-    participant P as Provider
-
-    U->>C: MessageCreateInput
-    C->>RT: TaskRequest + single-attempt Route + ExecutionOptions
-    RT->>RT: Resolve ExecutionPlan
-    RT->>AD: plan_request(execution_plan)
-    AD-->>RT: ProviderRequestPlan
-    RT->>TX: TransportExecutionInput
-    TX->>P: HTTP/SSE request
-    P-->>TX: Response
-    TX-->>RT: Framed response
-    RT-->>U: Canonical Response or Stream
+```rust
+let response = openai_client
+    .messages()
+    .create_with_options(
+        input,
+        NativeOptions {
+            family: Some(FamilyOptions::OpenAiCompatible(
+                OpenAiCompatibleOptions {
+                    reasoning: Some(OpenAiReasoning::default()),
+                    ..Default::default()
+                }
+            )),
+            provider: Some(ProviderOptions::OpenAi(
+                OpenAiOptions {
+                    service_tier: Some("priority".into()),
+                    ..Default::default()
+                }
+            )),
+        },
+    )
+    .await?;
 ```
 
-### 12.4 Routed fallback sequence
+## 14. Practical Reading Guide
 
-```mermaid
-sequenceDiagram
-    participant U as Caller
-    participant RT as Runtime
-    participant AD as Adapter
-    participant TX as Transport
-    participant P as Provider
+If you are consuming the API, keep these rules in your head:
 
-    U->>RT: TaskRequest + Route + ExecutionOptions
-    RT->>RT: Select AttemptSpec #1
-    RT->>RT: Static capability validation
-
-    alt Incompatible and SkipIncompatibleTargets
-        RT->>RT: Record AttemptRecord::Skipped
-        RT->>RT: Emit on_attempt_skipped
-        RT->>RT: Advance to AttemptSpec #2
-    end
-
-    RT->>RT: Build ExecutionPlan
-    RT->>AD: plan_request(execution_plan)
-    AD-->>RT: ProviderRequestPlan
-    RT->>TX: TransportExecutionInput
-    TX->>P: Request
-
-    alt Success
-        P-->>TX: Success response
-        TX-->>RT: Framed success
-        RT-->>U: Response + ResponseMeta
-    else Executed failure
-        P-->>TX: Non-success response
-        TX-->>RT: Framed failure
-        RT->>RT: Normalize RuntimeError
-        RT->>RT: Evaluate FallbackPolicy
-        alt RetryNextTarget
-            RT->>RT: Advance to next AttemptSpec
-        else Stop or no match
-            RT-->>U: RuntimeError
-        end
-    end
-```
-
-### 12.5 Codec and overlay composition
-
-```mermaid
-graph TD
-    A[TaskRequest] --> B[ProviderFamilyCodec.encode_task]
-    C[ResponseMode] --> B
-    D[FamilyOptions] --> B
-    E[Model] --> B
-
-    B --> F[EncodedFamilyRequest]
-    F --> G[ProviderOverlay.apply_provider_overlay]
-    H[ProviderOptions] --> G
-    G --> I[ProviderRequestPlan]
-
-    J[ProviderFamilyId] --> B
-    K[ProviderKind] --> G
-```
-
-### 12.6 Transport boundary
-
-```mermaid
-graph TD
-    A[PlatformConfig] --> T[TransportExecutionInput]
-    B[AuthCredentials] --> T
-    C[ResolvedTransportOptions] --> T
-    D[ProviderRequestPlan.body] --> T
-    E[ProviderRequestPlan.request_options] --> T
-    F[ProviderRequestPlan.provider_headers] --> T
-    G[Resolved final URL] --> T
-
-    T --> H[agent-transport]
-
-    I[Platform default headers] --> J[Header merge]
-    K[Route-wide extra headers] --> J
-    L[Attempt-local extra headers] --> J
-    M[Adapter/provider headers] --> J
-    N[Auth headers] --> J
-    J --> O[Final outbound headers]
-
-    P[request_id_header_override] --> Q[Response request-id extraction]
-    R[PlatformConfig.request_id_header] --> Q
-```
-
-### 12.7 Error normalization and fallback
-
-```mermaid
-sequenceDiagram
-    participant TX as Transport
-    participant RT as Runtime
-    participant FC as Family Codec
-    participant PO as Provider Overlay
-    participant FB as FallbackPolicy
-
-    TX-->>RT: Non-success response
-    alt preserve_error_body_for_adapter_decode = true
-        RT->>FC: decode_error(body)
-        FC-->>RT: ProviderErrorInfo(shared)
-        RT->>PO: decode_provider_error(body)
-        PO-->>RT: ProviderErrorInfo(provider)
-        RT->>RT: Merge with provider precedence
-    else preserve_error_body_for_adapter_decode = false
-        RT->>RT: Use transport/status-derived failure
-    end
-
-    RT->>RT: Normalize to RuntimeError
-    RT->>FB: Evaluate rules in order
-    FB-->>RT: RetryNextTarget or Stop
-```
-
-### 12.8 Static vs real-time validation
-
-```mermaid
-flowchart TD
-    A[AttemptSpec + TaskRequest + ExecutionOptions] --> B{Static capability checks}
-
-    B -->|streaming unsupported| C[Capability mismatch]
-    B -->|native option family/provider mismatch| C
-    B -->|native option layer unsupported| C
-    B -->|passes| D[Build ExecutionPlan]
-
-    C --> E{CapabilityMismatchPolicy}
-    E -->|FailFast| F[Return planning error]
-    E -->|SkipIncompatibleTargets| G[Record skipped attempt and continue]
-
-    D --> H[Adapter deterministic validation]
-    H -->|invalid request shape| I[Normalize RuntimeError]
-    H -->|ok| J[Transport execution]
-
-    J -->|upstream rejection| I
-    J -->|success| K[Canonical response]
-```
-
-## 13. Practical Reading Guide
-
-If you are consuming the API, the main thing to internalize is:
-
-- build task semantics once
-- build route attempts explicitly
+- build semantic task content once on `TaskRequest` or `MessageCreateInput`
+- build destination choices explicitly as `AttemptSpec`s inside a `Route`
 - keep route-wide execution behavior on `ExecutionOptions`
-- keep target-specific native knobs and timeout/header overrides on `AttemptSpec.execution`
+- keep target-specific native controls, timeout overrides, and extra headers on
+  `AttemptExecutionOptions`
+- expect ordered attempt history on success, executed failure, and planning failure surfaces
 
-If you are implementing the runtime, the main invariant is:
+If you are implementing the runtime, keep these invariants in your head:
 
-- runtime resolves ambiguity before adapter planning
-- adapter plans provider-specific request intent but not transport ownership
-- transport executes typed intent but does not interpret provider semantics
+- resolve ambiguity before adapter planning
+- adapters plan provider intent, not route behavior
+- runtime owns fallback and streaming commit classification
+- transport executes typed intent, not provider semantics
 
-That is the entire architecture in one sentence:
+In one line, the current architecture is:
 
-`TaskRequest + Route + ExecutionOptions -> ExecutionPlan -> ProviderRequestPlan -> TransportExecutionInput -> canonical response or normalized error`.
+`TaskRequest + Route + ExecutionOptions -> ExecutionPlan -> ProviderRequestPlan -> TransportExecutionInput -> canonical response/stream or normalized failure with attempt metadata`.

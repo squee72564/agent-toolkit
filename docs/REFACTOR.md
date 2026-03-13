@@ -1,4 +1,4 @@
-# REFACTOR2.md: Multi-Provider Runtime Architecture
+# REFACTOR.md: Multi-Provider Runtime Architecture
 
   ## Preface
 
@@ -98,6 +98,9 @@
   - streaming mode
   - transport options
   - observer overrides
+
+Semantic request content and shared generation controls must not be reintroduced through provider-
+native option structs.
   - layered native request controls
 
   ### Rule 2
@@ -109,7 +112,7 @@
   - primary attempt target
   - ordered fallback attempt targets
   - fallback decision policy
-  - capability mismatch handling policy
+  - planning rejection policy
 
   It must not own:
 
@@ -177,6 +180,13 @@
   - shared generation controls
   - semantic request metadata intended for provider payloads when supported
 
+Locked rule:
+
+- fields such as token limits that are intentionally part of the shared task surface belong on
+  `TaskRequest`, not on provider-native option structs
+- provider-native option structs may augment provider-specific request shape, but they must not
+  alias or override `TaskRequest` or `ExecutionOptions`
+
   ### 2. Routing Layer
 
   Owns where a task may run.
@@ -239,11 +249,13 @@
     - typed attempt-local transport overrides
     - adapter-produced provider headers
     - adapter-produced request body
+    - adapter-produced HTTP method
     - adapter-produced protocol-level request options
+    - adapter-produced transport response framing
   - place auth headers according to platform auth style
   - apply transport retry policy before response body handoff
   - enforce request, stream-setup, and stream-idle timeouts
-  - execute JSON, bytes, and SSE response modes
+  - execute the explicit transport response framing requested by runtime
   - produce low-level response framing via HttpResponseHead, HttpJsonResponse, HttpBytesResponse, and
     HttpSseResponse
   - parse and enforce SSE framing and limits without provider-specific semantics
@@ -254,9 +266,10 @@
   - resolved auth credentials
   - adapter-produced provider headers
   - adapter-produced request body
+  - adapter-produced HTTP method
   - adapter-produced HttpRequestOptions
+  - adapter-produced transport response framing
   - typed route-wide and attempt-local transport inputs normalized into the transport request contract
-  - expected response mode
 
   Transport returns:
 
@@ -273,12 +286,31 @@
   - HttpSendRequest, or a direct typed successor to it, is the runtime-to-transport request contract
   - runtime is responsible for normalizing route-wide and attempt-local typed transport inputs before
     calling agent-transport
+  - provider planning is the single source of truth for outbound HTTP method and transport response
+    framing
+  - runtime validates adapter-produced transport response framing against
+    `ExecutionOptions.response_mode` before calling transport
+  - resolved transport retry policy is carried through `ResolvedTransportOptions.retry_policy`
+  - runtime, not transport, resolves the effective retry policy before transport execution
+  - transport applies only the resolved retry policy it was given
   - transport is responsible for materializing final headers, applying auth, enforcing timeouts,
-    applying pre-body retries, and framing responses
+    applying pre-body retries, and executing the explicit response framing it was given
   - request, stream-setup, and stream-idle timeout fields are explicit typed transport inputs
   - first-byte timeout remains internal to transport and is governed by stream-idle timeout behavior
 
   Recommended Type Direction:
+
+  `HttpResponseMode` is the current codebase-oriented name for the transport response-framing field.
+  In the target architecture, this should be renamed or conceptually replaced by
+  `TransportResponseFraming` to avoid confusion with semantic `ResponseMode`.
+
+  ```rust
+  pub enum TransportResponseFraming {
+      Json,
+      Bytes,
+      Sse,
+  }
+  ```
 
   The redesigned runtime should eventually normalize into a transport-facing shape conceptually like:
 
@@ -289,7 +321,7 @@
       pub method: Method,
       pub url: String,
       pub body: HttpRequestBody,
-      pub response_mode: HttpResponseMode,
+      pub response_framing: TransportResponseFraming,
       pub request_options: HttpRequestOptions,
       pub transport: ResolvedTransportOptions,
       pub provider_headers: HeaderMap,
@@ -301,7 +333,12 @@ Where `ResolvedTransportOptions` is derived from:
 - route-wide ExecutionOptions.transport fields
 - attempt-local header overrides
 - attempt-local timeout overrides
+- resolved intra-attempt retry policy
 - provider/platform defaults
+
+`ResolvedTransportOptions` includes the effective request-id extraction override, caller-owned extra
+headers, resolved timeout selections, and resolved intra-attempt retry policy for the current
+execution attempt.
 
   The typed timeout fields carried through this boundary are:
 
@@ -347,9 +384,10 @@ Typed timeout selection is runtime-owned end-to-end:
 
   - runtime owns route resolution, target selection, capability validation, and transport-input
     normalization
-  - provider adapters own provider request-body planning and protocol-specific request hints
-  - transport owns outbound request construction, auth placement, retry/timeouts, and low-level
-    response framing
+  - provider adapters own provider request-body planning, outbound HTTP method selection, and
+    protocol-specific request/framing hints
+  - transport owns outbound request execution, auth placement, retry/timeouts, and low-level
+    framing mechanics for the explicit framing selected upstream
 
   ### Long-Term Transport Contract
 
@@ -365,7 +403,7 @@ Typed timeout selection is runtime-owned end-to-end:
       pub method: Method,
       pub url: String,
       pub body: HttpRequestBody,
-      pub response_mode: HttpResponseMode,
+      pub response_framing: TransportResponseFraming,
       pub request_options: HttpRequestOptions,
       pub transport: ResolvedTransportOptions,
       pub provider_headers: HeaderMap,
@@ -380,6 +418,15 @@ Typed timeout selection is runtime-owned end-to-end:
   - `TransportExecutionInput.url` is fully resolved by runtime before transport execution
   - transport does not combine `PlatformConfig.base_url` with endpoint paths
   - adapter-controlled endpoint selection happens only through `ProviderRequestPlan.endpoint_path_override`
+
+  Locked method/framing rule:
+
+  - `ProviderRequestPlan.method` is the single source of truth for the outbound HTTP method
+  - `ProviderRequestPlan.response_framing` is the single source of truth for transport response
+    framing
+  - runtime copies those fields into `TransportExecutionInput` after validating compatibility with
+    `ExecutionOptions.response_mode`
+  - transport must not invent or infer HTTP method or response framing on its own
 
   ### AdapterContext Decision
 
@@ -421,6 +468,9 @@ Typed timeout selection is runtime-owned end-to-end:
   - model_id is removed
   - stream is removed
   - layered native options are removed
+  - `max_output_tokens` is the canonical shared output-token limit surface
+  - provider-native options must not introduce alias fields such as provider-specific `max_tokens`
+    when they mean the same thing as `TaskRequest.max_output_tokens`
   - this replaces the semantic role of the current Request
 
   ## 2. ResponseMode
@@ -454,13 +504,42 @@ Typed timeout selection is runtime-owned end-to-end:
   - `ResponseMode::Streaming` means the caller receives canonical stream events from an opened SSE
     attempt requested in streaming mode
   - `ResponseMode::Streaming` is an optional provider capability
+  - streaming enablement and stream-delivery mode are owned only by `ResponseMode`
+  - provider-native options must not introduce alias or override fields for streaming mode or shared
+    stream setup semantics
+  - for `ResponseMode::Streaming`, route fallback is allowed only until the runtime emits the first
+    canonical stream event to the caller
+  - after the first canonical stream event is emitted, the streaming attempt is committed and route
+    fallback is forbidden
+  - if a committed streaming attempt later errors or terminates abnormally, runtime surfaces that
+    failure on the current stream/finalization path and must not retry another route target
+  - `ResponseMode::Streaming` is a two-phase public contract: incremental canonical stream events
+    followed by one terminal completion outcome for the same attempt
+  - streaming APIs must provide a terminal completion path, whether represented as explicit
+    `finalize()`, `await`, or an equivalent handle-level operation
+  - canonical stream events do not carry `ResponseMeta` or partial/live route-attempt metadata
+  - on streaming terminal success, the completion path yields the completed canonical `Response`
+    carrying normal `ResponseMeta`
+  - on streaming terminal executed failure, including committed-stream failure after the first
+    canonical event, the completion path yields normalized `RuntimeError` plus `ExecutedFailureMeta`
   - response mode is resolved before adapter request planning and is an input to planning, not an
     inference from the returned request plan
   - adapters must produce a request plan consistent with the requested response mode
   - returning an SSE transport plan for `ResponseMode::NonStreaming` is a planning error
-  - streaming APIs may expose a finalize/await step that yields the completed canonical `Response`
-    after the stream finishes
   - stream finalization is part of the streaming API contract, not a non-streaming transport path
+
+  Locked streaming commit rule:
+
+  - in `ResponseMode::Streaming`, runtime is the only layer that determines whether the attempt is
+    still fallback-eligible or has become a committed stream
+  - the commit point is the moment runtime emits the first canonical stream event to the caller
+  - transport opening an SSE response does not commit the attempt on its own
+  - receipt of raw SSE frames does not commit the attempt on its own
+  - provider stream projector creation does not commit the attempt on its own
+  - fallback remains eligible only for executed failures that occur before runtime emits the first
+    canonical stream event
+  - once runtime emits the first canonical stream event, the attempt is committed permanently and
+    fallback is forbidden for the rest of that stream and any associated finalization path
 
   ## 3. TransportOptions
 
@@ -485,18 +564,22 @@ Typed timeout selection is runtime-owned end-to-end:
   - this type only owns transport concerns that are truly call-wide
   - provider/protocol request hints do not live here
   - `request_id_header_override` changes response request-id extraction only
+  - `request_id_header_override` takes precedence over instance-configured and provider-default
+    request-id header selection
   - `request_id_header_override` does not materialize or modify any outbound request header
   - if a caller wants to send a request header with that same name, it must be supplied through
     normal extra-header fields instead
 
-  ## 4. ResolvedTransportOptions
+  ## 4. TransportTimeoutOverrides
 
   ### Purpose
 
-  Represents the transport-owned, fully normalized result of combining transport defaults with
-  route-wide and attempt-local transport settings before the transport request is issued.
+  Represents optional caller-supplied timeout overrides for one attempt.
 
-  ### Internal Shape
+  This is a public helper type used by attempt-local execution controls.
+  It does not represent fully resolved transport timeout values.
+
+  ### Public Shape
 
   ```rust
   pub struct TransportTimeoutOverrides {
@@ -504,28 +587,128 @@ Typed timeout selection is runtime-owned end-to-end:
       pub stream_setup_timeout: Option<Duration>,
       pub stream_idle_timeout: Option<Duration>,
   }
+  ```
 
+  ### Notes
+
+  - this is the public attempt-local timeout override surface
+  - each field is optional and overrides only the corresponding timeout when present
+  - absence means runtime resolves that timeout from provider defaults and route-wide transport
+    policy
+  - this type is reused by runtime when combining public execution inputs into internal
+    transport-owned structures
+
+  ## 5. ResolvedTransportOptions
+
+  ### Purpose
+
+  Represents the transport-owned internal result of combining route-wide transport settings,
+  attempt-local overrides, and provider/runtime defaults before the transport request is issued.
+
+  ### Internal Shape
+
+  ```rust
   pub struct ResolvedTransportOptions {
       pub request_id_header_override: Option<String>,
       pub extra_headers: BTreeMap<String, String>,
       pub timeouts: TransportTimeoutOverrides,
+      pub retry_policy: RetryPolicy,
   }
   ```
 
   ### Notes
 
+  - this is an internal runtime/transport shape, not a public API surface
   - produced by runtime during execution-plan resolution
   - consumed when constructing the transport request contract
   - contains only runtime-owned transport fields
+  - `timeouts` carries the normalized timeout selections derived from public inputs and defaults
+  - `retry_policy` is the resolved transport retry policy for this execution attempt
+  - runtime resolves effective timeout behavior before transport enforcement
+  - runtime resolves `retry_policy` before transport execution from provider/runtime defaults and
+    any runtime-owned transport policy inputs
+  - transport consumes the resolved retry policy as typed input and does not invent or merge retry
+    behavior on its own
+  - transport retry remains intra-attempt behavior; it does not select a new route target and does
+    not replace route fallback
   - does not include protocol-specific request hints from adapters; those stay in
     `HttpRequestOptions`
   - does not include adapter-produced provider headers; those are carried separately in the
     transport execution input
-  - `request_id_header_override` overrides the response-header lookup used to extract request ids
-    from response metadata; it does not participate in outbound header construction
+  - `request_id_header_override` overrides the effective response-header lookup used to extract
+    request ids from response metadata; it does not participate in outbound header construction
   - first-byte timeout remains an internal transport concern and is governed by `stream_idle_timeout`
 
-  ## 5. ExecutionOptions
+  ## 6. HttpRequestOptions
+
+  ### Purpose
+
+  Represents adapter-owned protocol-level HTTP request hints carried on the runtime-to-transport
+  boundary.
+
+  This is a typed boundary object, not a generic escape hatch for transport control.
+
+  ### Shape
+
+  ```rust
+  pub struct HttpRequestOptions {
+      pub accept: Option<Mime>,
+      pub expected_content_type: Option<Mime>,
+      pub preserve_error_body_for_adapter_decode: bool,
+      pub sse_defaults: Option<SseDefaults>,
+      pub sse_parser_limits: Option<SseParserLimits>,
+  }
+  ```
+
+  ### Locked semantics
+
+  - `HttpRequestOptions` is owned only by provider adapters during request planning
+  - `HttpRequestOptions` carries only protocol-level request/response hints needed by transport
+    execution
+  - `accept` controls the outbound HTTP `Accept` expectation when the protocol requires it
+  - `expected_content_type` tells runtime/transport what response content type is expected for the
+    selected provider protocol path
+  - `preserve_error_body_for_adapter_decode` controls whether non-success response bodies are
+    retained for family/provider error decode before fallback evaluation
+  - `sse_defaults` and `sse_parser_limits` carry protocol-specific SSE parsing configuration when
+    `response_framing = TransportResponseFraming::Sse`
+
+  ### Locked exclusion rule
+
+  `HttpRequestOptions` must not duplicate or override transport concerns owned elsewhere in the
+  architecture.
+
+  It must not carry:
+
+  - outbound HTTP method
+  - URL or endpoint-path selection
+  - transport response framing
+  - auth configuration or auth header placement
+  - provider-generated dynamic headers
+  - request-id extraction override
+  - call-wide or attempt-local extra headers
+  - request timeout
+  - stream-setup timeout
+  - stream-idle timeout
+  - retry policy
+  - semantic response mode
+  - route fallback policy or fallback eligibility
+
+  These concerns are owned respectively by:
+
+  - `ProviderRequestPlan.method`
+  - `ProviderRequestPlan.endpoint_path_override` plus runtime URL construction
+  - `ProviderRequestPlan.response_framing`
+  - `PlatformConfig.auth_style` plus transport auth placement
+  - `ProviderRequestPlan.provider_headers`
+  - `ResolvedTransportOptions.request_id_header_override`
+  - `TransportOptions.extra_headers` and `AttemptExecutionOptions.extra_headers`
+  - `TransportTimeoutOverrides` / `ResolvedTransportOptions.timeouts`
+  - `ResolvedTransportOptions.retry_policy`
+  - `ExecutionOptions.response_mode`
+  - `FallbackPolicy` and runtime fallback orchestration
+
+  ## 7. ExecutionOptions
 
   ### Purpose
 
@@ -547,7 +730,7 @@ Typed timeout selection is runtime-owned end-to-end:
   - direct-client high-level methods infer this automatically
   - routed high-level methods infer response_mode from .messages() vs .streaming()
 
-  ## 6. NativeOptions
+  ## 8. NativeOptions
 
   ### Purpose
 
@@ -613,7 +796,7 @@ Typed timeout selection is runtime-owned end-to-end:
   8. if `native.provider` is present and its variant matches the resolved provider kind, continue
   9. if `native.provider` is present and its variant does not match the resolved provider kind, mark the
      attempt statically incompatible
-  10. apply `CapabilityMismatchPolicy`
+  10. apply `PlanningRejectionPolicy`
 
   ### Ownership Rule
 
@@ -633,7 +816,7 @@ Typed timeout selection is runtime-owned end-to-end:
 A field belongs in `ProviderOptions` when any of the following are true:
 
 - the field is only accepted by one concrete provider
-- the field affects provider-specific routing, account, plugin, debug, or endpoint behavior
+- the field affects provider-specific account, plugin, debug, or endpoint behavior
 - the field requires provider-specific request shape, provider-specific dynamic headers, or
   provider-specific validation
 - the field is currently exposed by one provider, but its family-shared semantics, validation, or
@@ -647,7 +830,10 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
 - belong to family-layer validation
 - be encoded by the family codec rather than one provider overlay
 
-## 7. Target
+Fields do not belong in `ProviderOptions` when they merely restate or override semantics already
+owned by `TaskRequest` or `ExecutionOptions`.
+
+## 9. Target
 
   ### Purpose
 
@@ -666,9 +852,15 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
 
   - Target stays focused on destination identity
   - it names one registered runtime destination instance
+  - `Target.model`, when present, is the highest-precedence model selection for that attempt
+  - if `Target.model` is absent, runtime resolves the effective model from
+    `ProviderConfig.default_model`
+  - if neither `Target.model` nor `ProviderConfig.default_model` is present, runtime must fail
+    planning before adapter request planning or transport execution
+  - runtime must not rely on provider-side implicit model defaults
   - it does not own layered native request options or execution overrides
 
-  ## 8. AttemptExecutionOptions
+  ## 10. AttemptExecutionOptions
 
   ### Purpose
 
@@ -684,6 +876,13 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
       pub extra_headers: BTreeMap<String, String>,
   }
   ```
+
+  ### Notes
+
+  - `timeout_overrides` uses the public `TransportTimeoutOverrides` helper type
+  - these are caller-supplied attempt-local overrides, not resolved transport-owned timeout values
+  - runtime combines them with route-wide transport settings and provider defaults when
+    constructing `ResolvedTransportOptions`
 
   ### Semantics
 
@@ -734,14 +933,17 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
     - stream-setup timeout
     - stream-idle timeout
 
-  #### Provider adapters own protocol-specific HttpRequestOptions, including:
+  #### Provider adapters own closed protocol-specific HttpRequestOptions, including:
 
-  - accept
-  - expected_content_type
-  - preserve_error_body_for_adapter_decode
-  - SSE-specific defaults
-  - SSE parser limits
-  - provider/protocol response framing hints that are not route-owned transport controls
+  - `accept`
+  - `expected_content_type`
+  - `preserve_error_body_for_adapter_decode`
+  - `sse_defaults`
+  - `sse_parser_limits`
+
+  `HttpRequestOptions` is closed to protocol-level request/response hints.
+  It must not carry method, URL selection, framing, headers, auth, timeout, retry, or fallback
+  controls.
 
   #### Provider adapters also own provider-generated dynamic headers via provider request planning
 
@@ -757,8 +959,19 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
   - request_id_header_override is route-wide only
   - request_id_header_override affects response request-id extraction only; it is not an outbound
     header layer
+  - instance-specific default request-id header selection belongs on `ProviderConfig`, not on
+    `AttemptExecutionOptions`
   - content-type expectations are adapter-owned only
   - SSE parser limits are adapter-owned only
+  - `HttpRequestOptions` must not carry outbound HTTP method
+  - `HttpRequestOptions` must not carry URL or endpoint-selection data
+  - `HttpRequestOptions` must not carry transport response framing
+  - `HttpRequestOptions` must not carry caller-owned or provider-generated headers
+  - `HttpRequestOptions` must not carry timeout or retry controls
+  - `HttpRequestOptions` must not carry response-mode or fallback controls
+  - outbound HTTP method is adapter-owned only through `ProviderRequestPlan.method`
+  - transport response framing is adapter-owned only through `ProviderRequestPlan.response_framing`,
+    subject to runtime validation against `ExecutionOptions.response_mode`
   - preserve_error_body_for_adapter_decode is adapter-owned only
   - typed timeout fields are runtime-owned only
   - response mode is route-wide only
@@ -785,6 +998,11 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
 
   `request_id_header_override` is not part of this header merge order.
   It only changes which response header transport reads when extracting `HttpResponseHead.request_id`.
+
+  Request-id extraction precedence is:
+
+  1. `ResolvedTransportOptions.request_id_header_override`, when present
+  2. `PlatformConfig.request_id_header`, which is resolved per provider instance
 
   Runtime does not pre-merge these layers into one opaque header map.
   Runtime passes caller-owned transport headers through `ResolvedTransportOptions` and adapter-owned
@@ -860,19 +1078,19 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
       )
   ```
 
-  ## 10. CapabilityMismatchPolicy
+  ## 10. PlanningRejectionPolicy
 
   ### Purpose
 
-  Defines what routing should do when an attempt is statically incompatible with the task before any
-  provider request is sent.
+  Defines what routing should do when an attempt is rejected during planning before any provider
+  request is sent.
 
   ### Public Shape
 
   ```rust
-  pub enum CapabilityMismatchPolicy {
+  pub enum PlanningRejectionPolicy {
       FailFast,
-      SkipIncompatibleTargets,
+      SkipRejectedTargets,
   }
   ```
 
@@ -882,15 +1100,16 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
 
   ### Semantics
 
-  - FailFast: return a planning error immediately when the current attempt is statically incompatible
-  - SkipIncompatibleTargets: record the attempt as skipped and advance to the next compatible target
+  - `FailFast`: return a planning failure immediately when the current attempt is rejected during
+    planning
+  - `SkipRejectedTargets`: record the attempt as skipped and advance to the next target rejected
+    only during planning
 
   ### Locked validation scope
 
-  `CapabilityMismatchPolicy` applies only to high-confidence static incompatibilities that runtime
-  can determine before execution.
+  `PlanningRejectionPolicy` governs all pre-execution planning rejections.
 
-  Those checks are exactly:
+  That includes:
 
   - `ResponseMode::Streaming` requested for a target whose `ProviderCapabilities` do not support
     streaming
@@ -900,10 +1119,14 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
     options at all
   - provider-scoped native options requested for a target whose provider does not support provider-
     scoped native options at all
+  - deterministic local adapter-planning validation failures returned by
+    `ProviderAdapter::plan_request`
 
-  `CapabilityMismatchPolicy` does not decide model-level or deployment-level feature support for
-  request fields such as tools, structured output, `top_p`, stop sequences, reasoning controls, or
-  arbitrary passthrough fields.
+  Runtime distinguishes these planning-time rejection reasons through `SkipReason`.
+
+  `PlanningRejectionPolicy` does not perform broad provider capability inference for model-level or
+  deployment-level feature support for request fields such as tools, structured output, `top_p`,
+  stop sequences, reasoning controls, or arbitrary passthrough fields.
 
   ## 11. Attempt Outcome Metadata and Observer Model
 
@@ -916,7 +1139,10 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
 
   ```rust
   pub enum SkipReason {
-      CapabilityMismatch {
+      StaticIncompatibility {
+          message: String,
+      },
+      AdapterPlanningRejected {
           message: String,
       },
   }
@@ -940,7 +1166,7 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
   pub struct AttemptRecord {
       pub provider_instance: ProviderInstanceId,
       pub provider_kind: ProviderKind,
-      pub model: Option<String>,
+      pub model: String,
       pub target_index: usize,
       pub attempt_index: usize,
       pub disposition: AttemptDisposition,
@@ -954,14 +1180,64 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
       pub request_id: Option<String>,
       pub attempts: Vec<AttemptRecord>,
   }
+
+  pub struct ExecutedFailureMeta {
+      pub selected_provider_instance: ProviderInstanceId,
+      pub selected_provider_kind: ProviderKind,
+      pub selected_model: String,
+      pub status_code: Option<u16>,
+      pub request_id: Option<String>,
+      pub attempts: Vec<AttemptRecord>,
+  }
+
+  pub struct RoutePlanningFailure {
+      pub reason: RoutePlanningFailureReason,
+      pub attempts: Vec<AttemptRecord>,
+  }
+
+  pub enum RoutePlanningFailureReason {
+      NoCompatibleAttempts,
+      AllAttemptsRejectedDuringPlanning,
+  }
   ```
 
   ### Locked semantics
 
+  - `ResponseMeta` is success-only metadata for a logically successful call
   - `ResponseMeta.attempts` is the ordered route attempt history, not just executed attempts
   - skipped attempts are recorded in success metadata when routing later succeeds
+  - `ExecutedFailureMeta` is the failure-side metadata shape for executed failures normalized into
+    `RuntimeError`
+  - `ExecutedFailureMeta.attempts` is the ordered route attempt history for that failed call,
+    including prior skips and the final executed failed attempt
+  - `ExecutedFailureMeta` uses the same `AttemptRecord` shape, ordering rules, and skip semantics as
+    `ResponseMeta.attempts`
+  - `RoutePlanningFailure` is the failure-side metadata shape used when routing ends during
+    planning before any attempt reaches executed-failure normalization or success
+  - `RoutePlanningFailure.attempts` is the ordered route attempt history for that failed call
+  - `RoutePlanningFailure.attempts` uses the same `AttemptRecord` shape, ordering rules, and skip
+    semantics as `ResponseMeta.attempts`
   - skipped attempts are recorded in route-planning failures when no compatible attempt succeeds
   - a skipped attempt never has provider request id or executed-attempt status metadata
+  - `AttemptRecord.model` is always the concrete effective model resolved for that attempt, whether
+    the attempt was skipped, failed after execution began, or succeeded
+  - `AttemptRecord.model` uses the same model-resolution rule as `ResolvedProviderAttempt.model`;
+    it does not preserve only the explicit `Target.model` when a provider default supplied the
+    effective model
+  - if runtime cannot resolve an effective model for a candidate attempt, planning fails before that
+    attempt produces an `AttemptRecord`
+  - `ResponseMeta.selected_model` is always the concrete effective model of the successful executed
+    attempt
+  - runtime records an explicit resolved model in `ResponseMeta.selected_model`; it does not leave
+    model selection to provider-side implicit defaults
+  - `ExecutedFailureMeta.selected_provider_instance`, `selected_provider_kind`, and
+    `selected_model` identify the concrete executed attempt that failed
+  - `ExecutedFailureMeta.status_code` and `request_id` follow the final executed failed attempt when
+    that information is available after execution began
+  - `ExecutedFailureMeta` must not be produced for planning-only outcomes represented by
+    `RoutePlanningFailure`
+  - `RoutePlanningFailure` must not invent success-only fields such as selected provider instance,
+    selected provider kind, selected model, success status code, or upstream request id
 
   ### Observer rule
 
@@ -971,11 +1247,11 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
 
   ```rust
   pub struct AttemptSkippedEvent {
-      pub provider_instance: Option<ProviderInstanceId>,
-      pub provider_kind: Option<ProviderKind>,
-      pub model: Option<String>,
-      pub target_index: Option<usize>,
-      pub attempt_index: Option<usize>,
+      pub provider_instance: ProviderInstanceId,
+      pub provider_kind: ProviderKind,
+      pub model: String,
+      pub target_index: usize,
+      pub attempt_index: usize,
       pub elapsed: Duration,
       pub reason: SkipReason,
   }
@@ -987,6 +1263,16 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
   - `on_attempt_success` means an executed attempt succeeded
   - `on_attempt_failure` means an executed attempt failed after execution began
   - `on_attempt_skipped` means planning rejected the attempt before provider execution
+  - `on_attempt_skipped` is emitted only after runtime resolves the concrete attempt identity and
+    effective model for the candidate attempt
+  - `on_attempt_skipped.provider_instance`, `provider_kind`, `model`, `target_index`, and
+    `attempt_index` must match the corresponding `AttemptRecord` recorded for that skipped attempt
+  - `on_attempt_skipped.reason = SkipReason::StaticIncompatibility { .. }` means runtime rejected
+    the attempt during static compatibility validation
+  - `on_attempt_skipped.reason = SkipReason::AdapterPlanningRejected { .. }` means adapter
+    planning rejected the attempt before transport execution
+  - `AttemptSkippedEvent` must not use absent identity or ordering fields as defensive typing;
+    pre-resolution route pruning is not represented by `on_attempt_skipped`
 
   Skipped attempts do not emit:
 
@@ -1031,6 +1317,10 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
   - fallback targets do not live here anymore
   - this type answers only: should we advance to the next attempt?
   - `FallbackPolicy` is rule-driven in the target architecture
+  - `FallbackPolicy::default()` is exactly `FallbackPolicy { rules: vec![] }`
+  - the default policy performs no fallback retries on its own
+  - with the default policy, routing advances to another target only when the caller supplied
+    explicit fallback rules through `FallbackPolicy.rules`
   - legacy fallback toggles are migration-only compatibility behavior and are not part of this public
     target shape
 
@@ -1067,6 +1357,11 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
   `FallbackPolicy` evaluates only runtime-normalized executed failures.
   It does not inspect raw transport responses directly.
 
+  Planning-time rejections are excluded:
+
+  - static incompatibility before adapter request planning
+  - adapter-planning rejection before transport execution
+
   Locked error-normalization flow:
 
   1. transport executes the request and returns a framed response or a transport-level failure
@@ -1091,9 +1386,37 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
   - `FallbackRule.provider_codes` is meaningful only when family + provider error decoding and
     runtime normalization populated a provider code
   - fallback never runs against raw HTTP bodies or transport response objects
+  - in `ResponseMode::Streaming`, fallback may evaluate only for failures that occur before the
+    first canonical stream event is emitted to the caller
+  - in `ResponseMode::Streaming`, once any canonical stream event has been emitted, fallback
+    evaluation stops permanently for that attempt
   - family and provider error-body decoding happen before fallback evaluation whenever the adapter
     requested error-body preservation
   - if no rule matches the normalized error, fallback does not continue
+
+  Locked success-decode / streaming-projector flow:
+
+  1. if the response status is successful and `ExecutionOptions.response_mode` is
+     `ResponseMode::NonStreaming`, runtime invokes `ProviderAdapter.decode_response_json`
+  2. `ProviderAdapter.decode_response_json` is the adapter-facing orchestration entry point for
+     successful decode; it does not define an independent provider-specific decode path
+  3. adapter success decode checks `ProviderOverlay.decode_response_override` first
+  4. if the overlay returns `Some(result)`, that result is authoritative and family success decode
+     does not run
+  5. if the overlay returns `None`, adapter success decode falls back to
+     `ProviderFamilyCodec.decode_response`
+  6. if the response status is successful and `ExecutionOptions.response_mode` is
+     `ResponseMode::Streaming`, runtime invokes `ProviderAdapter.create_stream_projector`
+  7. `ProviderAdapter.create_stream_projector` is the adapter-facing orchestration entry point for
+     stream projector selection; it does not define an independent projector ownership layer
+  8. adapter stream-projector selection checks `ProviderOverlay.create_stream_projector_override`
+     first
+  9. if the overlay returns `Some(projector)`, that projector is authoritative and the family
+     projector does not run
+  10. if the overlay returns `None`, adapter stream-projector selection falls back to
+      `ProviderFamilyCodec.create_stream_projector`
+  11. `ProviderAdapter.create_stream_projector` selects projector behavior, but runtime owns stream
+      commit classification and fallback eligibility during projector execution
 
   ## 12. Route
 
@@ -1108,7 +1431,7 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
       pub primary: AttemptSpec,
       pub fallbacks: Vec<AttemptSpec>,
       pub fallback_policy: FallbackPolicy,
-      pub capability_mismatch_policy: CapabilityMismatchPolicy,
+      pub planning_rejection_policy: PlanningRejectionPolicy,
   }
   ```
 
@@ -1135,7 +1458,7 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
           )
   )
   .with_policy(FallbackPolicy::default())
-  .with_capability_mismatch_policy(CapabilityMismatchPolicy::FailFast)
+  .with_planning_rejection_policy(PlanningRejectionPolicy::FailFast)
   ```
 
   ## 13. ExecutionPlan
@@ -1165,6 +1488,18 @@ Promotion into `FamilyOptions` is intentional once a field is confirmed to:
       pub capabilities: ProviderCapabilities,
   }
   ```
+
+  ### Locked model resolution rule
+
+  `ResolvedProviderAttempt.model` is the fully resolved effective model for one concrete attempt.
+
+  Runtime resolves it using the following precedence:
+
+  1. `Target.model`, when present
+  2. `ProviderConfig.default_model`, when present
+
+  If neither source provides a model, runtime must fail planning before building `ExecutionPlan`.
+  Runtime must not defer model selection to provider-side implicit defaults.
 
   ### Notes
 
@@ -1251,13 +1586,20 @@ pub struct OpenRouterOptions {
       pub session_id: Option<String>,
       pub trace: Option<serde_json::Value>,
       pub route: Option<String>,
-      pub max_tokens: Option<u32>,
       pub modalities: Option<Vec<String>>,
       pub image_config: Option<serde_json::Value>,
       pub debug: Option<serde_json::Value>,
-      pub stream_options: Option<serde_json::Value>,
   }
   ```
+
+Locked rule:
+
+- `OpenRouterOptions` must not duplicate shared task-layer or execution-layer controls
+- output-token limits belong on `TaskRequest.max_output_tokens`, not `OpenRouterOptions`
+- streaming mode belongs on `ResponseMode`, not `OpenRouterOptions`
+- if OpenRouter exposes stream-payload augmentations that are meaningful only after
+  `ResponseMode::Streaming` is selected, they require a separately named provider-specific field
+  with non-overlapping semantics rather than a generic `stream_options` alias
 
   ## AnthropicOptions
 
@@ -1372,10 +1714,11 @@ pub struct OpenRouterOptions {
   pub struct ProviderDescriptor {
       pub kind: ProviderKind,
       pub family: ProviderFamilyId,
+      pub protocol: ProtocolKind,
       pub default_base_url: &'static str,
       pub endpoint_path: &'static str,
       pub auth_style: AuthStyle,
-      pub request_id_header: HeaderName,
+      pub default_request_id_header: HeaderName,
       pub default_headers: HeaderMap,
   }
   ```
@@ -1385,7 +1728,8 @@ pub struct OpenRouterOptions {
   `ProviderDescriptor` is adapter-owned static metadata.
 
   It replaces the current pattern where adapters directly synthesize `PlatformConfig` from hardcoded
-  provider facts such as default base URL, auth style, request-id header, and default headers.
+  provider facts such as default base URL, auth style, default request-id header, and default
+  headers.
 
   In the target architecture:
 
@@ -1406,6 +1750,7 @@ pub struct OpenRouterOptions {
       pub auth_token: Option<AuthCredentials>,
       pub base_url: Option<String>,
       pub default_model: Option<String>,
+      pub request_id_header: Option<HeaderName>,
       pub retry_policy: Option<RetryPolicy>,
       pub request_timeout: Option<Duration>,
       pub stream_setup_timeout: Option<Duration>,
@@ -1420,6 +1765,17 @@ pub struct OpenRouterOptions {
   It represents deployment-specific or user-supplied settings for one provider instance, not static
   facts about the provider protocol.
   Runtime stores this config per `ProviderInstanceId`.
+
+  `retry_policy` is provider-instance configuration input used by runtime when resolving
+  `ResolvedTransportOptions.retry_policy`.
+
+  `default_model` remains optional because some routes supply an explicit `Target.model` per
+  attempt. When `default_model` is absent, callers must provide `Target.model` for any attempt that
+  targets this provider instance.
+
+  `request_id_header` is an optional provider-instance override for response request-id extraction.
+  It is used when one registered instance of a provider family needs a different response request-id
+  header convention than the provider-kind default.
 
   ## PlatformConfig
 
@@ -1448,13 +1804,17 @@ pub struct OpenRouterOptions {
 
   Concretely:
 
-  - descriptor supplies protocol family, default base URL, auth style, request-id header, default
-    headers, and default endpoint path
-  - provider config supplies base URL override, auth credentials, default model, retry policy, and
-    transport defaults
+  - descriptor supplies provider family, protocol kind, default base URL, auth style, default
+    request-id header, default headers, and default endpoint path
+  - provider config supplies base URL override, auth credentials, default model, optional instance
+    request-id header override, retry policy, and transport defaults
+  - runtime copies `ProviderDescriptor.protocol` into `PlatformConfig.protocol`
   - `PlatformConfig` intentionally carries the resolved base URL but not the selected endpoint path
-  - `PlatformConfig.request_id_header` defines the default response header transport uses to extract
-    upstream request ids from responses
+  - `PlatformConfig.request_id_header` is the effective default response header transport uses to
+    extract upstream request ids from responses for the resolved provider instance
+  - runtime resolves `PlatformConfig.request_id_header` using:
+      1. `ProviderConfig.request_id_header`, when present
+      2. otherwise `ProviderDescriptor.default_request_id_header`
   - runtime validates and normalizes the effective base URL and produces the transport-facing
     `PlatformConfig`
   - runtime resolves the effective endpoint path separately using:
@@ -1485,7 +1845,7 @@ pub struct OpenRouterOptions {
   - `ResponseMode::Streaming` requires `supports_streaming = true`
   - if the caller requests `ResponseMode::Streaming` for a provider that does not support streaming,
     the attempt is statically incompatible
-  - runtime must reject or skip that attempt according to `CapabilityMismatchPolicy` before provider
+  - runtime must reject or skip that attempt according to `PlanningRejectionPolicy` before provider
     execution begins
 
   ### Static capability scope
@@ -1511,7 +1871,8 @@ pub struct OpenRouterOptions {
   - other request knobs whose support may vary by model, deployment, or upstream inference host
 
   Those features are validated during adapter planning and/or by the upstream provider response path,
-  then surfaced through normalized runtime errors rather than `CapabilityMismatchPolicy`.
+  then surfaced either as planning-time rejection or as normalized runtime error rather than as
+  broad static capability inference.
 
   ### Layered Native Capability Semantics
 
@@ -1556,7 +1917,7 @@ pub struct OpenRouterOptions {
   - map shared family request fields
   - consume matching family-scoped native options
   - produce the shared family request plan shape before provider-specific overlay augmentation
-  - set family-default transport kind, response kind, endpoint override, and protocol-level
+  - set family-default HTTP method, response framing, endpoint override, and protocol-level
     request options consistent with the requested `ResponseMode`
   - map shared family response shape
   - decode shared family-shaped error bodies into `ProviderErrorInfo`
@@ -1570,8 +1931,8 @@ pub struct OpenRouterOptions {
   pub struct EncodedFamilyRequest {
       pub body: Value,
       pub warnings: Vec<RuntimeWarning>,
-      pub transport_kind: ProviderTransportKind,
-      pub response_kind: ProviderResponseKind,
+      pub method: Method,
+      pub response_framing: TransportResponseFraming,
       pub endpoint_path_override: Option<String>,
       pub provider_headers: HeaderMap,
       pub request_options: HttpRequestOptions,
@@ -1583,6 +1944,8 @@ pub struct OpenRouterOptions {
   - this is the family-level intermediate request plan
   - it is not a provider-specific public request type
   - it is the common conceptual ancestor of today's family-specific encoded request values
+  - `method` and `response_framing` are family-level defaults that provider-specific overlays may
+    refine before final adapter planning completes
   - `endpoint_path_override` is the family-level hook for selecting a non-default endpoint path
   - provider-specific overlays may mutate it before the adapter finalizes `ProviderRequestPlan`
   - `provider_headers` carries adapter-owned dynamic request headers after `AdapterContext`
@@ -1597,8 +1960,8 @@ pub struct OpenRouterOptions {
   pub struct ProviderRequestPlan {
       pub body: Value,
       pub warnings: Vec<RuntimeWarning>,
-      pub transport_kind: ProviderTransportKind,
-      pub response_kind: ProviderResponseKind,
+      pub method: Method,
+      pub response_framing: TransportResponseFraming,
       pub endpoint_path_override: Option<String>,
       pub provider_headers: HeaderMap,
       pub request_options: HttpRequestOptions,
@@ -1615,6 +1978,26 @@ pub struct OpenRouterOptions {
   mechanism.
   When present, it replaces `ProviderDescriptor.endpoint_path`.
   Adapters do not construct the final URL; runtime does.
+
+  `ProviderRequestPlan.method` is the single adapter-produced outbound HTTP method consumed by
+  runtime and transport.
+
+  `ProviderRequestPlan.response_framing` is the single adapter-produced transport response-framing
+  decision consumed by runtime and transport.
+
+  `ExecutionOptions.response_mode` is the semantic source of truth for streaming vs non-streaming
+  execution.
+  Adapters must express that semantic decision concretely through
+  `ProviderRequestPlan.response_framing`.
+  Runtime must validate the adapter-produced framing against `ExecutionOptions.response_mode` and
+  copy the validated framing unchanged into `TransportExecutionInput.response_framing`.
+  Transport executes the requested framing and must not infer streaming behavior from any other
+  field or hidden selector.
+
+  Runtime validates the adapter-produced framing against `ExecutionOptions.response_mode`:
+
+  - `ResponseMode::NonStreaming` must not produce `TransportResponseFraming::Sse`
+  - `ResponseMode::Streaming` must produce `TransportResponseFraming::Sse`
 
   ## ProviderOverlay
 
@@ -1679,6 +2062,22 @@ pub struct OpenRouterOptions {
   - provider overlay decodes and refines provider-specific error details second
   - runtime merges those results and normalizes them into `RuntimeError` before fallback evaluation
 
+  Successful response decode follows the same layered composition:
+
+  - provider overlay gets first chance to override success decode through
+    `decode_response_override`
+  - if the overlay does not override, family codec success decode is used
+  - `ProviderAdapter.decode_response_json` is the orchestration entry point for that composition,
+    not a separate ownership layer
+
+  Stream projector selection follows the same layered composition:
+
+  - provider overlay gets first chance to override projector creation through
+    `create_stream_projector_override`
+  - if the overlay does not override, the family codec default stream projector is used
+  - `ProviderAdapter.create_stream_projector` is the orchestration entry point for that
+    composition, not a separate ownership layer
+
   ## Adapter Boundary Redesign
 
   ## Current Problem
@@ -1709,6 +2108,13 @@ pub struct OpenRouterOptions {
   }
   ```
 
+  `plan_request` may return deterministic local validation failures before transport execution.
+  Those failures are planning-time rejections, not executed failures.
+
+  `decode_response_json` and `create_stream_projector` are adapter-facing orchestration methods.
+  They compose family-codec defaults with provider-overlay overrides according to the locked
+  precedence rules above; they do not define independent provider-specific decode/projector paths.
+
   ## Adapter Planning Flow
 
   1. read execution.task
@@ -1733,7 +2139,7 @@ pub struct OpenRouterOptions {
   - selecting provider config and auth credentials from the resolved registered instance
   - resolving `PlatformConfig` from `ProviderDescriptor` + `ProviderConfig`
   - validating static capabilities
-  - applying CapabilityMismatchPolicy
+  - applying `PlanningRejectionPolicy`
   - normalizing route-wide and attempt-local transport inputs into the transport request contract
 
   ### Provider adapter owns
@@ -1927,6 +2333,10 @@ pub struct OpenRouterOptions {
 
   - .messages() implies ExecutionOptions { response_mode: NonStreaming, ... }
   - .streaming() implies ExecutionOptions { response_mode: Streaming, ... }
+  - routed `.streaming()` may retry a fallback target only if the current attempt fails before the
+    first canonical stream event is emitted
+  - after routed `.streaming()` emits the first canonical stream event, the selected attempt is
+    locked and toolkit must not reroute the stream to another target
   - these ergonomic routed methods infer default `ExecutionOptions`:
       - `observer: None`
       - `transport: TransportOptions::default()`
@@ -2035,7 +2445,7 @@ pub struct OpenRouterOptions {
 
   ### Default Behavior
 
-  CapabilityMismatchPolicy::FailFast
+  PlanningRejectionPolicy::FailFast
 
   Meaning:
 
@@ -2045,14 +2455,25 @@ pub struct OpenRouterOptions {
 
   ### Optional Behavior
 
-  CapabilityMismatchPolicy::SkipIncompatibleTargets
+  PlanningRejectionPolicy::SkipRejectedTargets
 
   Meaning:
 
-  - incompatible attempts are recorded as `AttemptRecord { disposition: Skipped { .. } }`
+  - statically incompatible attempts are recorded as
+    `AttemptRecord { disposition: Skipped { reason: SkipReason::StaticIncompatibility { .. } } }`
+  - adapter-planning rejections are recorded as
+    `AttemptRecord { disposition: Skipped { reason: SkipReason::AdapterPlanningRejected { .. } } }`
   - `on_attempt_skipped` is emitted for each skipped attempt
-  - routing advances to the next compatible attempt
-  - if no compatible attempts remain, return a route-planning failure summarizing all skipped attempts
+  - routing advances to the next attempt rejected only at planning time
+  - if no attempts remain after planning-time rejections, runtime returns
+    `RoutePlanningFailure { reason, attempts }`
+  - `RoutePlanningFailure.reason = NoCompatibleAttempts` when every remaining target was rejected by
+    static compatibility rules
+  - `RoutePlanningFailure.reason = AllAttemptsRejectedDuringPlanning` when one or more attempts
+    reached adapter planning but every remaining attempt was rejected before execution
+  - `RoutePlanningFailure.attempts` contains the full ordered skipped-attempt history accumulated
+    before routing terminated
+  - route-planning failure is a pre-execution routing outcome, not an executed `RuntimeError`
 
   ## Real-Time Feature Validation and Error Normalization
 
@@ -2074,9 +2495,22 @@ pub struct OpenRouterOptions {
      static mismatch rules above
   2. adapter planning performs deterministic request-shape validation that can be checked locally
   3. upstream provider responses may reject the request for model-level or deployment-level reasons
-  4. runtime normalizes those adapter/upstream failures into `RuntimeError`
-  5. callers receive a robust normalized error surface even when static capability checking could not
-     decide the feature in advance
+  4. deterministic adapter-planning validation failures are recorded as pre-execution planning
+     rejections and do not enter fallback evaluation
+  5. upstream provider responses and other executed failures are normalized into `RuntimeError`
+  6. callers receive a robust normalized error surface for executed failures even when static
+     capability checking could not decide the feature in advance
+
+  Locked distinction:
+
+  - `RuntimeError` is produced only for executed failures and normalized upstream/provider failures
+  - executed failures may carry `ExecutedFailureMeta` describing the selected failed attempt and the
+    full ordered `AttemptRecord` history for that call
+  - `RoutePlanningFailure` is produced only when routing terminates before any attempt yields an
+    executed failure or success
+  - fallback rules evaluate only against normalized executed failures represented as `RuntimeError`
+  - route-planning failures do not enter fallback-rule evaluation because no executed failure was
+    produced
 
   This architecture prefers conservative static validation plus strong runtime error normalization
   over inaccurate provider-level capability claims for model-specific features.
@@ -2088,28 +2522,35 @@ pub struct OpenRouterOptions {
   Static capability mismatch and fallback are separate concepts.
 
   - static capability mismatch is determined before any provider request is sent
+  - adapter-planning rejection is determined before any provider request is sent
   - fallback is evaluated only after an attempted provider execution fails
 
   ### Default
 
-  CapabilityMismatchPolicy::FailFast
+  PlanningRejectionPolicy::FailFast
 
   Meaning:
 
   - if the selected attempt is statically incompatible with the TaskRequest, planning fails
     immediately
+  - if adapter planning rejects the selected attempt before transport execution, planning fails
+    immediately
   - fallback rules are not consulted because no provider attempt occurred
 
   ### Optional mode
 
-  CapabilityMismatchPolicy::SkipIncompatibleTargets
+  PlanningRejectionPolicy::SkipRejectedTargets
 
   Meaning:
 
-  - statically incompatible attempts are recorded as `AttemptRecord { disposition: Skipped { .. } }`
+  - statically incompatible attempts are recorded as
+    `AttemptRecord { disposition: Skipped { reason: SkipReason::StaticIncompatibility { .. } } }`
+  - adapter-planning rejections are recorded as
+    `AttemptRecord { disposition: Skipped { reason: SkipReason::AdapterPlanningRejected { .. } } }`
   - `on_attempt_skipped` is emitted for each skipped attempt
-  - routing advances to the next compatible attempt
-  - if no compatible attempts remain, return a route-planning failure summarizing skipped attempts
+  - routing advances to the next attempt rejected only at planning time
+  - if no attempts remain after planning-time rejections, runtime returns
+    `RoutePlanningFailure { reason, attempts }`
 
   ### Executed-failure fallback rule
 
@@ -2119,6 +2560,37 @@ pub struct OpenRouterOptions {
   - the first matching rule decides the outcome
   - `RetryNextTarget` advances to the next attempt already present on `Route`
   - `Stop`, or no matching rule, stops routing and surfaces the current error
+  - planning-time rejections from static incompatibility or adapter planning do not enter this rule
+  - in `ResponseMode::Streaming`, this rule applies only before the first canonical stream event is
+    emitted to the caller
+  - after the first canonical stream event is emitted, the attempt is committed and `RetryNextTarget`
+    is no longer permitted
+
+  Locked streaming failure-classification rule:
+
+  - transport and provider streaming layers may surface raw SSE frames, parsed SSE items, projector
+    outputs, or streaming/finalization errors, but they do not decide fallback eligibility
+  - runtime classifies each streaming failure relative to the streaming commit point
+  - a streaming failure is pre-commit only if runtime has not yet emitted any canonical stream
+    event to the caller
+  - a streaming failure is post-commit once runtime has emitted at least one canonical stream event
+    to the caller
+
+  Pre-commit streaming failures are fallback-eligible executed failures, including:
+
+  - SSE connection/setup failure before any canonical stream event is emitted
+  - malformed or invalid SSE framing before any canonical stream event is emitted
+  - provider stream projector error before any canonical stream event is emitted
+  - end-of-stream or abnormal termination before any canonical stream event is emitted
+  - stream finalization failure before any canonical stream event is emitted
+
+  Post-commit streaming failures are committed-stream failures and must not trigger fallback,
+  including:
+
+  - malformed or invalid SSE framing after at least one canonical stream event was emitted
+  - provider stream projector error after at least one canonical stream event was emitted
+  - end-of-stream or abnormal termination after at least one canonical stream event was emitted
+  - stream finalization failure after at least one canonical stream event was emitted
 
   ### Locked rule
 
@@ -2157,7 +2629,9 @@ pub struct OpenRouterOptions {
   3. direct client creates a single AttemptSpec:
       - target instance fixed by client configuration
       - provider kind fixed by client type
-      - model from client default and/or explicit fluent override such as `.model(...)`
+      - model from explicit fluent override such as `.model(...)` or from the configured
+        `default_model`
+      - if neither source provides a model, fail planning before provider execution
       - layered native attempt options from direct-client convenience calls if present
   4. direct client wraps that in a single-attempt Route
   5. direct client creates ExecutionOptions from .messages() or .streaming()
@@ -2179,26 +2653,51 @@ pub struct OpenRouterOptions {
   5. toolkit iterates ordered attempts from the route
   6. for each attempt:
       - resolve target instance into `RegisteredProvider`
-      - resolve effective model
+      - resolve effective model:
+          - use `Target.model` when present
+          - otherwise use `ProviderConfig.default_model`
+          - if neither is present, fail planning before adapter request planning or transport
+            execution
+          - do not rely on provider-side implicit model defaults
       - resolve adapter by provider kind
       - resolve provider config from the registered instance
       - resolve `PlatformConfig` from `ProviderDescriptor` + `ProviderConfig`
       - validate static capabilities
-      - apply CapabilityMismatchPolicy
+      - apply `PlanningRejectionPolicy`
       - if statically incompatible and skipping is enabled:
-          - record `AttemptRecord { disposition: Skipped { .. } }`
-          - emit `on_attempt_skipped`
-          - continue
+          - record `AttemptRecord { disposition: Skipped { reason: SkipReason::StaticIncompatibility { .. } } }`
+          - emit `on_attempt_skipped` with the same resolved provider identity, effective model,
+            and indices recorded in that `AttemptRecord`
+          - if another attempt remains, continue
+          - otherwise surface `RoutePlanningFailure` with the ordered skipped-attempt history
       - build `ResolvedProviderAttempt`
       - build ExecutionPlan
       - adapter plans provider request
+      - if adapter planning rejects the attempt before transport execution:
+          - record `AttemptRecord { disposition: Skipped { reason: SkipReason::AdapterPlanningRejected { .. } } }`
+          - emit `on_attempt_skipped` with the same resolved provider identity, effective model,
+            and indices recorded in that `AttemptRecord`
+          - if another attempt remains and `PlanningRejectionPolicy::SkipRejectedTargets` is
+            active, continue
+          - otherwise surface `RoutePlanningFailure` with the ordered skipped-attempt history
       - runtime builds `TransportExecutionInput` from adapter output plus typed transport inputs
       - transport materializes final headers from explicit header layers
       - transport executes provider request, including any transport-level retries within the attempt
   7. if attempt fails after execution, runtime evaluates `FallbackPolicy.rules` against the
      normalized `RuntimeError`
+      - for `ResponseMode::NonStreaming`, this may occur at any executed failure point before a
+        completed canonical `Response` is returned
+      - for `ResponseMode::Streaming`, runtime may evaluate fallback only for executed failures that
+        occur before it emits the first canonical stream event to the caller
+     - after runtime emits the first canonical stream event in `ResponseMode::Streaming`, the
+        attempt is committed and routing must not continue to another target
+      - transport SSE errors, projector errors, abnormal termination, and stream finalization
+        failures are classified by runtime relative to that commit point
   8. on success, `ResponseMeta` records selected provider instance, provider kind, model, and the
      ordered `AttemptRecord` history, including prior skips
+  9. on executed failure, runtime returns normalized `RuntimeError` plus `ExecutedFailureMeta`
+     recording the selected failed attempt identity and the ordered `AttemptRecord` history,
+     including prior skips
 
   ## Internal Planning Pipeline
 
@@ -2234,14 +2733,20 @@ pub struct OpenRouterOptions {
   Provider adapters emit protocol-specific request hints, but they do not directly control route-
   level transport ownership.
 
+  Runtime and adapters must treat `HttpRequestOptions` as a closed typed contract.
+  If an adapter attempts to tunnel a concern through `HttpRequestOptions` that is owned by another
+  locked field or layer, that is a design violation and must be rejected rather than silently
+  merged.
+
   Concretely:
 
-  - provider adapters produce request bodies and protocol-specific `HttpRequestOptions`
+  - provider adapters produce request bodies, outbound HTTP methods, transport response framing, and
+    protocol-specific `HttpRequestOptions`
   - provider adapters may also produce provider-generated dynamic headers as part of provider
     request planning
-  - runtime resolves the effective endpoint path, constructs the final method + URL, and combines
-    provider request planning output with resolved transport ownership data into one typed transport
-    execution input
+  - runtime resolves the effective endpoint path, constructs the final URL, validates adapter-
+    produced framing against `ExecutionOptions.response_mode`, and combines provider request
+    planning output with resolved transport ownership data into one typed transport execution input
   - transport receives one fully normalized request contract
   - transport constructs final outbound headers from explicit header layers instead of metadata-driven
     conventions
@@ -2254,8 +2759,11 @@ pub struct OpenRouterOptions {
 
   Proposed normalized flow:
 
-  1. runtime resolves route-wide and attempt-local transport settings into `ResolvedTransportOptions`
-  2. adapter produces `ProviderRequestPlan { body, provider_headers, request_options, ... }`
+  1. runtime resolves route-wide and attempt-local transport settings into
+     `ResolvedTransportOptions`, including timeout selections and the effective intra-attempt
+     `retry_policy`
+  2. adapter produces `ProviderRequestPlan { method, body, response_framing, provider_headers,
+     request_options, ... }`
   3. runtime resolves effective endpoint path from:
       - `ProviderRequestPlan.endpoint_path_override` when present
       - otherwise `ProviderDescriptor.endpoint_path`
@@ -2266,6 +2774,7 @@ pub struct OpenRouterOptions {
       - `method`
       - `url`
       - `body`
+      - `response_framing`
       - `request_options`
       - `transport`
       - `provider_headers`
@@ -2276,7 +2785,8 @@ pub struct OpenRouterOptions {
       - adapter/provider-generated headers
       - auth headers
   6. transport executes the request and extracts response metadata using
-     `request_id_header_override` if present, otherwise `PlatformConfig.request_id_header`
+     `request_id_header_override` if present, otherwise the effective per-instance
+     `PlatformConfig.request_id_header`
 
   ## Migration and Compatibility
 
@@ -2311,6 +2821,9 @@ pub struct OpenRouterOptions {
   - adapters may temporarily retain internal helpers equivalent to today's `platform_config(base_url)`
     while runtime-owned `ProviderDescriptor` composition is introduced, but that is not the target
     architecture
+  - the existing transport field/type name `HttpResponseMode` may remain temporarily during
+    migration, but the target architecture treats that concept as transport-level
+    `TransportResponseFraming`
 
   These shims may be deprecated and later removed.
 
@@ -2349,10 +2862,18 @@ pub struct OpenRouterOptions {
     `ProviderInstanceId`
   - tests proving returned `ResponseMeta` and `AttemptRecord` values include both provider instance
     and provider kind
+  - tests proving `AttemptRecord.model` stores the concrete effective model for skipped, failed, and
+    successful attempts, including when the effective model came from `ProviderConfig.default_model`
   - agent-transport header tests updated to validate typed request-id override and typed extra header
     inputs instead of AdapterContext.metadata magic keys
   - runtime/provider integration tests proving that adapter-produced HttpRequestOptions merge
     correctly with route-wide and attempt-local typed transport inputs
+  - runtime/provider integration tests proving `ProviderRequestPlan.method` is copied into
+    `TransportExecutionInput.method` without transport-side inference
+  - runtime/provider integration tests proving `ProviderRequestPlan.response_framing` is copied into
+    `TransportExecutionInput.response_framing` without transport-side inference
+  - runtime/provider integration tests proving runtime rejects framing incompatible with
+    `ExecutionOptions.response_mode`
   - runtime/provider integration tests proving final URL construction uses
     `ProviderRequestPlan.endpoint_path_override` when present and `ProviderDescriptor.endpoint_path`
     otherwise
@@ -2375,13 +2896,42 @@ pub struct OpenRouterOptions {
   - tests confirming that no matching fallback rule prevents fallback
   - tests confirming blank `provider_codes` rule values do not match
   - static capability mismatch with FailFast for each locked high-confidence invariant
-  - static capability mismatch with SkipIncompatibleTargets for each locked high-confidence invariant
-  - tests confirming that CapabilityMismatchPolicy::FailFast does not invoke fallback
-  - tests confirming that CapabilityMismatchPolicy::SkipIncompatibleTargets records skipped attempts
+  - static capability mismatch with SkipRejectedTargets for each locked high-confidence invariant
+  - tests confirming that PlanningRejectionPolicy::FailFast does not invoke fallback
+  - tests confirming that PlanningRejectionPolicy::SkipRejectedTargets records skipped attempts
     and continues routing
+  - tests confirming adapter-planning rejections are recorded as
+    `SkipReason::AdapterPlanningRejected`
+  - tests confirming adapter-planning rejections emit `on_attempt_skipped` and do not emit
+    `on_attempt_start` / `on_attempt_failure`
+  - tests confirming adapter-planning rejections do not invoke fallback
+  - tests proving `RoutePlanningFailure.attempts` preserves the same ordered `AttemptRecord`
+    contract as `ResponseMeta.attempts`
+  - tests proving route-planning failure does not carry success-only metadata such as selected
+    provider/model or upstream request id
+  - tests proving all-planning-rejected routes return `RoutePlanningFailure`, not `RuntimeError`
+  - tests proving executed failures return normalized `RuntimeError`, not `RoutePlanningFailure`
   - tests confirming skipped attempts appear in returned `ResponseMeta.attempts`
   - tests confirming skipped attempts emit `on_attempt_skipped` and do not emit
     `on_attempt_start` / `on_attempt_failure`
+  - tests proving transport SSE setup failure before the first canonical stream event is fallback-
+    eligible
+  - tests proving projector failure before the first canonical stream event is fallback-eligible
+  - tests proving malformed SSE framing before the first canonical stream event is fallback-eligible
+  - tests proving EOF or abnormal termination before the first canonical stream event is fallback-
+    eligible
+  - tests proving projector failure after the first canonical stream event does not trigger fallback
+  - tests proving malformed SSE framing after the first canonical stream event does not trigger
+    fallback
+  - tests proving finalization failure after the first canonical stream event does not trigger
+    fallback
+  - tests proving streaming event delivery does not expose partial/live `ResponseMeta` before
+    terminal completion
+  - tests proving streaming terminal success yields completed `Response` with normal `ResponseMeta`
+  - tests proving committed-stream terminal failure yields normalized `RuntimeError` plus
+    `ExecutedFailureMeta` with the full ordered `AttemptRecord` history
+  - tests proving the streaming commit point is canonical-event emission to the caller, not SSE
+    stream open and not receipt of a raw SSE frame
   - adapter-planning and upstream-error normalization coverage for tools, structured output, `top_p`,
     stop sequences, reasoning controls, and passthrough / `extra` fields
   - tests confirming that transport retries occur within one attempt and do not emit fallback
@@ -2409,20 +2959,30 @@ pub struct OpenRouterOptions {
   - route-wide transport options own only call-wide transport concerns
   - attempt-local execution overrides own only attempt-local transport concerns, including typed
     request, stream-setup, and stream-idle timeout overrides
-  - provider adapters own only protocol-specific HttpRequestOptions
+  - provider adapters own protocol-specific request planning artifacts, including
+    `HttpRequestOptions`, outbound HTTP method, and transport response framing
   - adapter-controlled preservation of non-success response bodies for provider error decoding is a
     protocol-specific `HttpRequestOptions` concern
   - provider adapters may also emit provider-generated dynamic headers through provider request
     planning; those headers are carried separately from `ResolvedTransportOptions`
+  - provider adapters are the only layer that selects outbound HTTP method and transport response
+    framing
   - runtime owns normalization of typed transport inputs before calling transport
   - runtime resolves the effective endpoint path using `ProviderRequestPlan.endpoint_path_override`
     when present and `ProviderDescriptor.endpoint_path` otherwise
-  - runtime constructs the final outbound method + URL before calling transport
+  - runtime constructs the final outbound URL before calling transport
+  - runtime validates `ProviderRequestPlan.response_framing` against
+    `ExecutionOptions.response_mode` before calling transport
   - transport owns final header materialization and merges platform defaults, route-wide headers,
     attempt-local headers, adapter/provider headers, and auth in that order
   - transport receives a fully resolved URL and does not invent endpoint paths
+  - transport receives explicit method and response framing and does not infer either one
   - `request_id_header_override` overrides response request-id extraction only and does not
     materialize an outbound request header
+  - provider-kind default request-id header selection lives on `ProviderDescriptor`
+  - provider-instance request-id header override lives on `ProviderConfig`
+  - `PlatformConfig.request_id_header` is the effective per-instance default used when
+    `request_id_header_override` is absent
   - fallback is evaluated only after runtime normalizes an executed failure into `RuntimeError`
   - `FallbackPolicy` is rule-driven in the target architecture
   - `FallbackPolicy.rules` are evaluated in insertion order and first match wins
@@ -2458,11 +3018,14 @@ pub struct OpenRouterOptions {
     capability checked during static capability validation
   - static capability mismatch is intentionally narrow and limited to locked high-confidence
     invariants
+  - adapter-planning rejection is a distinct pre-execution planning outcome, not an executed
+    failure
   - model-level or deployment-level feature support is not inferred from provider-level static
     capabilities in the baseline architecture
   - fine-grained request features such as tools, structured output, `top_p`, stop sequences,
-    reasoning controls, and passthrough / `extra` fields are validated during adapter planning and/or
-    through normalized upstream errors rather than `CapabilityMismatchPolicy`
+    reasoning controls, and passthrough / `extra` fields are validated during adapter planning
+    and/or by the upstream provider response path, then surfaced either as planning-time rejection
+    or as normalized executed failure rather than broad static capability inference
   - fallback targets live on Route, not FallbackPolicy
   - layered native options are target-scoped through AttemptSpec
   - native options are layered into family-scoped and provider-scoped parts through `NativeOptions`
@@ -2481,8 +3044,10 @@ pub struct OpenRouterOptions {
   - `GenericOpenAiCompatible` is a first-class provider kind for self-hosted OpenAI-compatible
     endpoints
   - static capability mismatch fails fast by default
-  - optional skip-on-mismatch is supported through CapabilityMismatchPolicy
+  - optional skip-on-planning-rejection is supported through `PlanningRejectionPolicy`
   - skipped attempts are first-class `AttemptRecord` outcomes, not failed executions
+  - `SkipReason::StaticIncompatibility` and `SkipReason::AdapterPlanningRejected` are distinct
+    skipped-attempt reasons
   - skipped attempts emit `on_attempt_skipped`, not `on_attempt_start` / `on_attempt_failure`
   - returned route metadata is ordered attempt history, including both skipped and executed attempts,
     and records both provider instance and provider kind
