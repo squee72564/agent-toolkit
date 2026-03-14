@@ -1,5 +1,5 @@
 use agent_core::{
-    CanonicalStreamEvent, FinishReason, MessageRole, ProviderId, ProviderRawStreamEvent,
+    CanonicalStreamEvent, FinishReason, MessageRole, ProviderKind, ProviderRawStreamEvent,
     StreamOutputItemEnd, StreamOutputItemStart,
 };
 use serde_json::Value;
@@ -14,7 +14,7 @@ fn openrouter_stream_projector_completes_on_done_payload() {
 
     let events = projector
         .project(ProviderRawStreamEvent::from_sse(
-            ProviderId::OpenRouter,
+            ProviderKind::OpenRouter,
             1,
             None,
             None,
@@ -40,7 +40,7 @@ fn openrouter_stream_projector_ignores_leading_comments_and_completes_basic_chat
     for (sequence, event) in events.iter().take(2).enumerate() {
         let canonical = projector
             .project(ProviderRawStreamEvent::from_sse(
-                ProviderId::OpenRouter,
+                ProviderKind::OpenRouter,
                 u64::try_from(sequence + 1).expect("sequence fits in u64"),
                 event.0.clone(),
                 None,
@@ -59,7 +59,7 @@ fn openrouter_stream_projector_ignores_leading_comments_and_completes_basic_chat
         canonical.extend(
             projector
                 .project(ProviderRawStreamEvent::from_sse(
-                    ProviderId::OpenRouter,
+                    ProviderKind::OpenRouter,
                     u64::try_from(sequence + 1).expect("sequence fits in u64"),
                     event.0,
                     None,
@@ -136,7 +136,7 @@ fn openrouter_stream_projector_accumulates_tool_call_fixture_arguments() {
         canonical.extend(
             projector
                 .project(ProviderRawStreamEvent::from_sse(
-                    ProviderId::OpenRouter,
+                    ProviderKind::OpenRouter,
                     u64::try_from(sequence + 1).expect("sequence fits in u64"),
                     event.0,
                     None,

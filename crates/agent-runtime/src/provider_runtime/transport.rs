@@ -1,4 +1,4 @@
-use agent_core::{ExecutionPlan, ProviderId, Response, ResponseFormat, ResponseMode};
+use agent_core::{ExecutionPlan, ProviderKind, Response, ResponseFormat, ResponseMode};
 use agent_providers::request_plan::ProviderRequestPlan;
 use agent_transport::{
     HttpJsonResponse, HttpRequestBody, HttpResponse, HttpSendRequest, TransportResponseFraming,
@@ -56,7 +56,7 @@ pub(super) async fn execute_planned_non_streaming(
 }
 
 pub(super) fn validate_streaming_plan(
-    provider: ProviderId,
+    provider: ProviderKind,
     plan: &ProviderRequestPlan,
 ) -> Result<(), RuntimeError> {
     match plan.response_framing {

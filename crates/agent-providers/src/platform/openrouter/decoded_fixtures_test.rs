@@ -8,7 +8,7 @@ use crate::platform::test_fixtures::{
     load_decoded_error_fixture_body, load_decoded_success_fixture,
     validate_decoded_error_fixture_shape,
 };
-use agent_core::ProviderId;
+use agent_core::ProviderKind;
 use agent_core::types::{ContentPart, FinishReason, Response, ResponseFormat};
 
 const PROVIDER: &str = "openrouter";
@@ -39,7 +39,7 @@ fn decode_response_json(
     body: Value,
     requested_response_format: &ResponseFormat,
 ) -> Result<Response, crate::error::AdapterError> {
-    adapter_for(ProviderId::OpenRouter).decode_response_json(body, requested_response_format)
+    adapter_for(ProviderKind::OpenRouter).decode_response_json(body, requested_response_format)
 }
 
 #[test]

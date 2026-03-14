@@ -185,7 +185,7 @@ fn map_openai_plan_error(error: OpenAiFamilyError) -> AdapterError {
     let message = error.message().to_string();
     AdapterError::with_source(
         map_spec_error_kind(error.kind()),
-        agent_core::ProviderId::OpenAi,
+        agent_core::ProviderKind::OpenAi,
         AdapterOperation::PlanRequest,
         message,
         error,

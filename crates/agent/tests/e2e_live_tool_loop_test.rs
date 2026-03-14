@@ -3,7 +3,7 @@
 mod e2e;
 
 use agent_toolkit::{
-    ContentPart, Conversation, MessageCreateInput, ProviderId, ToolChoice,
+    ContentPart, Conversation, MessageCreateInput, ProviderKind, ToolChoice,
     core::CanonicalStreamEvent, openai,
 };
 use futures_util::StreamExt;
@@ -18,14 +18,14 @@ use e2e::tooling::{
 
 #[tokio::test]
 async fn live_openai_envelope_stream_exposes_tool_call_deltas_and_final_tool_calls() {
-    let Some(api_key) = require_provider_api_key(ProviderId::OpenAi, "live OpenAI tool loop test")
+    let Some(api_key) = require_provider_api_key(ProviderKind::OpenAi, "live OpenAI tool loop test")
     else {
         return;
     };
 
     let client = openai()
         .api_key(api_key)
-        .default_model(default_live_model(ProviderId::OpenAi))
+        .default_model(default_live_model(ProviderKind::OpenAi))
         .build()
         .expect("build openai client");
 
@@ -76,7 +76,7 @@ async fn live_openai_envelope_stream_exposes_tool_call_deltas_and_final_tool_cal
     let completion = with_live_test_timeout(stream.finish())
         .await
         .expect("stream should finish successfully");
-    assert_live_response_meta(&completion.meta, ProviderId::OpenAi);
+    assert_live_response_meta(&completion.meta, ProviderKind::OpenAi);
 
     let final_tool_calls: Vec<_> = completion
         .response

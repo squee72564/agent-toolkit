@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use agent_toolkit::{
     AgentToolkit, ContentPart, ExecutionOptions, Message, MessageCreateInput, MessageRole,
-    ProviderConfig, ProviderId, ProviderInstanceId, Route, Target, TaskRequest, ToolChoice,
+    ProviderConfig, ProviderKind, ProviderInstanceId, Route, Target, TaskRequest, ToolChoice,
     ToolDefinition, anthropic, openai,
 };
 
@@ -79,7 +79,7 @@ async fn create_task_with_meta_openai_uses_explicit_task_and_captures_shape() {
     .await
     .expect("create_task_with_meta should succeed");
 
-    assert_eq!(meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(meta.selected_model, "ignored-default");
 
     let captured = server.captured_requests().await;
@@ -169,7 +169,7 @@ async fn toolkit_execute_with_meta_honors_target_model_and_execution_headers() {
         .await
         .expect("toolkit execute_with_meta should succeed");
 
-    assert_eq!(meta.selected_provider_kind, ProviderId::OpenRouter);
+    assert_eq!(meta.selected_provider_kind, ProviderKind::OpenRouter);
     assert_eq!(meta.selected_model, "openai.gpt-5.4");
 
     let captured = server.captured_requests().await;
@@ -217,7 +217,7 @@ async fn toolkit_execute_with_meta_honors_route_and_execution_headers() {
         .await
         .expect("toolkit execute_with_meta should succeed");
 
-    assert_eq!(meta.selected_provider_kind, ProviderId::OpenRouter);
+    assert_eq!(meta.selected_provider_kind, ProviderKind::OpenRouter);
     assert_eq!(meta.selected_model, "openai.gpt-5.4");
 
     let captured = server.captured_requests().await;

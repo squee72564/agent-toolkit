@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use agent_core::{CanonicalStreamEnvelope, CanonicalStreamEvent, ProviderId};
+use agent_core::{CanonicalStreamEnvelope, CanonicalStreamEvent, ProviderKind};
 use agent_providers::adapter::adapter_for;
 use agent_transport::HttpTransport;
 use futures_util::StreamExt;
@@ -117,7 +117,7 @@ async fn direct_streaming_yields_envelopes_and_finishes_with_meta() {
         ),
     )
     .await;
-    let client = test_streaming_provider_client(ProviderId::OpenAi, &base_url, Some("gpt-5-mini"));
+    let client = test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
 
     let mut stream = client
         .streaming()
@@ -132,7 +132,7 @@ async fn direct_streaming_yields_envelopes_and_finishes_with_meta() {
     assert_eq!(first.raw.sequence, 1);
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(completion.meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(completion.meta.selected_model, "gpt-5-mini");
     assert_eq!(completion.meta.status_code, Some(200));
     assert_eq!(completion.meta.request_id.as_deref(), Some("req_sse"));
@@ -160,7 +160,7 @@ async fn direct_streaming_finish_after_drain_returns_completion() {
         ),
     )
     .await;
-    let client = test_streaming_provider_client(ProviderId::OpenAi, &base_url, Some("gpt-5-mini"));
+    let client = test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
 
     let mut stream = client
         .streaming()
@@ -171,7 +171,7 @@ async fn direct_streaming_finish_after_drain_returns_completion() {
     while next_stream_item(&mut stream).await.is_some() {}
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(completion.meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(
         completion.response.output.content,
         vec![agent_core::ContentPart::text("drained response")]
@@ -221,7 +221,7 @@ async fn routed_streaming_happy_path_finishes_with_response_meta() {
     assert_eq!(first.raw.sequence, 1);
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(completion.meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(completion.meta.attempts.len(), 1);
     assert_eq!(
         completion.response.output.content,
@@ -287,12 +287,12 @@ async fn routed_streaming_retries_next_target_when_initial_stream_open_fails() {
     let completion = stream.finish().await.expect("finish should succeed");
     assert_eq!(
         completion.meta.selected_provider_kind,
-        ProviderId::OpenRouter
+        ProviderKind::OpenRouter
     );
     assert_eq!(completion.meta.attempts.len(), 2);
     assert_eq!(
         completion.meta.attempts[0].provider_kind,
-        ProviderId::OpenAi
+        ProviderKind::OpenAi
     );
     assert!(matches!(
         completion.meta.attempts[0].disposition,
@@ -300,7 +300,7 @@ async fn routed_streaming_retries_next_target_when_initial_stream_open_fails() {
     ));
     assert_eq!(
         completion.meta.attempts[1].provider_kind,
-        ProviderId::OpenRouter
+        ProviderKind::OpenRouter
     );
     assert!(matches!(
         completion.meta.attempts[1].disposition,
@@ -382,7 +382,7 @@ async fn routed_streaming_allows_fallback_after_raw_envelope_without_canonical_e
     assert!(!second.canonical.is_empty());
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(completion.meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(completion.meta.attempts.len(), 2);
     assert_eq!(
         completion.response.output.content,
@@ -441,7 +441,7 @@ async fn routed_streaming_explicit_task_api_uses_route_and_execution_options() {
     assert_eq!(first.raw.sequence, 1);
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(completion.meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(completion.meta.selected_model, "gpt-5-mini");
     assert_eq!(
         completion.response.output.content,
@@ -534,7 +534,7 @@ async fn routed_streaming_does_not_fallback_after_first_canonical_event() {
         failure_meta.selected_provider_instance,
         crate::ProviderInstanceId::openai_default()
     );
-    assert_eq!(failure_meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(failure_meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(failure_meta.selected_model, "gpt-5-mini");
     assert_eq!(failure_meta.status_code, Some(200));
     assert_eq!(failure_meta.request_id.as_deref(), Some("req_sse"));
@@ -642,7 +642,7 @@ async fn routed_streaming_terminal_error_carries_ordered_attempt_history() {
         failure_meta.selected_provider_instance,
         crate::ProviderInstanceId::openai_default()
     );
-    assert_eq!(failure_meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(failure_meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(failure_meta.selected_model, "gpt-5-mini");
     assert_eq!(failure_meta.attempts.len(), 2);
     assert_eq!(
@@ -690,7 +690,7 @@ async fn routed_streaming_terminal_error_keeps_pre_open_failures_and_skips_befor
             (
                 crate::ProviderInstanceId::openrouter_default(),
                 test_provider_client_with_base_url(
-                    ProviderId::OpenRouter,
+                    ProviderKind::OpenRouter,
                     "http://127.0.0.1:1",
                     Some("openai/gpt-5-mini"),
                 ),
@@ -698,7 +698,7 @@ async fn routed_streaming_terminal_error_keeps_pre_open_failures_and_skips_befor
             (
                 crate::ProviderInstanceId::openai_default(),
                 test_provider_client_with_streaming_support(
-                    ProviderId::OpenAi,
+                    ProviderKind::OpenAi,
                     Some("gpt-5-mini"),
                     false,
                 ),
@@ -706,7 +706,7 @@ async fn routed_streaming_terminal_error_keeps_pre_open_failures_and_skips_befor
             (
                 crate::ProviderInstanceId::generic_openai_compatible_default(),
                 test_provider_client_with_base_url(
-                    ProviderId::GenericOpenAiCompatible,
+                    ProviderKind::GenericOpenAiCompatible,
                     &fallback_url,
                     Some("gpt-5-mini"),
                 ),
@@ -774,7 +774,7 @@ async fn routed_streaming_terminal_error_keeps_pre_open_failures_and_skips_befor
     );
     assert_eq!(
         failure_meta.selected_provider_kind,
-        ProviderId::GenericOpenAiCompatible
+        ProviderKind::GenericOpenAiCompatible
     );
     assert_eq!(failure_meta.attempts.len(), 3);
     assert_eq!(
@@ -834,7 +834,7 @@ async fn routed_streaming_success_uses_typed_attempt_history_for_legacy_response
             (
                 crate::ProviderInstanceId::openrouter_default(),
                 test_provider_client_with_base_url(
-                    ProviderId::OpenRouter,
+                    ProviderKind::OpenRouter,
                     "http://127.0.0.1:1",
                     Some("openai/gpt-5-mini"),
                 ),
@@ -842,7 +842,7 @@ async fn routed_streaming_success_uses_typed_attempt_history_for_legacy_response
             (
                 crate::ProviderInstanceId::openai_default(),
                 test_provider_client_with_streaming_support(
-                    ProviderId::OpenAi,
+                    ProviderKind::OpenAi,
                     Some("gpt-5-mini"),
                     false,
                 ),
@@ -850,7 +850,7 @@ async fn routed_streaming_success_uses_typed_attempt_history_for_legacy_response
             (
                 crate::ProviderInstanceId::generic_openai_compatible_default(),
                 test_provider_client_with_base_url(
-                    ProviderId::GenericOpenAiCompatible,
+                    ProviderKind::GenericOpenAiCompatible,
                     &fallback_url,
                     Some("gpt-5-mini"),
                 ),
@@ -891,13 +891,13 @@ async fn routed_streaming_success_uses_typed_attempt_history_for_legacy_response
     let completion = stream.finish().await.expect("finish should succeed");
     assert_eq!(
         completion.meta.selected_provider_kind,
-        ProviderId::GenericOpenAiCompatible
+        ProviderKind::GenericOpenAiCompatible
     );
     assert_eq!(completion.meta.selected_model, "gpt-5-mini");
     assert_eq!(completion.meta.attempts.len(), 3);
     assert_eq!(
         completion.meta.attempts[0].provider_kind,
-        ProviderId::OpenRouter
+        ProviderKind::OpenRouter
     );
     assert!(matches!(
         completion.meta.attempts[0].disposition,
@@ -905,7 +905,7 @@ async fn routed_streaming_success_uses_typed_attempt_history_for_legacy_response
     ));
     assert_eq!(
         completion.meta.attempts[1].provider_kind,
-        ProviderId::OpenAi
+        ProviderKind::OpenAi
     );
     assert!(matches!(
         completion.meta.attempts[1].disposition,
@@ -913,7 +913,7 @@ async fn routed_streaming_success_uses_typed_attempt_history_for_legacy_response
     ));
     assert_eq!(
         completion.meta.attempts[2].provider_kind,
-        ProviderId::GenericOpenAiCompatible
+        ProviderKind::GenericOpenAiCompatible
     );
     assert!(matches!(
         completion.meta.attempts[2].disposition,
@@ -932,14 +932,14 @@ async fn routed_streaming_fail_fast_stops_on_planning_rejection_before_fallback(
             (
                 crate::ProviderInstanceId::openai_default(),
                 test_provider_client_with_streaming_support(
-                    ProviderId::OpenAi,
+                    ProviderKind::OpenAi,
                     Some("gpt-5-mini"),
                     false,
                 ),
             ),
             (
                 crate::ProviderInstanceId::openrouter_default(),
-                test_provider_client(ProviderId::OpenRouter),
+                test_provider_client(ProviderKind::OpenRouter),
             ),
         ]),
         observer: None,
@@ -1000,7 +1000,7 @@ async fn routed_streaming_emits_attempt_skipped_without_execution_events_for_ski
             (
                 crate::ProviderInstanceId::openai_default(),
                 test_provider_client_with_streaming_support(
-                    ProviderId::OpenAi,
+                    ProviderKind::OpenAi,
                     Some("gpt-5-mini"),
                     false,
                 ),
@@ -1008,7 +1008,7 @@ async fn routed_streaming_emits_attempt_skipped_without_execution_events_for_ski
             (
                 crate::ProviderInstanceId::openrouter_default(),
                 test_provider_client_with_base_url(
-                    ProviderId::OpenRouter,
+                    ProviderKind::OpenRouter,
                     &base_url,
                     Some("openai/gpt-5-mini"),
                 ),
@@ -1038,7 +1038,7 @@ async fn routed_streaming_emits_attempt_skipped_without_execution_events_for_ski
     let completion = stream.finish().await.expect("finish should succeed");
     assert_eq!(
         completion.meta.selected_provider_kind,
-        ProviderId::OpenRouter
+        ProviderKind::OpenRouter
     );
 
     let events = observer.snapshot();
@@ -1058,7 +1058,7 @@ async fn routed_streaming_emits_attempt_skipped_without_execution_events_for_ski
         skipped.provider_instance,
         crate::ProviderInstanceId::openai_default()
     );
-    assert_eq!(skipped.provider_kind, ProviderId::OpenAi);
+    assert_eq!(skipped.provider_kind, ProviderKind::OpenAi);
     assert_eq!(skipped.model, "gpt-5-mini");
     assert_eq!(skipped.target_index, 0);
     assert_eq!(skipped.attempt_index, 0);
@@ -1075,7 +1075,7 @@ async fn routed_streaming_planning_failure_emits_request_end_after_attempt_skipp
         clients: HashMap::from([(
             crate::ProviderInstanceId::openai_default(),
             test_provider_client_with_streaming_support(
-                ProviderId::OpenAi,
+                ProviderKind::OpenAi,
                 Some("gpt-5-mini"),
                 false,
             ),
@@ -1110,7 +1110,7 @@ async fn routed_streaming_planning_failure_emits_request_end_after_attempt_skipp
         skipped.provider_instance,
         crate::ProviderInstanceId::openai_default()
     );
-    assert_eq!(skipped.provider_kind, ProviderId::OpenAi);
+    assert_eq!(skipped.provider_kind, ProviderKind::OpenAi);
     assert_eq!(skipped.model, "gpt-5-mini");
     assert!(matches!(
         skipped.reason,
@@ -1138,7 +1138,7 @@ async fn direct_text_stream_yields_text_chunks_and_finishes_with_meta() {
         ),
     )
     .await;
-    let client = test_streaming_provider_client(ProviderId::OpenAi, &base_url, Some("gpt-5-mini"));
+    let client = test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
 
     let mut stream = client
         .streaming()
@@ -1163,7 +1163,7 @@ async fn direct_text_stream_yields_text_chunks_and_finishes_with_meta() {
     );
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(completion.meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(completion.meta.selected_model, "gpt-5-mini");
     assert_eq!(
         completion.response.output.content,
@@ -1221,7 +1221,7 @@ async fn routed_text_stream_yields_text_chunks_and_finishes_with_response_meta()
     );
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(completion.meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(completion.meta.attempts.len(), 1);
     assert_eq!(
         completion.response.output.content,
@@ -1237,7 +1237,7 @@ fn text_stream_enqueues_multiple_text_deltas_from_one_envelope_in_order() {
         &mut pending,
         CanonicalStreamEnvelope {
             raw: agent_core::ProviderRawStreamEvent::from_sse(
-                ProviderId::OpenAi,
+                ProviderKind::OpenAi,
                 1,
                 Some("response.synthetic".to_string()),
                 None,
@@ -1289,7 +1289,7 @@ async fn text_stream_skips_non_text_envelopes_until_text_arrives() {
         ),
     )
     .await;
-    let client = test_streaming_provider_client(ProviderId::OpenAi, &base_url, Some("gpt-5-mini"));
+    let client = test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
 
     let mut stream = client
         .streaming()
@@ -1327,7 +1327,7 @@ async fn text_stream_finish_after_partial_consumption_preserves_full_response() 
         ),
     )
     .await;
-    let client = test_streaming_provider_client(ProviderId::OpenAi, &base_url, Some("gpt-5-mini"));
+    let client = test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
 
     let mut stream = client
         .streaming()
@@ -1367,7 +1367,7 @@ async fn text_stream_surfaces_terminal_error_after_emitting_prior_text() {
         ),
     )
     .await;
-    let client = test_streaming_provider_client(ProviderId::OpenAi, &base_url, Some("gpt-5-mini"));
+    let client = test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
 
     let mut stream = client
         .streaming()
@@ -1402,7 +1402,7 @@ async fn text_stream_surfaces_terminal_error_after_emitting_prior_text() {
         failure_meta.selected_provider_instance,
         crate::ProviderInstanceId::openai_default()
     );
-    assert_eq!(failure_meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(failure_meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(failure_meta.selected_model, "gpt-5-mini");
     assert_eq!(failure_meta.attempts.len(), 1);
 }
@@ -1426,9 +1426,9 @@ async fn text_stream_completion_matches_envelope_stream_completion() {
     let base_url_one = spawn_sse_stub("text/event-stream", body).await;
     let base_url_two = spawn_sse_stub("text/event-stream", body).await;
     let envelope_client =
-        test_streaming_provider_client(ProviderId::OpenAi, &base_url_one, Some("gpt-5-mini"));
+        test_streaming_provider_client(ProviderKind::OpenAi, &base_url_one, Some("gpt-5-mini"));
     let text_client =
-        test_streaming_provider_client(ProviderId::OpenAi, &base_url_two, Some("gpt-5-mini"));
+        test_streaming_provider_client(ProviderKind::OpenAi, &base_url_two, Some("gpt-5-mini"));
 
     let mut envelope_stream = envelope_client
         .streaming()
@@ -1475,7 +1475,7 @@ async fn text_stream_finish_after_drain_returns_completion() {
         ),
     )
     .await;
-    let client = test_streaming_provider_client(ProviderId::OpenAi, &base_url, Some("gpt-5-mini"));
+    let client = test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
 
     let mut stream = client
         .streaming()
@@ -1487,7 +1487,7 @@ async fn text_stream_finish_after_drain_returns_completion() {
     while next_text_stream_item(&mut stream).await.is_some() {}
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(completion.meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(
         completion.response.output.content,
         vec![agent_core::ContentPart::text("finish after drain")]
@@ -1507,7 +1507,7 @@ async fn next_text_stream_item(
 }
 
 fn test_streaming_provider_client(
-    provider: ProviderId,
+    provider: ProviderKind,
     base_url: &str,
     default_model: Option<&str>,
 ) -> crate::provider_client::ProviderClient {

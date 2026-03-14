@@ -6,7 +6,7 @@ use std::time::Duration;
 use agent_toolkit::runtime::AttemptDisposition;
 use agent_toolkit::{
     AgentToolkit, AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
-    FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig, ProviderId,
+    FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig, ProviderKind,
     ProviderInstanceId, RequestEndEvent, RequestStartEvent, RetryPolicy, Route, RuntimeErrorKind,
     RuntimeObserver, Target,
 };
@@ -116,14 +116,14 @@ async fn fallback_retries_next_provider_on_status_rule_then_succeeds() {
     .await
     .expect("fallback should succeed on anthropic");
 
-    assert_eq!(meta.selected_provider_kind, ProviderId::Anthropic);
+    assert_eq!(meta.selected_provider_kind, ProviderKind::Anthropic);
     assert_eq!(meta.attempts.len(), 2);
-    assert_eq!(meta.attempts[0].provider_kind, ProviderId::OpenAi);
+    assert_eq!(meta.attempts[0].provider_kind, ProviderKind::OpenAi);
     assert!(matches!(
         meta.attempts[0].disposition,
         AttemptDisposition::Failed { .. }
     ));
-    assert_eq!(meta.attempts[1].provider_kind, ProviderId::Anthropic);
+    assert_eq!(meta.attempts[1].provider_kind, ProviderKind::Anthropic);
     assert!(matches!(
         meta.attempts[1].disposition,
         AttemptDisposition::Succeeded { .. }
@@ -245,7 +245,7 @@ async fn fallback_rule_retry_on_provider_code_is_honored() {
     .await
     .expect("provider-code fallback should succeed");
 
-    assert_eq!(meta.selected_provider_kind, ProviderId::OpenRouter);
+    assert_eq!(meta.selected_provider_kind, ProviderKind::OpenRouter);
     assert_eq!(meta.attempts.len(), 2);
 }
 

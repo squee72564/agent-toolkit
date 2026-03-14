@@ -23,8 +23,6 @@ pub use identity::ProviderCapabilities;
 pub use identity::ProviderDescriptor;
 /// Re-export of [`identity::ProviderFamilyId`].
 pub use identity::ProviderFamilyId;
-/// Re-export of [`identity::ProviderId`].
-pub use identity::ProviderId;
 /// Re-export of [`identity::ProviderInstanceId`].
 pub use identity::ProviderInstanceId;
 /// Re-export of [`identity::ProviderKind`].

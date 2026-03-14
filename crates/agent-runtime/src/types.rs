@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use agent_core::{ProviderId, ProviderInstanceId, ProviderKind};
+use agent_core::{ProviderInstanceId, ProviderKind};
 
 use crate::{RuntimeError, RuntimeErrorKind};
 
@@ -13,7 +13,7 @@ pub struct RequestStartEvent {
     /// Provider request ID when it is already known at request start.
     pub request_id: Option<String>,
     /// Initially selected provider, if resolution succeeded before dispatch.
-    pub provider: Option<ProviderId>,
+    pub provider: Option<ProviderKind>,
     /// Initially selected model after request/target normalization, if any.
     pub model: Option<String>,
     /// Target index for this event. Always `None` for request-start.
@@ -23,7 +23,7 @@ pub struct RequestStartEvent {
     /// Elapsed wall-clock time since request start.
     pub elapsed: Duration,
     /// First resolved target provider for the request, if any targets exist.
-    pub first_target: Option<ProviderId>,
+    pub first_target: Option<ProviderKind>,
     /// Total number of resolved targets considered for the request.
     pub resolved_target_count: usize,
 }
@@ -34,7 +34,7 @@ pub struct AttemptStartEvent {
     /// Provider request ID when it is already known at attempt start.
     pub request_id: Option<String>,
     /// Provider selected for this attempt.
-    pub provider: Option<ProviderId>,
+    pub provider: Option<ProviderKind>,
     /// Model selected for this attempt after normalization, if any.
     pub model: Option<String>,
     /// Zero-based target index for the attempt.
@@ -51,7 +51,7 @@ pub struct AttemptSuccessEvent {
     /// Provider request identifier, when available.
     pub request_id: Option<String>,
     /// Provider used for the attempt.
-    pub provider: Option<ProviderId>,
+    pub provider: Option<ProviderKind>,
     /// Model selected for the attempt.
     pub model: Option<String>,
     /// Zero-based target index for the attempt.
@@ -70,7 +70,7 @@ pub struct AttemptFailureEvent {
     /// Provider request identifier, when available.
     pub request_id: Option<String>,
     /// Provider used for the attempt.
-    pub provider: Option<ProviderId>,
+    pub provider: Option<ProviderKind>,
     /// Model selected for the attempt.
     pub model: Option<String>,
     /// Zero-based target index for the attempt.
@@ -115,7 +115,7 @@ pub struct RequestEndEvent {
     /// Provider request identifier, when available.
     pub request_id: Option<String>,
     /// Provider selected for the terminal attempt, when known.
-    pub provider: Option<ProviderId>,
+    pub provider: Option<ProviderKind>,
     /// Model selected for the terminal attempt, when known.
     pub model: Option<String>,
     /// Zero-based target index for the terminal attempt.
@@ -139,7 +139,7 @@ pub struct RequestEndEvent {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttemptMeta {
     /// Provider used for the attempt.
-    pub provider: ProviderId,
+    pub provider: ProviderKind,
     /// Model selected for the attempt.
     pub model: String,
     /// Whether the attempt succeeded.
@@ -261,7 +261,7 @@ pub struct ExecutedFailureMeta {
 
 pub(crate) struct RequestEndContext {
     pub(crate) request_id: Option<String>,
-    pub(crate) provider: Option<ProviderId>,
+    pub(crate) provider: Option<ProviderKind>,
     pub(crate) model: Option<String>,
     pub(crate) target_index: Option<usize>,
     pub(crate) attempt_index: Option<usize>,
@@ -270,10 +270,10 @@ pub(crate) struct RequestEndContext {
 }
 
 pub(crate) fn request_start_event(
-    provider: Option<ProviderId>,
+    provider: Option<ProviderKind>,
     model: Option<String>,
     elapsed: Duration,
-    first_target: Option<ProviderId>,
+    first_target: Option<ProviderKind>,
     resolved_target_count: usize,
 ) -> RequestStartEvent {
     RequestStartEvent {
@@ -289,7 +289,7 @@ pub(crate) fn request_start_event(
 }
 
 pub(crate) fn attempt_start_event(
-    provider: ProviderId,
+    provider: ProviderKind,
     model: Option<String>,
     target_index: usize,
     attempt_index: usize,
@@ -306,7 +306,7 @@ pub(crate) fn attempt_start_event(
 }
 
 pub(crate) fn attempt_success_event_fields(
-    provider: ProviderId,
+    provider: ProviderKind,
     model: Option<String>,
     request_id: Option<String>,
     target_index: usize,
@@ -327,7 +327,7 @@ pub(crate) fn attempt_success_event_fields(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn attempt_failure_event_fields(
-    provider: ProviderId,
+    provider: ProviderKind,
     model: Option<String>,
     request_id: Option<String>,
     target_index: usize,

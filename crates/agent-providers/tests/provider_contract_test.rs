@@ -1,4 +1,4 @@
-use agent_core::{CanonicalStreamEvent, ProviderId, ProviderRawStreamEvent};
+use agent_core::{CanonicalStreamEvent, ProviderKind, ProviderRawStreamEvent};
 use agent_providers::request_plan::{ProviderRequestPlan, TransportResponseFraming};
 use agent_providers::streaming::ProviderStreamProjector;
 use agent_transport::HttpRequestOptions;
@@ -42,7 +42,7 @@ fn provider_request_plan_carries_transport_and_response_contract() {
 fn provider_stream_projector_trait_is_object_safe() {
     let mut projector: Box<dyn ProviderStreamProjector> = Box::new(EchoProjector);
     let raw = ProviderRawStreamEvent::from_sse(
-        ProviderId::OpenAi,
+        ProviderKind::OpenAi,
         7,
         Some("response.created".to_string()),
         Some("evt-1".to_string()),

@@ -1,7 +1,7 @@
 use crate::adapter::adapter_for;
 use crate::error::{AdapterErrorKind, AdapterOperation};
 use agent_core::{
-    ContentPart, Message, MessageRole, ProviderId, Request, ResponseFormat, ToolChoice,
+    ContentPart, Message, MessageRole, ProviderKind, Request, ResponseFormat, ToolChoice,
 };
 
 use super::request;
@@ -36,7 +36,7 @@ fn anthropic_request_error_maps_into_adapter_error() {
     )
     .expect_err("planning should fail");
 
-    assert_eq!(adapter_error.provider, ProviderId::Anthropic);
+    assert_eq!(adapter_error.provider, ProviderKind::Anthropic);
     assert_eq!(adapter_error.operation, AdapterOperation::PlanRequest);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Validation);
     assert!(!adapter_error.message.is_empty());
@@ -45,14 +45,14 @@ fn anthropic_request_error_maps_into_adapter_error() {
 
 #[test]
 fn anthropic_response_error_maps_into_adapter_error() {
-    let adapter_error = adapter_for(ProviderId::Anthropic)
+    let adapter_error = adapter_for(ProviderKind::Anthropic)
         .decode_response_json(
             serde_json::json!({"model":"claude-sonnet-4-6"}),
             &agent_core::ResponseFormat::Text,
         )
         .expect_err("decode should fail");
 
-    assert_eq!(adapter_error.provider, ProviderId::Anthropic);
+    assert_eq!(adapter_error.provider, ProviderKind::Anthropic);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Decode);
     assert!(!adapter_error.message.is_empty());
@@ -80,7 +80,7 @@ fn anthropic_request_error_preserves_source_chain() {
 
 #[test]
 fn anthropic_upstream_error_maps_into_adapter_error() {
-    let adapter_error = adapter_for(ProviderId::Anthropic)
+    let adapter_error = adapter_for(ProviderKind::Anthropic)
         .decode_response_json(
             serde_json::json!({
                 "type":"error",
@@ -91,7 +91,7 @@ fn anthropic_upstream_error_maps_into_adapter_error() {
         )
         .expect_err("decode should fail");
 
-    assert_eq!(adapter_error.provider, ProviderId::Anthropic);
+    assert_eq!(adapter_error.provider, ProviderKind::Anthropic);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Upstream);
     assert!(adapter_error.message.contains("provider said no"));
@@ -104,14 +104,14 @@ fn anthropic_upstream_error_maps_into_adapter_error() {
 
 #[test]
 fn anthropic_protocol_violation_error_maps_into_adapter_error() {
-    let adapter_error = adapter_for(ProviderId::Anthropic)
+    let adapter_error = adapter_for(ProviderKind::Anthropic)
         .decode_response_json(
             serde_json::json!({"content":[],"role":"assistant","model":"claude-sonnet-4-6","stop_reason":"end_turn","usage":"bad"}),
             &agent_core::ResponseFormat::Text,
         )
     .expect_err("decode should fail");
 
-    assert_eq!(adapter_error.provider, ProviderId::Anthropic);
+    assert_eq!(adapter_error.provider, ProviderKind::Anthropic);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert!(matches!(
         adapter_error.kind,

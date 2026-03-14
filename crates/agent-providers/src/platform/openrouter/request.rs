@@ -253,7 +253,7 @@ fn map_openrouter_plan_error(error: OpenAiFamilyError) -> AdapterError {
     let message = error.message().to_string();
     AdapterError::with_source(
         map_spec_error_kind(error.kind()),
-        agent_core::ProviderId::OpenRouter,
+        agent_core::ProviderKind::OpenRouter,
         AdapterOperation::PlanRequest,
         message,
         error,

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use agent_core::{
-    CanonicalStreamEnvelope, CanonicalStreamEvent, ContentPart, FinishReason, Message, ProviderId,
+    CanonicalStreamEnvelope, CanonicalStreamEvent, ContentPart, FinishReason, Message, ProviderKind,
     RawStreamPayload, RawStreamTransport, Response, ResponseFormat, RuntimeWarning,
     StreamOutputItemEnd, StreamOutputItemStart, TaskRequest, ToolChoice,
 };
@@ -20,7 +20,7 @@ use crate::{MessageCreateInput, RuntimeErrorKind};
 
 #[test]
 fn wrap_sse_event_assigns_monotonic_sequences() {
-    let mut runtime = ProviderStreamRuntime::new(ProviderId::OpenAi);
+    let mut runtime = ProviderStreamRuntime::new(ProviderKind::OpenAi);
 
     let first = runtime.wrap_sse_event(SseEvent {
         event: Some("response.created".to_string()),
@@ -41,7 +41,7 @@ fn wrap_sse_event_assigns_monotonic_sequences() {
 
 #[test]
 fn wrap_sse_event_preserves_transport_metadata_and_payload_shape() {
-    let mut runtime = ProviderStreamRuntime::new(ProviderId::Anthropic);
+    let mut runtime = ProviderStreamRuntime::new(ProviderKind::Anthropic);
 
     let raw = runtime.wrap_sse_event(SseEvent {
         event: Some("message_start".to_string()),
@@ -50,7 +50,7 @@ fn wrap_sse_event_preserves_transport_metadata_and_payload_shape() {
         retry: Some(250),
     });
 
-    assert_eq!(raw.provider, ProviderId::Anthropic);
+    assert_eq!(raw.provider, ProviderKind::Anthropic);
     assert_eq!(
         raw.transport,
         RawStreamTransport::Sse {
@@ -64,7 +64,7 @@ fn wrap_sse_event_preserves_transport_metadata_and_payload_shape() {
 
 #[tokio::test]
 async fn current_non_streaming_api_rejects_stream_requests() {
-    let client = super::test_provider_client(ProviderId::OpenAi);
+    let client = super::test_provider_client(ProviderKind::OpenAi);
 
     let error = client
         .messages()
@@ -106,7 +106,7 @@ async fn runtime_executes_openai_sse_plan_and_builds_response() {
         ),
     )
     .await;
-    let runtime = test_provider_runtime(ProviderId::OpenAi, &base_url, Some("gpt-5-mini"));
+    let runtime = test_provider_runtime(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
 
     let attempt = runtime
         .execute_attempt(
@@ -618,11 +618,11 @@ fn response_from_events(
     final_events: Vec<CanonicalStreamEvent>,
 ) -> Result<Response, crate::provider_stream_runtime::StreamRuntimeError> {
     ProviderStreamRuntime::response_from_events_for_test(
-        ProviderId::OpenAi,
+        ProviderKind::OpenAi,
         &response_format,
         Vec::new(),
         vec![CanonicalStreamEnvelope {
-            raw: ProviderStreamRuntime::new(ProviderId::OpenAi).wrap_sse_event(SseEvent {
+            raw: ProviderStreamRuntime::new(ProviderKind::OpenAi).wrap_sse_event(SseEvent {
                 event: Some("test".to_string()),
                 data: "{}".to_string(),
                 id: Some("evt_test".to_string()),
@@ -636,7 +636,7 @@ fn response_from_events(
 }
 
 fn test_provider_runtime(
-    provider: ProviderId,
+    provider: ProviderKind,
     base_url: &str,
     default_model: Option<&str>,
 ) -> ProviderRuntime {

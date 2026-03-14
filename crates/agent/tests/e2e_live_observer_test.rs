@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use agent_toolkit::{
     AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
-    MessageCreateInput, ProviderId, ProviderInstanceId, RequestEndEvent, RequestStartEvent,
+    MessageCreateInput, ProviderKind, ProviderInstanceId, RequestEndEvent, RequestStartEvent,
     ResponseMode, Route, RuntimeObserver, Target, openai,
 };
 
@@ -107,7 +107,7 @@ fn assert_stream_observer_lifecycle(events: &[&'static str]) {
 
 #[tokio::test]
 async fn live_openai_streaming_emits_observer_lifecycle_events() {
-    let Some(api_key) = require_provider_api_key(ProviderId::OpenAi, "live OpenAI observer test")
+    let Some(api_key) = require_provider_api_key(ProviderKind::OpenAi, "live OpenAI observer test")
     else {
         return;
     };
@@ -117,7 +117,7 @@ async fn live_openai_streaming_emits_observer_lifecycle_events() {
 
     let client = openai()
         .api_key(api_key)
-        .default_model(default_live_model(ProviderId::OpenAi))
+        .default_model(default_live_model(ProviderKind::OpenAi))
         .observer(observer_trait)
         .build()
         .expect("build openai client");
@@ -134,7 +134,7 @@ async fn live_openai_streaming_emits_observer_lifecycle_events() {
         .await
         .expect("stream should finish");
 
-    assert_live_response_meta(&completion.meta, ProviderId::OpenAi);
+    assert_live_response_meta(&completion.meta, ProviderKind::OpenAi);
     assert!(
         !response_text(&completion.response.output.content)
             .trim()
@@ -149,7 +149,7 @@ async fn live_openai_streaming_emits_observer_lifecycle_events() {
 #[tokio::test]
 async fn live_openai_routed_streaming_supports_per_call_observer_override() {
     let Some(api_key) =
-        require_provider_api_key(ProviderId::OpenAi, "live OpenAI routed observer test")
+        require_provider_api_key(ProviderKind::OpenAi, "live OpenAI routed observer test")
     else {
         return;
     };
@@ -159,7 +159,7 @@ async fn live_openai_routed_streaming_supports_per_call_observer_override() {
     let toolkit = agent_toolkit::AgentToolkit::builder()
         .with_openai(
             agent_toolkit::ProviderConfig::new(api_key)
-                .with_default_model(default_live_model(ProviderId::OpenAi)),
+                .with_default_model(default_live_model(ProviderKind::OpenAi)),
         )
         .observer(toolkit_observer_trait)
         .build()
@@ -185,7 +185,7 @@ async fn live_openai_routed_streaming_supports_per_call_observer_override() {
         .await
         .expect("routed stream should finish");
 
-    assert_live_response_meta(&completion.meta, ProviderId::OpenAi);
+    assert_live_response_meta(&completion.meta, ProviderKind::OpenAi);
     assert!(
         !response_text(&completion.response.output.content)
             .trim()

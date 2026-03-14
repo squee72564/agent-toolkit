@@ -1,9 +1,9 @@
-use agent_core::{ContentPart, Message, MessageRole, ProviderId, Usage};
+use agent_core::{ContentPart, Message, MessageRole, ProviderKind, Usage};
 
 #[test]
 fn root_reexports_core_types() {
-    let provider = ProviderId::OpenAi;
-    assert_eq!(provider, agent_core::types::ProviderId::OpenAi);
+    let provider = ProviderKind::OpenAi;
+    assert_eq!(provider, agent_core::types::ProviderKind::OpenAi);
 
     let message = Message::new(MessageRole::User, vec![ContentPart::text("hello")]);
     assert_eq!(message.role, MessageRole::User);
@@ -12,9 +12,9 @@ fn root_reexports_core_types() {
 
 #[test]
 fn root_and_module_types_are_interchangeable() {
-    let from_root: ProviderId = ProviderId::Anthropic;
-    let from_module: agent_core::types::ProviderId = from_root;
-    assert_eq!(from_module, agent_core::types::ProviderId::Anthropic);
+    let from_root: ProviderKind = ProviderKind::Anthropic;
+    let from_module: agent_core::types::ProviderKind = from_root;
+    assert_eq!(from_module, agent_core::types::ProviderKind::Anthropic);
 }
 
 #[test]

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::ProviderId;
+use crate::types::ProviderKind;
 
 /// Transport envelope for a raw streaming event before it is normalized.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -39,7 +39,7 @@ pub enum RawStreamPayload {
 #[serde(deny_unknown_fields)]
 pub struct ProviderRawStreamEvent {
     /// Provider that emitted the frame.
-    pub provider: ProviderId,
+    pub provider: ProviderKind,
     /// Monotonic sequence number assigned by the transport.
     pub sequence: u64,
     /// Transport metadata for the frame.
@@ -51,7 +51,7 @@ pub struct ProviderRawStreamEvent {
 impl ProviderRawStreamEvent {
     /// Creates a raw stream event from a single SSE frame and classifies its `data` payload.
     pub fn from_sse(
-        provider: ProviderId,
+        provider: ProviderKind,
         sequence: u64,
         event: Option<String>,
         id: Option<String>,

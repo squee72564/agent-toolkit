@@ -1,4 +1,4 @@
-use agent_core::{CanonicalStreamEvent, FinishReason, ProviderId, ProviderRawStreamEvent};
+use agent_core::{CanonicalStreamEvent, FinishReason, ProviderKind, ProviderRawStreamEvent};
 
 use crate::platform::openai::stream::OpenAiStreamProjector;
 use crate::streaming::ProviderStreamProjector;
@@ -9,7 +9,7 @@ fn openai_stream_projector_emits_started_and_completed_events() {
 
     let started = projector
         .project(ProviderRawStreamEvent::from_sse(
-            ProviderId::OpenAi,
+            ProviderKind::OpenAi,
             1,
             Some("response.created".to_string()),
             None,
@@ -19,7 +19,7 @@ fn openai_stream_projector_emits_started_and_completed_events() {
         .expect("projection should succeed");
     let completed = projector
         .project(ProviderRawStreamEvent::from_sse(
-            ProviderId::OpenAi,
+            ProviderKind::OpenAi,
             2,
             Some("response.completed".to_string()),
             None,

@@ -1,5 +1,5 @@
 use agent_core::{
-    AssistantOutput, CanonicalStreamEnvelope, CanonicalStreamEvent, ProviderId, Response,
+    AssistantOutput, CanonicalStreamEnvelope, CanonicalStreamEvent, ProviderKind, Response,
     ResponseFormat, RuntimeWarning,
 };
 use agent_providers::error::{AdapterError, AdapterErrorKind, AdapterOperation};
@@ -12,7 +12,7 @@ use super::structured_output::decode_structured_output_payload;
 
 pub(super) fn finalize_stream_response(
     state: StreamResponseState,
-    provider: ProviderId,
+    provider: ProviderKind,
     response_format: &ResponseFormat,
     mut prepended_warnings: Vec<RuntimeWarning>,
     transcript: Vec<CanonicalStreamEnvelope>,

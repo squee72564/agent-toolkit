@@ -26,7 +26,7 @@ fn normalized_event_model_falls_back_to_trimmed_request_model() {
 #[test]
 fn attempt_event_helpers_map_attempt_meta() {
     let success = attempt_success_event_fields(
-        ProviderId::OpenAi,
+        ProviderKind::OpenAi,
         Some("gpt-5-mini".to_string()),
         Some("req_123".to_string()),
         2,
@@ -35,14 +35,14 @@ fn attempt_event_helpers_map_attempt_meta() {
         Some(200),
     );
     assert_eq!(success.request_id.as_deref(), Some("req_123"));
-    assert_eq!(success.provider, Some(ProviderId::OpenAi));
+    assert_eq!(success.provider, Some(ProviderKind::OpenAi));
     assert_eq!(success.model.as_deref(), Some("gpt-5-mini"));
     assert_eq!(success.target_index, Some(2));
     assert_eq!(success.attempt_index, Some(3));
     assert_eq!(success.status_code, Some(200));
 
     let failure = attempt_failure_event_fields(
-        ProviderId::OpenAi,
+        ProviderKind::OpenAi,
         Some("gpt-5-mini".to_string()),
         Some("req_123".to_string()),
         2,
@@ -52,7 +52,7 @@ fn attempt_event_helpers_map_attempt_meta() {
         Some("upstream failure".to_string()),
     );
     assert_eq!(failure.request_id.as_deref(), Some("req_123"));
-    assert_eq!(failure.provider, Some(ProviderId::OpenAi));
+    assert_eq!(failure.provider, Some(ProviderKind::OpenAi));
     assert_eq!(failure.model.as_deref(), Some("gpt-5-mini"));
     assert_eq!(failure.target_index, Some(2));
     assert_eq!(failure.attempt_index, Some(3));
@@ -64,7 +64,7 @@ fn attempt_event_helpers_map_attempt_meta() {
 fn request_end_event_helpers_map_terminal_outcomes() {
     let success = request_end_success_event(RequestEndContext {
         request_id: Some("req_123".to_string()),
-        provider: Some(ProviderId::OpenAi),
+        provider: Some(ProviderKind::OpenAi),
         model: Some("gpt-5-mini".to_string()),
         target_index: Some(0),
         attempt_index: Some(0),
@@ -78,7 +78,7 @@ fn request_end_event_helpers_map_terminal_outcomes() {
     let failure = request_end_failure_event(
         RequestEndContext {
             request_id: Some("req_999".to_string()),
-            provider: Some(ProviderId::Anthropic),
+            provider: Some(ProviderKind::Anthropic),
             model: Some("claude".to_string()),
             target_index: Some(1),
             attempt_index: Some(1),
@@ -89,7 +89,7 @@ fn request_end_event_helpers_map_terminal_outcomes() {
         "timed out".to_string(),
     );
     assert_eq!(failure.request_id.as_deref(), Some("req_999"));
-    assert_eq!(failure.provider, Some(ProviderId::Anthropic));
+    assert_eq!(failure.provider, Some(ProviderKind::Anthropic));
     assert_eq!(failure.model.as_deref(), Some("claude"));
     assert_eq!(failure.status_code, Some(503));
     assert_eq!(failure.error_kind, Some(RuntimeErrorKind::Transport));
@@ -100,7 +100,7 @@ fn request_end_event_helpers_map_terminal_outcomes() {
 fn response_meta_helper_preserves_selected_attempt_and_order() {
     let first = AttemptRecord {
         provider_instance: crate::ProviderInstanceId::anthropic_default(),
-        provider_kind: ProviderId::Anthropic,
+        provider_kind: ProviderKind::Anthropic,
         model: "claude".to_string(),
         target_index: 0,
         attempt_index: 0,
@@ -112,7 +112,7 @@ fn response_meta_helper_preserves_selected_attempt_and_order() {
     };
     let second = AttemptRecord {
         provider_instance: crate::ProviderInstanceId::openai_default(),
-        provider_kind: ProviderId::OpenAi,
+        provider_kind: ProviderKind::OpenAi,
         model: "gpt-5-mini".to_string(),
         target_index: 1,
         attempt_index: 1,
@@ -134,7 +134,7 @@ fn response_meta_helper_preserves_selected_attempt_and_order() {
         meta.selected_provider_instance,
         crate::ProviderInstanceId::openai_default()
     );
-    assert_eq!(meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(meta.selected_model, "gpt-5-mini");
     assert_eq!(meta.request_id.as_deref(), Some("req_123"));
     assert_eq!(meta.attempts, vec![first, second]);

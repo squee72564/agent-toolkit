@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use super::{
-    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, HttpJsonResponse, ProviderId,
+    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, HttpJsonResponse, ProviderKind,
     RequestEndEvent, RequestStartEvent, RetryPolicy, RuntimeObserver, StreamCompletion, core,
     message, protocols, request, response, runtime, tool, tools, transport,
 };
@@ -9,17 +9,17 @@ use super::{
 #[test]
 fn provider_id_reexport_matches_agent_core_type() {
     for provider_from_agent in [
-        ProviderId::OpenAi,
-        ProviderId::Anthropic,
-        ProviderId::OpenRouter,
+        ProviderKind::OpenAi,
+        ProviderKind::Anthropic,
+        ProviderKind::OpenRouter,
     ] {
-        let provider_from_core: agent_core::types::ProviderId = provider_from_agent;
+        let provider_from_core: agent_core::types::ProviderKind = provider_from_agent;
         let expected = match provider_from_agent {
-            ProviderId::OpenAi => agent_core::types::ProviderId::OpenAi,
-            ProviderId::Anthropic => agent_core::types::ProviderId::Anthropic,
-            ProviderId::OpenRouter => agent_core::types::ProviderId::OpenRouter,
-            ProviderId::GenericOpenAiCompatible => {
-                agent_core::types::ProviderId::GenericOpenAiCompatible
+            ProviderKind::OpenAi => agent_core::types::ProviderKind::OpenAi,
+            ProviderKind::Anthropic => agent_core::types::ProviderKind::Anthropic,
+            ProviderKind::OpenRouter => agent_core::types::ProviderKind::OpenRouter,
+            ProviderKind::GenericOpenAiCompatible => {
+                agent_core::types::ProviderKind::GenericOpenAiCompatible
             }
         };
 
@@ -84,10 +84,10 @@ fn observability_reexports_are_accessible() {
 
 #[test]
 fn module_reexports_are_accessible() {
-    let provider_from_core_mod: core::types::ProviderId = core::types::ProviderId::Anthropic;
+    let provider_from_core_mod: core::types::ProviderKind = core::types::ProviderKind::Anthropic;
     assert_eq!(
         provider_from_core_mod,
-        agent_core::types::ProviderId::Anthropic
+        agent_core::types::ProviderKind::Anthropic
     );
 
     let adapter_error_kind: protocols::error::AdapterErrorKind =
@@ -102,7 +102,7 @@ fn module_reexports_are_accessible() {
     let _tool_registry = tools::ToolRegistry::new();
 
     let _message_role = message::MessageRole::User;
-    let _platform_provider = core::types::ProviderId::OpenAi;
+    let _platform_provider = core::types::ProviderKind::OpenAi;
     let _response_format = request::ResponseFormat::default();
     let _finish_reason = response::FinishReason::Stop;
     let _tool_choice = tool::ToolChoice::Auto;

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use agent_core::{
     ExecutionPlan, PlatformConfig, ProviderCapabilities, ProviderDescriptor, ProviderFamilyId,
-    ProviderId, ProviderInstanceId, ProviderKind, Response, ResponseFormat, ToolChoice,
+    ProviderInstanceId, ProviderKind, Response, ResponseFormat, ToolChoice,
     types::{ContentPart, Message, MessageRole, ToolResultContent},
 };
 use agent_providers::adapter::{ProviderAdapter, adapter_for};
@@ -41,7 +41,7 @@ mod types_test;
 
 fn runtime_error(
     kind: RuntimeErrorKind,
-    provider: Option<ProviderId>,
+    provider: Option<ProviderKind>,
     status_code: Option<u16>,
     provider_code: Option<&str>,
 ) -> RuntimeError {
@@ -68,7 +68,7 @@ pub(crate) fn default_instance_id(provider: ProviderKind) -> ProviderInstanceId 
     }
 }
 
-fn test_provider_client(provider: ProviderId) -> ProviderClient {
+fn test_provider_client(provider: ProviderKind) -> ProviderClient {
     let adapter = adapter_for(provider);
     let client = reqwest::Client::builder()
         .no_proxy()
@@ -97,7 +97,7 @@ fn test_provider_client(provider: ProviderId) -> ProviderClient {
 }
 
 fn test_provider_client_with_base_url(
-    provider: ProviderId,
+    provider: ProviderKind,
     base_url: &str,
     default_model: Option<&str>,
 ) -> ProviderClient {
@@ -129,7 +129,7 @@ fn test_provider_client_with_base_url(
 }
 
 fn test_provider_client_with_streaming_support(
-    provider: ProviderId,
+    provider: ProviderKind,
     default_model: Option<&str>,
     supports_streaming: bool,
 ) -> ProviderClient {
@@ -253,7 +253,7 @@ impl ProviderAdapter for StreamingCapabilityTestAdapter {
         &self,
         execution: &ExecutionPlan,
     ) -> Result<agent_providers::request_plan::ProviderRequestPlan, AdapterError> {
-        adapter_for(ProviderId::OpenAi).plan_request(execution)
+        adapter_for(ProviderKind::OpenAi).plan_request(execution)
     }
 
     fn decode_response_json(
@@ -261,14 +261,14 @@ impl ProviderAdapter for StreamingCapabilityTestAdapter {
         body: Value,
         requested_format: &ResponseFormat,
     ) -> Result<Response, AdapterError> {
-        adapter_for(ProviderId::OpenAi).decode_response_json(body, requested_format)
+        adapter_for(ProviderKind::OpenAi).decode_response_json(body, requested_format)
     }
 
     fn decode_error(&self, body: &Value) -> Option<ProviderErrorInfo> {
-        adapter_for(ProviderId::OpenAi).decode_error(body)
+        adapter_for(ProviderKind::OpenAi).decode_error(body)
     }
 
     fn create_stream_projector(&self) -> Box<dyn ProviderStreamProjector> {
-        adapter_for(ProviderId::OpenAi).create_stream_projector()
+        adapter_for(ProviderKind::OpenAi).create_stream_projector()
     }
 }

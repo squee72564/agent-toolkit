@@ -256,7 +256,7 @@ fn resolve_route_targets_errors_for_unregistered_provider() {
     let toolkit = AgentToolkit {
         clients: HashMap::from([(
             crate::ProviderInstanceId::openai_default(),
-            test_provider_client(ProviderId::OpenAi),
+            test_provider_client(ProviderKind::OpenAi),
         )]),
         observer: None,
     };
@@ -275,11 +275,11 @@ fn resolve_route_targets_deduplicates_primary_and_fallback_targets() {
         clients: HashMap::from([
             (
                 crate::ProviderInstanceId::openai_default(),
-                test_provider_client(ProviderId::OpenAi),
+                test_provider_client(ProviderKind::OpenAi),
             ),
             (
                 crate::ProviderInstanceId::openrouter_default(),
-                test_provider_client(ProviderId::OpenRouter),
+                test_provider_client(ProviderKind::OpenRouter),
             ),
         ]),
         observer: None,
@@ -324,11 +324,11 @@ fn resolve_route_targets_preserves_attempt_order() {
         clients: HashMap::from([
             (
                 crate::ProviderInstanceId::openai_default(),
-                test_provider_client(ProviderId::OpenAi),
+                test_provider_client(ProviderKind::OpenAi),
             ),
             (
                 crate::ProviderInstanceId::openrouter_default(),
-                test_provider_client(ProviderId::OpenRouter),
+                test_provider_client(ProviderKind::OpenRouter),
             ),
         ]),
         observer: None,
@@ -365,11 +365,11 @@ async fn routed_messages_fail_fast_surfaces_typed_route_planning_failure() {
         clients: HashMap::from([
             (
                 crate::ProviderInstanceId::anthropic_default(),
-                test_provider_client(ProviderId::Anthropic),
+                test_provider_client(ProviderKind::Anthropic),
             ),
             (
                 crate::ProviderInstanceId::openrouter_default(),
-                test_provider_client(ProviderId::OpenRouter),
+                test_provider_client(ProviderKind::OpenRouter),
             ),
         ]),
         observer: None,
@@ -444,7 +444,7 @@ async fn routed_messages_create_uses_explicit_provider_instance_route() {
         meta.selected_provider_instance,
         crate::ProviderInstanceId::new("openai-secondary")
     );
-    assert_eq!(meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(meta.selected_provider_kind, ProviderKind::OpenAi);
 }
 
 #[tokio::test]
@@ -455,12 +455,12 @@ async fn routed_messages_emit_attempt_skipped_without_execution_events_for_plann
         clients: HashMap::from([
             (
                 crate::ProviderInstanceId::anthropic_default(),
-                test_provider_client(ProviderId::Anthropic),
+                test_provider_client(ProviderKind::Anthropic),
             ),
             (
                 crate::ProviderInstanceId::openai_default(),
                 test_provider_client_with_base_url(
-                    ProviderId::OpenAi,
+                    ProviderKind::OpenAi,
                     &base_url,
                     Some("gpt-5-mini"),
                 ),
@@ -497,7 +497,7 @@ async fn routed_messages_emit_attempt_skipped_without_execution_events_for_plann
         meta.selected_provider_instance,
         crate::ProviderInstanceId::openai_default()
     );
-    assert_eq!(meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(meta.selected_provider_kind, ProviderKind::OpenAi);
 
     let events = observer.snapshot();
     assert_eq!(
@@ -516,7 +516,7 @@ async fn routed_messages_emit_attempt_skipped_without_execution_events_for_plann
         skipped.provider_instance,
         crate::ProviderInstanceId::anthropic_default()
     );
-    assert_eq!(skipped.provider_kind, ProviderId::Anthropic);
+    assert_eq!(skipped.provider_kind, ProviderKind::Anthropic);
     assert_eq!(skipped.model, "claude-sonnet-4-6");
     assert_eq!(skipped.target_index, 0);
     assert_eq!(skipped.attempt_index, 0);
@@ -535,19 +535,19 @@ async fn routed_messages_success_preserves_failed_and_skipped_attempt_history() 
             (
                 crate::ProviderInstanceId::openrouter_default(),
                 test_provider_client_with_base_url(
-                    ProviderId::OpenRouter,
+                    ProviderKind::OpenRouter,
                     "http://127.0.0.1:1",
                     Some("openai/gpt-5-mini"),
                 ),
             ),
             (
                 crate::ProviderInstanceId::anthropic_default(),
-                test_provider_client(ProviderId::Anthropic),
+                test_provider_client(ProviderKind::Anthropic),
             ),
             (
                 crate::ProviderInstanceId::openai_default(),
                 test_provider_client_with_base_url(
-                    ProviderId::OpenAi,
+                    ProviderKind::OpenAi,
                     &success_url,
                     Some("gpt-5-mini"),
                 ),
@@ -589,7 +589,7 @@ async fn routed_messages_success_preserves_failed_and_skipped_attempt_history() 
         meta.selected_provider_instance,
         crate::ProviderInstanceId::openai_default()
     );
-    assert_eq!(meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(meta.selected_model, "gpt-5-mini");
     assert_eq!(
         meta.request_id.as_deref(),
@@ -634,19 +634,19 @@ async fn routed_messages_terminal_error_carries_failed_and_skipped_attempt_histo
             (
                 crate::ProviderInstanceId::openrouter_default(),
                 test_provider_client_with_base_url(
-                    ProviderId::OpenRouter,
+                    ProviderKind::OpenRouter,
                     "http://127.0.0.1:1",
                     Some("openai/gpt-5-mini"),
                 ),
             ),
             (
                 crate::ProviderInstanceId::anthropic_default(),
-                test_provider_client(ProviderId::Anthropic),
+                test_provider_client(ProviderKind::Anthropic),
             ),
             (
                 crate::ProviderInstanceId::openai_default(),
                 test_provider_client_with_base_url(
-                    ProviderId::OpenAi,
+                    ProviderKind::OpenAi,
                     "http://127.0.0.1:1",
                     Some("gpt-5-mini"),
                 ),
@@ -689,7 +689,7 @@ async fn routed_messages_terminal_error_carries_failed_and_skipped_attempt_histo
         failure_meta.selected_provider_instance,
         crate::ProviderInstanceId::openai_default()
     );
-    assert_eq!(failure_meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(failure_meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(failure_meta.selected_model, "gpt-5-mini");
     assert_eq!(failure_meta.attempts.len(), 3);
     assert_eq!(

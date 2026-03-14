@@ -1,6 +1,6 @@
 use crate::runtime_error::RuntimeError;
 use crate::types::AttemptMeta;
-use agent_core::{ExecutionPlan, ProviderId};
+use agent_core::{ExecutionPlan, ProviderKind};
 
 pub(super) struct PreparedAttempt {
     pub(super) selected_model: String,
@@ -13,7 +13,7 @@ pub(super) fn prepare_attempt(execution_plan: &ExecutionPlan) -> PreparedAttempt
 }
 
 pub(super) fn success_meta(
-    provider: ProviderId,
+    provider: ProviderKind,
     model: String,
     status_code: u16,
     request_id: Option<String>,
@@ -30,7 +30,7 @@ pub(super) fn success_meta(
 }
 
 pub(super) fn failure_meta(
-    provider: ProviderId,
+    provider: ProviderKind,
     model: String,
     error: &RuntimeError,
 ) -> AttemptMeta {

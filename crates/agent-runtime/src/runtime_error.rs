@@ -1,4 +1,4 @@
-use agent_core::ProviderId;
+use agent_core::ProviderKind;
 use agent_providers::error::{AdapterError, AdapterErrorKind};
 use agent_transport::{TimeoutStage, TransportError};
 use std::error::Error as StdError;
@@ -36,7 +36,7 @@ pub struct RuntimeError {
     /// Human-readable error message.
     pub message: String,
     /// Provider associated with the error, when known.
-    pub provider: Option<ProviderId>,
+    pub provider: Option<ProviderKind>,
     /// HTTP status code associated with the error, when known.
     pub status_code: Option<u16>,
     /// Provider request identifier, when one was returned.
@@ -127,7 +127,7 @@ impl RuntimeError {
     }
 
     /// Converts a transport-layer error into a runtime error.
-    pub fn from_transport(provider: ProviderId, error: TransportError) -> Self {
+    pub fn from_transport(provider: ProviderKind, error: TransportError) -> Self {
         let (message, status_code, request_id) = match &error {
             TransportError::InvalidHeaderName => ("invalid header name".to_string(), None, None),
             TransportError::InvalidHeaderValue => ("invalid header value".to_string(), None, None),

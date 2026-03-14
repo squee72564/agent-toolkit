@@ -36,7 +36,7 @@ struct DirectRequestContext<'a> {
 
 struct DirectFailureContext {
     request_id: Option<String>,
-    provider: Option<agent_core::ProviderId>,
+    provider: Option<agent_core::ProviderKind>,
     model: Option<String>,
     status_code: Option<u16>,
     error_kind: RuntimeErrorKind,

@@ -19,7 +19,7 @@ fn fallback_policy_default_has_no_implicit_retry_behavior() {
 
     let transport_error = runtime_error(
         RuntimeErrorKind::Transport,
-        Some(ProviderId::OpenAi),
+        Some(ProviderKind::OpenAi),
         None,
         None,
     );
@@ -38,7 +38,7 @@ fn fallback_policy_rules_retry_on_error_kind() {
 
     let error = runtime_error(
         RuntimeErrorKind::Upstream,
-        Some(ProviderId::OpenAi),
+        Some(ProviderKind::OpenAi),
         None,
         None,
     );
@@ -57,7 +57,7 @@ fn fallback_policy_stop_prevents_fallback() {
 
     let error = runtime_error(
         RuntimeErrorKind::Upstream,
-        Some(ProviderId::OpenAi),
+        Some(ProviderKind::OpenAi),
         Some(429),
         None,
     );
@@ -76,7 +76,7 @@ fn fallback_policy_rules_match_provider_code() {
 
     let matching_error = runtime_error(
         RuntimeErrorKind::Upstream,
-        Some(ProviderId::OpenAi),
+        Some(ProviderKind::OpenAi),
         None,
         Some("rate_limit_exceeded"),
     );
@@ -89,7 +89,7 @@ fn fallback_policy_rules_match_provider_code() {
 
     let non_matching_error = runtime_error(
         RuntimeErrorKind::Upstream,
-        Some(ProviderId::OpenAi),
+        Some(ProviderKind::OpenAi),
         None,
         Some("insufficient_quota"),
     );
@@ -109,7 +109,7 @@ fn fallback_policy_rules_match_provider_code_with_whitespace_normalization() {
 
     let matching_error = runtime_error(
         RuntimeErrorKind::Upstream,
-        Some(ProviderId::OpenAi),
+        Some(ProviderKind::OpenAi),
         None,
         Some("  rate_limit_exceeded\t"),
     );
@@ -159,7 +159,7 @@ fn fallback_policy_rules_can_scope_to_provider_kind() {
 
     let openrouter_error = runtime_error(
         RuntimeErrorKind::Upstream,
-        Some(ProviderId::OpenRouter),
+        Some(ProviderKind::OpenRouter),
         Some(429),
         None,
     );
@@ -172,7 +172,7 @@ fn fallback_policy_rules_can_scope_to_provider_kind() {
 
     let openai_error = runtime_error(
         RuntimeErrorKind::Upstream,
-        Some(ProviderId::OpenAi),
+        Some(ProviderKind::OpenAi),
         Some(429),
         None,
     );
@@ -193,7 +193,7 @@ fn fallback_policy_rules_can_scope_to_provider_instance() {
 
     let error = runtime_error(
         RuntimeErrorKind::Upstream,
-        Some(ProviderId::OpenAi),
+        Some(ProviderKind::OpenAi),
         Some(429),
         None,
     );
@@ -219,7 +219,7 @@ fn fallback_policy_rules_use_first_match_precedence() {
 
     let error = runtime_error(
         RuntimeErrorKind::Upstream,
-        Some(ProviderId::OpenAi),
+        Some(ProviderKind::OpenAi),
         Some(429),
         None,
     );
@@ -237,7 +237,7 @@ fn fallback_policy_no_match_does_not_fallback() {
 
     let error = runtime_error(
         RuntimeErrorKind::Upstream,
-        Some(ProviderId::OpenAi),
+        Some(ProviderKind::OpenAi),
         Some(429),
         None,
     );
@@ -264,7 +264,7 @@ fn fallback_policy_rule_requires_all_match_conditions() {
 
     let matching_error = runtime_error(
         RuntimeErrorKind::Upstream,
-        Some(ProviderId::OpenAi),
+        Some(ProviderKind::OpenAi),
         Some(429),
         Some("rate_limit_exceeded"),
     );
@@ -277,7 +277,7 @@ fn fallback_policy_rule_requires_all_match_conditions() {
 
     let wrong_status_error = runtime_error(
         RuntimeErrorKind::Upstream,
-        Some(ProviderId::OpenAi),
+        Some(ProviderKind::OpenAi),
         Some(503),
         Some("rate_limit_exceeded"),
     );
@@ -295,7 +295,7 @@ fn fallback_policy_provider_code_rule_does_not_match_blank_rule_value() {
 
     let error = runtime_error(
         RuntimeErrorKind::Upstream,
-        Some(ProviderId::OpenAi),
+        Some(ProviderKind::OpenAi),
         Some(429),
         Some("rate_limit_exceeded"),
     );
@@ -313,7 +313,7 @@ fn fallback_policy_status_rule_does_not_match_without_status_code() {
 
     let error = runtime_error(
         RuntimeErrorKind::Upstream,
-        Some(ProviderId::OpenAi),
+        Some(ProviderKind::OpenAi),
         None,
         None,
     );

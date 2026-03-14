@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use agent_core::ProviderId;
+use agent_core::ProviderKind;
 
 use super::AgentToolkit;
 use crate::attempt_spec::AttemptSpec;
@@ -100,7 +100,7 @@ impl PreparedExecution {
 
     pub(super) fn emit_request_end_failure(
         &self,
-        provider: Option<ProviderId>,
+        provider: Option<ProviderKind>,
         model: Option<String>,
         target_index: Option<usize>,
         attempt_index: Option<usize>,
@@ -127,7 +127,7 @@ impl PreparedExecution {
 
     pub(super) fn emit_request_end_success(
         &self,
-        provider: Option<ProviderId>,
+        provider: Option<ProviderKind>,
         model: Option<String>,
         target_index: Option<usize>,
         attempt_index: Option<usize>,

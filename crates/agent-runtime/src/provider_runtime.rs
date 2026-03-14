@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use agent_core::{
-    CanonicalStreamEnvelope, ExecutionPlan, PlatformConfig, ProviderId, ProviderInstanceId,
+    CanonicalStreamEnvelope, ExecutionPlan, PlatformConfig, ProviderInstanceId,
     ProviderKind, Response, ResponseFormat, RuntimeWarning,
 };
 use agent_providers::error::AdapterOperation;
@@ -71,7 +71,7 @@ pub(crate) enum ProviderStreamAttemptOutcome {
 }
 
 pub(crate) struct OpenedProviderStream {
-    provider: ProviderId,
+    provider: ProviderKind,
     response: HttpSseResponse,
     response_format: ResponseFormat,
     prepended_warnings: Vec<RuntimeWarning>,
@@ -218,7 +218,7 @@ impl ProviderRuntime {
     }
 }
 
-fn map_stream_runtime_error(provider: ProviderId, error: StreamRuntimeError) -> RuntimeError {
+fn map_stream_runtime_error(provider: ProviderKind, error: StreamRuntimeError) -> RuntimeError {
     match error {
         StreamRuntimeError::Transport {
             error,
@@ -251,7 +251,7 @@ fn map_stream_runtime_error(provider: ProviderId, error: StreamRuntimeError) -> 
 }
 
 pub(crate) fn response_mode_mismatch_error(
-    provider: ProviderId,
+    provider: ProviderKind,
     expected_mode: TransportResponseFraming,
     actual_response_kind: &'static str,
     head: &agent_transport::HttpResponseHead,

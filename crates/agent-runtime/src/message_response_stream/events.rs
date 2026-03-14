@@ -29,7 +29,7 @@ pub(super) fn attempt_failure_meta(context: &AttemptContext, error: &RuntimeErro
 
 pub(super) fn emit_attempt_start(
     observer: Option<&Arc<dyn RuntimeObserver>>,
-    provider: agent_core::ProviderId,
+    provider: agent_core::ProviderKind,
     model: Option<String>,
     target_index: usize,
     attempt_index: usize,

@@ -2,7 +2,7 @@
 
 mod e2e;
 
-use agent_toolkit::{MessageCreateInput, ProviderId, anthropic, openai, openrouter};
+use agent_toolkit::{MessageCreateInput, ProviderKind, anthropic, openai, openrouter};
 use futures_util::StreamExt;
 
 use e2e::live::{
@@ -12,7 +12,7 @@ use e2e::live::{
 
 async fn collect_text_stream_completion(
     mut stream: agent_toolkit::MessageTextStream,
-    provider: ProviderId,
+    provider: ProviderKind,
 ) {
     let mut streamed_text = String::new();
     while let Some(chunk) = stream.next().await {
@@ -38,14 +38,14 @@ async fn collect_text_stream_completion(
 
 #[tokio::test]
 async fn live_openai_text_streaming_smoke_test() {
-    let Some(api_key) = require_provider_api_key(ProviderId::OpenAi, "live OpenAI streaming test")
+    let Some(api_key) = require_provider_api_key(ProviderKind::OpenAi, "live OpenAI streaming test")
     else {
         return;
     };
 
     let client = openai()
         .api_key(api_key)
-        .default_model(default_live_model(ProviderId::OpenAi))
+        .default_model(default_live_model(ProviderKind::OpenAi))
         .build()
         .expect("build openai client");
 
@@ -56,20 +56,20 @@ async fn live_openai_text_streaming_smoke_test() {
     .expect("openai stream should open")
     .into_text_stream();
 
-    collect_text_stream_completion(stream, ProviderId::OpenAi).await;
+    collect_text_stream_completion(stream, ProviderKind::OpenAi).await;
 }
 
 #[tokio::test]
 async fn live_anthropic_text_streaming_smoke_test() {
     let Some(api_key) =
-        require_provider_api_key(ProviderId::Anthropic, "live Anthropic streaming test")
+        require_provider_api_key(ProviderKind::Anthropic, "live Anthropic streaming test")
     else {
         return;
     };
 
     let client = anthropic()
         .api_key(api_key)
-        .default_model(default_live_model(ProviderId::Anthropic))
+        .default_model(default_live_model(ProviderKind::Anthropic))
         .build()
         .expect("build anthropic client");
 
@@ -80,20 +80,20 @@ async fn live_anthropic_text_streaming_smoke_test() {
     .expect("anthropic stream should open")
     .into_text_stream();
 
-    collect_text_stream_completion(stream, ProviderId::Anthropic).await;
+    collect_text_stream_completion(stream, ProviderKind::Anthropic).await;
 }
 
 #[tokio::test]
 async fn live_openrouter_text_streaming_smoke_test() {
     let Some(api_key) =
-        require_provider_api_key(ProviderId::OpenRouter, "live OpenRouter streaming test")
+        require_provider_api_key(ProviderKind::OpenRouter, "live OpenRouter streaming test")
     else {
         return;
     };
 
     let client = openrouter()
         .api_key(api_key)
-        .default_model(default_live_model(ProviderId::OpenRouter))
+        .default_model(default_live_model(ProviderKind::OpenRouter))
         .build()
         .expect("build openrouter client");
 
@@ -104,5 +104,5 @@ async fn live_openrouter_text_streaming_smoke_test() {
     .expect("openrouter stream should open")
     .into_text_stream();
 
-    collect_text_stream_completion(stream, ProviderId::OpenRouter).await;
+    collect_text_stream_completion(stream, ProviderKind::OpenRouter).await;
 }

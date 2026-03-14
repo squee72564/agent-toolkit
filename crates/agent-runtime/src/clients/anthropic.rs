@@ -2,7 +2,7 @@ use crate::base_client_builder::BaseClientBuilder;
 use crate::clients::common::{ClientEnv, impl_provider_client};
 use crate::provider_client::ProviderClient;
 use agent_core::{
-    AnthropicFamilyOptions, AnthropicOptions, FamilyOptions, NativeOptions, ProviderId,
+    AnthropicFamilyOptions, AnthropicOptions, FamilyOptions, NativeOptions, ProviderKind,
     ProviderOptions, Response, TaskRequest,
 };
 
@@ -25,7 +25,7 @@ pub struct AnthropicClientBuilder {
 impl_provider_client!(
     client = AnthropicClient,
     builder = AnthropicClientBuilder,
-    provider = ProviderId::Anthropic,
+    provider = ProviderKind::Anthropic,
     constructor = anthropic,
     env = ClientEnv::new(
         ANTHROPIC_API_KEY_ENV,

@@ -8,7 +8,7 @@ use crate::platform::test_fixtures::{
     load_decoded_error_fixture_body, load_decoded_success_fixture,
     validate_decoded_error_fixture_shape,
 };
-use agent_core::ProviderId;
+use agent_core::ProviderKind;
 use agent_core::types::{ContentPart, FinishReason, Response, ResponseFormat};
 
 const PROVIDER: &str = "openai";
@@ -35,7 +35,7 @@ fn decode_response_json(
     body: Value,
     requested_response_format: &ResponseFormat,
 ) -> Result<Response, crate::error::AdapterError> {
-    adapter_for(ProviderId::OpenAi).decode_response_json(body, requested_response_format)
+    adapter_for(ProviderKind::OpenAi).decode_response_json(body, requested_response_format)
 }
 
 #[test]

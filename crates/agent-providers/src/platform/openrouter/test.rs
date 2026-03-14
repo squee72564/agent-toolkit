@@ -4,7 +4,7 @@ use serde_json::{Map, json};
 
 use crate::adapter::adapter_for;
 use crate::error::{AdapterErrorKind, AdapterOperation};
-use agent_core::types::ProviderId;
+use agent_core::types::ProviderKind;
 use agent_core::types::{ContentPart, Message, MessageRole, Request, ResponseFormat, ToolChoice};
 
 use super::request;
@@ -42,7 +42,7 @@ fn openrouter_request_error_maps_into_adapter_error() {
     )
     .expect_err("planning should fail");
 
-    assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
+    assert_eq!(adapter_error.provider, ProviderKind::OpenRouter);
     assert_eq!(adapter_error.operation, AdapterOperation::PlanRequest);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Validation);
     assert!(adapter_error.message.contains("model_id must not be empty"));
@@ -50,14 +50,14 @@ fn openrouter_request_error_maps_into_adapter_error() {
 
 #[test]
 fn openrouter_upstream_error_maps_into_adapter_error() {
-    let adapter_error = adapter_for(ProviderId::OpenRouter)
+    let adapter_error = adapter_for(ProviderKind::OpenRouter)
         .decode_response_json(
             json!({"error":{"message":"provider failure","code":"rate_limit_exceeded"}}),
             &ResponseFormat::Text,
         )
         .expect_err("decode should fail");
 
-    assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
+    assert_eq!(adapter_error.provider, ProviderKind::OpenRouter);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Upstream);
     assert!(adapter_error.message.contains("provider failure"));
@@ -69,11 +69,11 @@ fn openrouter_upstream_error_maps_into_adapter_error() {
 
 #[test]
 fn openrouter_decode_error_maps_into_adapter_error() {
-    let adapter_error = adapter_for(ProviderId::OpenRouter)
+    let adapter_error = adapter_for(ProviderKind::OpenRouter)
         .decode_response_json(json!("bad response"), &ResponseFormat::Text)
         .expect_err("decode should fail");
 
-    assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
+    assert_eq!(adapter_error.provider, ProviderKind::OpenRouter);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Decode);
     assert!(!adapter_error.message.is_empty());
@@ -81,7 +81,7 @@ fn openrouter_decode_error_maps_into_adapter_error() {
 
 #[test]
 fn openrouter_protocol_violation_error_maps_into_adapter_error() {
-    let adapter_error = adapter_for(ProviderId::OpenRouter)
+    let adapter_error = adapter_for(ProviderKind::OpenRouter)
         .decode_response_json(
             json!({
                 "id": "chatcmpl-123",
@@ -93,7 +93,7 @@ fn openrouter_protocol_violation_error_maps_into_adapter_error() {
         )
         .expect_err("decode should fail");
 
-    assert_eq!(adapter_error.provider, ProviderId::OpenRouter);
+    assert_eq!(adapter_error.provider, ProviderKind::OpenRouter);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Decode);
     assert!(!adapter_error.message.is_empty());
@@ -258,7 +258,7 @@ fn openrouter_request_extra_overrides_take_precedence() {
 
 #[test]
 fn openrouter_decode_uses_openai_path_when_payload_is_openai_compatible() {
-    let response = adapter_for(ProviderId::OpenRouter)
+    let response = adapter_for(ProviderKind::OpenRouter)
         .decode_response_json(
             json!({
                 "status": "completed",
@@ -292,7 +292,7 @@ fn openrouter_decode_uses_openai_path_when_payload_is_openai_compatible() {
 
 #[test]
 fn openrouter_decode_rejects_chat_completions_shape() {
-    let error = adapter_for(ProviderId::OpenRouter)
+    let error = adapter_for(ProviderKind::OpenRouter)
         .decode_response_json(
             json!({
                 "id": "chatcmpl-123",
@@ -317,7 +317,7 @@ fn openrouter_decode_rejects_chat_completions_shape() {
 
 #[test]
 fn openrouter_decode_maps_upstream_error_without_fallback_context() {
-    let error = adapter_for(ProviderId::OpenRouter)
+    let error = adapter_for(ProviderKind::OpenRouter)
         .decode_response_json(
             json!({
                 "error": {

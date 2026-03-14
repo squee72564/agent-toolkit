@@ -83,7 +83,7 @@ impl StreamResponseState {
         self.failed_message.as_deref()
     }
 
-    pub(super) fn model_or_provider_fallback(&self, provider: agent_core::ProviderId) -> String {
+    pub(super) fn model_or_provider_fallback(&self, provider: agent_core::ProviderKind) -> String {
         self.model
             .clone()
             .unwrap_or_else(|| format!("{provider:?}").to_lowercase())

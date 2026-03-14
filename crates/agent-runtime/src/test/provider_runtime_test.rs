@@ -3,7 +3,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
 use agent_core::{
-    Message, ProviderCapabilities, ProviderDescriptor, ProviderFamilyId, ProviderId, ProviderKind,
+    Message, ProviderCapabilities, ProviderDescriptor, ProviderFamilyId, ProviderKind,
     Response, ResponseFormat, TaskRequest, ToolChoice,
 };
 use agent_providers::adapter::{ProviderAdapter, adapter_for};
@@ -31,14 +31,14 @@ use crate::provider_runtime::{
 #[test]
 fn response_mode_mismatch_reports_protocol_violation_for_json_expectation() {
     let error = response_mode_mismatch_error(
-        ProviderId::OpenAi,
+        ProviderKind::OpenAi,
         TransportResponseFraming::Json,
         "SSE",
         &response_head(StatusCode::OK, Some("req_json_mismatch")),
     );
 
     assert_eq!(error.kind, RuntimeErrorKind::ProtocolViolation);
-    assert_eq!(error.provider, Some(ProviderId::OpenAi));
+    assert_eq!(error.provider, Some(ProviderKind::OpenAi));
     assert_eq!(error.status_code, Some(200));
     assert_eq!(error.request_id.as_deref(), Some("req_json_mismatch"));
     assert!(
@@ -51,14 +51,14 @@ fn response_mode_mismatch_reports_protocol_violation_for_json_expectation() {
 #[test]
 fn response_mode_mismatch_reports_protocol_violation_for_sse_expectation() {
     let error = response_mode_mismatch_error(
-        ProviderId::Anthropic,
+        ProviderKind::Anthropic,
         TransportResponseFraming::Sse,
         "JSON",
         &response_head(StatusCode::CREATED, Some("req_sse_mismatch")),
     );
 
     assert_eq!(error.kind, RuntimeErrorKind::ProtocolViolation);
-    assert_eq!(error.provider, Some(ProviderId::Anthropic));
+    assert_eq!(error.provider, Some(ProviderKind::Anthropic));
     assert_eq!(error.status_code, Some(201));
     assert_eq!(error.request_id.as_deref(), Some("req_sse_mismatch"));
     assert!(
@@ -71,7 +71,7 @@ fn response_mode_mismatch_reports_protocol_violation_for_sse_expectation() {
 #[tokio::test]
 async fn execute_attempt_uses_override_model_in_meta() {
     let runtime = test_provider_runtime(
-        ProviderId::OpenAi,
+        ProviderKind::OpenAi,
         "http://127.0.0.1:1",
         Some("default-model"),
     );
@@ -97,7 +97,7 @@ async fn execute_attempt_uses_override_model_in_meta() {
 #[tokio::test]
 async fn execute_attempt_uses_default_model_when_request_blank() {
     let runtime = test_provider_runtime(
-        ProviderId::OpenAi,
+        ProviderKind::OpenAi,
         "http://127.0.0.1:1",
         Some("default-model"),
     );
@@ -122,12 +122,12 @@ async fn execute_attempt_uses_default_model_when_request_blank() {
 
 #[test]
 fn direct_planner_fails_when_no_model_available() {
-    let runtime = test_provider_runtime(ProviderId::OpenAi, "http://127.0.0.1:1", None);
+    let runtime = test_provider_runtime(ProviderKind::OpenAi, "http://127.0.0.1:1", None);
     let error = planner::plan_direct_attempt(
         &ProviderClient::new(runtime),
         &test_task_request(),
         &crate::AttemptSpec::to(crate::Target::new(crate::test::default_instance_id(
-            ProviderId::OpenAi,
+            ProviderKind::OpenAi,
         ))),
         &crate::ExecutionOptions::default(),
     )
@@ -149,7 +149,7 @@ async fn open_stream_attempt_reports_selected_model_and_response_meta() {
         ),
     )
     .await;
-    let runtime = test_provider_runtime(ProviderId::OpenAi, &base_url, Some("default-model"));
+    let runtime = test_provider_runtime(ProviderKind::OpenAi, &base_url, Some("default-model"));
 
     let attempt = runtime
         .open_stream_attempt(direct_execution_plan(
@@ -272,7 +272,7 @@ fn planner_resolves_transport_headers_timeouts_and_retry_policy() {
         ]));
 
     let runtime = test_provider_runtime_with(
-        ProviderId::OpenAi,
+        ProviderKind::OpenAi,
         "http://127.0.0.1:1",
         Some("model"),
         |config| {
@@ -357,7 +357,7 @@ fn response_head(status: StatusCode, request_id: Option<&str>) -> HttpResponseHe
 }
 
 fn test_provider_runtime(
-    provider: ProviderId,
+    provider: ProviderKind,
     base_url: &str,
     default_model: Option<&str>,
 ) -> ProviderRuntime {
@@ -396,7 +396,7 @@ fn test_provider_runtime_with_adapter(
 }
 
 fn test_provider_runtime_with(
-    provider: ProviderId,
+    provider: ProviderKind,
     base_url: &str,
     default_model: Option<&str>,
     configure: impl FnOnce(crate::ProviderConfig) -> crate::ProviderConfig,
@@ -530,15 +530,15 @@ impl ProviderAdapter for StreamTransportContractAdapter {
         body: Value,
         requested_format: &ResponseFormat,
     ) -> Result<Response, AdapterError> {
-        adapter_for(ProviderId::OpenAi).decode_response_json(body, requested_format)
+        adapter_for(ProviderKind::OpenAi).decode_response_json(body, requested_format)
     }
 
     fn decode_error(&self, body: &Value) -> Option<ProviderErrorInfo> {
-        adapter_for(ProviderId::OpenAi).decode_error(body)
+        adapter_for(ProviderKind::OpenAi).decode_error(body)
     }
 
     fn create_stream_projector(&self) -> Box<dyn ProviderStreamProjector> {
-        adapter_for(ProviderId::OpenAi).create_stream_projector()
+        adapter_for(ProviderKind::OpenAi).create_stream_projector()
     }
 }
 

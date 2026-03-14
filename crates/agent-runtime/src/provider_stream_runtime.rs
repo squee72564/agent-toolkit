@@ -1,5 +1,5 @@
 use agent_core::{
-    CanonicalStreamEnvelope, CanonicalStreamEvent, ProviderId, ProviderRawStreamEvent, Response,
+    CanonicalStreamEnvelope, CanonicalStreamEvent, ProviderKind, ProviderRawStreamEvent, Response,
     ResponseFormat, RuntimeWarning,
 };
 use agent_providers::error::{AdapterError, AdapterErrorKind, AdapterOperation};
@@ -16,13 +16,13 @@ use self::reducer::StreamResponseState;
 
 #[derive(Debug)]
 pub(crate) struct ProviderStreamRuntime {
-    provider: ProviderId,
+    provider: ProviderKind,
     next_sequence: u64,
     state: StreamResponseState,
 }
 
 impl ProviderStreamRuntime {
-    pub(crate) fn new(provider: ProviderId) -> Self {
+    pub(crate) fn new(provider: ProviderKind) -> Self {
         Self {
             provider,
             next_sequence: 0,
@@ -145,7 +145,7 @@ impl ProviderStreamRuntime {
 
     #[cfg(test)]
     pub(crate) fn response_from_events_for_test(
-        provider: ProviderId,
+        provider: ProviderKind,
         response_format: &ResponseFormat,
         prepended_warnings: Vec<RuntimeWarning>,
         transcript: Vec<CanonicalStreamEnvelope>,

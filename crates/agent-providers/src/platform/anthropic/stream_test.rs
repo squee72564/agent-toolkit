@@ -1,5 +1,5 @@
 use agent_core::{
-    CanonicalStreamEvent, FinishReason, MessageRole, ProviderId, ProviderRawStreamEvent,
+    CanonicalStreamEvent, FinishReason, MessageRole, ProviderKind, ProviderRawStreamEvent,
     StreamOutputItemEnd, StreamOutputItemStart,
 };
 use serde_json::Value;
@@ -14,7 +14,7 @@ fn anthropic_stream_projector_tracks_message_lifecycle() {
 
     let started = projector
         .project(ProviderRawStreamEvent::from_sse(
-            ProviderId::Anthropic,
+            ProviderKind::Anthropic,
             1,
             Some("message_start".to_string()),
             None,
@@ -24,7 +24,7 @@ fn anthropic_stream_projector_tracks_message_lifecycle() {
         .expect("projection should succeed");
     let completed = projector
         .project(ProviderRawStreamEvent::from_sse(
-            ProviderId::Anthropic,
+            ProviderKind::Anthropic,
             2,
             Some("message_stop".to_string()),
             None,
@@ -58,7 +58,7 @@ fn anthropic_stream_projector_preserves_incremental_stop_reason_and_tool_call_fi
         canonical.extend(
             projector
                 .project(ProviderRawStreamEvent::from_sse(
-                    ProviderId::Anthropic,
+                    ProviderKind::Anthropic,
                     u64::try_from(sequence + 1).expect("sequence fits in u64"),
                     event.0,
                     None,
@@ -163,7 +163,7 @@ fn anthropic_stream_projector_maps_basic_chat_fixture_to_stop_completion() {
         canonical.extend(
             projector
                 .project(ProviderRawStreamEvent::from_sse(
-                    ProviderId::Anthropic,
+                    ProviderKind::Anthropic,
                     u64::try_from(sequence + 1).expect("sequence fits in u64"),
                     event.0,
                     None,

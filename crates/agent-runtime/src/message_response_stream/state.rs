@@ -114,7 +114,7 @@ impl StreamDriverState {
     pub(super) fn note_failed_open_attempt(
         &mut self,
         provider_instance: agent_core::ProviderInstanceId,
-        provider: agent_core::ProviderId,
+        provider: agent_core::ProviderKind,
         model: String,
         target_index: usize,
         attempt_index: usize,
@@ -221,7 +221,7 @@ impl PendingCompletion {
 
 pub(super) struct StreamSuccessMeta {
     pub(super) selected_provider_instance: agent_core::ProviderInstanceId,
-    pub(super) selected_provider_kind: agent_core::ProviderId,
+    pub(super) selected_provider_kind: agent_core::ProviderKind,
     pub(super) selected_model: String,
     pub(super) status_code: Option<u16>,
     pub(super) request_id: Option<String>,
@@ -239,7 +239,7 @@ pub(crate) struct AttemptContext {
     pub(crate) started_at: Instant,
     pub(crate) observer: Option<Arc<dyn RuntimeObserver>>,
     pub(crate) provider_instance: agent_core::ProviderInstanceId,
-    pub(crate) provider: agent_core::ProviderId,
+    pub(crate) provider: agent_core::ProviderKind,
     pub(crate) model: String,
     pub(crate) request_id: Option<String>,
     pub(crate) status_code: Option<u16>,

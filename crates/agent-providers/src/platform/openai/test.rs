@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::adapter::adapter_for;
 use crate::error::{AdapterErrorKind, AdapterOperation};
-use agent_core::types::ProviderId;
+use agent_core::types::ProviderKind;
 use agent_core::types::{ContentPart, Message, MessageRole, Request, ResponseFormat, ToolChoice};
 use serde_json::json;
 
@@ -36,12 +36,12 @@ fn openai_request_error_maps_into_adapter_error() {
             model_id: String::new(),
             ..base_request()
         },
-        ProviderId::OpenAi,
+        ProviderKind::OpenAi,
         None,
     )
     .expect_err("planning should fail");
 
-    assert_eq!(adapter_error.provider, ProviderId::OpenAi);
+    assert_eq!(adapter_error.provider, ProviderKind::OpenAi);
     assert_eq!(adapter_error.operation, AdapterOperation::PlanRequest);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Validation);
     assert!(!adapter_error.message.is_empty());
@@ -50,11 +50,11 @@ fn openai_request_error_maps_into_adapter_error() {
 
 #[test]
 fn openai_response_error_maps_into_adapter_error() {
-    let adapter_error = adapter_for(ProviderId::OpenAi)
+    let adapter_error = adapter_for(ProviderKind::OpenAi)
         .decode_response_json(json!("bad response"), &ResponseFormat::Text)
         .expect_err("decode should fail");
 
-    assert_eq!(adapter_error.provider, ProviderId::OpenAi);
+    assert_eq!(adapter_error.provider, ProviderKind::OpenAi);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Decode);
     assert!(!adapter_error.message.is_empty());
@@ -67,7 +67,7 @@ fn openai_request_error_preserves_source_chain() {
             model_id: String::new(),
             ..base_request()
         },
-        ProviderId::OpenAi,
+        ProviderKind::OpenAi,
         None,
     )
     .expect_err("planning should fail");
@@ -83,14 +83,14 @@ fn openai_request_error_preserves_source_chain() {
 
 #[test]
 fn openai_upstream_error_maps_into_adapter_error() {
-    let adapter_error = adapter_for(ProviderId::OpenAi)
+    let adapter_error = adapter_for(ProviderKind::OpenAi)
         .decode_response_json(
             json!({"error":{"message":"provider said no","code":"rate_limit_exceeded","type":"rate_limit_error"}}),
             &ResponseFormat::Text,
         )
         .expect_err("decode should fail");
 
-    assert_eq!(adapter_error.provider, ProviderId::OpenAi);
+    assert_eq!(adapter_error.provider, ProviderKind::OpenAi);
     assert_eq!(adapter_error.operation, AdapterOperation::DecodeResponse);
     assert_eq!(adapter_error.kind, AdapterErrorKind::Upstream);
     assert!(adapter_error.message.contains("provider said no"));
@@ -102,7 +102,7 @@ fn openai_upstream_error_maps_into_adapter_error() {
 
 #[test]
 fn openai_decode_empty_content_is_nonfatal_and_warns() {
-    let response = adapter_for(ProviderId::OpenAi)
+    let response = adapter_for(ProviderKind::OpenAi)
         .decode_response_json(
             json!({"status":"completed","model":"gpt-4.1-mini","output":"not-an-array"}),
             &ResponseFormat::Text,
@@ -125,7 +125,7 @@ fn openai_translator_is_constructible() {
 
 #[test]
 fn openai_request_plan_passes_through_openai_encoder() {
-    let encoded = request::plan_request(base_request(), ProviderId::OpenAi, None)
+    let encoded = request::plan_request(base_request(), ProviderKind::OpenAi, None)
         .expect("planning should succeed");
 
     assert_eq!(encoded.body["model"], "gpt-4.1-mini");
@@ -134,7 +134,7 @@ fn openai_request_plan_passes_through_openai_encoder() {
 
 #[test]
 fn openai_response_decode_passes_through_openai_decoder() {
-    let response = adapter_for(ProviderId::OpenAi)
+    let response = adapter_for(ProviderKind::OpenAi)
         .decode_response_json(
             json!({
                 "status": "completed",

@@ -2,7 +2,7 @@ use agent_core::ResponseFormat;
 use serde_json::json;
 
 use crate::adapter::adapter_for;
-use agent_core::ProviderId;
+use agent_core::ProviderKind;
 
 #[test]
 fn openrouter_response_decoder_rejects_chat_completions_payloads() {
@@ -36,5 +36,5 @@ fn decode_response_json(
     body: serde_json::Value,
     requested_format: &ResponseFormat,
 ) -> Result<agent_core::Response, crate::error::AdapterError> {
-    adapter_for(ProviderId::OpenRouter).decode_response_json(body, requested_format)
+    adapter_for(ProviderKind::OpenRouter).decode_response_json(body, requested_format)
 }

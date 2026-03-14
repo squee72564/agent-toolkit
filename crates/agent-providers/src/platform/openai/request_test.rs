@@ -1,4 +1,4 @@
-use agent_core::{Message, ProviderId, Request, ResponseFormat, ToolChoice};
+use agent_core::{Message, ProviderKind, Request, ResponseFormat, ToolChoice};
 
 use crate::platform::openai::request::plan_request;
 use crate::request_plan::TransportResponseFraming;
@@ -22,7 +22,7 @@ fn base_request(stream: bool) -> Request {
 
 #[test]
 fn openai_request_plan_uses_json_defaults_for_non_streaming_requests() {
-    let plan = plan_request(base_request(false), ProviderId::OpenAi, None)
+    let plan = plan_request(base_request(false), ProviderKind::OpenAi, None)
         .expect("planning should succeed");
 
     assert_eq!(plan.method, Method::POST);
@@ -34,7 +34,7 @@ fn openai_request_plan_uses_json_defaults_for_non_streaming_requests() {
 
 #[test]
 fn openai_request_plan_enables_sse_for_streaming_requests() {
-    let plan = plan_request(base_request(true), ProviderId::OpenAi, None)
+    let plan = plan_request(base_request(true), ProviderKind::OpenAi, None)
         .expect("planning should succeed");
 
     assert_eq!(plan.method, Method::POST);

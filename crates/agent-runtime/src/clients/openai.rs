@@ -2,7 +2,7 @@ use crate::base_client_builder::BaseClientBuilder;
 use crate::clients::common::{ClientEnv, impl_provider_client};
 use crate::provider_client::ProviderClient;
 use agent_core::{
-    FamilyOptions, NativeOptions, OpenAiCompatibleOptions, OpenAiOptions, ProviderId,
+    FamilyOptions, NativeOptions, OpenAiCompatibleOptions, OpenAiOptions, ProviderKind,
     ProviderOptions, Response, TaskRequest,
 };
 
@@ -25,7 +25,7 @@ pub struct OpenAiClientBuilder {
 impl_provider_client!(
     client = OpenAiClient,
     builder = OpenAiClientBuilder,
-    provider = ProviderId::OpenAi,
+    provider = ProviderKind::OpenAi,
     constructor = openai,
     env = ClientEnv::new(OPENAI_API_KEY_ENV, OPENAI_BASE_URL_ENV, OPENAI_MODEL_ENV)
 );

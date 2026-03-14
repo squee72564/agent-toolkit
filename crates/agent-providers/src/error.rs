@@ -2,7 +2,7 @@
 
 use std::error::Error as StdError;
 
-use agent_core::types::ProviderId;
+use agent_core::types::ProviderKind;
 use thiserror::Error;
 
 /// Adapter pipeline stage that produced an [`AdapterError`].
@@ -75,7 +75,7 @@ pub struct AdapterError {
     /// High-level adapter error category.
     pub kind: AdapterErrorKind,
     /// Provider that produced the error.
-    pub provider: ProviderId,
+    pub provider: ProviderKind,
     /// Adapter pipeline stage that failed.
     pub operation: AdapterOperation,
     /// Human-readable error message.
@@ -95,7 +95,7 @@ impl AdapterError {
     #[must_use]
     pub fn new(
         kind: AdapterErrorKind,
-        provider: ProviderId,
+        provider: ProviderKind,
         operation: AdapterOperation,
         message: impl Into<String>,
     ) -> Self {
@@ -106,7 +106,7 @@ impl AdapterError {
     #[must_use]
     pub fn with_source<E>(
         kind: AdapterErrorKind,
-        provider: ProviderId,
+        provider: ProviderKind,
         operation: AdapterOperation,
         message: impl Into<String>,
         source: E,
@@ -150,7 +150,7 @@ impl AdapterError {
 
     fn build(
         kind: AdapterErrorKind,
-        provider: ProviderId,
+        provider: ProviderKind,
         operation: AdapterOperation,
         message: impl Into<String>,
         source: Option<Box<dyn StdError + Send + Sync>>,

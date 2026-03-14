@@ -31,7 +31,7 @@ impl AnthropicNativeOptionsOverrides {
             let ProviderOptions::Anthropic(AnthropicOptions { top_k }) = provider_options else {
                 return Err(AdapterError::new(
                     AdapterErrorKind::Validation,
-                    agent_core::ProviderId::Anthropic,
+                    agent_core::ProviderKind::Anthropic,
                     AdapterOperation::PlanRequest,
                     format!(
                         "Anthropic adapter received mismatched provider native options for {:?}",
@@ -49,7 +49,7 @@ impl AnthropicNativeOptionsOverrides {
         let Some(body) = request.body.as_object_mut() else {
             return Err(AdapterError::new(
                 AdapterErrorKind::ProtocolViolation,
-                agent_core::ProviderId::Anthropic,
+                agent_core::ProviderKind::Anthropic,
                 AdapterOperation::PlanRequest,
                 "Anthropic family request body must be an object".to_string(),
             ));
@@ -138,7 +138,7 @@ fn map_anthropic_plan_error(error: AnthropicFamilyError) -> AdapterError {
     let message = error.message().to_string();
     AdapterError::with_source(
         map_spec_error_kind(error.kind()),
-        agent_core::ProviderId::Anthropic,
+        agent_core::ProviderKind::Anthropic,
         AdapterOperation::PlanRequest,
         message,
         error,

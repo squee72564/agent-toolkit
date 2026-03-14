@@ -223,9 +223,9 @@ async fn direct_provider_client_non_stream_success_emits_expected_events() {
 
     let request_start = as_request_start(&events[0]);
     let attempt_start = as_attempt_start(&events[1]);
-    assert_eq!(request_start.provider, Some(ProviderId::OpenAi));
+    assert_eq!(request_start.provider, Some(ProviderKind::OpenAi));
     assert_eq!(request_start.model.as_deref(), Some("gpt-5-mini"));
-    assert_eq!(attempt_start.provider, Some(ProviderId::OpenAi));
+    assert_eq!(attempt_start.provider, Some(ProviderKind::OpenAi));
     assert_eq!(attempt_start.model.as_deref(), Some("gpt-5-mini"));
     assert_eq!(attempt_start.target_index, Some(0));
     assert_eq!(attempt_start.attempt_index, Some(0));
@@ -253,7 +253,7 @@ async fn direct_provider_client_explicit_task_api_uses_execution_boundary() {
         meta.selected_provider_instance,
         crate::ProviderInstanceId::openai_default()
     );
-    assert_eq!(meta.selected_provider_kind, agent_core::ProviderId::OpenAi);
+    assert_eq!(meta.selected_provider_kind, agent_core::ProviderKind::OpenAi);
     assert_eq!(meta.selected_model, "gpt-5-mini");
     assert_eq!(meta.attempts.len(), 1);
 }
@@ -282,7 +282,7 @@ async fn direct_provider_client_explicit_attempt_api_uses_attempt_model_override
         meta.selected_provider_instance,
         crate::ProviderInstanceId::openai_default()
     );
-    assert_eq!(meta.selected_provider_kind, agent_core::ProviderId::OpenAi);
+    assert_eq!(meta.selected_provider_kind, agent_core::ProviderKind::OpenAi);
     assert_eq!(meta.selected_model, "gpt-5-mini");
     assert_eq!(meta.attempts.len(), 1);
 }
@@ -314,7 +314,7 @@ async fn direct_provider_client_non_stream_failure_emits_expected_events() {
     );
 
     let request_end = as_request_end(&events[3]);
-    assert_eq!(request_end.provider, Some(ProviderId::OpenAi));
+    assert_eq!(request_end.provider, Some(ProviderKind::OpenAi));
     assert_eq!(request_end.model.as_deref(), Some("gpt-5-mini"));
     assert_eq!(request_end.error_kind, Some(RuntimeErrorKind::Transport));
     assert!(request_end.error_message.is_some());
@@ -342,9 +342,9 @@ async fn direct_provider_client_stream_open_success_only_emits_start_events() {
 
     let request_start = as_request_start(&events[0]);
     let attempt_start = as_attempt_start(&events[1]);
-    assert_eq!(request_start.provider, Some(ProviderId::OpenAi));
+    assert_eq!(request_start.provider, Some(ProviderKind::OpenAi));
     assert_eq!(request_start.model.as_deref(), Some("gpt-5-mini"));
-    assert_eq!(attempt_start.provider, Some(ProviderId::OpenAi));
+    assert_eq!(attempt_start.provider, Some(ProviderKind::OpenAi));
     assert_eq!(attempt_start.model.as_deref(), Some("gpt-5-mini"));
     assert_eq!(attempt_start.target_index, Some(0));
     assert_eq!(attempt_start.attempt_index, Some(0));
@@ -373,7 +373,7 @@ async fn direct_provider_client_stream_open_failure_emits_expected_events() {
     );
 
     let request_end = as_request_end(&events[3]);
-    assert_eq!(request_end.provider, Some(ProviderId::OpenAi));
+    assert_eq!(request_end.provider, Some(ProviderKind::OpenAi));
     assert_eq!(request_end.model.as_deref(), Some("gpt-5-mini"));
     assert_eq!(request_end.error_kind, Some(RuntimeErrorKind::Transport));
     assert!(request_end.error_message.is_some());

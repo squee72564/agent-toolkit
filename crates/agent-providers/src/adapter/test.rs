@@ -8,7 +8,7 @@ use serde_json::json;
 
 use agent_core::types::{
     AssistantOutput, AuthCredentials, AuthStyle, ContentPart, ExecutionPlan, FinishReason, Message,
-    MessageRole, NativeOptions, PlatformConfig, ProtocolKind, ProviderCapabilities, ProviderId,
+    MessageRole, NativeOptions, PlatformConfig, ProtocolKind, ProviderCapabilities,
     ProviderInstanceId, ProviderKind, Request, ResolvedAuthContext, ResolvedProviderAttempt,
     ResolvedTransportOptions, Response, ResponseFormat, ResponseMode, ToolChoice,
     TransportTimeoutOverrides, Usage,
@@ -96,43 +96,43 @@ fn execution_plan(
 
 #[test]
 fn adapter_lookup_returns_expected_kinds() {
-    assert_eq!(adapter_for(ProviderId::OpenAi).kind(), ProviderId::OpenAi);
+    assert_eq!(adapter_for(ProviderKind::OpenAi).kind(), ProviderKind::OpenAi);
     assert_eq!(
-        adapter_for(ProviderId::Anthropic).kind(),
-        ProviderId::Anthropic
+        adapter_for(ProviderKind::Anthropic).kind(),
+        ProviderKind::Anthropic
     );
     assert_eq!(
-        adapter_for(ProviderId::OpenRouter).kind(),
-        ProviderId::OpenRouter
+        adapter_for(ProviderKind::OpenRouter).kind(),
+        ProviderKind::OpenRouter
     );
     assert_eq!(
-        adapter_for(ProviderId::GenericOpenAiCompatible).kind(),
-        ProviderId::GenericOpenAiCompatible
+        adapter_for(ProviderKind::GenericOpenAiCompatible).kind(),
+        ProviderKind::GenericOpenAiCompatible
     );
 }
 
 #[test]
 fn all_builtin_adapters_contains_all_known_providers() {
-    let ids: Vec<ProviderId> = all_builtin_adapters()
+    let ids: Vec<ProviderKind> = all_builtin_adapters()
         .iter()
         .map(|adapter| adapter.kind())
         .collect();
     assert_eq!(ids.len(), 4);
-    assert!(ids.contains(&ProviderId::OpenAi));
-    assert!(ids.contains(&ProviderId::Anthropic));
-    assert!(ids.contains(&ProviderId::OpenRouter));
-    assert!(ids.contains(&ProviderId::GenericOpenAiCompatible));
+    assert!(ids.contains(&ProviderKind::OpenAi));
+    assert!(ids.contains(&ProviderKind::Anthropic));
+    assert!(ids.contains(&ProviderKind::OpenRouter));
+    assert!(ids.contains(&ProviderKind::GenericOpenAiCompatible));
 }
 
 #[test]
 fn descriptors_expose_expected_static_metadata() {
-    let openai = adapter_for(ProviderId::OpenAi).descriptor();
+    let openai = adapter_for(ProviderKind::OpenAi).descriptor();
     assert_eq!(openai.protocol, ProtocolKind::OpenAI);
     assert_eq!(openai.default_auth_style, AuthStyle::Bearer);
     assert_eq!(openai.default_base_url, "https://api.openai.com");
     assert_eq!(openai.endpoint_path, "/v1/responses");
 
-    let anthropic = adapter_for(ProviderId::Anthropic).descriptor();
+    let anthropic = adapter_for(ProviderKind::Anthropic).descriptor();
     assert_eq!(anthropic.protocol, ProtocolKind::Anthropic);
     assert_eq!(
         anthropic.default_auth_style,
@@ -149,11 +149,11 @@ fn descriptors_expose_expected_static_metadata() {
 #[test]
 fn openai_adapter_plan_request_matches_family_overlay_translation() {
     let request = base_request();
-    let execution = execution_plan(ProviderId::OpenAi, &request, None);
+    let execution = execution_plan(ProviderKind::OpenAi, &request, None);
 
-    let translated = openai_request::plan_request(request.clone(), ProviderId::OpenAi, None)
+    let translated = openai_request::plan_request(request.clone(), ProviderKind::OpenAi, None)
         .expect("request planning should succeed");
-    let adapter_plan = adapter_for(ProviderId::OpenAi)
+    let adapter_plan = adapter_for(ProviderKind::OpenAi)
         .plan_request(&execution)
         .expect("adapter planning should succeed");
 
@@ -170,11 +170,11 @@ fn openai_adapter_plan_request_matches_family_overlay_translation() {
 fn anthropic_adapter_plan_request_matches_family_overlay_translation() {
     let mut request = base_request();
     request.model_id = "claude-sonnet-4-6".to_string();
-    let execution = execution_plan(ProviderId::Anthropic, &request, None);
+    let execution = execution_plan(ProviderKind::Anthropic, &request, None);
 
     let translated =
         anthropic_request::plan_request(request.clone(), None).expect("planning should succeed");
-    let adapter_plan = adapter_for(ProviderId::Anthropic)
+    let adapter_plan = adapter_for(ProviderKind::Anthropic)
         .plan_request(&execution)
         .expect("adapter planning should succeed");
 
@@ -192,14 +192,14 @@ fn openrouter_adapter_plan_request_matches_family_overlay_translation() {
     let mut request = base_request();
     request.top_p = Some(0.5);
     request.stop = vec!["done".to_string()];
-    let execution = execution_plan(ProviderId::OpenRouter, &request, None);
+    let execution = execution_plan(ProviderKind::OpenRouter, &request, None);
 
     let translated = openrouter_request::plan_request(
         request.clone(),
         &openrouter_request::OpenRouterOverrides::default(),
     )
     .expect("planning should succeed");
-    let adapter_plan = adapter_for(ProviderId::OpenRouter)
+    let adapter_plan = adapter_for(ProviderKind::OpenRouter)
         .plan_request(&execution)
         .expect("adapter planning should succeed");
 
@@ -220,8 +220,8 @@ fn openai_streaming_plan_preserves_family_default_request_contract() {
     let mut request = base_request();
     request.stream = true;
 
-    let execution = execution_plan(ProviderId::OpenAi, &request, None);
-    let adapter_plan = adapter_for(ProviderId::OpenAi)
+    let execution = execution_plan(ProviderKind::OpenAi, &request, None);
+    let adapter_plan = adapter_for(ProviderKind::OpenAi)
         .plan_request(&execution)
         .expect("adapter planning should succeed");
 
@@ -241,8 +241,8 @@ fn anthropic_non_streaming_plan_preserves_family_default_request_contract() {
     let mut request = base_request();
     request.model_id = "claude-sonnet-4-6".to_string();
 
-    let execution = execution_plan(ProviderId::Anthropic, &request, None);
-    let adapter_plan = adapter_for(ProviderId::Anthropic)
+    let execution = execution_plan(ProviderKind::Anthropic, &request, None);
+    let adapter_plan = adapter_for(ProviderKind::Anthropic)
         .plan_request(&execution)
         .expect("adapter planning should succeed");
 
@@ -266,7 +266,7 @@ fn adapters_decode_responses_with_existing_translators() {
     });
     let format = ResponseFormat::Text;
     assert_eq!(
-        adapter_for(ProviderId::OpenAi)
+        adapter_for(ProviderKind::OpenAi)
             .decode_response_json(openai_body.clone(), &format)
             .expect("decode should succeed"),
         decode_openai_response(&OpenAiDecodeEnvelope {
@@ -286,7 +286,7 @@ fn adapters_decode_responses_with_existing_translators() {
         "usage": { "input_tokens": 1, "output_tokens": 2 }
     });
     assert_eq!(
-        adapter_for(ProviderId::Anthropic)
+        adapter_for(ProviderKind::Anthropic)
             .decode_response_json(anthropic_body.clone(), &format)
             .expect("decode should succeed"),
         decode_anthropic_response(&AnthropicDecodeEnvelope {
@@ -302,7 +302,7 @@ fn adapters_decode_responses_with_existing_translators() {
         "output": [{ "type": "message", "content": [{ "type": "output_text", "text": "hello" }] }]
     });
     assert_eq!(
-        adapter_for(ProviderId::OpenRouter)
+        adapter_for(ProviderKind::OpenRouter)
             .decode_response_json(openrouter_body.clone(), &format)
             .expect("decode should succeed"),
         decode_openai_response(&OpenAiDecodeEnvelope {
@@ -383,7 +383,7 @@ fn decode_response_refines_family_error_after_family_decode_runs() {
             family_order.borrow_mut().push("family");
             Err(crate::error::AdapterError::new(
                 crate::error::AdapterErrorKind::Upstream,
-                ProviderId::OpenAi,
+                ProviderKind::OpenAi,
                 crate::error::AdapterOperation::DecodeResponse,
                 "family failure",
             ))
@@ -459,7 +459,7 @@ fn decode_error_overlay_fields_win_on_collision() {
 
 #[test]
 fn adapters_expose_layered_error_decode_contract() {
-    let openai_error = adapter_for(ProviderId::OpenAi)
+    let openai_error = adapter_for(ProviderKind::OpenAi)
         .decode_error(&json!({
             "error": {
                 "message": "rate limited",
@@ -480,7 +480,7 @@ fn adapters_expose_layered_error_decode_contract() {
             .is_some_and(|message| message.contains("rate limited"))
     );
 
-    let anthropic_error = adapter_for(ProviderId::Anthropic)
+    let anthropic_error = adapter_for(ProviderKind::Anthropic)
         .decode_error(&json!({
             "type": "error",
             "error": {
@@ -539,7 +539,7 @@ fn create_stream_projector_uses_overlay_override_before_family_fallback() {
 
     let events = projector
         .project(agent_core::ProviderRawStreamEvent::from_sse(
-            ProviderId::OpenRouter,
+            ProviderKind::OpenRouter,
             1,
             None,
             None,
@@ -560,10 +560,10 @@ fn create_stream_projector_uses_overlay_override_before_family_fallback() {
 
 #[test]
 fn openrouter_adapter_stream_projector_uses_overlay_override() {
-    let mut projector = adapter_for(ProviderId::OpenRouter).create_stream_projector();
+    let mut projector = adapter_for(ProviderKind::OpenRouter).create_stream_projector();
     let events = projector
         .project(agent_core::ProviderRawStreamEvent::from_sse(
-            ProviderId::OpenRouter,
+            ProviderKind::OpenRouter,
             1,
             None,
             None,

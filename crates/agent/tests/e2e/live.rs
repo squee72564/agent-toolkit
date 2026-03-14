@@ -2,28 +2,28 @@ use std::env;
 use std::future::Future;
 use std::time::Duration;
 
-use agent_toolkit::{ContentPart, ProviderId, ResponseMeta};
+use agent_toolkit::{ContentPart, ProviderKind, ResponseMeta};
 
 use super::timeout::with_timeout;
 
 const LIVE_TEST_TIMEOUT: Duration = Duration::from_secs(45);
 
-pub fn provider_api_key(provider: ProviderId) -> Option<String> {
+pub fn provider_api_key(provider: ProviderKind) -> Option<String> {
     env::var(provider_api_key_env(provider))
         .ok()
         .filter(|value| !value.trim().is_empty())
 }
 
-pub fn provider_api_key_env(provider: ProviderId) -> &'static str {
+pub fn provider_api_key_env(provider: ProviderKind) -> &'static str {
     match provider {
-        ProviderId::OpenAi => "OPENAI_API_KEY",
-        ProviderId::Anthropic => "ANTHROPIC_API_KEY",
-        ProviderId::OpenRouter => "OPENROUTER_API_KEY",
-        ProviderId::GenericOpenAiCompatible => "OPENAI_API_KEY",
+        ProviderKind::OpenAi => "OPENAI_API_KEY",
+        ProviderKind::Anthropic => "ANTHROPIC_API_KEY",
+        ProviderKind::OpenRouter => "OPENROUTER_API_KEY",
+        ProviderKind::GenericOpenAiCompatible => "OPENAI_API_KEY",
     }
 }
 
-pub fn require_provider_api_key(provider: ProviderId, test_name: &str) -> Option<String> {
+pub fn require_provider_api_key(provider: ProviderKind, test_name: &str) -> Option<String> {
     let api_key = provider_api_key(provider);
     if api_key.is_none() {
         eprintln!(
@@ -34,12 +34,12 @@ pub fn require_provider_api_key(provider: ProviderId, test_name: &str) -> Option
     api_key
 }
 
-pub fn default_live_model(provider: ProviderId) -> &'static str {
+pub fn default_live_model(provider: ProviderKind) -> &'static str {
     match provider {
-        ProviderId::OpenAi => "gpt-5-mini",
-        ProviderId::Anthropic => "claude-sonnet-4-6",
-        ProviderId::OpenRouter => "openai/gpt-5-nano",
-        ProviderId::GenericOpenAiCompatible => "gpt-5-mini",
+        ProviderKind::OpenAi => "gpt-5-mini",
+        ProviderKind::Anthropic => "claude-sonnet-4-6",
+        ProviderKind::OpenRouter => "openai/gpt-5-nano",
+        ProviderKind::GenericOpenAiCompatible => "gpt-5-mini",
     }
 }
 
@@ -59,7 +59,7 @@ pub fn response_text(parts: &[ContentPart]) -> String {
     })
 }
 
-pub fn assert_live_response_meta(meta: &ResponseMeta, provider: ProviderId) {
+pub fn assert_live_response_meta(meta: &ResponseMeta, provider: ProviderKind) {
     assert_eq!(meta.selected_provider_kind, provider);
     assert!(
         !meta.selected_model.trim().is_empty(),

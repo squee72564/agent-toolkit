@@ -32,7 +32,7 @@ impl ProviderStreamProjector for OpenRouterStreamProjector {
                 if json_str(value, "type").is_none() {
                     return Err(AdapterError::new(
                         AdapterErrorKind::ProtocolViolation,
-                        agent_core::ProviderId::OpenRouter,
+                        agent_core::ProviderKind::OpenRouter,
                         AdapterOperation::ProjectStreamEvent,
                         "OpenRouter streaming expected Responses SSE payload with top-level 'type'",
                     ));

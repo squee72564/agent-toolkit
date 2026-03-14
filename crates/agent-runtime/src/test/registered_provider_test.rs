@@ -6,14 +6,14 @@ use super::*;
 fn registered_provider_platform_config_uses_instance_request_id_override() {
     let registered = RegisteredProvider::new(
         crate::ProviderInstanceId::openai_default(),
-        ProviderId::OpenAi,
+        ProviderKind::OpenAi,
         ProviderConfig::new("test-key")
             .with_base_url("https://api.openai.com")
             .with_request_id_header(HeaderName::from_static("x-instance-request-id")),
     );
 
     let platform = registered
-        .platform_config(adapter_for(ProviderId::OpenAi).descriptor())
+        .platform_config(adapter_for(ProviderKind::OpenAi).descriptor())
         .expect("platform config should build");
 
     assert_eq!(
@@ -26,11 +26,11 @@ fn registered_provider_platform_config_uses_instance_request_id_override() {
 fn registered_provider_platform_config_supports_generic_openai_compatible_kind() {
     let registered = RegisteredProvider::new(
         crate::ProviderInstanceId::generic_openai_compatible_default(),
-        ProviderId::GenericOpenAiCompatible,
+        ProviderKind::GenericOpenAiCompatible,
         ProviderConfig::new("test-key").with_base_url("https://example.test/v1"),
     );
 
-    let descriptor = adapter_for(ProviderId::GenericOpenAiCompatible).descriptor();
+    let descriptor = adapter_for(ProviderKind::GenericOpenAiCompatible).descriptor();
     let platform = registered
         .platform_config(descriptor)
         .expect("generic openai-compatible platform config should build");
