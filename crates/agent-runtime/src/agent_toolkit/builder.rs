@@ -8,8 +8,6 @@ use crate::observer::RuntimeObserver;
 use crate::provider_client::ProviderClient;
 use crate::provider_config::ProviderConfig;
 use crate::runtime_error::RuntimeError;
-use crate::target::Target;
-
 #[derive(Clone)]
 struct ProviderRegistration {
     kind: ProviderKind,
@@ -29,26 +27,19 @@ pub struct AgentToolkitBuilder {
 impl AgentToolkitBuilder {
     /// Registers an OpenAI provider configuration.
     pub fn with_openai(mut self, config: ProviderConfig) -> Self {
-        self =
-            self.with_openai_instance(Target::default_instance_for(ProviderKind::OpenAi), config);
+        self = self.with_openai_instance(ProviderInstanceId::openai_default(), config);
         self
     }
 
     /// Registers an Anthropic provider configuration.
     pub fn with_anthropic(mut self, config: ProviderConfig) -> Self {
-        self = self.with_anthropic_instance(
-            Target::default_instance_for(ProviderKind::Anthropic),
-            config,
-        );
+        self = self.with_anthropic_instance(ProviderInstanceId::anthropic_default(), config);
         self
     }
 
     /// Registers an OpenRouter provider configuration.
     pub fn with_openrouter(mut self, config: ProviderConfig) -> Self {
-        self = self.with_openrouter_instance(
-            Target::default_instance_for(ProviderKind::OpenRouter),
-            config,
-        );
+        self = self.with_openrouter_instance(ProviderInstanceId::openrouter_default(), config);
         self
     }
 

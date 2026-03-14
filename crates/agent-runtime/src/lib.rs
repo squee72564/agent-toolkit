@@ -1,3 +1,5 @@
+#![allow(clippy::result_large_err)]
+
 //! Runtime clients and routing primitives for `agent-toolkit`.
 //!
 //! This crate exposes two main entry points:
@@ -71,7 +73,8 @@ pub use crate::types::{
 };
 pub use agent_core::{
     AnthropicFamilyOptions, AnthropicOptions, FamilyOptions, NativeOptions,
-    OpenAiCompatibleOptions, OpenAiOptions, OpenRouterOptions, ProviderOptions,
+    OpenAiCompatibleOptions, OpenAiOptions, OpenRouterOptions, ProviderInstanceId, ProviderKind,
+    ProviderOptions,
 };
 
 #[cfg(test)]

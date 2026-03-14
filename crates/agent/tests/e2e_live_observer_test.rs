@@ -6,8 +6,8 @@ use std::sync::{Arc, Mutex};
 
 use agent_toolkit::{
     AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
-    MessageCreateInput, ProviderId, RequestEndEvent, RequestStartEvent, ResponseMode, Route,
-    RuntimeObserver, Target, openai,
+    MessageCreateInput, ProviderId, ProviderInstanceId, RequestEndEvent, RequestStartEvent,
+    ResponseMode, Route, RuntimeObserver, Target, openai,
 };
 
 use e2e::live::{
@@ -170,7 +170,7 @@ async fn live_openai_routed_streaming_supports_per_call_observer_override() {
     let task = MessageCreateInput::user("Say hello in five words.")
         .into_task_request()
         .expect("task should build");
-    let route = Route::to(Target::new(ProviderId::OpenAi));
+    let route = Route::to(Target::new(ProviderInstanceId::openai_default()));
     let execution = ExecutionOptions {
         response_mode: ResponseMode::Streaming,
         observer: Some(observer_trait),

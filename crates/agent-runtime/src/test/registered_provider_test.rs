@@ -5,7 +5,7 @@ use super::*;
 #[test]
 fn registered_provider_platform_config_uses_instance_request_id_override() {
     let registered = RegisteredProvider::new(
-        Target::default_instance_for(ProviderId::OpenAi),
+        crate::ProviderInstanceId::openai_default(),
         ProviderId::OpenAi,
         ProviderConfig::new("test-key")
             .with_base_url("https://api.openai.com")
@@ -25,7 +25,7 @@ fn registered_provider_platform_config_uses_instance_request_id_override() {
 #[test]
 fn registered_provider_platform_config_supports_generic_openai_compatible_kind() {
     let registered = RegisteredProvider::new(
-        Target::default_instance_for(ProviderId::GenericOpenAiCompatible),
+        crate::ProviderInstanceId::generic_openai_compatible_default(),
         ProviderId::GenericOpenAiCompatible,
         ProviderConfig::new("test-key").with_base_url("https://example.test/v1"),
     );

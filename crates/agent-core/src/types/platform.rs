@@ -1,22 +1,4 @@
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
-
-/// REFACTOR-SHIM: legacy metadata carrier retained only for migration.
-///
-/// The typed runtime-to-transport boundary no longer depends on this type.
-/// New transport behavior must be modeled through typed execution inputs
-/// instead of `metadata` keys.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct AdapterContext {
-    /// Legacy adapter/request metadata preserved for compatibility.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub metadata: BTreeMap<String, String>,
-    /// Optional credentials carried by legacy request paths.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub auth_token: Option<AuthCredentials>,
-}
 
 /// Authentication material supplied by the caller.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 
 use agent_toolkit::{
     AgentToolkit, ContentPart, ExecutionOptions, Message, MessageCreateInput, MessageRole,
-    ProviderConfig, ProviderId, Route, Target, TaskRequest, ToolChoice, ToolDefinition, anthropic,
-    openai,
+    ProviderConfig, ProviderId, ProviderInstanceId, Route, Target, TaskRequest, ToolChoice,
+    ToolDefinition, anthropic, openai,
 };
 
 use e2e::assertions::{
@@ -156,7 +156,9 @@ async fn toolkit_execute_with_meta_honors_target_model_and_execution_headers() {
         .expect("build toolkit");
 
     let task = explicit_task_with_text("hello from explicit request");
-    let route = Route::to(Target::new(ProviderId::OpenRouter).with_model("openai.gpt-5.4"));
+    let route = Route::to(
+        Target::new(ProviderInstanceId::openrouter_default()).with_model("openai.gpt-5.4"),
+    );
     let mut execution = ExecutionOptions::default();
     execution
         .transport
@@ -202,7 +204,9 @@ async fn toolkit_execute_with_meta_honors_route_and_execution_headers() {
         .expect("build toolkit");
 
     let task = explicit_task();
-    let route = Route::to(Target::new(ProviderId::OpenRouter).with_model("openai.gpt-5.4"));
+    let route = Route::to(
+        Target::new(ProviderInstanceId::openrouter_default()).with_model("openai.gpt-5.4"),
+    );
     let mut execution = ExecutionOptions::default();
     execution
         .transport
@@ -249,7 +253,8 @@ async fn router_messages_create_task_and_execute_match_same_explicit_contract() 
         .build()
         .expect("build toolkit");
 
-    let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"));
+    let route =
+        Route::to(Target::new(ProviderInstanceId::openai_default()).with_model("gpt-5-mini"));
     let task_a = explicit_task_with_text("hello from explicit request");
     let task_b = explicit_task_with_text("hello from explicit request");
 

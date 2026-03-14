@@ -249,7 +249,11 @@ async fn direct_provider_client_explicit_task_api_uses_execution_boundary() {
     .await
     .expect("direct explicit task request should succeed");
 
-    assert_eq!(meta.selected_provider, agent_core::ProviderId::OpenAi);
+    assert_eq!(
+        meta.selected_provider_instance,
+        crate::ProviderInstanceId::openai_default()
+    );
+    assert_eq!(meta.selected_provider_kind, agent_core::ProviderId::OpenAi);
     assert_eq!(meta.selected_model, "gpt-5-mini");
     assert_eq!(meta.attempts.len(), 1);
 }
@@ -267,14 +271,18 @@ async fn direct_provider_client_explicit_attempt_api_uses_attempt_model_override
     let (_response, meta) = with_timeout(client.messages().execute_on_attempt_with_meta(
         task,
         AttemptSpec::to(
-            Target::new(Target::default_instance_for(ProviderId::OpenAi)).with_model("gpt-5-mini"),
+            Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5-mini"),
         ),
         ExecutionOptions::default(),
     ))
     .await
     .expect("direct explicit attempt request should succeed");
 
-    assert_eq!(meta.selected_provider, agent_core::ProviderId::OpenAi);
+    assert_eq!(
+        meta.selected_provider_instance,
+        crate::ProviderInstanceId::openai_default()
+    );
+    assert_eq!(meta.selected_provider_kind, agent_core::ProviderId::OpenAi);
     assert_eq!(meta.selected_model, "gpt-5-mini");
     assert_eq!(meta.attempts.len(), 1);
 }

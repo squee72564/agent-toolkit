@@ -6,8 +6,9 @@ use std::time::Duration;
 use agent_toolkit::runtime::AttemptDisposition;
 use agent_toolkit::{
     AgentToolkit, AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
-    FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig, ProviderId, RequestEndEvent,
-    RequestStartEvent, RetryPolicy, Route, RuntimeErrorKind, RuntimeObserver, Target,
+    FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig, ProviderId,
+    ProviderInstanceId, RequestEndEvent, RequestStartEvent, RetryPolicy, Route, RuntimeErrorKind,
+    RuntimeObserver, Target,
 };
 
 use e2e::fixtures::{FixtureProvider, FixtureScenario, load_fixture_json};
@@ -98,9 +99,10 @@ async fn fallback_retries_next_provider_on_status_rule_then_succeeds() {
 
     let fallback = FallbackPolicy::new().with_rule(FallbackRule::retry_on_status(401));
 
-    let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
-        .with_fallback(Target::new(ProviderId::Anthropic))
-        .with_fallback_policy(fallback);
+    let route =
+        Route::to(Target::new(ProviderInstanceId::openai_default()).with_model("gpt-5-mini"))
+            .with_fallback(Target::new(ProviderInstanceId::anthropic_default()))
+            .with_fallback_policy(fallback);
 
     let (_response, meta) = with_test_timeout(
         toolkit.execute_with_meta(
@@ -160,9 +162,10 @@ async fn fallback_exhaustion_returns_terminal_error_kind() {
 
     let fallback = FallbackPolicy::new().with_rule(FallbackRule::retry_on_status(401));
 
-    let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
-        .with_fallback(Target::new(ProviderId::Anthropic))
-        .with_fallback_policy(fallback);
+    let route =
+        Route::to(Target::new(ProviderInstanceId::openai_default()).with_model("gpt-5-mini"))
+            .with_fallback(Target::new(ProviderInstanceId::anthropic_default()))
+            .with_fallback_policy(fallback);
 
     let error = with_test_timeout(
         toolkit.execute_with_meta(
@@ -225,9 +228,10 @@ async fn fallback_rule_retry_on_provider_code_is_honored() {
     let fallback = FallbackPolicy::new()
         .with_rule(FallbackRule::retry_on_provider_code("rate_limit_exceeded"));
 
-    let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
-        .with_fallback(Target::new(ProviderId::OpenRouter))
-        .with_fallback_policy(fallback);
+    let route =
+        Route::to(Target::new(ProviderInstanceId::openai_default()).with_model("gpt-5-mini"))
+            .with_fallback(Target::new(ProviderInstanceId::openrouter_default()))
+            .with_fallback_policy(fallback);
 
     let (_response, meta) = with_test_timeout(
         toolkit.execute_with_meta(
@@ -271,7 +275,8 @@ async fn execution_observer_takes_precedence_over_toolkit_observer_and_records_o
         .build()
         .expect("build toolkit");
 
-    let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"));
+    let route =
+        Route::to(Target::new(ProviderInstanceId::openai_default()).with_model("gpt-5-mini"));
     let execution = ExecutionOptions {
         observer: Some(send_observer.clone()),
         ..ExecutionOptions::default()
@@ -315,7 +320,8 @@ async fn observer_lifecycle_on_failure_attempts_is_deterministic() {
         .build()
         .expect("build toolkit");
 
-    let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"));
+    let route =
+        Route::to(Target::new(ProviderInstanceId::openai_default()).with_model("gpt-5-mini"));
 
     let error = with_test_timeout(
         toolkit.execute_with_meta(

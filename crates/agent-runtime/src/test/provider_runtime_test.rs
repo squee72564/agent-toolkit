@@ -126,7 +126,7 @@ fn direct_planner_fails_when_no_model_available() {
     let error = planner::plan_direct_attempt(
         &ProviderClient::new(runtime),
         &test_task_request(),
-        &crate::AttemptSpec::to(crate::Target::new(crate::Target::default_instance_for(
+        &crate::AttemptSpec::to(crate::Target::new(crate::test::default_instance_id(
             ProviderId::OpenAi,
         ))),
         &crate::ExecutionOptions::default(),
@@ -291,8 +291,7 @@ fn planner_resolves_transport_headers_timeouts_and_retry_policy() {
     let execution_plan = planner::plan_routed_attempt(
         &ProviderClient::new(runtime),
         &crate::AttemptSpec::to(
-            crate::Target::new(crate::Target::default_instance_for(ProviderId::OpenAi))
-                .with_model("model"),
+            crate::Target::new(crate::ProviderInstanceId::openai_default()).with_model("model"),
         )
         .with_execution(execution),
         &test_task_request(),
@@ -375,7 +374,7 @@ fn test_provider_runtime_with_adapter(
         .build()
         .expect("test client should build");
     let transport = agent_transport::HttpTransport::builder(client).build();
-    let instance_id = crate::Target::default_instance_for(adapter.kind());
+    let instance_id = crate::test::default_instance_id(adapter.kind());
     let mut config = crate::ProviderConfig::new("test-key").with_base_url(base_url);
     if let Some(default_model) = default_model {
         config = config.with_default_model(default_model);
@@ -408,7 +407,7 @@ fn test_provider_runtime_with(
         .build()
         .expect("test client should build");
     let transport = agent_transport::HttpTransport::builder(client).build();
-    let instance_id = crate::Target::default_instance_for(provider);
+    let instance_id = crate::test::default_instance_id(provider);
     let mut config = crate::ProviderConfig::new("test-key").with_base_url(base_url);
     if let Some(default_model) = default_model {
         config = config.with_default_model(default_model);

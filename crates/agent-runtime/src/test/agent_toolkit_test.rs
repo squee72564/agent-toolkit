@@ -1,8 +1,6 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use agent_core::ProviderInstanceId;
-
 use super::*;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -143,7 +141,7 @@ fn builder_registers_openai_provider() {
     assert!(
         toolkit
             .clients
-            .contains_key(&Target::default_instance_for(ProviderId::OpenAi))
+            .contains_key(&crate::ProviderInstanceId::openai_default())
     );
 }
 
@@ -157,7 +155,7 @@ fn builder_registers_anthropic_provider() {
     assert!(
         toolkit
             .clients
-            .contains_key(&Target::default_instance_for(ProviderId::Anthropic))
+            .contains_key(&crate::ProviderInstanceId::anthropic_default())
     );
 }
 
@@ -171,7 +169,7 @@ fn builder_registers_openrouter_provider() {
     assert!(
         toolkit
             .clients
-            .contains_key(&Target::default_instance_for(ProviderId::OpenRouter))
+            .contains_key(&crate::ProviderInstanceId::openrouter_default())
     );
 }
 
@@ -188,7 +186,7 @@ fn builder_registers_custom_provider_instance() {
     assert!(
         toolkit
             .clients
-            .contains_key(&ProviderInstanceId::new("openai-secondary"))
+            .contains_key(&crate::ProviderInstanceId::new("openai-secondary"))
     );
 }
 
@@ -209,12 +207,12 @@ fn builder_supports_multiple_instances_for_same_provider_kind() {
     assert!(
         toolkit
             .clients
-            .contains_key(&ProviderInstanceId::new("openai-primary"))
+            .contains_key(&crate::ProviderInstanceId::new("openai-primary"))
     );
     assert!(
         toolkit
             .clients
-            .contains_key(&ProviderInstanceId::new("openai-secondary"))
+            .contains_key(&crate::ProviderInstanceId::new("openai-secondary"))
     );
 }
 
@@ -229,7 +227,7 @@ fn builder_propagates_observer_to_provider_runtime() {
 
     let client = toolkit
         .clients
-        .get(&Target::default_instance_for(ProviderId::OpenAi))
+        .get(&crate::ProviderInstanceId::openai_default())
         .expect("openai client should be registered");
 
     assert!(toolkit.observer.is_some());
@@ -244,7 +242,7 @@ fn router_requires_explicit_target_without_policy() {
     };
     let error = toolkit
         .resolve_route_targets(&Route {
-            primary: Target::new(ProviderId::OpenAi).into(),
+            primary: Target::new(crate::ProviderInstanceId::openai_default()).into(),
             fallbacks: Vec::new(),
             fallback_policy: FallbackPolicy::default(),
             planning_rejection_policy: PlanningRejectionPolicy::FailFast,
@@ -257,14 +255,14 @@ fn router_requires_explicit_target_without_policy() {
 fn resolve_route_targets_errors_for_unregistered_provider() {
     let toolkit = AgentToolkit {
         clients: HashMap::from([(
-            Target::default_instance_for(ProviderId::OpenAi),
+            crate::ProviderInstanceId::openai_default(),
             test_provider_client(ProviderId::OpenAi),
         )]),
         observer: None,
     };
     let error = toolkit
         .resolve_route_targets(&Route::to(
-            Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"),
+            Target::new(crate::ProviderInstanceId::openrouter_default()).with_model("openai/gpt-5"),
         ))
         .expect_err("unregistered provider should fail target resolution");
 
@@ -276,27 +274,31 @@ fn resolve_route_targets_deduplicates_primary_and_fallback_targets() {
     let toolkit = AgentToolkit {
         clients: HashMap::from([
             (
-                Target::default_instance_for(ProviderId::OpenAi),
+                crate::ProviderInstanceId::openai_default(),
                 test_provider_client(ProviderId::OpenAi),
             ),
             (
-                Target::default_instance_for(ProviderId::OpenRouter),
+                crate::ProviderInstanceId::openrouter_default(),
                 test_provider_client(ProviderId::OpenRouter),
             ),
         ]),
         observer: None,
     };
 
-    let route = crate::Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5"))
-        .with_fallbacks(vec![
-            Target::new(ProviderId::OpenAi).with_model("gpt-5").into(),
-            Target::new(ProviderId::OpenRouter)
-                .with_model("openai/gpt-5")
-                .into(),
-            Target::new(ProviderId::OpenRouter)
-                .with_model("openai/gpt-5")
-                .into(),
-        ]);
+    let route = crate::Route::to(
+        Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5"),
+    )
+    .with_fallbacks(vec![
+        Target::new(crate::ProviderInstanceId::openai_default())
+            .with_model("gpt-5")
+            .into(),
+        Target::new(crate::ProviderInstanceId::openrouter_default())
+            .with_model("openai/gpt-5")
+            .into(),
+        Target::new(crate::ProviderInstanceId::openrouter_default())
+            .with_model("openai/gpt-5")
+            .into(),
+    ]);
 
     let targets = toolkit
         .resolve_route_targets(&route)
@@ -308,10 +310,10 @@ fn resolve_route_targets_deduplicates_primary_and_fallback_targets() {
             .map(|attempt| attempt.target)
             .collect::<Vec<_>>(),
         vec![
-            Target::new(ProviderId::OpenAi).with_model("gpt-5"),
-            Target::new(ProviderId::OpenAi).with_model("gpt-5"),
-            Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"),
-            Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"),
+            Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5"),
+            Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5"),
+            Target::new(crate::ProviderInstanceId::openrouter_default()).with_model("openai/gpt-5"),
+            Target::new(crate::ProviderInstanceId::openrouter_default()).with_model("openai/gpt-5"),
         ]
     );
 }
@@ -321,20 +323,24 @@ fn resolve_route_targets_preserves_attempt_order() {
     let toolkit = AgentToolkit {
         clients: HashMap::from([
             (
-                Target::default_instance_for(ProviderId::OpenAi),
+                crate::ProviderInstanceId::openai_default(),
                 test_provider_client(ProviderId::OpenAi),
             ),
             (
-                Target::default_instance_for(ProviderId::OpenRouter),
+                crate::ProviderInstanceId::openrouter_default(),
                 test_provider_client(ProviderId::OpenRouter),
             ),
         ]),
         observer: None,
     };
 
-    let route = crate::Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5"))
-        .with_fallback(Target::new(ProviderId::OpenAi).with_model("gpt-5"))
-        .with_fallback(Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"));
+    let route = crate::Route::to(
+        Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5"),
+    )
+    .with_fallback(Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5"))
+    .with_fallback(
+        Target::new(crate::ProviderInstanceId::openrouter_default()).with_model("openai/gpt-5"),
+    );
 
     let targets = toolkit
         .resolve_route_targets(&route)
@@ -346,9 +352,9 @@ fn resolve_route_targets_preserves_attempt_order() {
             .map(|attempt| attempt.target)
             .collect::<Vec<_>>(),
         vec![
-            Target::new(ProviderId::OpenAi).with_model("gpt-5"),
-            Target::new(ProviderId::OpenAi).with_model("gpt-5"),
-            Target::new(ProviderId::OpenRouter).with_model("openai/gpt-5"),
+            Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5"),
+            Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5"),
+            Target::new(crate::ProviderInstanceId::openrouter_default()).with_model("openai/gpt-5"),
         ]
     );
 }
@@ -358,11 +364,11 @@ async fn routed_messages_fail_fast_surfaces_typed_route_planning_failure() {
     let toolkit = AgentToolkit {
         clients: HashMap::from([
             (
-                Target::default_instance_for(ProviderId::Anthropic),
+                crate::ProviderInstanceId::anthropic_default(),
                 test_provider_client(ProviderId::Anthropic),
             ),
             (
-                Target::default_instance_for(ProviderId::OpenRouter),
+                crate::ProviderInstanceId::openrouter_default(),
                 test_provider_client(ProviderId::OpenRouter),
             ),
         ]),
@@ -379,9 +385,12 @@ async fn routed_messages_fail_fast_surfaces_typed_route_planning_failure() {
         .messages()
         .execute(
             task,
-            Route::to(Target::new(ProviderId::Anthropic).with_model("claude-sonnet-4-6"))
-                .with_fallback(Target::new(ProviderId::OpenRouter))
-                .with_planning_rejection_policy(PlanningRejectionPolicy::FailFast),
+            Route::to(
+                Target::new(crate::ProviderInstanceId::anthropic_default())
+                    .with_model("claude-sonnet-4-6"),
+            )
+            .with_fallback(Target::new(crate::ProviderInstanceId::openrouter_default()))
+            .with_planning_rejection_policy(PlanningRejectionPolicy::FailFast),
             ExecutionOptions::default(),
         )
         .await
@@ -431,7 +440,11 @@ async fn routed_messages_create_uses_explicit_provider_instance_route() {
         .await
         .expect("request should target the named provider instance");
 
-    assert_eq!(meta.selected_provider, ProviderId::OpenAi);
+    assert_eq!(
+        meta.selected_provider_instance,
+        crate::ProviderInstanceId::new("openai-secondary")
+    );
+    assert_eq!(meta.selected_provider_kind, ProviderId::OpenAi);
 }
 
 #[tokio::test]
@@ -441,11 +454,11 @@ async fn routed_messages_emit_attempt_skipped_without_execution_events_for_plann
     let toolkit = AgentToolkit {
         clients: HashMap::from([
             (
-                Target::default_instance_for(ProviderId::Anthropic),
+                crate::ProviderInstanceId::anthropic_default(),
                 test_provider_client(ProviderId::Anthropic),
             ),
             (
-                Target::default_instance_for(ProviderId::OpenAi),
+                crate::ProviderInstanceId::openai_default(),
                 test_provider_client_with_base_url(
                     ProviderId::OpenAi,
                     &base_url,
@@ -467,15 +480,24 @@ async fn routed_messages_emit_attempt_skipped_without_execution_events_for_plann
         .messages()
         .execute_with_meta(
             task,
-            Route::to(Target::new(ProviderId::Anthropic).with_model("claude-sonnet-4-6"))
-                .with_fallback(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
-                .with_planning_rejection_policy(PlanningRejectionPolicy::SkipRejectedTargets),
+            Route::to(
+                Target::new(crate::ProviderInstanceId::anthropic_default())
+                    .with_model("claude-sonnet-4-6"),
+            )
+            .with_fallback(
+                Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5-mini"),
+            )
+            .with_planning_rejection_policy(PlanningRejectionPolicy::SkipRejectedTargets),
             ExecutionOptions::default(),
         )
         .await
         .expect("route should skip rejected attempt and succeed");
 
-    assert_eq!(meta.selected_provider, ProviderId::OpenAi);
+    assert_eq!(
+        meta.selected_provider_instance,
+        crate::ProviderInstanceId::openai_default()
+    );
+    assert_eq!(meta.selected_provider_kind, ProviderId::OpenAi);
 
     let events = observer.snapshot();
     assert_eq!(
@@ -492,7 +514,7 @@ async fn routed_messages_emit_attempt_skipped_without_execution_events_for_plann
     let skipped = as_attempt_skipped(&events[1]);
     assert_eq!(
         skipped.provider_instance,
-        Target::default_instance_for(ProviderId::Anthropic)
+        crate::ProviderInstanceId::anthropic_default()
     );
     assert_eq!(skipped.provider_kind, ProviderId::Anthropic);
     assert_eq!(skipped.model, "claude-sonnet-4-6");
@@ -502,5 +524,204 @@ async fn routed_messages_emit_attempt_skipped_without_execution_events_for_plann
     assert!(matches!(
         skipped.reason,
         SkipReason::AdapterPlanningRejected { .. }
+    ));
+}
+
+#[tokio::test]
+async fn routed_messages_success_preserves_failed_and_skipped_attempt_history() {
+    let success_url = spawn_json_success_stub("req_routed_history_success").await;
+    let toolkit = AgentToolkit {
+        clients: HashMap::from([
+            (
+                crate::ProviderInstanceId::openrouter_default(),
+                test_provider_client_with_base_url(
+                    ProviderId::OpenRouter,
+                    "http://127.0.0.1:1",
+                    Some("openai/gpt-5-mini"),
+                ),
+            ),
+            (
+                crate::ProviderInstanceId::anthropic_default(),
+                test_provider_client(ProviderId::Anthropic),
+            ),
+            (
+                crate::ProviderInstanceId::openai_default(),
+                test_provider_client_with_base_url(
+                    ProviderId::OpenAi,
+                    &success_url,
+                    Some("gpt-5-mini"),
+                ),
+            ),
+        ]),
+        observer: None,
+    };
+    let task = MessageCreateInput::new(vec![
+        Message::user_text("hello"),
+        Message::system_text("late system"),
+    ])
+    .into_task_request()
+    .expect("task request should build");
+
+    let (_response, meta) = toolkit
+        .messages()
+        .execute_with_meta(
+            task,
+            Route::to(Target::new(crate::ProviderInstanceId::openrouter_default()))
+                .with_fallback(
+                    Target::new(crate::ProviderInstanceId::anthropic_default())
+                        .with_model("claude-sonnet-4-6"),
+                )
+                .with_fallback(
+                    Target::new(crate::ProviderInstanceId::openai_default())
+                        .with_model("gpt-5-mini"),
+                )
+                .with_fallback_policy(
+                    FallbackPolicy::new()
+                        .with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Transport)),
+                )
+                .with_planning_rejection_policy(PlanningRejectionPolicy::SkipRejectedTargets),
+            ExecutionOptions::default(),
+        )
+        .await
+        .expect("third target should succeed after a failed and skipped attempt");
+
+    assert_eq!(
+        meta.selected_provider_instance,
+        crate::ProviderInstanceId::openai_default()
+    );
+    assert_eq!(meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(meta.selected_model, "gpt-5-mini");
+    assert_eq!(
+        meta.request_id.as_deref(),
+        Some("req_routed_history_success")
+    );
+    assert_eq!(meta.attempts.len(), 3);
+    assert_eq!(
+        meta.attempts[0].provider_instance,
+        crate::ProviderInstanceId::openrouter_default()
+    );
+    assert!(matches!(
+        meta.attempts[0].disposition,
+        AttemptDisposition::Failed {
+            error_kind: RuntimeErrorKind::Transport,
+            ..
+        }
+    ));
+    assert_eq!(
+        meta.attempts[1].provider_instance,
+        crate::ProviderInstanceId::anthropic_default()
+    );
+    assert!(matches!(
+        meta.attempts[1].disposition,
+        AttemptDisposition::Skipped {
+            reason: SkipReason::AdapterPlanningRejected { .. }
+        }
+    ));
+    assert_eq!(
+        meta.attempts[2].provider_instance,
+        crate::ProviderInstanceId::openai_default()
+    );
+    assert!(matches!(
+        meta.attempts[2].disposition,
+        AttemptDisposition::Succeeded { .. }
+    ));
+}
+
+#[tokio::test]
+async fn routed_messages_terminal_error_carries_failed_and_skipped_attempt_history() {
+    let toolkit = AgentToolkit {
+        clients: HashMap::from([
+            (
+                crate::ProviderInstanceId::openrouter_default(),
+                test_provider_client_with_base_url(
+                    ProviderId::OpenRouter,
+                    "http://127.0.0.1:1",
+                    Some("openai/gpt-5-mini"),
+                ),
+            ),
+            (
+                crate::ProviderInstanceId::anthropic_default(),
+                test_provider_client(ProviderId::Anthropic),
+            ),
+            (
+                crate::ProviderInstanceId::openai_default(),
+                test_provider_client_with_base_url(
+                    ProviderId::OpenAi,
+                    "http://127.0.0.1:1",
+                    Some("gpt-5-mini"),
+                ),
+            ),
+        ]),
+        observer: None,
+    };
+    let task = MessageCreateInput::new(vec![
+        Message::user_text("hello"),
+        Message::system_text("late system"),
+    ])
+    .into_task_request()
+    .expect("task request should build");
+
+    let error = toolkit
+        .messages()
+        .execute_with_meta(
+            task,
+            Route::to(Target::new(crate::ProviderInstanceId::openrouter_default()))
+                .with_fallback(
+                    Target::new(crate::ProviderInstanceId::anthropic_default())
+                        .with_model("claude-sonnet-4-6"),
+                )
+                .with_fallback(
+                    Target::new(crate::ProviderInstanceId::openai_default())
+                        .with_model("gpt-5-mini"),
+                )
+                .with_fallback_policy(
+                    FallbackPolicy::new()
+                        .with_rule(FallbackRule::retry_on_kind(RuntimeErrorKind::Transport)),
+                )
+                .with_planning_rejection_policy(PlanningRejectionPolicy::SkipRejectedTargets),
+            ExecutionOptions::default(),
+        )
+        .await
+        .expect_err("terminal error should carry full typed attempt history");
+
+    let failure_meta = executed_failure_meta(&error);
+    assert_eq!(
+        failure_meta.selected_provider_instance,
+        crate::ProviderInstanceId::openai_default()
+    );
+    assert_eq!(failure_meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(failure_meta.selected_model, "gpt-5-mini");
+    assert_eq!(failure_meta.attempts.len(), 3);
+    assert_eq!(
+        failure_meta.attempts[0].provider_instance,
+        crate::ProviderInstanceId::openrouter_default()
+    );
+    assert!(matches!(
+        failure_meta.attempts[0].disposition,
+        AttemptDisposition::Failed {
+            error_kind: RuntimeErrorKind::Transport,
+            ..
+        }
+    ));
+    assert_eq!(
+        failure_meta.attempts[1].provider_instance,
+        crate::ProviderInstanceId::anthropic_default()
+    );
+    assert!(matches!(
+        failure_meta.attempts[1].disposition,
+        AttemptDisposition::Skipped {
+            reason: SkipReason::AdapterPlanningRejected { .. }
+        }
+    ));
+    assert_eq!(
+        failure_meta.attempts[2].provider_instance,
+        crate::ProviderInstanceId::openai_default()
+    );
+    assert!(matches!(
+        failure_meta.attempts[2].disposition,
+        AttemptDisposition::Failed {
+            error_kind: RuntimeErrorKind::Transport,
+            ..
+        }
     ));
 }

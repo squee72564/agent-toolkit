@@ -13,15 +13,17 @@ use super::*;
 #[test]
 fn routed_planner_rejects_mismatched_native_family() {
     let client = test_provider_client(agent_core::ProviderId::OpenAi);
-    let attempt = AttemptSpec::to(Target::new(agent_core::ProviderId::OpenAi).with_model("gpt-5"))
-        .with_execution(
-            AttemptExecutionOptions::default().with_native_options(NativeOptions {
-                family: Some(FamilyOptions::Anthropic(
-                    agent_core::AnthropicFamilyOptions { thinking: None },
-                )),
-                provider: None,
-            }),
-        );
+    let attempt = AttemptSpec::to(
+        Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5"),
+    )
+    .with_execution(
+        AttemptExecutionOptions::default().with_native_options(NativeOptions {
+            family: Some(FamilyOptions::Anthropic(
+                agent_core::AnthropicFamilyOptions { thinking: None },
+            )),
+            provider: None,
+        }),
+    );
 
     let error = planner::plan_routed_attempt(
         &client,
@@ -47,15 +49,17 @@ fn routed_planner_rejects_mismatched_native_family() {
 #[test]
 fn routed_planner_rejects_mismatched_native_provider() {
     let client = test_provider_client(agent_core::ProviderId::OpenAi);
-    let attempt = AttemptSpec::to(Target::new(agent_core::ProviderId::OpenAi).with_model("gpt-5"))
-        .with_execution(
-            AttemptExecutionOptions::default().with_native_options(NativeOptions {
-                family: None,
-                provider: Some(ProviderOptions::Anthropic(agent_core::AnthropicOptions {
-                    top_k: Some(8),
-                })),
-            }),
-        );
+    let attempt = AttemptSpec::to(
+        Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5"),
+    )
+    .with_execution(
+        AttemptExecutionOptions::default().with_native_options(NativeOptions {
+            family: None,
+            provider: Some(ProviderOptions::Anthropic(agent_core::AnthropicOptions {
+                top_k: Some(8),
+            })),
+        }),
+    );
 
     let error = planner::plan_routed_attempt(
         &client,
@@ -82,7 +86,8 @@ fn routed_planner_rejects_mismatched_native_provider() {
 fn routed_planner_rejects_provider_native_layer_for_generic_openai_compatible() {
     let client = test_provider_client(agent_core::ProviderId::GenericOpenAiCompatible);
     let attempt = AttemptSpec::to(
-        Target::new(agent_core::ProviderId::GenericOpenAiCompatible).with_model("gpt-5"),
+        Target::new(crate::ProviderInstanceId::generic_openai_compatible_default())
+            .with_model("gpt-5"),
     )
     .with_execution(
         AttemptExecutionOptions::default().with_native_options(NativeOptions {
@@ -122,8 +127,9 @@ fn routed_planner_rejects_provider_native_layer_for_generic_openai_compatible() 
 fn routed_planner_rejects_streaming_when_provider_capability_is_disabled() {
     let client =
         test_provider_client_with_streaming_support(agent_core::ProviderId::OpenAi, None, false);
-    let attempt =
-        AttemptSpec::to(Target::new(agent_core::ProviderId::OpenAi).with_model("gpt-5-mini"));
+    let attempt = AttemptSpec::to(
+        Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5-mini"),
+    );
     let execution = ExecutionOptions {
         response_mode: crate::ResponseMode::Streaming,
         ..ExecutionOptions::default()
@@ -171,8 +177,9 @@ fn skip_rejection_policy_advances_only_when_more_attempts_exist() {
 fn routed_planner_uses_target_model_before_provider_default() {
     let client =
         provider_client_with_default_model(agent_core::ProviderId::OpenAi, Some("default-model"));
-    let attempt =
-        AttemptSpec::to(Target::new(agent_core::ProviderId::OpenAi).with_model("target-model"));
+    let attempt = AttemptSpec::to(
+        Target::new(crate::ProviderInstanceId::openai_default()).with_model("target-model"),
+    );
 
     let plan = planner::plan_routed_attempt(
         &client,
@@ -189,7 +196,7 @@ fn routed_planner_uses_target_model_before_provider_default() {
 fn routed_planner_uses_provider_default_when_target_model_is_blank() {
     let client =
         provider_client_with_default_model(agent_core::ProviderId::OpenAi, Some("default-model"));
-    let attempt = AttemptSpec::to(Target::new(agent_core::ProviderId::OpenAi));
+    let attempt = AttemptSpec::to(Target::new(crate::ProviderInstanceId::openai_default()));
 
     let plan = planner::plan_routed_attempt(
         &client,
@@ -205,7 +212,7 @@ fn routed_planner_uses_provider_default_when_target_model_is_blank() {
 #[test]
 fn routed_planner_treats_missing_model_as_fatal() {
     let client = provider_client_with_default_model(agent_core::ProviderId::OpenAi, None);
-    let attempt = AttemptSpec::to(Target::new(agent_core::ProviderId::OpenAi));
+    let attempt = AttemptSpec::to(Target::new(crate::ProviderInstanceId::openai_default()));
 
     let error = planner::plan_routed_attempt(
         &client,
@@ -230,7 +237,7 @@ fn routed_planner_classifies_adapter_planning_rejection() {
         agent_core::ProviderId::Anthropic,
         Some("claude-sonnet-4-6"),
     );
-    let attempt = AttemptSpec::to(Target::new(agent_core::ProviderId::Anthropic));
+    let attempt = AttemptSpec::to(Target::new(crate::ProviderInstanceId::anthropic_default()));
     let task = TaskRequest {
         messages: vec![
             Message::user_text("hello"),
@@ -313,7 +320,7 @@ fn routed_planning_failure_tracks_static_skip_history_and_reason() {
     let toolkit = AgentToolkit {
         clients: HashMap::from([
             (
-                Target::default_instance_for(agent_core::ProviderId::OpenAi),
+                crate::test::default_instance_id(agent_core::ProviderId::OpenAi),
                 test_provider_client_with_streaming_support(
                     agent_core::ProviderId::OpenAi,
                     Some("gpt-5-mini"),
@@ -321,7 +328,7 @@ fn routed_planning_failure_tracks_static_skip_history_and_reason() {
                 ),
             ),
             (
-                Target::default_instance_for(agent_core::ProviderId::OpenRouter),
+                crate::test::default_instance_id(agent_core::ProviderId::OpenRouter),
                 test_provider_client_with_streaming_support(
                     agent_core::ProviderId::OpenRouter,
                     Some("openai/gpt-5-mini"),
@@ -333,8 +340,8 @@ fn routed_planning_failure_tracks_static_skip_history_and_reason() {
     };
     let attempts = toolkit
         .resolve_route_targets(
-            &Route::to(Target::new(agent_core::ProviderId::OpenAi))
-                .with_fallback(Target::new(agent_core::ProviderId::OpenRouter))
+            &Route::to(Target::new(crate::ProviderInstanceId::openai_default()))
+                .with_fallback(Target::new(crate::ProviderInstanceId::openrouter_default()))
                 .with_planning_rejection_policy(PlanningRejectionPolicy::SkipRejectedTargets),
         )
         .expect("route targets should resolve");
@@ -360,7 +367,7 @@ fn routed_planning_failure_tracks_static_skip_history_and_reason() {
             assert_eq!(failure.attempts.len(), 2);
             assert_eq!(
                 failure.attempts[0].provider_instance,
-                Target::default_instance_for(agent_core::ProviderId::OpenAi)
+                crate::test::default_instance_id(agent_core::ProviderId::OpenAi)
             );
             assert_eq!(
                 failure.attempts[0].provider_kind,
@@ -407,8 +414,8 @@ fn routed_planning_failure_uses_adapter_rejection_reason_when_any_attempt_reache
     };
     let attempts = toolkit
         .resolve_route_targets(
-            &Route::to(Target::new(agent_core::ProviderId::OpenAi))
-                .with_fallback(Target::new(agent_core::ProviderId::Anthropic))
+            &Route::to(Target::new(crate::ProviderInstanceId::openai_default()))
+                .with_fallback(Target::new(crate::ProviderInstanceId::anthropic_default()))
                 .with_planning_rejection_policy(PlanningRejectionPolicy::SkipRejectedTargets),
         )
         .expect("route targets should resolve");
@@ -467,13 +474,15 @@ fn routed_planning_failure_uses_adapter_rejection_reason_when_any_attempt_reache
 fn routed_planning_fails_before_attempt_record_when_model_is_unresolved() {
     let toolkit = AgentToolkit {
         clients: HashMap::from([(
-            Target::default_instance_for(agent_core::ProviderId::OpenAi),
+            crate::test::default_instance_id(agent_core::ProviderId::OpenAi),
             provider_client_with_default_model(agent_core::ProviderId::OpenAi, None),
         )]),
         observer: None,
     };
     let attempts = toolkit
-        .resolve_route_targets(&Route::to(Target::new(agent_core::ProviderId::OpenAi)))
+        .resolve_route_targets(&Route::to(Target::new(
+            crate::ProviderInstanceId::openai_default(),
+        )))
         .expect("route targets should resolve");
 
     let result = planner::plan_routed_execution(
@@ -501,7 +510,7 @@ fn skipped_planning_records_never_carry_request_id_or_status_metadata() {
     let toolkit = AgentToolkit {
         clients: HashMap::from([
             (
-                Target::default_instance_for(agent_core::ProviderId::OpenAi),
+                crate::test::default_instance_id(agent_core::ProviderId::OpenAi),
                 test_provider_client_with_streaming_support(
                     agent_core::ProviderId::OpenAi,
                     Some("gpt-5-mini"),
@@ -509,7 +518,7 @@ fn skipped_planning_records_never_carry_request_id_or_status_metadata() {
                 ),
             ),
             (
-                Target::default_instance_for(agent_core::ProviderId::OpenRouter),
+                crate::test::default_instance_id(agent_core::ProviderId::OpenRouter),
                 test_provider_client_with_streaming_support(
                     agent_core::ProviderId::OpenRouter,
                     Some("openai/gpt-5-mini"),
@@ -521,8 +530,8 @@ fn skipped_planning_records_never_carry_request_id_or_status_metadata() {
     };
     let attempts = toolkit
         .resolve_route_targets(
-            &Route::to(Target::new(agent_core::ProviderId::OpenAi))
-                .with_fallback(Target::new(agent_core::ProviderId::OpenRouter))
+            &Route::to(Target::new(crate::ProviderInstanceId::openai_default()))
+                .with_fallback(Target::new(crate::ProviderInstanceId::openrouter_default()))
                 .with_planning_rejection_policy(PlanningRejectionPolicy::SkipRejectedTargets),
         )
         .expect("route targets should resolve");
@@ -577,7 +586,7 @@ fn provider_client_with_default_model(
         .build()
         .expect("test client should build");
     let transport = agent_transport::HttpTransport::builder(client).build();
-    let instance_id = Target::default_instance_for(provider);
+    let instance_id = crate::test::default_instance_id(provider);
     let mut config = ProviderConfig::new("test-key").with_base_url("http://127.0.0.1:1");
     if let Some(default_model) = default_model {
         config = config.with_default_model(default_model);

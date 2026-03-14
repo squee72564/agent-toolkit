@@ -2,7 +2,7 @@ use std::env;
 
 use agent_toolkit::{
     AgentToolkit, ExecutionOptions, FallbackPolicy, FallbackRule, MessageCreateInput,
-    ProviderConfig, ProviderId, Route, Target,
+    ProviderConfig, ProviderInstanceId, Route, Target,
 };
 
 fn response_text(parts: &[agent_toolkit::ContentPart]) -> String {
@@ -34,8 +34,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_rule(FallbackRule::retry_on_provider_code("rate_limit_exceeded"));
     let task =
         MessageCreateInput::user("Write one short sentence about Rust.").into_task_request()?;
-    let route = Route::to(Target::new(ProviderId::OpenAi))
-        .with_fallback(Target::new(ProviderId::OpenRouter))
+    let route = Route::to(Target::new(ProviderInstanceId::openai_default()))
+        .with_fallback(Target::new(ProviderInstanceId::openrouter_default()))
         .with_fallback_policy(fallback_policy);
 
     let (response, meta) = toolkit

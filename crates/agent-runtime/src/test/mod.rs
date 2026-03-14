@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use agent_core::{
     ExecutionPlan, PlatformConfig, ProviderCapabilities, ProviderDescriptor, ProviderFamilyId,
-    ProviderId, ProviderKind, Response, ResponseFormat, ToolChoice,
+    ProviderId, ProviderInstanceId, ProviderKind, Response, ResponseFormat, ToolChoice,
     types::{ContentPart, Message, MessageRole, ToolResultContent},
 };
 use agent_providers::adapter::{ProviderAdapter, adapter_for};
@@ -57,6 +57,17 @@ fn runtime_error(
     }
 }
 
+pub(crate) fn default_instance_id(provider: ProviderKind) -> ProviderInstanceId {
+    match provider {
+        ProviderKind::OpenAi => ProviderInstanceId::openai_default(),
+        ProviderKind::Anthropic => ProviderInstanceId::anthropic_default(),
+        ProviderKind::OpenRouter => ProviderInstanceId::openrouter_default(),
+        ProviderKind::GenericOpenAiCompatible => {
+            ProviderInstanceId::generic_openai_compatible_default()
+        }
+    }
+}
+
 fn test_provider_client(provider: ProviderId) -> ProviderClient {
     let adapter = adapter_for(provider);
     let client = reqwest::Client::builder()
@@ -64,7 +75,7 @@ fn test_provider_client(provider: ProviderId) -> ProviderClient {
         .build()
         .expect("test client should build");
     let transport = HttpTransport::builder(client).build();
-    let instance_id = Target::default_instance_for(provider);
+    let instance_id = default_instance_id(provider);
     let registered = RegisteredProvider::new(
         instance_id.clone(),
         provider,
@@ -96,7 +107,7 @@ fn test_provider_client_with_base_url(
         .build()
         .expect("test client should build");
     let transport = HttpTransport::builder(client).build();
-    let instance_id = Target::default_instance_for(provider);
+    let instance_id = default_instance_id(provider);
     let mut config = ProviderConfig::new("test-key").with_base_url(base_url);
     if let Some(default_model) = default_model {
         config = config.with_default_model(default_model);
@@ -148,7 +159,7 @@ fn test_provider_client_with_streaming_support(
         request_id_header: adapter.descriptor().default_request_id_header.clone(),
         default_headers: adapter.descriptor().default_headers.clone(),
     };
-    let instance_id = Target::default_instance_for(provider);
+    let instance_id = default_instance_id(provider);
     let mut config = ProviderConfig::new("test-key");
     if let Some(default_model) = default_model {
         config = config.with_default_model(default_model);

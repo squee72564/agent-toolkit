@@ -28,7 +28,7 @@ fn attempt_spec_builder_preserves_attempt_local_execution_state() {
         ))),
     };
 
-    let attempt = AttemptSpec::to(Target::new(agent_core::ProviderId::OpenRouter))
+    let attempt = AttemptSpec::to(Target::new(crate::ProviderInstanceId::openrouter_default()))
         .with_native_options(native.clone())
         .with_timeout_overrides(timeout_overrides.clone())
         .with_extra_headers(extra_headers.clone());
@@ -49,10 +49,14 @@ fn route_builder_preserves_routing_and_attempt_state() {
     };
 
     let route = Route::to(
-        AttemptSpec::to(Target::new(agent_core::ProviderId::OpenAi).with_model("primary-model"))
-            .with_native_options(native.clone()),
+        AttemptSpec::to(
+            Target::new(crate::ProviderInstanceId::openai_default()).with_model("primary-model"),
+        )
+        .with_native_options(native.clone()),
     )
-    .with_fallback(Target::new(agent_core::ProviderId::OpenRouter).with_model("fallback-model"))
+    .with_fallback(
+        Target::new(crate::ProviderInstanceId::openrouter_default()).with_model("fallback-model"),
+    )
     .with_fallback_policy(FallbackPolicy::new())
     .with_planning_rejection_policy(PlanningRejectionPolicy::SkipRejectedTargets);
 

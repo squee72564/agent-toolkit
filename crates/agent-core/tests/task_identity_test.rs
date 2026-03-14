@@ -45,7 +45,7 @@ fn legacy_request_task_request_projection_drops_execution_fields() {
 fn provider_kind_and_instance_identity_are_distinct() {
     assert_eq!(ProviderKind::OpenAi, agent_core::ProviderId::OpenAi);
     assert_eq!(
-        ProviderInstanceId::from(ProviderKind::GenericOpenAiCompatible).as_str(),
+        ProviderInstanceId::generic_openai_compatible_default().as_str(),
         "generic-openai-compatible-default"
     );
     assert_eq!(

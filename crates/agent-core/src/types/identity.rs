@@ -27,9 +27,6 @@ pub enum ProviderKind {
     GenericOpenAiCompatible,
 }
 
-/// REFACTOR-SHIM: preserve the old provider identity name while the runtime migrates.
-pub type ProviderId = ProviderKind;
-
 /// Identifier for one registered runtime destination instance.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -39,6 +36,26 @@ impl ProviderInstanceId {
     /// Creates a new provider instance identifier.
     pub fn new(value: impl Into<String>) -> Self {
         Self(value.into())
+    }
+
+    /// Conventional default instance id used by `AgentToolkitBuilder::with_openai`.
+    pub fn openai_default() -> Self {
+        Self::new("openai-default")
+    }
+
+    /// Conventional default instance id used by `AgentToolkitBuilder::with_anthropic`.
+    pub fn anthropic_default() -> Self {
+        Self::new("anthropic-default")
+    }
+
+    /// Conventional default instance id used by `AgentToolkitBuilder::with_openrouter`.
+    pub fn openrouter_default() -> Self {
+        Self::new("openrouter-default")
+    }
+
+    /// Conventional default instance id used by generic OpenAI-compatible registrations.
+    pub fn generic_openai_compatible_default() -> Self {
+        Self::new("generic-openai-compatible-default")
     }
 
     /// Returns the identifier as a string slice.
@@ -68,17 +85,6 @@ impl From<&str> for ProviderInstanceId {
 impl std::fmt::Display for ProviderInstanceId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
-    }
-}
-
-impl From<ProviderKind> for ProviderInstanceId {
-    fn from(kind: ProviderKind) -> Self {
-        match kind {
-            ProviderKind::OpenAi => Self::new("openai-default"),
-            ProviderKind::Anthropic => Self::new("anthropic-default"),
-            ProviderKind::OpenRouter => Self::new("openrouter-default"),
-            ProviderKind::GenericOpenAiCompatible => Self::new("generic-openai-compatible-default"),
-        }
     }
 }
 

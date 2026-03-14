@@ -194,7 +194,20 @@ macro_rules! impl_provider_client {
             pub fn build(self) -> Result<$client, crate::runtime_error::RuntimeError> {
                 let provider_runtime = self.inner.build_runtime(
                     $provider,
-                    crate::target::Target::default_instance_for($provider),
+                    match $provider {
+                        agent_core::ProviderKind::OpenAi => {
+                            agent_core::ProviderInstanceId::openai_default()
+                        }
+                        agent_core::ProviderKind::Anthropic => {
+                            agent_core::ProviderInstanceId::anthropic_default()
+                        }
+                        agent_core::ProviderKind::OpenRouter => {
+                            agent_core::ProviderInstanceId::openrouter_default()
+                        }
+                        agent_core::ProviderKind::GenericOpenAiCompatible => {
+                            agent_core::ProviderInstanceId::generic_openai_compatible_default()
+                        }
+                    },
                 )?;
                 Ok($client {
                     inner: crate::provider_client::ProviderClient::new(provider_runtime),

@@ -4,11 +4,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use agent_core::types::ProviderId;
 use agent_runtime::{
     AgentToolkit, AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
-    FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig, RequestEndEvent,
-    RequestStartEvent, Route, RuntimeErrorKind, RuntimeObserver, Target, openai,
+    FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig, ProviderInstanceId,
+    RequestEndEvent, RequestStartEvent, Route, RuntimeErrorKind, RuntimeObserver, Target, openai,
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -329,8 +328,8 @@ async fn router_fallback_ordered_attempts_with_indices() {
     let (_response, meta) = with_timeout(
         toolkit.messages().create_with_meta_and_options(
             MessageCreateInput::user("hello"),
-            Route::to(Target::new(ProviderId::OpenAi))
-                .with_fallback(Target::new(ProviderId::OpenRouter))
+            Route::to(Target::new(ProviderInstanceId::openai_default()))
+                .with_fallback(Target::new(ProviderInstanceId::openrouter_default()))
                 .with_fallback_policy(fallback_policy),
             ExecutionOptions::default(),
         ),
@@ -378,7 +377,7 @@ async fn toolkit_observer_and_execution_override_precedence() {
 
     let _ = with_timeout(toolkit.messages().create_with_meta_and_options(
         MessageCreateInput::user("hello"),
-        Route::to(Target::new(ProviderId::OpenAi)),
+        Route::to(Target::new(ProviderInstanceId::openai_default())),
         ExecutionOptions {
             observer: Some(send_observer.clone()),
             ..ExecutionOptions::default()
@@ -424,8 +423,8 @@ async fn fallback_exhausted_request_end_uses_terminal_failure_context() {
     let error = with_timeout(
         toolkit.messages().create_with_meta_and_options(
             MessageCreateInput::user("hello"),
-            Route::to(Target::new(ProviderId::OpenAi))
-                .with_fallback(Target::new(ProviderId::OpenRouter))
+            Route::to(Target::new(ProviderInstanceId::openai_default()))
+                .with_fallback(Target::new(ProviderInstanceId::openrouter_default()))
                 .with_fallback_policy(fallback_policy),
             ExecutionOptions::default(),
         ),

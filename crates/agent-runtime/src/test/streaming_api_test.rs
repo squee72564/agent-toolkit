@@ -132,7 +132,7 @@ async fn direct_streaming_yields_envelopes_and_finishes_with_meta() {
     assert_eq!(first.raw.sequence, 1);
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider, ProviderId::OpenAi);
+    assert_eq!(completion.meta.selected_provider_kind, ProviderId::OpenAi);
     assert_eq!(completion.meta.selected_model, "gpt-5-mini");
     assert_eq!(completion.meta.status_code, Some(200));
     assert_eq!(completion.meta.request_id.as_deref(), Some("req_sse"));
@@ -171,7 +171,7 @@ async fn direct_streaming_finish_after_drain_returns_completion() {
     while next_stream_item(&mut stream).await.is_some() {}
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider, ProviderId::OpenAi);
+    assert_eq!(completion.meta.selected_provider_kind, ProviderId::OpenAi);
     assert_eq!(
         completion.response.output.content,
         vec![agent_core::ContentPart::text("drained response")]
@@ -209,7 +209,7 @@ async fn routed_streaming_happy_path_finishes_with_response_meta() {
         .streaming()
         .create(
             MessageCreateInput::user("hello"),
-            Route::to(Target::new(ProviderId::OpenAi)),
+            Route::to(Target::new(crate::ProviderInstanceId::openai_default())),
         )
         .await
         .expect("stream should open");
@@ -221,7 +221,7 @@ async fn routed_streaming_happy_path_finishes_with_response_meta() {
     assert_eq!(first.raw.sequence, 1);
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider, ProviderId::OpenAi);
+    assert_eq!(completion.meta.selected_provider_kind, ProviderId::OpenAi);
     assert_eq!(completion.meta.attempts.len(), 1);
     assert_eq!(
         completion.response.output.content,
@@ -265,8 +265,8 @@ async fn routed_streaming_retries_next_target_when_initial_stream_open_fails() {
         .streaming()
         .create_with_options(
             MessageCreateInput::user("hello"),
-            Route::to(Target::new(ProviderId::OpenAi))
-                .with_fallback(Target::new(ProviderId::OpenRouter))
+            Route::to(Target::new(crate::ProviderInstanceId::openai_default()))
+                .with_fallback(Target::new(crate::ProviderInstanceId::openrouter_default()))
                 .with_fallback_policy(crate::FallbackPolicy::new().with_rule(
                     crate::FallbackRule::retry_on_kind(crate::RuntimeErrorKind::Transport),
                 )),
@@ -285,12 +285,27 @@ async fn routed_streaming_retries_next_target_when_initial_stream_open_fails() {
     assert_eq!(first.raw.sequence, 1);
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider, ProviderId::OpenRouter);
+    assert_eq!(
+        completion.meta.selected_provider_kind,
+        ProviderId::OpenRouter
+    );
     assert_eq!(completion.meta.attempts.len(), 2);
-    assert_eq!(completion.meta.attempts[0].provider, ProviderId::OpenAi);
-    assert!(!completion.meta.attempts[0].success);
-    assert_eq!(completion.meta.attempts[1].provider, ProviderId::OpenRouter);
-    assert!(completion.meta.attempts[1].success);
+    assert_eq!(
+        completion.meta.attempts[0].provider_kind,
+        ProviderId::OpenAi
+    );
+    assert!(matches!(
+        completion.meta.attempts[0].disposition,
+        AttemptDisposition::Failed { .. }
+    ));
+    assert_eq!(
+        completion.meta.attempts[1].provider_kind,
+        ProviderId::OpenRouter
+    );
+    assert!(matches!(
+        completion.meta.attempts[1].disposition,
+        AttemptDisposition::Succeeded { .. }
+    ));
     assert_eq!(
         completion.response.output.content,
         vec![agent_core::ContentPart::text("fallback stream")]
@@ -341,8 +356,8 @@ async fn routed_streaming_allows_fallback_after_raw_envelope_without_canonical_e
         .streaming()
         .create_with_options(
             MessageCreateInput::user("hello"),
-            Route::to(Target::new(ProviderId::OpenRouter))
-                .with_fallback(Target::new(ProviderId::OpenAi))
+            Route::to(Target::new(crate::ProviderInstanceId::openrouter_default()))
+                .with_fallback(Target::new(crate::ProviderInstanceId::openai_default()))
                 .with_fallback_policy(crate::FallbackPolicy::new().with_rule(
                     crate::FallbackRule::retry_on_kind(crate::RuntimeErrorKind::ProtocolViolation),
                 )),
@@ -367,7 +382,7 @@ async fn routed_streaming_allows_fallback_after_raw_envelope_without_canonical_e
     assert!(!second.canonical.is_empty());
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider, ProviderId::OpenAi);
+    assert_eq!(completion.meta.selected_provider_kind, ProviderId::OpenAi);
     assert_eq!(completion.meta.attempts.len(), 2);
     assert_eq!(
         completion.response.output.content,
@@ -405,7 +420,9 @@ async fn routed_streaming_explicit_task_api_uses_route_and_execution_options() {
     let task = MessageCreateInput::user("hello explicit route")
         .into_task_request()
         .expect("task request should build");
-    let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"));
+    let route = Route::to(
+        Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5-mini"),
+    );
     let execution = ExecutionOptions {
         response_mode: crate::ResponseMode::Streaming,
         ..ExecutionOptions::default()
@@ -424,7 +441,7 @@ async fn routed_streaming_explicit_task_api_uses_route_and_execution_options() {
     assert_eq!(first.raw.sequence, 1);
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider, ProviderId::OpenAi);
+    assert_eq!(completion.meta.selected_provider_kind, ProviderId::OpenAi);
     assert_eq!(completion.meta.selected_model, "gpt-5-mini");
     assert_eq!(
         completion.response.output.content,
@@ -476,8 +493,8 @@ async fn routed_streaming_does_not_fallback_after_first_canonical_event() {
         .streaming()
         .create_with_options(
             MessageCreateInput::user("hello"),
-            Route::to(Target::new(ProviderId::OpenAi))
-                .with_fallback(Target::new(ProviderId::OpenRouter))
+            Route::to(Target::new(crate::ProviderInstanceId::openai_default()))
+                .with_fallback(Target::new(crate::ProviderInstanceId::openrouter_default()))
                 .with_fallback_policy(crate::FallbackPolicy::new().with_rule(
                     crate::FallbackRule::retry_on_kind(crate::RuntimeErrorKind::Upstream),
                 )),
@@ -515,7 +532,7 @@ async fn routed_streaming_does_not_fallback_after_first_canonical_event() {
     let failure_meta = executed_failure_meta(&finish_error);
     assert_eq!(
         failure_meta.selected_provider_instance,
-        Target::default_instance_for(ProviderId::OpenAi)
+        crate::ProviderInstanceId::openai_default()
     );
     assert_eq!(failure_meta.selected_provider_kind, ProviderId::OpenAi);
     assert_eq!(failure_meta.selected_model, "gpt-5-mini");
@@ -580,8 +597,8 @@ async fn routed_streaming_terminal_error_carries_ordered_attempt_history() {
         .streaming()
         .create_with_options(
             MessageCreateInput::user("hello"),
-            Route::to(Target::new(ProviderId::OpenRouter))
-                .with_fallback(Target::new(ProviderId::OpenAi))
+            Route::to(Target::new(crate::ProviderInstanceId::openrouter_default()))
+                .with_fallback(Target::new(crate::ProviderInstanceId::openai_default()))
                 .with_fallback_policy(crate::FallbackPolicy::new().with_rule(
                     crate::FallbackRule::retry_on_kind(crate::RuntimeErrorKind::ProtocolViolation),
                 )),
@@ -623,14 +640,14 @@ async fn routed_streaming_terminal_error_carries_ordered_attempt_history() {
     let failure_meta = executed_failure_meta(&finish_error);
     assert_eq!(
         failure_meta.selected_provider_instance,
-        Target::default_instance_for(ProviderId::OpenAi)
+        crate::ProviderInstanceId::openai_default()
     );
     assert_eq!(failure_meta.selected_provider_kind, ProviderId::OpenAi);
     assert_eq!(failure_meta.selected_model, "gpt-5-mini");
     assert_eq!(failure_meta.attempts.len(), 2);
     assert_eq!(
         failure_meta.attempts[0].provider_instance,
-        Target::default_instance_for(ProviderId::OpenRouter)
+        crate::ProviderInstanceId::openrouter_default()
     );
     assert!(matches!(
         failure_meta.attempts[0].disposition,
@@ -641,7 +658,7 @@ async fn routed_streaming_terminal_error_carries_ordered_attempt_history() {
     ));
     assert_eq!(
         failure_meta.attempts[1].provider_instance,
-        Target::default_instance_for(ProviderId::OpenAi)
+        crate::ProviderInstanceId::openai_default()
     );
     assert!(matches!(
         failure_meta.attempts[1].disposition,
@@ -671,7 +688,7 @@ async fn routed_streaming_terminal_error_keeps_pre_open_failures_and_skips_befor
     let toolkit = AgentToolkit {
         clients: HashMap::from([
             (
-                Target::default_instance_for(ProviderId::OpenRouter),
+                crate::ProviderInstanceId::openrouter_default(),
                 test_provider_client_with_base_url(
                     ProviderId::OpenRouter,
                     "http://127.0.0.1:1",
@@ -679,7 +696,7 @@ async fn routed_streaming_terminal_error_keeps_pre_open_failures_and_skips_befor
                 ),
             ),
             (
-                Target::default_instance_for(ProviderId::OpenAi),
+                crate::ProviderInstanceId::openai_default(),
                 test_provider_client_with_streaming_support(
                     ProviderId::OpenAi,
                     Some("gpt-5-mini"),
@@ -687,7 +704,7 @@ async fn routed_streaming_terminal_error_keeps_pre_open_failures_and_skips_befor
                 ),
             ),
             (
-                Target::default_instance_for(ProviderId::GenericOpenAiCompatible),
+                crate::ProviderInstanceId::generic_openai_compatible_default(),
                 test_provider_client_with_base_url(
                     ProviderId::GenericOpenAiCompatible,
                     &fallback_url,
@@ -702,9 +719,11 @@ async fn routed_streaming_terminal_error_keeps_pre_open_failures_and_skips_befor
         .streaming()
         .create_with_options(
             MessageCreateInput::user("hello"),
-            Route::to(Target::new(ProviderId::OpenRouter))
-                .with_fallback(Target::new(ProviderId::OpenAi))
-                .with_fallback(Target::new(ProviderId::GenericOpenAiCompatible))
+            Route::to(Target::new(crate::ProviderInstanceId::openrouter_default()))
+                .with_fallback(Target::new(crate::ProviderInstanceId::openai_default()))
+                .with_fallback(Target::new(
+                    crate::ProviderInstanceId::generic_openai_compatible_default(),
+                ))
                 .with_fallback_policy(crate::FallbackPolicy::new().with_rule(
                     crate::FallbackRule::retry_on_kind(crate::RuntimeErrorKind::Transport),
                 ))
@@ -751,7 +770,7 @@ async fn routed_streaming_terminal_error_keeps_pre_open_failures_and_skips_befor
     let failure_meta = executed_failure_meta(&finish_error);
     assert_eq!(
         failure_meta.selected_provider_instance,
-        Target::default_instance_for(ProviderId::GenericOpenAiCompatible)
+        crate::ProviderInstanceId::generic_openai_compatible_default()
     );
     assert_eq!(
         failure_meta.selected_provider_kind,
@@ -760,7 +779,7 @@ async fn routed_streaming_terminal_error_keeps_pre_open_failures_and_skips_befor
     assert_eq!(failure_meta.attempts.len(), 3);
     assert_eq!(
         failure_meta.attempts[0].provider_instance,
-        Target::default_instance_for(ProviderId::OpenRouter)
+        crate::ProviderInstanceId::openrouter_default()
     );
     assert!(matches!(
         failure_meta.attempts[0].disposition,
@@ -771,7 +790,7 @@ async fn routed_streaming_terminal_error_keeps_pre_open_failures_and_skips_befor
     ));
     assert_eq!(
         failure_meta.attempts[1].provider_instance,
-        Target::default_instance_for(ProviderId::OpenAi)
+        crate::ProviderInstanceId::openai_default()
     );
     assert!(matches!(
         failure_meta.attempts[1].disposition,
@@ -781,7 +800,7 @@ async fn routed_streaming_terminal_error_keeps_pre_open_failures_and_skips_befor
     ));
     assert_eq!(
         failure_meta.attempts[2].provider_instance,
-        Target::default_instance_for(ProviderId::GenericOpenAiCompatible)
+        crate::ProviderInstanceId::generic_openai_compatible_default()
     );
     assert!(matches!(
         failure_meta.attempts[2].disposition,
@@ -813,7 +832,7 @@ async fn routed_streaming_success_uses_typed_attempt_history_for_legacy_response
     let toolkit = AgentToolkit {
         clients: HashMap::from([
             (
-                Target::default_instance_for(ProviderId::OpenRouter),
+                crate::ProviderInstanceId::openrouter_default(),
                 test_provider_client_with_base_url(
                     ProviderId::OpenRouter,
                     "http://127.0.0.1:1",
@@ -821,7 +840,7 @@ async fn routed_streaming_success_uses_typed_attempt_history_for_legacy_response
                 ),
             ),
             (
-                Target::default_instance_for(ProviderId::OpenAi),
+                crate::ProviderInstanceId::openai_default(),
                 test_provider_client_with_streaming_support(
                     ProviderId::OpenAi,
                     Some("gpt-5-mini"),
@@ -829,7 +848,7 @@ async fn routed_streaming_success_uses_typed_attempt_history_for_legacy_response
                 ),
             ),
             (
-                Target::default_instance_for(ProviderId::GenericOpenAiCompatible),
+                crate::ProviderInstanceId::generic_openai_compatible_default(),
                 test_provider_client_with_base_url(
                     ProviderId::GenericOpenAiCompatible,
                     &fallback_url,
@@ -844,9 +863,11 @@ async fn routed_streaming_success_uses_typed_attempt_history_for_legacy_response
         .streaming()
         .create_with_options(
             MessageCreateInput::user("hello"),
-            Route::to(Target::new(ProviderId::OpenRouter))
-                .with_fallback(Target::new(ProviderId::OpenAi))
-                .with_fallback(Target::new(ProviderId::GenericOpenAiCompatible))
+            Route::to(Target::new(crate::ProviderInstanceId::openrouter_default()))
+                .with_fallback(Target::new(crate::ProviderInstanceId::openai_default()))
+                .with_fallback(Target::new(
+                    crate::ProviderInstanceId::generic_openai_compatible_default(),
+                ))
                 .with_fallback_policy(crate::FallbackPolicy::new().with_rule(
                     crate::FallbackRule::retry_on_kind(crate::RuntimeErrorKind::Transport),
                 ))
@@ -869,18 +890,35 @@ async fn routed_streaming_success_uses_typed_attempt_history_for_legacy_response
 
     let completion = stream.finish().await.expect("finish should succeed");
     assert_eq!(
-        completion.meta.selected_provider,
+        completion.meta.selected_provider_kind,
         ProviderId::GenericOpenAiCompatible
     );
     assert_eq!(completion.meta.selected_model, "gpt-5-mini");
-    assert_eq!(completion.meta.attempts.len(), 2);
-    assert_eq!(completion.meta.attempts[0].provider, ProviderId::OpenRouter);
-    assert!(!completion.meta.attempts[0].success);
+    assert_eq!(completion.meta.attempts.len(), 3);
     assert_eq!(
-        completion.meta.attempts[1].provider,
+        completion.meta.attempts[0].provider_kind,
+        ProviderId::OpenRouter
+    );
+    assert!(matches!(
+        completion.meta.attempts[0].disposition,
+        AttemptDisposition::Failed { .. }
+    ));
+    assert_eq!(
+        completion.meta.attempts[1].provider_kind,
+        ProviderId::OpenAi
+    );
+    assert!(matches!(
+        completion.meta.attempts[1].disposition,
+        AttemptDisposition::Skipped { .. }
+    ));
+    assert_eq!(
+        completion.meta.attempts[2].provider_kind,
         ProviderId::GenericOpenAiCompatible
     );
-    assert!(completion.meta.attempts[1].success);
+    assert!(matches!(
+        completion.meta.attempts[2].disposition,
+        AttemptDisposition::Succeeded { .. }
+    ));
     assert_eq!(
         completion.response.output.content,
         vec![agent_core::ContentPart::text("opened after typed history")]
@@ -892,7 +930,7 @@ async fn routed_streaming_fail_fast_stops_on_planning_rejection_before_fallback(
     let toolkit = AgentToolkit {
         clients: HashMap::from([
             (
-                Target::default_instance_for(ProviderId::OpenAi),
+                crate::ProviderInstanceId::openai_default(),
                 test_provider_client_with_streaming_support(
                     ProviderId::OpenAi,
                     Some("gpt-5-mini"),
@@ -900,7 +938,7 @@ async fn routed_streaming_fail_fast_stops_on_planning_rejection_before_fallback(
                 ),
             ),
             (
-                Target::default_instance_for(ProviderId::OpenRouter),
+                crate::ProviderInstanceId::openrouter_default(),
                 test_provider_client(ProviderId::OpenRouter),
             ),
         ]),
@@ -911,8 +949,8 @@ async fn routed_streaming_fail_fast_stops_on_planning_rejection_before_fallback(
         .streaming()
         .create_with_options(
             MessageCreateInput::user("hello"),
-            Route::to(Target::new(ProviderId::OpenAi))
-                .with_fallback(Target::new(ProviderId::OpenRouter))
+            Route::to(Target::new(crate::ProviderInstanceId::openai_default()))
+                .with_fallback(Target::new(crate::ProviderInstanceId::openrouter_default()))
                 .with_planning_rejection_policy(crate::PlanningRejectionPolicy::FailFast),
             ExecutionOptions {
                 response_mode: crate::ResponseMode::Streaming,
@@ -960,7 +998,7 @@ async fn routed_streaming_emits_attempt_skipped_without_execution_events_for_ski
     let toolkit = AgentToolkit {
         clients: HashMap::from([
             (
-                Target::default_instance_for(ProviderId::OpenAi),
+                crate::ProviderInstanceId::openai_default(),
                 test_provider_client_with_streaming_support(
                     ProviderId::OpenAi,
                     Some("gpt-5-mini"),
@@ -968,7 +1006,7 @@ async fn routed_streaming_emits_attempt_skipped_without_execution_events_for_ski
                 ),
             ),
             (
-                Target::default_instance_for(ProviderId::OpenRouter),
+                crate::ProviderInstanceId::openrouter_default(),
                 test_provider_client_with_base_url(
                     ProviderId::OpenRouter,
                     &base_url,
@@ -983,8 +1021,8 @@ async fn routed_streaming_emits_attempt_skipped_without_execution_events_for_ski
         .streaming()
         .create_with_options(
             MessageCreateInput::user("hello"),
-            Route::to(Target::new(ProviderId::OpenAi))
-                .with_fallback(Target::new(ProviderId::OpenRouter))
+            Route::to(Target::new(crate::ProviderInstanceId::openai_default()))
+                .with_fallback(Target::new(crate::ProviderInstanceId::openrouter_default()))
                 .with_planning_rejection_policy(
                     crate::PlanningRejectionPolicy::SkipRejectedTargets,
                 ),
@@ -998,7 +1036,10 @@ async fn routed_streaming_emits_attempt_skipped_without_execution_events_for_ski
 
     while next_stream_item(&mut stream).await.is_some() {}
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider, ProviderId::OpenRouter);
+    assert_eq!(
+        completion.meta.selected_provider_kind,
+        ProviderId::OpenRouter
+    );
 
     let events = observer.snapshot();
     assert_eq!(
@@ -1015,7 +1056,7 @@ async fn routed_streaming_emits_attempt_skipped_without_execution_events_for_ski
     let skipped = as_attempt_skipped(&events[1]);
     assert_eq!(
         skipped.provider_instance,
-        Target::default_instance_for(ProviderId::OpenAi)
+        crate::ProviderInstanceId::openai_default()
     );
     assert_eq!(skipped.provider_kind, ProviderId::OpenAi);
     assert_eq!(skipped.model, "gpt-5-mini");
@@ -1032,7 +1073,7 @@ async fn routed_streaming_planning_failure_emits_request_end_after_attempt_skipp
     let observer = Arc::new(RecordingObserver::new());
     let toolkit = AgentToolkit {
         clients: HashMap::from([(
-            Target::default_instance_for(ProviderId::OpenAi),
+            crate::ProviderInstanceId::openai_default(),
             test_provider_client_with_streaming_support(
                 ProviderId::OpenAi,
                 Some("gpt-5-mini"),
@@ -1046,7 +1087,7 @@ async fn routed_streaming_planning_failure_emits_request_end_after_attempt_skipp
         .streaming()
         .create_with_options(
             MessageCreateInput::user("hello"),
-            Route::to(Target::new(ProviderId::OpenAi))
+            Route::to(Target::new(crate::ProviderInstanceId::openai_default()))
                 .with_planning_rejection_policy(crate::PlanningRejectionPolicy::FailFast),
             ExecutionOptions {
                 response_mode: crate::ResponseMode::Streaming,
@@ -1067,7 +1108,7 @@ async fn routed_streaming_planning_failure_emits_request_end_after_attempt_skipp
     let skipped = as_attempt_skipped(&events[1]);
     assert_eq!(
         skipped.provider_instance,
-        Target::default_instance_for(ProviderId::OpenAi)
+        crate::ProviderInstanceId::openai_default()
     );
     assert_eq!(skipped.provider_kind, ProviderId::OpenAi);
     assert_eq!(skipped.model, "gpt-5-mini");
@@ -1122,7 +1163,7 @@ async fn direct_text_stream_yields_text_chunks_and_finishes_with_meta() {
     );
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider, ProviderId::OpenAi);
+    assert_eq!(completion.meta.selected_provider_kind, ProviderId::OpenAi);
     assert_eq!(completion.meta.selected_model, "gpt-5-mini");
     assert_eq!(
         completion.response.output.content,
@@ -1161,7 +1202,7 @@ async fn routed_text_stream_yields_text_chunks_and_finishes_with_response_meta()
         .streaming()
         .create_with_options(
             MessageCreateInput::user("hello"),
-            Route::to(Target::new(ProviderId::OpenAi)),
+            Route::to(Target::new(crate::ProviderInstanceId::openai_default())),
             ExecutionOptions {
                 response_mode: crate::ResponseMode::Streaming,
                 ..ExecutionOptions::default()
@@ -1180,7 +1221,7 @@ async fn routed_text_stream_yields_text_chunks_and_finishes_with_response_meta()
     );
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider, ProviderId::OpenAi);
+    assert_eq!(completion.meta.selected_provider_kind, ProviderId::OpenAi);
     assert_eq!(completion.meta.attempts.len(), 1);
     assert_eq!(
         completion.response.output.content,
@@ -1359,7 +1400,7 @@ async fn text_stream_surfaces_terminal_error_after_emitting_prior_text() {
     let failure_meta = executed_failure_meta(&finish_error);
     assert_eq!(
         failure_meta.selected_provider_instance,
-        Target::default_instance_for(ProviderId::OpenAi)
+        crate::ProviderInstanceId::openai_default()
     );
     assert_eq!(failure_meta.selected_provider_kind, ProviderId::OpenAi);
     assert_eq!(failure_meta.selected_model, "gpt-5-mini");
@@ -1446,7 +1487,7 @@ async fn text_stream_finish_after_drain_returns_completion() {
     while next_text_stream_item(&mut stream).await.is_some() {}
 
     let completion = stream.finish().await.expect("finish should succeed");
-    assert_eq!(completion.meta.selected_provider, ProviderId::OpenAi);
+    assert_eq!(completion.meta.selected_provider_kind, ProviderId::OpenAi);
     assert_eq!(
         completion.response.output.content,
         vec![agent_core::ContentPart::text("finish after drain")]
@@ -1476,7 +1517,7 @@ fn test_streaming_provider_client(
         .build()
         .expect("test client should build");
     let transport = HttpTransport::builder(client).build();
-    let instance_id = crate::Target::default_instance_for(provider);
+    let instance_id = crate::test::default_instance_id(provider);
     let mut config = crate::ProviderConfig::new("test-key").with_base_url(base_url);
     if let Some(default_model) = default_model {
         config = config.with_default_model(default_model);
