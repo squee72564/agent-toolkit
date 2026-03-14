@@ -12,9 +12,10 @@ use crate::route::Route;
 use crate::runtime_error::RuntimeError;
 use crate::target::Target;
 use crate::types::{
-    AttemptMeta, RequestEndContext, ResponseMeta, attempt_failure_event, attempt_skipped_event,
-    attempt_start_event, attempt_success_event, normalized_event_model, request_end_failure_event,
-    request_end_success_event, request_start_event, response_meta, terminal_failure_error,
+    AttemptDisposition, AttemptRecord, RequestEndContext, attempt_failure_event_fields,
+    attempt_skipped_event, attempt_start_event, attempt_success_event_fields,
+    normalized_event_model, request_end_failure_event, request_end_success_event,
+    request_start_event, terminal_failure_error,
 };
 
 pub(super) struct PreparedExecution {
@@ -151,29 +152,32 @@ impl PreparedExecution {
         &self,
         _toolkit: &AgentToolkit,
         _execution: &ExecutionOptions,
-        attempts: &[AttemptMeta],
+        attempts: &[AttemptRecord],
         error: &RuntimeError,
     ) {
         let terminal_error = terminal_failure_error(error);
-        let terminal_provider = terminal_error
-            .provider
-            .or_else(|| attempts.last().map(|attempt| attempt.provider));
-        let request_observer = self.request_observer.clone();
-        let terminal_index = attempts.len().checked_sub(1);
+        let terminal_attempt = attempts.iter().rev().find(|attempt| {
+            matches!(
+                attempt.disposition,
+                AttemptDisposition::Succeeded { .. } | AttemptDisposition::Failed { .. }
+            )
+        });
         let event = request_end_failure_event(
             RequestEndContext {
                 request_id: terminal_error.request_id.clone(),
-                provider: terminal_provider,
-                model: attempts.last().map(|attempt| attempt.model.clone()),
-                target_index: terminal_index,
-                attempt_index: terminal_index,
+                provider: terminal_error
+                    .provider
+                    .or_else(|| terminal_attempt.map(|attempt| attempt.provider_kind)),
+                model: terminal_attempt.map(|attempt| attempt.model.clone()),
+                target_index: terminal_attempt.map(|attempt| attempt.target_index),
+                attempt_index: terminal_attempt.map(|attempt| attempt.attempt_index),
                 elapsed: self.request_started_at.elapsed(),
                 status_code: terminal_error.status_code,
             },
             terminal_error.kind,
             terminal_error.message.clone(),
         );
-        safe_call_observer(request_observer.as_ref(), |observer| {
+        safe_call_observer(self.request_observer.as_ref(), |observer| {
             observer.on_request_end(&event);
         });
     }
@@ -195,31 +199,34 @@ impl PreparedExecution {
 
 impl AttemptExecution {
     pub(super) fn emit_success(&self, meta: &crate::types::AttemptMeta, index: usize) {
-        let event = attempt_success_event(meta, index, index, self.started_at.elapsed());
+        let event = attempt_success_event_fields(
+            meta.provider,
+            Some(meta.model.clone()),
+            meta.request_id.clone(),
+            index,
+            index,
+            self.started_at.elapsed(),
+            meta.status_code,
+        );
         safe_call_observer(self.observer.as_ref(), |runtime_observer| {
             runtime_observer.on_attempt_success(&event);
         });
     }
 
     pub(super) fn emit_failure(&self, meta: &crate::types::AttemptMeta, index: usize) {
-        let event = attempt_failure_event(meta, index, index, self.started_at.elapsed());
+        let event = attempt_failure_event_fields(
+            meta.provider,
+            Some(meta.model.clone()),
+            meta.request_id.clone(),
+            index,
+            index,
+            self.started_at.elapsed(),
+            meta.error_kind,
+            meta.error_message.clone(),
+        );
         safe_call_observer(self.observer.as_ref(), |runtime_observer| {
             runtime_observer.on_attempt_failure(&event);
         });
-    }
-
-    pub(super) fn response_meta(
-        &self,
-        attempts: Vec<AttemptMeta>,
-        meta: crate::types::AttemptMeta,
-    ) -> ResponseMeta {
-        response_meta(
-            meta.provider,
-            meta.model.clone(),
-            meta.status_code,
-            meta.request_id.clone(),
-            attempts,
-        )
     }
 }
 

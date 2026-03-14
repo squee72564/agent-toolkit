@@ -7,9 +7,9 @@ use crate::message_response_stream::state::{
 use crate::observer::{RuntimeObserver, safe_call_observer};
 use crate::runtime_error::RuntimeError;
 use crate::types::{
-    AttemptDisposition, AttemptMeta, RequestEndContext, attempt_failure_event, attempt_start_event,
-    attempt_success_event, request_end_failure_event, request_end_success_event,
-    terminal_failure_error,
+    AttemptDisposition, AttemptMeta, RequestEndContext, attempt_failure_event_fields,
+    attempt_start_event, attempt_success_event_fields, request_end_failure_event,
+    request_end_success_event, terminal_failure_error,
 };
 
 pub(super) fn attempt_failure_meta(context: &AttemptContext, error: &RuntimeError) -> AttemptMeta {
@@ -56,21 +56,16 @@ pub(super) fn emit_attempt_success(
         request_id,
     } = &attempt.record.disposition
     else {
-        panic!("completed stream attempt must carry AttemptDisposition::Succeeded");
+        unreachable!("completed stream attempt must carry AttemptDisposition::Succeeded");
     };
-    let event = attempt_success_event(
-        &AttemptMeta {
-            provider: attempt.record.provider_kind,
-            model: attempt.record.model.clone(),
-            success: true,
-            status_code: *status_code,
-            request_id: request_id.clone(),
-            error_kind: None,
-            error_message: None,
-        },
+    let event = attempt_success_event_fields(
+        attempt.record.provider_kind,
+        Some(attempt.record.model.clone()),
+        request_id.clone(),
         attempt.target_index,
         attempt.attempt_index,
         attempt.started_at.elapsed(),
+        *status_code,
     );
     safe_call_observer(
         attempt.observer.as_ref().or(request_observer.as_ref()),
@@ -87,7 +82,16 @@ pub(super) fn emit_attempt_failure(
     attempt_index: usize,
     started_at: Instant,
 ) {
-    let event = attempt_failure_event(meta, target_index, attempt_index, started_at.elapsed());
+    let event = attempt_failure_event_fields(
+        meta.provider,
+        Some(meta.model.clone()),
+        meta.request_id.clone(),
+        target_index,
+        attempt_index,
+        started_at.elapsed(),
+        meta.error_kind,
+        meta.error_message.clone(),
+    );
     safe_call_observer(observer, |runtime_observer| {
         runtime_observer.on_attempt_failure(&event);
     });
@@ -102,7 +106,7 @@ pub(super) fn emit_request_end_success(
         request_id,
     } = &attempt.record.disposition
     else {
-        panic!("completed stream attempt must carry AttemptDisposition::Succeeded");
+        unreachable!("completed stream attempt must carry AttemptDisposition::Succeeded");
     };
     let event = request_end_success_event(RequestEndContext {
         request_id: request_id.clone(),

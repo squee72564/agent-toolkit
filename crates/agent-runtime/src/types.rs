@@ -228,16 +228,18 @@ impl std::error::Error for RoutePlanningFailure {}
 /// Returned metadata describing the selected response and all attempted targets.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResponseMeta {
-    /// Provider that produced the returned response.
-    pub selected_provider: ProviderId,
+    /// Registered provider instance that produced the returned response.
+    pub selected_provider_instance: ProviderInstanceId,
+    /// Concrete provider kind that produced the returned response.
+    pub selected_provider_kind: ProviderKind,
     /// Model that produced the returned response.
     pub selected_model: String,
     /// HTTP status code from the selected response, when available.
     pub status_code: Option<u16>,
     /// Provider request identifier from the selected response, when available.
     pub request_id: Option<String>,
-    /// Attempt metadata in execution order.
-    pub attempts: Vec<AttemptMeta>,
+    /// Ordered route-attempt history for the request.
+    pub attempts: Vec<AttemptRecord>,
 }
 
 /// Metadata describing the terminal executed failure for a call.
@@ -303,38 +305,46 @@ pub(crate) fn attempt_start_event(
     }
 }
 
-pub(crate) fn attempt_success_event(
-    meta: &AttemptMeta,
+pub(crate) fn attempt_success_event_fields(
+    provider: ProviderId,
+    model: Option<String>,
+    request_id: Option<String>,
     target_index: usize,
     attempt_index: usize,
     elapsed: Duration,
+    status_code: Option<u16>,
 ) -> AttemptSuccessEvent {
     AttemptSuccessEvent {
-        request_id: meta.request_id.clone(),
-        provider: Some(meta.provider),
-        model: Some(meta.model.clone()),
+        request_id,
+        provider: Some(provider),
+        model,
         target_index: Some(target_index),
         attempt_index: Some(attempt_index),
         elapsed,
-        status_code: meta.status_code,
+        status_code,
     }
 }
 
-pub(crate) fn attempt_failure_event(
-    meta: &AttemptMeta,
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn attempt_failure_event_fields(
+    provider: ProviderId,
+    model: Option<String>,
+    request_id: Option<String>,
     target_index: usize,
     attempt_index: usize,
     elapsed: Duration,
+    error_kind: Option<RuntimeErrorKind>,
+    error_message: Option<String>,
 ) -> AttemptFailureEvent {
     AttemptFailureEvent {
-        request_id: meta.request_id.clone(),
-        provider: Some(meta.provider),
-        model: Some(meta.model.clone()),
+        request_id,
+        provider: Some(provider),
+        model,
         target_index: Some(target_index),
         attempt_index: Some(attempt_index),
         elapsed,
-        error_kind: meta.error_kind,
-        error_message: meta.error_message.clone(),
+        error_kind,
+        error_message,
     }
 }
 
@@ -343,7 +353,7 @@ pub(crate) fn attempt_skipped_event(
     elapsed: Duration,
 ) -> AttemptSkippedEvent {
     let AttemptDisposition::Skipped { reason } = &attempt.disposition else {
-        panic!("attempt_skipped_event requires AttemptDisposition::Skipped");
+        unreachable!("attempt_skipped_event requires AttemptDisposition::Skipped");
     };
 
     AttemptSkippedEvent {
@@ -390,59 +400,21 @@ pub(crate) fn request_end_failure_event(
 }
 
 pub(crate) fn response_meta(
-    selected_provider: ProviderId,
+    selected_provider_instance: ProviderInstanceId,
+    selected_provider_kind: ProviderKind,
     selected_model: String,
     status_code: Option<u16>,
     request_id: Option<String>,
-    attempts: Vec<AttemptMeta>,
+    attempts: Vec<AttemptRecord>,
 ) -> ResponseMeta {
     ResponseMeta {
-        selected_provider,
+        selected_provider_instance,
+        selected_provider_kind,
         selected_model,
         status_code,
         request_id,
         attempts,
     }
-}
-
-// REFACTOR-SHIM: convert typed AttemptRecord history into the legacy ResponseMeta.attempts shape
-// until phase 09 replaces ResponseMeta.attempts with Vec<AttemptRecord>.
-pub(crate) fn legacy_attempt_meta(record: &AttemptRecord) -> Option<AttemptMeta> {
-    match &record.disposition {
-        AttemptDisposition::Skipped { .. } => None,
-        AttemptDisposition::Succeeded {
-            status_code,
-            request_id,
-        } => Some(AttemptMeta {
-            provider: record.provider_kind,
-            model: record.model.clone(),
-            success: true,
-            status_code: *status_code,
-            request_id: request_id.clone(),
-            error_kind: None,
-            error_message: None,
-        }),
-        AttemptDisposition::Failed {
-            error_kind,
-            error_message,
-            status_code,
-            request_id,
-        } => Some(AttemptMeta {
-            provider: record.provider_kind,
-            model: record.model.clone(),
-            success: false,
-            status_code: *status_code,
-            request_id: request_id.clone(),
-            error_kind: Some(*error_kind),
-            error_message: Some(error_message.clone()),
-        }),
-    }
-}
-
-// REFACTOR-SHIM: preserve the legacy ResponseMeta.attempts contract while streaming runtime state
-// is already normalized to ordered AttemptRecord history.
-pub(crate) fn legacy_attempt_history(records: &[AttemptRecord]) -> Vec<AttemptMeta> {
-    records.iter().filter_map(legacy_attempt_meta).collect()
 }
 
 pub(crate) fn executed_failure_meta(

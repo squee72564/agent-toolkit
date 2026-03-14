@@ -15,7 +15,10 @@ use crate::route::Route;
 use crate::routed_messages_api::RoutedMessagesApi;
 use crate::routed_streaming_api::RoutedStreamingApi;
 use crate::runtime_error::RuntimeError;
-use crate::types::{AttemptRecord, ResponseMeta, failed_attempt_record};
+use crate::types::{
+    AttemptRecord, ResponseMeta, executed_failure_meta, failed_attempt_record, response_meta,
+    succeeded_attempt_record,
+};
 
 mod builder;
 mod execution;
@@ -90,7 +93,7 @@ impl AgentToolkit {
         prepared.emit_request_start(None);
 
         let fallback_policy = route.fallback_policy.clone();
-        let mut attempts = Vec::new();
+        let mut attempt_history: Vec<AttemptRecord> = Vec::new();
         let mut last_error: Option<RuntimeError> = None;
         let initial_plan = match planner::plan_routed_execution(
             self,
@@ -118,6 +121,7 @@ impl AgentToolkit {
         };
         for skipped in &initial_plan.skipped_attempts {
             prepared.emit_attempt_skipped(self, &execution, skipped);
+            attempt_history.push(skipped.record.clone());
         }
 
         for (index, attempt_spec) in prepared
@@ -150,10 +154,12 @@ impl AgentToolkit {
                     planner::FallbackPlanResult::Executable(plan) => *plan,
                     planner::FallbackPlanResult::Skip(skipped) => {
                         prepared.emit_attempt_skipped(self, &execution, &skipped);
+                        attempt_history.push(skipped.record);
                         continue;
                     }
                     planner::FallbackPlanResult::Rejected(skipped) => {
                         prepared.emit_attempt_skipped(self, &execution, &skipped);
+                        attempt_history.push(skipped.record);
                         break;
                     }
                     planner::FallbackPlanResult::Stop => break,
@@ -172,12 +178,26 @@ impl AgentToolkit {
             match attempt {
                 ProviderAttemptOutcome::Success { response, meta } => {
                     attempt_execution.emit_success(&meta, index);
-
-                    attempts.push(meta.clone());
-                    let response_meta = attempt_execution.response_meta(attempts, meta);
+                    attempt_history.push(succeeded_attempt_record(
+                        target.instance.clone(),
+                        client.runtime.kind,
+                        meta.model.clone(),
+                        index,
+                        index,
+                        meta.status_code,
+                        meta.request_id.clone(),
+                    ));
+                    let response_meta = response_meta(
+                        target.instance.clone(),
+                        client.runtime.kind,
+                        meta.model.clone(),
+                        meta.status_code,
+                        meta.request_id.clone(),
+                        attempt_history,
+                    );
                     let response_model = response_meta.selected_model.clone();
                     prepared.emit_request_end_success(
-                        Some(response_meta.selected_provider),
+                        Some(response_meta.selected_provider_kind),
                         Some(response_model),
                         Some(index),
                         Some(index),
@@ -188,8 +208,24 @@ impl AgentToolkit {
                 }
                 ProviderAttemptOutcome::Failure { error, meta } => {
                     attempt_execution.emit_failure(&meta, index);
-
-                    attempts.push(meta);
+                    attempt_history.push(failed_attempt_record(
+                        target.instance.clone(),
+                        client.runtime.kind,
+                        meta.model.clone(),
+                        index,
+                        index,
+                        &error,
+                    ));
+                    let status_code = error.status_code;
+                    let request_id = error.request_id.clone();
+                    let error = error.with_executed_failure_meta(executed_failure_meta(
+                        target.instance.clone(),
+                        client.runtime.kind,
+                        meta.model,
+                        status_code,
+                        request_id,
+                        attempt_history.clone(),
+                    ));
                     let should_continue = index + 1 < prepared.attempts.len()
                         && fallback_policy.should_retry_next_target(
                             &error,
@@ -205,7 +241,20 @@ impl AgentToolkit {
         }
 
         let result = match last_error {
-            Some(error) if attempts.len() > 1 => Err(RuntimeError::fallback_exhausted(error)),
+            Some(error)
+                if attempt_history
+                    .iter()
+                    .filter(|attempt| {
+                        !matches!(
+                            attempt.disposition,
+                            crate::AttemptDisposition::Skipped { .. }
+                        )
+                    })
+                    .count()
+                    > 1 =>
+            {
+                Err(RuntimeError::fallback_exhausted(error))
+            }
             Some(error) => Err(error),
             None => Err(RuntimeError::target_resolution(
                 "no target providers were resolved for this request",
@@ -213,7 +262,7 @@ impl AgentToolkit {
         };
 
         if let Err(error) = &result {
-            prepared.emit_terminal_request_end(self, &execution, &attempts, error);
+            prepared.emit_terminal_request_end(self, &execution, &attempt_history, error);
         }
 
         result
@@ -235,7 +284,6 @@ impl AgentToolkit {
         let prepared = PreparedExecution::new(self, &route, &execution)?;
         prepared.emit_request_start(None);
         let fallback_policy = route.fallback_policy.clone();
-        let mut attempts = Vec::new();
         let mut attempt_history: Vec<AttemptRecord> = Vec::new();
         let mut last_error: Option<RuntimeError> = None;
 
@@ -350,7 +398,6 @@ impl AgentToolkit {
                 }
                 ProviderStreamAttemptOutcome::Failure { error, meta } => {
                     attempt_execution.emit_failure(&meta, index);
-                    attempts.push(meta);
                     attempt_history.push(failed_attempt_record(
                         target.instance.clone(),
                         client.runtime.kind,
@@ -358,6 +405,16 @@ impl AgentToolkit {
                         index,
                         index,
                         &error,
+                    ));
+                    let status_code = error.status_code;
+                    let request_id = error.request_id.clone();
+                    let error = error.with_executed_failure_meta(executed_failure_meta(
+                        target.instance.clone(),
+                        client.runtime.kind,
+                        meta.model,
+                        status_code,
+                        request_id,
+                        attempt_history.clone(),
                     ));
                     let should_continue = index + 1 < prepared.attempts.len()
                         && fallback_policy.should_retry_next_target(
@@ -374,7 +431,20 @@ impl AgentToolkit {
         }
 
         let result = match last_error {
-            Some(error) if attempts.len() > 1 => Err(RuntimeError::fallback_exhausted(error)),
+            Some(error)
+                if attempt_history
+                    .iter()
+                    .filter(|attempt| {
+                        !matches!(
+                            attempt.disposition,
+                            crate::AttemptDisposition::Skipped { .. }
+                        )
+                    })
+                    .count()
+                    > 1 =>
+            {
+                Err(RuntimeError::fallback_exhausted(error))
+            }
             Some(error) => Err(error),
             None => Err(RuntimeError::target_resolution(
                 "no target providers were resolved for this request",
@@ -382,7 +452,7 @@ impl AgentToolkit {
         };
 
         if let Err(error) = &result {
-            prepared.emit_terminal_request_end(self, &execution, &attempts, error);
+            prepared.emit_terminal_request_end(self, &execution, &attempt_history, error);
         }
 
         result

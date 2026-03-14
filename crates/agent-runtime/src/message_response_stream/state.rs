@@ -13,7 +13,7 @@ use crate::provider_runtime::OpenedProviderStream;
 use crate::runtime_error::RuntimeError;
 use crate::types::{
     AttemptRecord, ExecutedFailureMeta, ResponseMeta, executed_failure_meta, failed_attempt_record,
-    legacy_attempt_history, response_meta, succeeded_attempt_record,
+    response_meta, succeeded_attempt_record,
 };
 
 pub(super) struct StreamDriverState {
@@ -208,13 +208,13 @@ pub(super) struct PendingCompletion {
 
 impl PendingCompletion {
     pub(super) fn meta(self) -> ResponseMeta {
-        let _selected_provider_instance = &self.success_meta.selected_provider_instance;
         response_meta(
+            self.success_meta.selected_provider_instance,
             self.success_meta.selected_provider_kind,
             self.success_meta.selected_model,
             self.success_meta.status_code,
             self.success_meta.request_id,
-            legacy_attempt_history(&self.success_meta.attempts),
+            self.success_meta.attempts,
         )
     }
 }
