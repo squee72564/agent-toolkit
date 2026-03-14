@@ -3,15 +3,17 @@ use std::collections::BTreeMap;
 use crate::adapter::adapter_for;
 use crate::error::{AdapterErrorKind, AdapterOperation};
 use agent_core::types::ProviderKind;
-use agent_core::types::{ContentPart, Message, MessageRole, Request, ResponseFormat, ToolChoice};
+use agent_core::types::{
+    ContentPart, Message, MessageRole, ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
+};
 use serde_json::json;
 
 use super::request;
 
-fn base_request() -> Request {
-    Request {
-        model_id: "gpt-4.1-mini".to_string(),
-        stream: false,
+const MODEL_ID: &str = "gpt-4.1-mini";
+
+fn base_task() -> TaskRequest {
+    TaskRequest {
         messages: vec![Message {
             role: MessageRole::User,
             content: vec![ContentPart::Text {
@@ -32,10 +34,9 @@ fn base_request() -> Request {
 #[test]
 fn openai_request_error_maps_into_adapter_error() {
     let adapter_error = request::plan_request(
-        Request {
-            model_id: String::new(),
-            ..base_request()
-        },
+        &base_task(),
+        "",
+        ResponseMode::NonStreaming,
         ProviderKind::OpenAi,
         None,
     )
@@ -63,10 +64,9 @@ fn openai_response_error_maps_into_adapter_error() {
 #[test]
 fn openai_request_error_preserves_source_chain() {
     let adapter_error = request::plan_request(
-        Request {
-            model_id: String::new(),
-            ..base_request()
-        },
+        &base_task(),
+        "",
+        ResponseMode::NonStreaming,
         ProviderKind::OpenAi,
         None,
     )
@@ -120,15 +120,21 @@ fn openai_decode_empty_content_is_nonfatal_and_warns() {
 
 #[test]
 fn openai_translator_is_constructible() {
-    let _ = base_request();
+    let _ = base_task();
 }
 
 #[test]
 fn openai_request_plan_passes_through_openai_encoder() {
-    let encoded = request::plan_request(base_request(), ProviderKind::OpenAi, None)
-        .expect("planning should succeed");
+    let encoded = request::plan_request(
+        &base_task(),
+        MODEL_ID,
+        ResponseMode::NonStreaming,
+        ProviderKind::OpenAi,
+        None,
+    )
+    .expect("planning should succeed");
 
-    assert_eq!(encoded.body["model"], "gpt-4.1-mini");
+    assert_eq!(encoded.body["model"], MODEL_ID);
     assert!(encoded.body["input"].is_array());
 }
 

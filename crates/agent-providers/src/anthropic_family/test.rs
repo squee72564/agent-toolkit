@@ -3,23 +3,28 @@ use std::collections::BTreeMap;
 use serde_json::json;
 
 use agent_core::types::{
-    ContentPart, FinishReason, Message, MessageRole, Request, ResponseFormat, ToolCall, ToolChoice,
-    ToolDefinition, ToolResult, ToolResultContent,
+    ContentPart, FinishReason, Message, MessageRole, ResponseFormat, TaskRequest, ToolCall,
+    ToolChoice, ToolDefinition, ToolResult, ToolResultContent,
 };
 
 use super::decode::{
     decode_anthropic_response, format_anthropic_error_message, parse_anthropic_error_value,
 };
-use super::encode::encode_anthropic_request;
+use super::encode::encode_anthropic_request as encode_task_request;
 use super::schema_rules::{
     canonicalize_json, extract_first_json_object, permissive_json_object_schema, stable_json_string,
 };
 use super::{AnthropicDecodeEnvelope, AnthropicFamilyError, AnthropicFamilyErrorKind};
+const MODEL_ID: &str = "claude-sonnet-4.6";
 
-fn base_request(messages: Vec<Message>) -> Request {
-    Request {
-        model_id: "claude-sonnet-4.6".to_string(),
-        stream: false,
+fn encode_anthropic_request(
+    task: TaskRequest,
+) -> Result<super::AnthropicEncodedRequest, AnthropicFamilyError> {
+    encode_task_request(&task, MODEL_ID)
+}
+
+fn base_request(messages: Vec<Message>) -> TaskRequest {
+    TaskRequest {
         messages,
         tools: Vec::new(),
         tool_choice: ToolChoice::Auto,

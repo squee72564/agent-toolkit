@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::{Map, Value, json};
 
 use agent_core::types::{
-    ContentPart, Message, MessageRole, Request, ResponseFormat, RuntimeWarning, ToolChoice,
+    ContentPart, Message, MessageRole, ResponseFormat, RuntimeWarning, TaskRequest, ToolChoice,
     ToolDefinition, ToolResultContent,
 };
 
@@ -33,12 +33,13 @@ impl WireMessage {
 }
 
 pub(crate) fn encode_anthropic_request(
-    req: Request,
+    task: &TaskRequest,
+    model_id: &str,
 ) -> Result<AnthropicEncodedRequest, AnthropicFamilyError> {
-    validate_request(&req)?;
+    validate_request(task, model_id)?;
 
     let mut warnings = Vec::new();
-    if req.temperature.is_some() && req.top_p.is_some() {
+    if task.temperature.is_some() && task.top_p.is_some() {
         push_warning(
             &mut warnings,
             WARN_BOTH_TEMPERATURE_AND_TOP_P_SET,
@@ -46,9 +47,7 @@ pub(crate) fn encode_anthropic_request(
         );
     }
 
-    let Request {
-        model_id,
-        stream: _,
+    let TaskRequest {
         messages,
         tools,
         tool_choice,
@@ -58,7 +57,7 @@ pub(crate) fn encode_anthropic_request(
         top_p,
         max_output_tokens,
         stop,
-    } = req;
+    } = task.clone();
 
     let (system, non_system_messages) = map_system_prefix(messages)?;
     let mapped_messages = map_non_system_messages(non_system_messages)?;
@@ -76,7 +75,7 @@ pub(crate) fn encode_anthropic_request(
     let metadata = map_metadata(metadata, &mut warnings);
 
     let mut body = Map::new();
-    body.insert("model".to_string(), Value::String(model_id));
+    body.insert("model".to_string(), Value::String(model_id.to_string()));
     body.insert(
         "max_tokens".to_string(),
         Value::from(max_output_tokens.unwrap_or_else(|| {
@@ -130,18 +129,18 @@ pub(crate) fn encode_anthropic_request(
     })
 }
 
-fn validate_request(req: &Request) -> Result<(), AnthropicFamilyError> {
-    if req.model_id.trim().is_empty() {
+fn validate_request(task: &TaskRequest, model_id: &str) -> Result<(), AnthropicFamilyError> {
+    if model_id.trim().is_empty() {
         return Err(AnthropicFamilyError::validation("missing model_id"));
     }
 
-    if req.max_output_tokens == Some(0) {
+    if task.max_output_tokens == Some(0) {
         return Err(AnthropicFamilyError::validation(
             "max_output_tokens must be at least 1 for Anthropic",
         ));
     }
 
-    if let Some(temperature) = req.temperature
+    if let Some(temperature) = task.temperature
         && !(0.0..=1.0).contains(&temperature)
     {
         return Err(AnthropicFamilyError::validation(format!(
@@ -149,7 +148,7 @@ fn validate_request(req: &Request) -> Result<(), AnthropicFamilyError> {
         )));
     }
 
-    if let Some(top_p) = req.top_p
+    if let Some(top_p) = task.top_p
         && !(0.0..=1.0).contains(&top_p)
     {
         return Err(AnthropicFamilyError::validation(format!(
@@ -157,7 +156,7 @@ fn validate_request(req: &Request) -> Result<(), AnthropicFamilyError> {
         )));
     }
 
-    for stop in &req.stop {
+    for stop in &task.stop {
         if stop.is_empty() {
             return Err(AnthropicFamilyError::validation(
                 "stop sequences must not contain empty strings",
@@ -165,33 +164,33 @@ fn validate_request(req: &Request) -> Result<(), AnthropicFamilyError> {
         }
     }
 
-    validate_tool_choice(req)?;
+    validate_tool_choice(task)?;
 
     Ok(())
 }
 
-fn validate_tool_choice(req: &Request) -> Result<(), AnthropicFamilyError> {
-    if req.tools.is_empty() {
-        if matches!(req.tool_choice, ToolChoice::Required) {
+fn validate_tool_choice(task: &TaskRequest) -> Result<(), AnthropicFamilyError> {
+    if task.tools.is_empty() {
+        if matches!(task.tool_choice, ToolChoice::Required) {
             return Err(AnthropicFamilyError::validation(
                 "tool_choice 'required' requires at least one tool definition",
             ));
         }
 
-        if matches!(req.tool_choice, ToolChoice::Specific { .. }) {
+        if matches!(task.tool_choice, ToolChoice::Specific { .. }) {
             return Err(AnthropicFamilyError::validation(
                 "tool_choice 'specific' requires at least one tool definition",
             ));
         }
     }
 
-    if let ToolChoice::Specific { name } = &req.tool_choice {
+    if let ToolChoice::Specific { name } = &task.tool_choice {
         if name.trim().is_empty() {
             return Err(AnthropicFamilyError::validation(
                 "tool_choice specific requires a non-empty tool name",
             ));
         }
-        if !req.tools.iter().any(|tool| tool.name == *name) {
+        if !task.tools.iter().any(|tool| tool.name == *name) {
             return Err(AnthropicFamilyError::validation(format!(
                 "tool_choice specific references unknown tool: {name}",
             )));

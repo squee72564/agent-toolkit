@@ -79,8 +79,6 @@ pub use response::Response;
 pub use response::RuntimeWarning;
 /// Re-export of [`response::Usage`].
 pub use response::Usage;
-/// Re-export of [`task::Request`].
-pub use task::Request;
 /// Re-export of [`task::ResponseFormat`].
 pub use task::ResponseFormat;
 /// Re-export of [`task::TaskRequest`].

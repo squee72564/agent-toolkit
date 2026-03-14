@@ -4,20 +4,32 @@ use std::io;
 use serde_json::json;
 
 use agent_core::types::{
-    ContentPart, Message, MessageRole, Request, ResponseFormat, ToolCall, ToolChoice,
+    ContentPart, Message, MessageRole, ResponseFormat, TaskRequest, ToolCall, ToolChoice,
     ToolDefinition, ToolResult, ToolResultContent,
 };
 
 use super::OpenAiFamilyError;
 use super::decode::decode_openai_response;
-use super::encode::encode_openai_request;
+use super::encode::encode_openai_request as encode_task_request;
 use super::schema_rules::{canonicalize_json, is_strict_compatible_schema, stable_json_string};
 use super::{OpenAiDecodeEnvelope, OpenAiFamilyErrorKind};
+const MODEL_ID: &str = "gpt-4.1-mini";
 
-fn base_request(messages: Vec<Message>) -> Request {
-    Request {
-        model_id: "gpt-4.1-mini".to_string(),
-        stream: false,
+fn encode_openai_request(
+    task: TaskRequest,
+) -> Result<super::OpenAiEncodedRequest, OpenAiFamilyError> {
+    encode_task_request(&task, MODEL_ID)
+}
+
+fn encode_openai_request_with_model(
+    task: TaskRequest,
+    model_id: &str,
+) -> Result<super::OpenAiEncodedRequest, OpenAiFamilyError> {
+    encode_task_request(&task, model_id)
+}
+
+fn base_request(messages: Vec<Message>) -> TaskRequest {
+    TaskRequest {
         messages,
         tools: Vec::new(),
         tool_choice: ToolChoice::Auto,
@@ -490,10 +502,10 @@ fn serializes_assistant_tool_call_and_tool_result() {
 
 #[test]
 fn reject_empty_model_id() {
-    let mut request = base_request(vec![Message::user_text("hello")]);
-    request.model_id = "   ".to_string();
+    let request = base_request(vec![Message::user_text("hello")]);
 
-    let error = encode_openai_request(request.clone()).expect_err("encoding should fail");
+    let error =
+        encode_openai_request_with_model(request.clone(), "   ").expect_err("encoding should fail");
 
     match error {
         OpenAiFamilyError::Validation { message } => {

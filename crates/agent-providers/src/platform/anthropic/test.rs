@@ -1,15 +1,14 @@
 use crate::adapter::adapter_for;
 use crate::error::{AdapterErrorKind, AdapterOperation};
 use agent_core::{
-    ContentPart, Message, MessageRole, ProviderKind, Request, ResponseFormat, ToolChoice,
+    ContentPart, Message, MessageRole, ProviderKind, ResponseFormat, ResponseMode, TaskRequest,
+    ToolChoice,
 };
 
 use super::request;
 
-fn base_request() -> Request {
-    Request {
-        model_id: "claude-sonnet-4-6".to_string(),
-        stream: false,
+fn base_task() -> TaskRequest {
+    TaskRequest {
         messages: vec![Message {
             role: MessageRole::User,
             content: vec![ContentPart::text("hello")],
@@ -27,14 +26,8 @@ fn base_request() -> Request {
 
 #[test]
 fn anthropic_request_error_maps_into_adapter_error() {
-    let adapter_error = request::plan_request(
-        agent_core::Request {
-            model_id: String::new(),
-            ..base_request()
-        },
-        None,
-    )
-    .expect_err("planning should fail");
+    let adapter_error = request::plan_request(&base_task(), "", ResponseMode::NonStreaming, None)
+        .expect_err("planning should fail");
 
     assert_eq!(adapter_error.provider, ProviderKind::Anthropic);
     assert_eq!(adapter_error.operation, AdapterOperation::PlanRequest);
@@ -60,14 +53,8 @@ fn anthropic_response_error_maps_into_adapter_error() {
 
 #[test]
 fn anthropic_request_error_preserves_source_chain() {
-    let adapter_error = request::plan_request(
-        agent_core::Request {
-            model_id: String::new(),
-            ..base_request()
-        },
-        None,
-    )
-    .expect_err("planning should fail");
+    let adapter_error = request::plan_request(&base_task(), "", ResponseMode::NonStreaming, None)
+        .expect_err("planning should fail");
 
     let spec_source = adapter_error
         .source_ref()
@@ -122,5 +109,5 @@ fn anthropic_protocol_violation_error_maps_into_adapter_error() {
 
 #[test]
 fn anthropic_translator_is_constructible() {
-    let _ = base_request();
+    let _ = base_task();
 }

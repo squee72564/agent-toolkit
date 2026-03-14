@@ -1,6 +1,6 @@
 use agent_core::{
-    AnthropicFamilyOptions, AnthropicOptions, NativeOptions, ProviderOptions, Request,
-    ResponseMode, TaskRequest,
+    AnthropicFamilyOptions, AnthropicOptions, NativeOptions, ProviderOptions, ResponseMode,
+    TaskRequest,
 };
 use agent_transport::HttpRequestOptions;
 use reqwest::{Method, header::HeaderMap};
@@ -71,11 +71,7 @@ pub(crate) fn encode_family_request(
     model: &str,
     response_mode: ResponseMode,
 ) -> Result<EncodedFamilyRequest, AdapterError> {
-    let mut request = Request::from(task.clone());
-    request.model_id = model.to_string();
-    request.stream = response_mode == ResponseMode::Streaming;
-
-    let encoded = crate::anthropic_family::encode::encode_anthropic_request(request)
+    let encoded = crate::anthropic_family::encode::encode_anthropic_request(task, model)
         .map_err(map_anthropic_plan_error)?;
     let mut body = encoded.body;
     if response_mode == ResponseMode::Streaming {
@@ -111,18 +107,12 @@ pub(crate) fn apply_provider_overlay(
 
 #[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn plan_request(
-    req: Request,
+    task: &TaskRequest,
+    model: &str,
+    response_mode: ResponseMode,
     native_options: Option<&NativeOptions>,
 ) -> Result<crate::request_plan::ProviderRequestPlan, AdapterError> {
-    let mut request = encode_family_request(
-        &req.task_request(),
-        &req.model_id,
-        if req.stream {
-            ResponseMode::Streaming
-        } else {
-            ResponseMode::NonStreaming
-        },
-    )?;
+    let mut request = encode_family_request(task, model, response_mode)?;
     let family_options = native_options
         .and_then(|native| native.family.as_ref())
         .and_then(|family| match family {

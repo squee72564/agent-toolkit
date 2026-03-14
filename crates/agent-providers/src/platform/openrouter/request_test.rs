@@ -1,13 +1,13 @@
-use agent_core::{Message, Request, ResponseFormat, ToolChoice};
+use agent_core::{Message, ResponseFormat, ResponseMode, TaskRequest, ToolChoice};
 
 use crate::platform::openrouter::request::{OpenRouterOverrides, plan_request};
 use crate::request_plan::TransportResponseFraming;
 use reqwest::Method;
 
-fn base_request(stream: bool) -> Request {
-    Request {
-        model_id: "openai/gpt-5-mini".to_string(),
-        stream,
+const MODEL_ID: &str = "openai/gpt-5-mini";
+
+fn base_task() -> TaskRequest {
+    TaskRequest {
         messages: vec![Message::user_text("hello")],
         tools: Vec::new(),
         tool_choice: ToolChoice::Auto,
@@ -22,8 +22,13 @@ fn base_request(stream: bool) -> Request {
 
 #[test]
 fn openrouter_request_plan_uses_json_defaults_for_non_streaming_requests() {
-    let plan = plan_request(base_request(false), &OpenRouterOverrides::default())
-        .expect("planning should succeed");
+    let plan = plan_request(
+        &base_task(),
+        MODEL_ID,
+        ResponseMode::NonStreaming,
+        &OpenRouterOverrides::default(),
+    )
+    .expect("planning should succeed");
 
     assert_eq!(plan.method, Method::POST);
     assert_eq!(plan.response_framing, TransportResponseFraming::Json);
@@ -33,8 +38,13 @@ fn openrouter_request_plan_uses_json_defaults_for_non_streaming_requests() {
 
 #[test]
 fn openrouter_request_plan_enables_sse_for_streaming_requests() {
-    let plan = plan_request(base_request(true), &OpenRouterOverrides::default())
-        .expect("planning should succeed");
+    let plan = plan_request(
+        &base_task(),
+        MODEL_ID,
+        ResponseMode::Streaming,
+        &OpenRouterOverrides::default(),
+    )
+    .expect("planning should succeed");
 
     assert_eq!(plan.method, Method::POST);
     assert_eq!(plan.response_framing, TransportResponseFraming::Sse);

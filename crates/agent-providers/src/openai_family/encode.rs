@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashSet};
 use serde_json::{Map, Value, json};
 
 use agent_core::types::{
-    ContentPart, Message, MessageRole, Request, ResponseFormat, RuntimeWarning, ToolChoice,
+    ContentPart, Message, MessageRole, ResponseFormat, RuntimeWarning, TaskRequest, ToolChoice,
     ToolDefinition, ToolResult, ToolResultContent,
 };
 
@@ -28,33 +28,20 @@ pub(crate) struct OpenAiEncodeInput<'a> {
 }
 
 pub(crate) fn encode_openai_request(
-    req: Request,
+    task: &TaskRequest,
+    model_id: &str,
 ) -> Result<OpenAiEncodedRequest, OpenAiFamilyError> {
-    let Request {
-        model_id,
-        stream: _,
-        messages,
-        tools,
-        tool_choice,
-        response_format,
-        metadata,
-        temperature,
-        top_p,
-        max_output_tokens,
-        stop,
-    } = req;
-
     encode_openai_request_parts(OpenAiEncodeInput {
-        model_id: &model_id,
-        messages,
-        tools,
-        tool_choice,
-        response_format,
-        temperature,
-        top_p,
-        max_output_tokens,
-        stop: &stop,
-        metadata,
+        model_id,
+        messages: task.messages.clone(),
+        tools: task.tools.clone(),
+        tool_choice: task.tool_choice.clone(),
+        response_format: task.response_format.clone(),
+        temperature: task.temperature,
+        top_p: task.top_p,
+        max_output_tokens: task.max_output_tokens,
+        stop: &task.stop,
+        metadata: task.metadata.clone(),
     })
 }
 

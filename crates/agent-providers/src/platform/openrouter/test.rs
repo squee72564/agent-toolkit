@@ -5,15 +5,17 @@ use serde_json::{Map, json};
 use crate::adapter::adapter_for;
 use crate::error::{AdapterErrorKind, AdapterOperation};
 use agent_core::types::ProviderKind;
-use agent_core::types::{ContentPart, Message, MessageRole, Request, ResponseFormat, ToolChoice};
+use agent_core::types::{
+    ContentPart, Message, MessageRole, ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
+};
 
 use super::request;
 use crate::platform::openrouter::request::OpenRouterOverrides;
 
-fn base_request() -> Request {
-    Request {
-        model_id: "openai/gpt-4.1-mini".to_string(),
-        stream: false,
+const MODEL_ID: &str = "openai/gpt-4.1-mini";
+
+fn base_task() -> TaskRequest {
+    TaskRequest {
         messages: vec![Message {
             role: MessageRole::User,
             content: vec![ContentPart::Text {
@@ -34,10 +36,9 @@ fn base_request() -> Request {
 #[test]
 fn openrouter_request_error_maps_into_adapter_error() {
     let adapter_error = request::plan_request(
-        Request {
-            model_id: String::new(),
-            ..base_request()
-        },
+        &base_task(),
+        "",
+        ResponseMode::NonStreaming,
         &OpenRouterOverrides::default(),
     )
     .expect_err("planning should fail");
@@ -102,10 +103,9 @@ fn openrouter_protocol_violation_error_maps_into_adapter_error() {
 #[test]
 fn openrouter_request_error_preserves_source_chain() {
     let adapter_error = request::plan_request(
-        Request {
-            model_id: String::new(),
-            ..base_request()
-        },
+        &base_task(),
+        "",
+        ResponseMode::NonStreaming,
         &OpenRouterOverrides::default(),
     )
     .expect_err("planning should fail");
@@ -121,21 +121,31 @@ fn openrouter_request_error_preserves_source_chain() {
 
 #[test]
 fn openrouter_request_reuses_openai_family_encoder() {
-    let encoded = request::plan_request(base_request(), &OpenRouterOverrides::default())
-        .expect("planning should succeed");
+    let encoded = request::plan_request(
+        &base_task(),
+        MODEL_ID,
+        ResponseMode::NonStreaming,
+        &OpenRouterOverrides::default(),
+    )
+    .expect("planning should succeed");
 
-    assert_eq!(encoded.body["model"], "openai/gpt-4.1-mini");
+    assert_eq!(encoded.body["model"], MODEL_ID);
     assert!(encoded.body["input"].is_array());
 }
 
 #[test]
 fn openrouter_request_preserves_openai_encode_warnings() {
-    let mut request = base_request();
-    request.top_p = Some(0.9);
-    request.stop = vec!["DONE".to_string()];
+    let mut task = base_task();
+    task.top_p = Some(0.9);
+    task.stop = vec!["DONE".to_string()];
 
-    let encoded = request::plan_request(request.clone(), &OpenRouterOverrides::default())
-        .expect("planning should succeed");
+    let encoded = request::plan_request(
+        &task,
+        MODEL_ID,
+        ResponseMode::NonStreaming,
+        &OpenRouterOverrides::default(),
+    )
+    .expect("planning should succeed");
 
     let top_p = encoded.body["top_p"]
         .as_f64()
@@ -162,11 +172,12 @@ fn openrouter_request_reintroduces_top_p_and_stop_with_fallback_models() {
         fallback_models: vec!["openai/gpt-4.1".to_string()],
         ..OpenRouterOverrides::default()
     };
-    let mut request = base_request();
-    request.top_p = Some(0.9);
-    request.stop = vec!["DONE".to_string()];
+    let mut task = base_task();
+    task.top_p = Some(0.9);
+    task.stop = vec!["DONE".to_string()];
 
-    let encoded = request::plan_request(request, &overrides).expect("planning should succeed");
+    let encoded = request::plan_request(&task, MODEL_ID, ResponseMode::NonStreaming, &overrides)
+        .expect("planning should succeed");
 
     assert_eq!(
         encoded.body["models"],
@@ -188,8 +199,13 @@ fn openrouter_request_applies_typed_overrides() {
         parallel_tool_calls: Some(true),
         ..OpenRouterOverrides::default()
     };
-    let encoded =
-        request::plan_request(base_request(), &overrides).expect("planning should succeed");
+    let encoded = request::plan_request(
+        &base_task(),
+        MODEL_ID,
+        ResponseMode::NonStreaming,
+        &overrides,
+    )
+    .expect("planning should succeed");
 
     assert_eq!(encoded.body["max_tokens"], 384);
     assert_eq!(encoded.body["user"], "user-1");
@@ -204,8 +220,13 @@ fn openrouter_request_omits_empty_serde_backed_overrides() {
         modalities: Some(Vec::new()),
         ..OpenRouterOverrides::default()
     };
-    let encoded =
-        request::plan_request(base_request(), &overrides).expect("planning should succeed");
+    let encoded = request::plan_request(
+        &base_task(),
+        MODEL_ID,
+        ResponseMode::NonStreaming,
+        &overrides,
+    )
+    .expect("planning should succeed");
 
     assert!(encoded.body.get("plugins").is_none());
     assert_eq!(encoded.body["modalities"], json!([]));
@@ -219,8 +240,13 @@ fn openrouter_request_rejects_non_finite_frequency_penalty_override() {
         frequency_penalty: Some(f32::NAN),
         ..OpenRouterOverrides::default()
     };
-    let error = request::plan_request(base_request(), &overrides)
-        .expect_err("planning should fail for non-finite frequency_penalty");
+    let error = request::plan_request(
+        &base_task(),
+        MODEL_ID,
+        ResponseMode::NonStreaming,
+        &overrides,
+    )
+    .expect_err("planning should fail for non-finite frequency_penalty");
     assert!(error.message.contains("frequency_penalty"));
     assert!(error.message.contains("must be finite"));
 }
@@ -231,8 +257,13 @@ fn openrouter_request_rejects_non_finite_presence_penalty_override() {
         presence_penalty: Some(f32::INFINITY),
         ..OpenRouterOverrides::default()
     };
-    let error = request::plan_request(base_request(), &overrides)
-        .expect_err("planning should fail for non-finite presence_penalty");
+    let error = request::plan_request(
+        &base_task(),
+        MODEL_ID,
+        ResponseMode::NonStreaming,
+        &overrides,
+    )
+    .expect_err("planning should fail for non-finite presence_penalty");
     assert!(error.message.contains("presence_penalty"));
     assert!(error.message.contains("must be finite"));
 }
@@ -249,8 +280,13 @@ fn openrouter_request_extra_overrides_take_precedence() {
         extra,
         ..OpenRouterOverrides::default()
     };
-    let encoded =
-        request::plan_request(base_request(), &overrides).expect("planning should succeed");
+    let encoded = request::plan_request(
+        &base_task(),
+        MODEL_ID,
+        ResponseMode::NonStreaming,
+        &overrides,
+    )
+    .expect("planning should succeed");
 
     assert_eq!(encoded.body["user"], "from-extra");
     assert_eq!(encoded.body["max_tokens"], 777);

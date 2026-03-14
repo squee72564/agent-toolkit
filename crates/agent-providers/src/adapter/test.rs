@@ -9,8 +9,8 @@ use serde_json::json;
 use agent_core::types::{
     AssistantOutput, AuthCredentials, AuthStyle, ContentPart, ExecutionPlan, FinishReason, Message,
     MessageRole, NativeOptions, PlatformConfig, ProtocolKind, ProviderCapabilities,
-    ProviderInstanceId, ProviderKind, Request, ResolvedAuthContext, ResolvedProviderAttempt,
-    ResolvedTransportOptions, Response, ResponseFormat, ResponseMode, ToolChoice,
+    ProviderInstanceId, ProviderKind, ResolvedAuthContext, ResolvedProviderAttempt,
+    ResolvedTransportOptions, Response, ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
     TransportTimeoutOverrides, Usage,
 };
 
@@ -27,10 +27,11 @@ use crate::streaming::ProviderStreamProjector;
 
 use super::*;
 
-fn base_request() -> Request {
-    Request {
-        model_id: "openai/gpt-5-mini".to_string(),
-        stream: false,
+const OPENAI_MODEL: &str = "openai/gpt-5-mini";
+const ANTHROPIC_MODEL: &str = "claude-sonnet-4-6";
+
+fn base_task() -> TaskRequest {
+    TaskRequest {
         messages: vec![Message {
             role: MessageRole::User,
             content: vec![ContentPart::Text {
@@ -50,22 +51,28 @@ fn base_request() -> Request {
 
 fn execution_plan(
     provider: ProviderKind,
-    request: &Request,
+    task: &TaskRequest,
+    model: &str,
+    response_mode: ResponseMode,
     native_options: Option<NativeOptions>,
 ) -> ExecutionPlan {
     let adapter = adapter_for(provider);
+    let instance_id = match provider {
+        ProviderKind::OpenAi => ProviderInstanceId::openai_default(),
+        ProviderKind::Anthropic => ProviderInstanceId::anthropic_default(),
+        ProviderKind::OpenRouter => ProviderInstanceId::openrouter_default(),
+        ProviderKind::GenericOpenAiCompatible => {
+            ProviderInstanceId::generic_openai_compatible_default()
+        }
+    };
     ExecutionPlan {
-        response_mode: if request.stream {
-            ResponseMode::Streaming
-        } else {
-            ResponseMode::NonStreaming
-        },
-        task: request.task_request(),
+        response_mode,
+        task: task.clone(),
         provider_attempt: ResolvedProviderAttempt {
-            instance_id: ProviderInstanceId::from(provider),
+            instance_id,
             provider_kind: provider,
             family: adapter.descriptor().family,
-            model: request.model_id.clone(),
+            model: model.to_string(),
             capabilities: *adapter.capabilities(),
             native_options,
         },
@@ -96,7 +103,10 @@ fn execution_plan(
 
 #[test]
 fn adapter_lookup_returns_expected_kinds() {
-    assert_eq!(adapter_for(ProviderKind::OpenAi).kind(), ProviderKind::OpenAi);
+    assert_eq!(
+        adapter_for(ProviderKind::OpenAi).kind(),
+        ProviderKind::OpenAi
+    );
     assert_eq!(
         adapter_for(ProviderKind::Anthropic).kind(),
         ProviderKind::Anthropic
@@ -148,11 +158,23 @@ fn descriptors_expose_expected_static_metadata() {
 
 #[test]
 fn openai_adapter_plan_request_matches_family_overlay_translation() {
-    let request = base_request();
-    let execution = execution_plan(ProviderKind::OpenAi, &request, None);
+    let task = base_task();
+    let execution = execution_plan(
+        ProviderKind::OpenAi,
+        &task,
+        OPENAI_MODEL,
+        ResponseMode::NonStreaming,
+        None,
+    );
 
-    let translated = openai_request::plan_request(request.clone(), ProviderKind::OpenAi, None)
-        .expect("request planning should succeed");
+    let translated = openai_request::plan_request(
+        &task,
+        OPENAI_MODEL,
+        ResponseMode::NonStreaming,
+        ProviderKind::OpenAi,
+        None,
+    )
+    .expect("request planning should succeed");
     let adapter_plan = adapter_for(ProviderKind::OpenAi)
         .plan_request(&execution)
         .expect("adapter planning should succeed");
@@ -168,12 +190,18 @@ fn openai_adapter_plan_request_matches_family_overlay_translation() {
 
 #[test]
 fn anthropic_adapter_plan_request_matches_family_overlay_translation() {
-    let mut request = base_request();
-    request.model_id = "claude-sonnet-4-6".to_string();
-    let execution = execution_plan(ProviderKind::Anthropic, &request, None);
+    let task = base_task();
+    let execution = execution_plan(
+        ProviderKind::Anthropic,
+        &task,
+        ANTHROPIC_MODEL,
+        ResponseMode::NonStreaming,
+        None,
+    );
 
     let translated =
-        anthropic_request::plan_request(request.clone(), None).expect("planning should succeed");
+        anthropic_request::plan_request(&task, ANTHROPIC_MODEL, ResponseMode::NonStreaming, None)
+            .expect("planning should succeed");
     let adapter_plan = adapter_for(ProviderKind::Anthropic)
         .plan_request(&execution)
         .expect("adapter planning should succeed");
@@ -189,13 +217,21 @@ fn anthropic_adapter_plan_request_matches_family_overlay_translation() {
 
 #[test]
 fn openrouter_adapter_plan_request_matches_family_overlay_translation() {
-    let mut request = base_request();
-    request.top_p = Some(0.5);
-    request.stop = vec!["done".to_string()];
-    let execution = execution_plan(ProviderKind::OpenRouter, &request, None);
+    let mut task = base_task();
+    task.top_p = Some(0.5);
+    task.stop = vec!["done".to_string()];
+    let execution = execution_plan(
+        ProviderKind::OpenRouter,
+        &task,
+        OPENAI_MODEL,
+        ResponseMode::NonStreaming,
+        None,
+    );
 
     let translated = openrouter_request::plan_request(
-        request.clone(),
+        &task,
+        OPENAI_MODEL,
+        ResponseMode::NonStreaming,
         &openrouter_request::OpenRouterOverrides::default(),
     )
     .expect("planning should succeed");
@@ -217,10 +253,14 @@ fn openrouter_adapter_plan_request_matches_family_overlay_translation() {
 
 #[test]
 fn openai_streaming_plan_preserves_family_default_request_contract() {
-    let mut request = base_request();
-    request.stream = true;
-
-    let execution = execution_plan(ProviderKind::OpenAi, &request, None);
+    let task = base_task();
+    let execution = execution_plan(
+        ProviderKind::OpenAi,
+        &task,
+        OPENAI_MODEL,
+        ResponseMode::Streaming,
+        None,
+    );
     let adapter_plan = adapter_for(ProviderKind::OpenAi)
         .plan_request(&execution)
         .expect("adapter planning should succeed");
@@ -238,10 +278,14 @@ fn openai_streaming_plan_preserves_family_default_request_contract() {
 
 #[test]
 fn anthropic_non_streaming_plan_preserves_family_default_request_contract() {
-    let mut request = base_request();
-    request.model_id = "claude-sonnet-4-6".to_string();
-
-    let execution = execution_plan(ProviderKind::Anthropic, &request, None);
+    let task = base_task();
+    let execution = execution_plan(
+        ProviderKind::Anthropic,
+        &task,
+        ANTHROPIC_MODEL,
+        ResponseMode::NonStreaming,
+        None,
+    );
     let adapter_plan = adapter_for(ProviderKind::Anthropic)
         .plan_request(&execution)
         .expect("adapter planning should succeed");

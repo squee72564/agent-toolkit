@@ -2,8 +2,8 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 
 use agent_core::{
-    OpenAiCompatibleOptions, OpenRouterOptions, ProviderOptions, Request, ResponseMode,
-    RuntimeWarning,
+    OpenAiCompatibleOptions, OpenRouterOptions, ProviderOptions, ResponseMode, RuntimeWarning,
+    TaskRequest,
 };
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
@@ -132,26 +132,19 @@ pub(crate) fn apply_provider_overlay(
 
 #[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn plan_request(
-    req: Request,
+    task: &TaskRequest,
+    model: &str,
+    response_mode: ResponseMode,
     overrides: &OpenRouterOverrides,
 ) -> Result<crate::request_plan::ProviderRequestPlan, AdapterError> {
-    let mut request = encode_family_request(
-        &req.task_request(),
-        &req.model_id,
-        if req.stream {
-            ResponseMode::Streaming
-        } else {
-            ResponseMode::NonStreaming
-        },
-    )
-    .map_err(|mut error| {
+    let mut request = encode_family_request(task, model, response_mode).map_err(|mut error| {
         error.provider = agent_core::ProviderKind::OpenRouter;
         error
     })?;
     apply_openrouter_overrides(
-        &req.model_id,
-        req.top_p,
-        &req.stop,
+        model,
+        task.top_p,
+        &task.stop,
         overrides,
         &mut request.body,
         &mut request.warnings,

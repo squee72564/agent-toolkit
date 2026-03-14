@@ -1,5 +1,5 @@
 use agent_core::{
-    NativeOptions, OpenAiCompatibleOptions, OpenAiOptions, ProviderKind, ProviderOptions, Request,
+    NativeOptions, OpenAiCompatibleOptions, OpenAiOptions, ProviderKind, ProviderOptions,
     ResponseMode, TaskRequest,
 };
 use agent_transport::HttpRequestOptions;
@@ -112,11 +112,7 @@ pub(crate) fn encode_family_request(
     model: &str,
     response_mode: ResponseMode,
 ) -> Result<EncodedFamilyRequest, AdapterError> {
-    let mut request = Request::from(task.clone());
-    request.model_id = model.to_string();
-    request.stream = response_mode == ResponseMode::Streaming;
-
-    let encoded = encode_openai_request(request).map_err(map_openai_plan_error)?;
+    let encoded = encode_openai_request(task, model).map_err(map_openai_plan_error)?;
     let mut body = encoded.body;
     if response_mode == ResponseMode::Streaming {
         body["stream"] = Value::Bool(true);
@@ -153,20 +149,13 @@ pub(crate) fn apply_provider_overlay(
 
 #[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn plan_request(
-    req: Request,
+    task: &TaskRequest,
+    model: &str,
+    response_mode: ResponseMode,
     provider: ProviderKind,
     native_options: Option<&NativeOptions>,
 ) -> Result<crate::request_plan::ProviderRequestPlan, AdapterError> {
-    let mut request = encode_family_request(
-        &req.task_request(),
-        &req.model_id,
-        if req.stream {
-            ResponseMode::Streaming
-        } else {
-            ResponseMode::NonStreaming
-        },
-    )
-    .map_err(|mut error| {
+    let mut request = encode_family_request(task, model, response_mode).map_err(|mut error| {
         error.provider = provider;
         error
     })?;
