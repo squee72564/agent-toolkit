@@ -7,6 +7,7 @@ use agent_core::types::{ContentPart, ResponseFormat};
 use super::decode::decode_openai_response;
 use super::{OpenAiDecodeEnvelope, OpenAiFamilyError, OpenAiFamilyErrorKind};
 
+#[test]
 fn decode_top_level_error_maps_to_upstream() {
     let envelope = OpenAiDecodeEnvelope {
         body: json!({

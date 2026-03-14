@@ -8,6 +8,7 @@ use super::decode::{
 };
 use super::{AnthropicDecodeEnvelope, AnthropicFamilyError, AnthropicFamilyErrorKind};
 
+#[test]
 fn decode_basic_text_usage_and_stop_reason() {
     let payload = AnthropicDecodeEnvelope {
         body: json!({

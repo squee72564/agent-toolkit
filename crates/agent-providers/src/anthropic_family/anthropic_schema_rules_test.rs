@@ -4,6 +4,7 @@ use super::schema_rules::{
     canonicalize_json, extract_first_json_object, permissive_json_object_schema, stable_json_string,
 };
 
+#[test]
 fn schema_rules_canonicalize_json_sorts_object_keys_recursively() {
     let input = json!({
         "z": {"b": 2, "a": 1},

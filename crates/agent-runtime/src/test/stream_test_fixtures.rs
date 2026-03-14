@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use agent_core::{
     CanonicalStreamEnvelope, CanonicalStreamEvent, ProviderKind, Response, ResponseFormat,
 };

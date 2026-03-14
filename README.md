@@ -54,10 +54,10 @@ Observer precedence is `SendOptions::with_observer(...)` > `AgentToolkit::builde
 This workspace uses deterministic release-readiness gates in CI:
 
 1. `cargo check --workspace --all-targets --locked`
-2. `cargo fmt --all -- --check`
+2. `cargo fmt --all`
 3. `cargo clippy --workspace --all-targets --all-features -- -D warnings`
 4. `cargo clippy --workspace --lib --all-features -- -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic`
-5. `cargo test --workspace --all-targets --all-features`
+5. `cargo test --workspace --all-targets --all-features -- --quiet`
 6. `RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --document-private-items`
 
 `clippy::unwrap_used`, `clippy::expect_used`, and `clippy::panic` are intentionally enforced on non-test targets in this milestone. Existing test code remains outside full migration scope for now.

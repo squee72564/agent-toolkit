@@ -2,7 +2,9 @@ use agent_core::types::AuthStyle;
 use agent_transport::{HttpRequestBody, RetryPolicy, TransportRequestInput};
 use reqwest::StatusCode;
 
-use crate::support::http_server::{ScriptedBody, ScriptedResponse, await_server, captured_requests, spawn_scripted_server};
+use crate::support::http_server::{
+    ScriptedBody, ScriptedResponse, await_server, captured_requests, spawn_scripted_server,
+};
 use crate::support::{TestResult, default_platform, default_resolved_transport, default_transport};
 
 #[tokio::test]

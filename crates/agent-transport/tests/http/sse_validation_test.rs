@@ -5,7 +5,9 @@ use agent_transport::{RetryPolicy, SseLimits, TransportError};
 use reqwest::StatusCode;
 use serde_json::json;
 
-use crate::support::http_server::{ScriptedBody, ScriptedResponse, await_server, spawn_scripted_server};
+use crate::support::http_server::{
+    ScriptedBody, ScriptedResponse, await_server, spawn_scripted_server,
+};
 use crate::support::{ExampleBody, TestResult, default_platform, default_transport};
 
 #[tokio::test]

@@ -8,8 +8,12 @@ use agent_transport::{
 };
 use reqwest::StatusCode;
 
-use crate::support::http_server::{ScriptedBody, ScriptedResponse, await_server, spawn_scripted_server};
-use crate::support::{ExampleBody, TestResult, default_platform, default_resolved_transport, default_transport};
+use crate::support::http_server::{
+    ScriptedBody, ScriptedResponse, await_server, spawn_scripted_server,
+};
+use crate::support::{
+    ExampleBody, TestResult, default_platform, default_resolved_transport, default_transport,
+};
 
 #[tokio::test]
 async fn post_sse_times_out_before_response_headers() -> TestResult {

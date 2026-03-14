@@ -14,3 +14,4 @@
 .env.*
 coverage/
 Thumbs.db
+temp

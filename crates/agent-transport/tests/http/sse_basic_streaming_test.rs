@@ -5,7 +5,9 @@ use agent_transport::{RetryPolicy, TransportError, TransportResponseFraming};
 use reqwest::StatusCode;
 use serde_json::json;
 
-use crate::support::http_server::{ScriptedBody, ScriptedResponse, await_server, captured_requests, spawn_scripted_server};
+use crate::support::http_server::{
+    ScriptedBody, ScriptedResponse, await_server, captured_requests, spawn_scripted_server,
+};
 use crate::support::{ExampleBody, TestResult, default_platform, default_transport};
 
 #[tokio::test]
@@ -39,7 +41,9 @@ async fn post_sse_streams_events_and_preserves_metadata() -> TestResult {
             auth: None,
             method: reqwest::Method::POST,
             url: &format!("{base_url}/v1/stream"),
-            body: agent_transport::HttpRequestBody::Json(serde_json::to_vec(&ExampleBody { msg: "hello" })?.into()),
+            body: agent_transport::HttpRequestBody::Json(
+                serde_json::to_vec(&ExampleBody { msg: "hello" })?.into(),
+            ),
             response_framing: TransportResponseFraming::Sse,
             options: agent_transport::HttpRequestOptions::sse_defaults(),
             transport: transport_options,

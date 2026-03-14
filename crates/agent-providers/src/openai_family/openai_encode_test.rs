@@ -5,9 +5,9 @@ use agent_core::types::{
     ToolResult, ToolResultContent,
 };
 
+use super::OpenAiFamilyError;
 use super::openai_test_helpers::*;
 use super::schema_rules::{canonicalize_json, is_strict_compatible_schema, stable_json_string};
-use super::{OpenAiFamilyError, OpenAiFamilyErrorKind};
 
 #[test]
 fn encode_simple_user_text_message() {

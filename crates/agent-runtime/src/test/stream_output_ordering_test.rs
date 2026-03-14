@@ -1,4 +1,6 @@
-use agent_core::{CanonicalStreamEvent, ContentPart, ResponseFormat, StreamOutputItemEnd, StreamOutputItemStart};
+use agent_core::{
+    CanonicalStreamEvent, ContentPart, ResponseFormat, StreamOutputItemEnd, StreamOutputItemStart,
+};
 use serde_json::json;
 
 use super::stream_test_fixtures::*;

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use agent_core::types::Message;
 use agent_core::ProviderKind;
+use agent_core::types::Message;
 
 use super::agent_toolkit_test_fixtures::*;
 use super::*;
