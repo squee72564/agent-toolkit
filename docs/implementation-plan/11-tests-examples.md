@@ -1,9 +1,8 @@
-# Phase 10: Tests, Examples, and Shim Removal
+# Phase 10: Tests, Examples
 
 ## Goal
 
-Complete the refactor by proving the new architecture through tests and by
-removing any temporary migration-only code paths.
+Complete the refactor by proving the new architecture through tests
 
 ## Spec Coverage
 
@@ -12,7 +11,6 @@ This phase must fully cover the `REFACTOR.md` material for:
 - fixture and live test continuity
 - every required coverage addition listed in `REFACTOR.md`
 - migration/compatibility cleanup
-- final removal of temporary shims
 
 ## Fixture and Live Expectations
 
@@ -26,25 +24,6 @@ architecture contract, not as optional cleanup.
 - live tests continue proving direct-client ergonomics, routed fallback,
   family-shared behavior, and correct application of layered attempt-local
   native options
-
-## Compatibility Cleanup Scope
-
-Do not stop at removing comment markers. This phase also removes migration-only
-compatibility behavior called out in `REFACTOR.md`, including any remaining:
-
-- old `Request` normalized into `TaskRequest +` single-attempt `Route + ExecutionOptions`
-- old `SendOptions` normalized into `Route + ExecutionOptions`
-- old provider-kind-targeted routes normalized into instance-targeted routes
-  through a temporary runtime lookup shim
-- old fallback toggles such as `retry_on_status_codes`,
-  `retry_on_transport_error`, and `FallbackMode` normalized into equivalent
-  ordered `FallbackRule`s during migration
-- adapters temporarily retaining internal helpers equivalent to today's
-  `platform_config(base_url)` while runtime-owned `ProviderDescriptor`
-  composition is introduced
-- the existing transport field/type name `HttpResponseMode` temporarily
-  retained during migration even though the target architecture treats that
-  concept as transport-level `TransportResponseFraming`
 
 ## Current Repo Anchors
 
@@ -150,8 +129,6 @@ are done.
    direct-client, routed-fallback, family-shared, and layered-native-option
    behaviors from `REFACTOR.md`.
 7. Update examples so direct and routed usage both match the new public model.
-8. Remove every `REFACTOR-SHIM:` marker and delete every remaining migration-
-   only compatibility path that does not belong to the target architecture.
 
 ## Exit Criteria
 
