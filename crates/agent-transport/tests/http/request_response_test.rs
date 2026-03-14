@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use agent_core::types::AuthStyle;
 use agent_transport::{
-    HttpRequestBody, HttpRequestOptions, HttpResponse, HttpSendRequest, RetryPolicy,
+    HttpRequestBody, HttpRequestOptions, HttpResponse, TransportExecutionInput, RetryPolicy,
     TransportRequestInput, TransportResponseFraming,
 };
 use bytes::Bytes;
@@ -38,7 +38,7 @@ async fn post_json_value_preserves_non_success_status_and_extracts_request_id() 
 
     let transport = default_transport(RetryPolicy::default());
     let response = transport
-        .send(HttpSendRequest {
+        .send(TransportExecutionInput {
             platform: &platform,
             auth: None,
             method: reqwest::Method::POST,
@@ -139,7 +139,7 @@ async fn send_bytes_without_body_does_not_set_content_type() -> TestResult {
     let transport = default_transport(RetryPolicy::default());
     let platform = default_platform(AuthStyle::None);
     let response = transport
-        .send(HttpSendRequest {
+        .send(TransportExecutionInput {
             platform: &platform,
             auth: None,
             method: reqwest::Method::GET,
@@ -184,7 +184,7 @@ async fn send_bytes_preserves_raw_payload_and_explicit_content_type() -> TestRes
     let transport = default_transport(RetryPolicy::default());
     let platform = default_platform(AuthStyle::None);
     let response = transport
-        .send(HttpSendRequest {
+        .send(TransportExecutionInput {
             platform: &platform,
             auth: None,
             method: reqwest::Method::POST,
@@ -272,7 +272,7 @@ async fn send_json_mode_can_preserve_error_status_when_opted_in() -> TestResult 
     let transport = default_transport(RetryPolicy::default());
     let platform = default_platform(AuthStyle::None);
     let response = transport
-        .send(HttpSendRequest {
+        .send(TransportExecutionInput {
             platform: &platform,
             auth: None,
             method: reqwest::Method::POST,

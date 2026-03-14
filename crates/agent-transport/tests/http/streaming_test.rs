@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use agent_core::types::AuthStyle;
 use agent_transport::{
-    HttpRequestBody, HttpRequestOptions, HttpResponse, HttpSendRequest, RetryPolicy, SseLimits,
+    HttpRequestBody, HttpRequestOptions, HttpResponse, TransportExecutionInput, RetryPolicy, SseLimits,
     TimeoutStage, TransportError, TransportRequestInput, TransportResponseFraming,
 };
 use reqwest::StatusCode;
@@ -42,7 +42,7 @@ async fn post_sse_streams_events_and_preserves_metadata() -> TestResult {
 
     let transport = default_transport(RetryPolicy::default());
     let mut response = match transport
-        .send(HttpSendRequest {
+        .send(TransportExecutionInput {
             platform: &platform,
             auth: None,
             method: reqwest::Method::POST,
@@ -483,7 +483,7 @@ async fn send_sse_times_out_waiting_for_first_byte() -> TestResult {
     let transport = default_transport(RetryPolicy::default());
     let platform = default_platform(AuthStyle::None);
     let error = transport
-        .send(HttpSendRequest {
+        .send(TransportExecutionInput {
             platform: &platform,
             auth: None,
             method: reqwest::Method::POST,
@@ -537,7 +537,7 @@ async fn send_sse_times_out_when_stream_goes_idle_after_first_event() -> TestRes
     let transport = default_transport(RetryPolicy::default());
     let platform = default_platform(AuthStyle::None);
     let mut response = match transport
-        .send(HttpSendRequest {
+        .send(TransportExecutionInput {
             platform: &platform,
             auth: None,
             method: reqwest::Method::POST,
@@ -605,7 +605,7 @@ async fn send_sse_request_options_override_setup_timeout() -> TestResult {
         .build();
     let platform = default_platform(AuthStyle::None);
     let error = transport
-        .send(HttpSendRequest {
+        .send(TransportExecutionInput {
             platform: &platform,
             auth: None,
             method: reqwest::Method::POST,

@@ -17,7 +17,7 @@ use crate::http::builder::HttpTransportBuilder;
 use crate::http::headers::build_header_config;
 use crate::http::request::{
     HeaderConfig, HttpBytesResponse, HttpJsonResponse, HttpRequestBody, HttpRequestOptions,
-    HttpResponse, HttpResponseHead, HttpSendRequest, RequestExecution, TransportResponseFraming,
+    HttpResponse, HttpResponseHead, TransportExecutionInput, RequestExecution, TransportResponseFraming,
 };
 use crate::http::response::{build_response_head, content_type_matches};
 use crate::http::sse::{HttpSseResponse, HttpSseStream, PendingSseEvent, SseLimits};
@@ -206,8 +206,8 @@ impl HttpTransport {
     /// Retries are applied only before a response body is handed to the caller. For JSON mode,
     /// non-success statuses can be preserved by setting
     /// [`HttpRequestOptions::allow_error_status`](crate::http::HttpRequestOptions::allow_error_status).
-    pub async fn send(&self, request: HttpSendRequest<'_>) -> Result<HttpResponse, TransportError> {
-        let HttpSendRequest {
+    pub async fn send(&self, request: TransportExecutionInput<'_>) -> Result<HttpResponse, TransportError> {
+        let TransportExecutionInput {
             platform,
             auth,
             method,
@@ -340,7 +340,7 @@ impl HttpTransport {
     {
         let provider_headers = reqwest::header::HeaderMap::new();
         match self
-            .send(HttpSendRequest {
+            .send(TransportExecutionInput {
                 platform,
                 auth,
                 method,
@@ -469,7 +469,7 @@ impl HttpTransport {
         } = request;
         let provider_headers = reqwest::header::HeaderMap::new();
         match self
-            .send(HttpSendRequest {
+            .send(TransportExecutionInput {
                 platform,
                 auth,
                 method,
@@ -514,7 +514,7 @@ impl HttpTransport {
 
         let provider_headers = reqwest::header::HeaderMap::new();
         match self
-            .send(HttpSendRequest {
+            .send(TransportExecutionInput {
                 platform,
                 auth,
                 method,

@@ -1,7 +1,7 @@
 use agent_core::{ExecutionPlan, ProviderKind, Response, ResponseFormat, ResponseMode};
 use agent_providers::request_plan::ProviderRequestPlan;
 use agent_transport::{
-    HttpJsonResponse, HttpRequestBody, HttpResponse, HttpSendRequest, TransportResponseFraming,
+    HttpJsonResponse, HttpRequestBody, HttpResponse, TransportExecutionInput, TransportResponseFraming,
 };
 
 use crate::provider_runtime::{
@@ -203,8 +203,8 @@ fn transport_request<'a>(
     plan: &'a ProviderRequestPlan,
     url: &'a str,
     body: HttpRequestBody,
-) -> HttpSendRequest<'a> {
-    HttpSendRequest {
+) -> TransportExecutionInput<'a> {
+    TransportExecutionInput {
         platform: &execution_plan.platform,
         auth: execution_plan.auth.credentials.as_ref(),
         method: plan.method.clone(),

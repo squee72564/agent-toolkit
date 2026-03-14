@@ -97,8 +97,6 @@ pub struct TransportExecutionInput<'a> {
     pub provider_headers: HeaderMap,
 }
 
-pub type HttpSendRequest<'a> = TransportExecutionInput<'a>;
-
 pub(crate) struct RequestExecution<'a> {
     pub platform: &'a PlatformConfig,
     pub auth: Option<&'a AuthCredentials>,
