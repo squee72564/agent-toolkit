@@ -4,7 +4,7 @@ use std::time::Duration;
 use agent_core::types::AuthStyle;
 use agent_transport::{
     HttpRequestBody, HttpRequestOptions, HttpResponse, HttpSendRequest, RetryPolicy, SseLimits,
-    TimeoutStage, TransportError, TransportResponseFraming,
+    TimeoutStage, TransportError, TransportRequestInput, TransportResponseFraming,
 };
 use reqwest::StatusCode;
 use serde_json::{Value, json};
@@ -698,17 +698,19 @@ async fn send_sse_request_supports_raw_bytes_body() -> TestResult {
     let mut response = transport
         .send_sse_request(
             &platform,
-            reqwest::Method::POST,
-            &format!("{base_url}/raw-stream"),
-            HttpRequestBody::Bytes {
-                content_type: Some(reqwest::header::HeaderValue::from_static(
-                    "application/octet-stream",
-                )),
-                body: bytes::Bytes::from_static(b"\x01\x02"),
+            TransportRequestInput {
+                method: reqwest::Method::POST,
+                url: &format!("{base_url}/raw-stream"),
+                body: HttpRequestBody::Bytes {
+                    content_type: Some(reqwest::header::HeaderValue::from_static(
+                        "application/octet-stream",
+                    )),
+                    body: bytes::Bytes::from_static(b"\x01\x02"),
+                },
+                auth: None,
+                options: HttpRequestOptions::default(),
+                transport: default_resolved_transport(RetryPolicy::default()),
             },
-            None,
-            HttpRequestOptions::default(),
-            default_resolved_transport(RetryPolicy::default()),
         )
         .await?;
 

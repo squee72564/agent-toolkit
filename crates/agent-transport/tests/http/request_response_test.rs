@@ -3,7 +3,7 @@ use std::time::Duration;
 use agent_core::types::AuthStyle;
 use agent_transport::{
     HttpRequestBody, HttpRequestOptions, HttpResponse, HttpSendRequest, RetryPolicy,
-    TransportResponseFraming,
+    TransportRequestInput, TransportResponseFraming,
 };
 use bytes::Bytes;
 use reqwest::StatusCode;
@@ -315,17 +315,19 @@ async fn send_bytes_request_returns_bytes_helper_result() -> TestResult {
     let response = transport
         .send_bytes_request(
             &platform,
-            reqwest::Method::POST,
-            &format!("{base_url}/binary"),
-            HttpRequestBody::Bytes {
-                content_type: Some(HeaderValue::from_static("application/octet-stream")),
-                body: Bytes::from_static(b"\xaa\xbb"),
+            TransportRequestInput {
+                method: reqwest::Method::POST,
+                url: &format!("{base_url}/binary"),
+                body: HttpRequestBody::Bytes {
+                    content_type: Some(HeaderValue::from_static("application/octet-stream")),
+                    body: Bytes::from_static(b"\xaa\xbb"),
+                },
+                auth: None,
+                options: HttpRequestOptions::default()
+                    .with_accept(HeaderValue::from_static("application/octet-stream"))
+                    .with_expected_content_type("application/octet-stream"),
+                transport: default_resolved_transport(RetryPolicy::default()),
             },
-            None,
-            HttpRequestOptions::default()
-                .with_accept(HeaderValue::from_static("application/octet-stream"))
-                .with_expected_content_type("application/octet-stream"),
-            default_resolved_transport(RetryPolicy::default()),
         )
         .await?;
 

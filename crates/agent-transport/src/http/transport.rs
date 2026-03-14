@@ -112,6 +112,23 @@ pub enum StreamTerminationReason {
     Protocol,
 }
 
+/// Typed request input for byte and SSE helper methods.
+#[derive(Debug)]
+pub struct TransportRequestInput<'a> {
+    /// Outbound HTTP method.
+    pub method: Method,
+    /// Fully resolved request URL.
+    pub url: &'a str,
+    /// Request body.
+    pub body: HttpRequestBody,
+    /// Auth credentials to apply, when present.
+    pub auth: Option<&'a AuthCredentials>,
+    /// Protocol-level request options.
+    pub options: HttpRequestOptions,
+    /// Resolved transport behavior for the request.
+    pub transport: ResolvedTransportOptions,
+}
+
 impl From<reqwest::Error> for TransportError {
     fn from(err: reqwest::Error) -> Self {
         if err.is_timeout() {
@@ -440,13 +457,16 @@ impl HttpTransport {
     pub async fn send_bytes_request(
         &self,
         platform: &PlatformConfig,
-        method: Method,
-        url: &str,
-        body: HttpRequestBody,
-        auth: Option<&AuthCredentials>,
-        options: HttpRequestOptions,
-        transport: ResolvedTransportOptions,
+        request: TransportRequestInput<'_>,
     ) -> Result<HttpBytesResponse, TransportError> {
+        let TransportRequestInput {
+            method,
+            url,
+            body,
+            auth,
+            options,
+            transport,
+        } = request;
         let provider_headers = reqwest::header::HeaderMap::new();
         match self
             .send(HttpSendRequest {
@@ -475,13 +495,16 @@ impl HttpTransport {
     pub async fn send_sse_request(
         &self,
         platform: &PlatformConfig,
-        method: Method,
-        url: &str,
-        body: HttpRequestBody,
-        auth: Option<&AuthCredentials>,
-        mut options: HttpRequestOptions,
-        transport: ResolvedTransportOptions,
+        request: TransportRequestInput<'_>,
     ) -> Result<HttpSseResponse, TransportError> {
+        let TransportRequestInput {
+            method,
+            url,
+            body,
+            auth,
+            mut options,
+            transport,
+        } = request;
         if options.accept.is_none() {
             options.accept = Some(HeaderValue::from_static("text/event-stream"));
         }
@@ -518,12 +541,14 @@ impl HttpTransport {
     ) -> Result<HttpSseResponse, TransportError> {
         self.send_sse_request(
             platform,
-            Method::GET,
-            url,
-            HttpRequestBody::None,
-            auth,
-            HttpRequestOptions::default(),
-            self.default_transport_options(),
+            TransportRequestInput {
+                method: Method::GET,
+                url,
+                body: HttpRequestBody::None,
+                auth,
+                options: HttpRequestOptions::default(),
+                transport: self.default_transport_options(),
+            },
         )
         .await
     }
@@ -546,12 +571,14 @@ impl HttpTransport {
 
         self.send_sse_request(
             platform,
-            method,
-            url,
-            HttpRequestBody::Json(payload),
-            auth,
-            HttpRequestOptions::sse_defaults(),
-            self.default_transport_options(),
+            TransportRequestInput {
+                method,
+                url,
+                body: HttpRequestBody::Json(payload),
+                auth,
+                options: HttpRequestOptions::sse_defaults(),
+                transport: self.default_transport_options(),
+            },
         )
         .await
     }
