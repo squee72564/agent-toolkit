@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use agent_core::{
-    CanonicalStreamEnvelope, ExecutionPlan, PlatformConfig, ProviderInstanceId,
-    ProviderKind, Response, ResponseFormat, RuntimeWarning,
+    CanonicalStreamEnvelope, ExecutionPlan, PlatformConfig, ProviderInstanceId, ProviderKind,
+    Response, ResponseFormat, RuntimeWarning,
 };
 use agent_providers::error::AdapterOperation;
 use agent_providers::{
@@ -14,7 +14,6 @@ use crate::observer::RuntimeObserver;
 use crate::provider_stream_runtime::{ProviderStreamRuntime, StreamRuntimeError};
 use crate::registered_provider::RegisteredProvider;
 use crate::runtime_error::RuntimeError;
-use crate::types::AttemptMeta;
 
 mod attempt;
 mod transport;
@@ -51,22 +50,26 @@ impl std::fmt::Debug for ProviderRuntime {
 pub(crate) enum ProviderAttemptOutcome {
     Success {
         response: Response,
-        meta: AttemptMeta,
+        selected_model: String,
+        status_code: Option<u16>,
+        request_id: Option<String>,
     },
     Failure {
         error: RuntimeError,
-        meta: AttemptMeta,
+        selected_model: String,
     },
 }
 
 pub(crate) enum ProviderStreamAttemptOutcome {
     Opened {
         stream: Box<OpenedProviderStream>,
-        meta: AttemptMeta,
+        selected_model: String,
+        status_code: Option<u16>,
+        request_id: Option<String>,
     },
     Failure {
         error: RuntimeError,
-        meta: AttemptMeta,
+        selected_model: String,
     },
 }
 
@@ -137,8 +140,8 @@ impl ProviderRuntime {
             Ok(planned) => planned,
             Err(error) => {
                 return ProviderAttemptOutcome::Failure {
-                    meta: attempt::failure_meta(self.kind, selected_model, &error),
                     error,
+                    selected_model,
                 };
             }
         };
@@ -146,17 +149,14 @@ impl ProviderRuntime {
 
         match provider_response {
             Ok((response, http_response)) => ProviderAttemptOutcome::Success {
-                meta: attempt::success_meta(
-                    self.kind,
-                    selected_model,
-                    http_response.head.status.as_u16(),
-                    http_response.head.request_id.clone(),
-                ),
                 response,
+                selected_model,
+                status_code: Some(http_response.head.status.as_u16()),
+                request_id: http_response.head.request_id.clone(),
             },
             Err(error) => ProviderAttemptOutcome::Failure {
-                meta: attempt::failure_meta(self.kind, selected_model, &error),
                 error,
+                selected_model,
             },
         }
     }
@@ -171,8 +171,8 @@ impl ProviderRuntime {
             Ok(planned) => planned,
             Err(error) => {
                 return ProviderStreamAttemptOutcome::Failure {
-                    meta: attempt::failure_meta(self.kind, selected_model, &error),
                     error,
+                    selected_model,
                 };
             }
         };
@@ -182,18 +182,19 @@ impl ProviderRuntime {
         };
 
         match stream {
-            Ok(stream) => ProviderStreamAttemptOutcome::Opened {
-                meta: attempt::success_meta(
-                    self.kind,
+            Ok(stream) => {
+                let status_code = Some(stream.response.head.status.as_u16());
+                let request_id = stream.response.head.request_id.clone();
+                ProviderStreamAttemptOutcome::Opened {
+                    stream: Box::new(stream),
                     selected_model,
-                    stream.response.head.status.as_u16(),
-                    stream.response.head.request_id.clone(),
-                ),
-                stream: Box::new(stream),
-            },
+                    status_code,
+                    request_id,
+                }
+            }
             Err(error) => ProviderStreamAttemptOutcome::Failure {
-                meta: attempt::failure_meta(self.kind, selected_model, &error),
                 error,
+                selected_model,
             },
         }
     }

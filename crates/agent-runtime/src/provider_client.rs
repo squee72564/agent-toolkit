@@ -16,10 +16,10 @@ use crate::provider_runtime::{
 use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
 use crate::target::Target;
 use crate::types::{
-    RequestEndContext, ResponseMeta, attempt_failure_event_fields, attempt_start_event,
-    attempt_success_event_fields, executed_failure_meta, failed_attempt_record,
-    request_end_failure_event, request_end_success_event, request_start_event, response_meta,
-    succeeded_attempt_record, terminal_failure_error,
+    RequestEndContext, ResponseMeta, attempt_failure_event, attempt_start_event,
+    attempt_success_event, executed_failure_meta, failed_attempt_record, request_end_failure_event,
+    request_end_success_event, request_start_event, response_meta, succeeded_attempt_record,
+    terminal_failure_error,
 };
 
 #[derive(Debug, Clone)]
@@ -119,45 +119,53 @@ impl ProviderClient {
         let attempt = self.runtime.execute_attempt(execution_plan).await;
 
         match attempt {
-            ProviderAttemptOutcome::Success { response, meta } => {
-                self.emit_attempt_success(&context, &meta);
+            ProviderAttemptOutcome::Success {
+                response,
+                selected_model,
+                status_code,
+                request_id,
+            } => {
                 let attempt_record = succeeded_attempt_record(
                     self.runtime.instance_id.clone(),
                     self.runtime.kind,
-                    meta.model.clone(),
+                    selected_model.clone(),
                     0,
                     0,
-                    meta.status_code,
-                    meta.request_id.clone(),
+                    status_code,
+                    request_id.clone(),
                 );
+                self.emit_attempt_success(&context, &attempt_record);
                 let response_meta = response_meta(
                     self.runtime.instance_id.clone(),
                     self.runtime.kind,
-                    meta.model.clone(),
-                    meta.status_code,
-                    meta.request_id.clone(),
+                    selected_model,
+                    status_code,
+                    request_id,
                     vec![attempt_record],
                 );
                 self.emit_request_end_success(&context, &response_meta);
 
                 Ok((response, response_meta))
             }
-            ProviderAttemptOutcome::Failure { error, meta } => {
-                self.emit_attempt_failure(&context, &meta);
+            ProviderAttemptOutcome::Failure {
+                error,
+                selected_model,
+            } => {
                 let attempt_record = failed_attempt_record(
                     self.runtime.instance_id.clone(),
                     self.runtime.kind,
-                    meta.model.clone(),
+                    selected_model.clone(),
                     0,
                     0,
                     &error,
                 );
+                self.emit_attempt_failure(&context, &attempt_record);
                 let status_code = error.status_code;
                 let request_id = error.request_id.clone();
                 let error = error.with_executed_failure_meta(executed_failure_meta(
                     self.runtime.instance_id.clone(),
                     self.runtime.kind,
-                    meta.model.clone(),
+                    selected_model.clone(),
                     status_code,
                     request_id,
                     vec![attempt_record],
@@ -168,7 +176,7 @@ impl ProviderClient {
                     DirectFailureContext {
                         request_id: terminal_error.request_id.clone(),
                         provider: terminal_error.provider,
-                        model: Some(meta.model),
+                        model: Some(selected_model),
                         status_code: terminal_error.status_code,
                         error_kind: terminal_error.kind,
                         error_message: terminal_error.message.clone(),
@@ -219,42 +227,48 @@ impl ProviderClient {
         let stream_observer = context.cloned_observer();
 
         match self.runtime.open_stream_attempt(execution_plan).await {
-            ProviderStreamAttemptOutcome::Opened { stream, meta } => {
-                Ok(MessageResponseStream::new_direct(
-                    context.request_started_at,
-                    stream_observer,
-                    LiveAttempt {
-                        stream: *stream,
-                        context: crate::message_response_stream::AttemptContext {
-                            target_index: 0,
-                            attempt_index: 0,
-                            started_at: context.attempt_started_at,
-                            observer: context.cloned_observer(),
-                            provider_instance: self.runtime.instance_id.clone(),
-                            provider: meta.provider,
-                            model: meta.model,
-                            request_id: meta.request_id,
-                            status_code: meta.status_code,
-                        },
+            ProviderStreamAttemptOutcome::Opened {
+                stream,
+                selected_model,
+                status_code,
+                request_id,
+            } => Ok(MessageResponseStream::new_direct(
+                context.request_started_at,
+                stream_observer,
+                LiveAttempt {
+                    stream: *stream,
+                    context: crate::message_response_stream::AttemptContext {
+                        target_index: 0,
+                        attempt_index: 0,
+                        started_at: context.attempt_started_at,
+                        observer: context.cloned_observer(),
+                        provider_instance: self.runtime.instance_id.clone(),
+                        provider: self.runtime.kind,
+                        model: selected_model,
+                        request_id,
+                        status_code,
                     },
-                ))
-            }
-            ProviderStreamAttemptOutcome::Failure { error, meta } => {
-                self.emit_attempt_failure(&context, &meta);
+                },
+            )),
+            ProviderStreamAttemptOutcome::Failure {
+                error,
+                selected_model,
+            } => {
                 let attempt_record = failed_attempt_record(
                     self.runtime.instance_id.clone(),
                     self.runtime.kind,
-                    meta.model.clone(),
+                    selected_model.clone(),
                     0,
                     0,
                     &error,
                 );
+                self.emit_attempt_failure(&context, &attempt_record);
                 let status_code = error.status_code;
                 let request_id = error.request_id.clone();
                 let error = error.with_executed_failure_meta(executed_failure_meta(
                     self.runtime.instance_id.clone(),
                     self.runtime.kind,
-                    meta.model.clone(),
+                    selected_model.clone(),
                     status_code,
                     request_id,
                     vec![attempt_record],
@@ -263,8 +277,8 @@ impl ProviderClient {
                     &context,
                     DirectFailureContext {
                         request_id: error.request_id.clone(),
-                        provider: Some(meta.provider),
-                        model: Some(meta.model),
+                        provider: Some(self.runtime.kind),
+                        model: Some(selected_model),
                         status_code: error.status_code,
                         error_kind: error.kind,
                         error_message: error.message.clone(),
@@ -313,17 +327,9 @@ impl ProviderClient {
     fn emit_attempt_success(
         &self,
         context: &DirectRequestContext<'_>,
-        meta: &crate::types::AttemptMeta,
+        attempt: &crate::types::AttemptRecord,
     ) {
-        let event = attempt_success_event_fields(
-            meta.provider,
-            Some(meta.model.clone()),
-            meta.request_id.clone(),
-            0,
-            0,
-            context.attempt_started_at.elapsed(),
-            meta.status_code,
-        );
+        let event = attempt_success_event(attempt, context.attempt_started_at.elapsed());
         safe_call_observer(context.observer, |runtime_observer| {
             runtime_observer.on_attempt_success(&event);
         });
@@ -332,18 +338,9 @@ impl ProviderClient {
     fn emit_attempt_failure(
         &self,
         context: &DirectRequestContext<'_>,
-        meta: &crate::types::AttemptMeta,
+        attempt: &crate::types::AttemptRecord,
     ) {
-        let event = attempt_failure_event_fields(
-            meta.provider,
-            Some(meta.model.clone()),
-            meta.request_id.clone(),
-            0,
-            0,
-            context.attempt_started_at.elapsed(),
-            meta.error_kind,
-            meta.error_message.clone(),
-        );
+        let event = attempt_failure_event(attempt, context.attempt_started_at.elapsed());
         safe_call_observer(context.observer, |runtime_observer| {
             runtime_observer.on_attempt_failure(&event);
         });

@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use crate::message_response_stream::events::{
-    attempt_failure_meta, emit_attempt_failure, emit_attempt_start, emit_request_end_failure,
+    emit_attempt_failure, emit_attempt_start, emit_request_end_failure,
 };
 use crate::message_response_stream::state::{
     AttemptContext, CompletedAttemptContext, LiveAttempt, PendingCompletion, RoutingState,
@@ -11,7 +11,7 @@ use crate::observer::{resolve_observer_for_request, safe_call_observer};
 use crate::planner;
 use crate::provider_runtime::ProviderStreamAttemptOutcome;
 use crate::runtime_error::RuntimeError;
-use crate::types::{attempt_skipped_event, succeeded_attempt_record};
+use crate::types::{attempt_skipped_event, failed_attempt_record, succeeded_attempt_record};
 
 pub(super) enum DriveNextOutcome {
     Envelope(agent_core::CanonicalStreamEnvelope),
@@ -72,24 +72,34 @@ pub(super) async fn drive_next(
                     if let Some(next_attempt) =
                         try_open_fallback_attempt(&mut state, &attempt.context, &error).await
                     {
-                        let failure_meta = attempt_failure_meta(&attempt.context, &error);
-                        emit_attempt_failure(
-                            attempt.context.observer.as_ref(),
-                            &failure_meta,
+                        let failure_record = failed_attempt_record(
+                            attempt.context.provider_instance.clone(),
+                            attempt.context.provider,
+                            attempt.context.model.clone(),
                             attempt.context.target_index,
                             attempt.context.attempt_index,
+                            &error,
+                        );
+                        emit_attempt_failure(
+                            attempt.context.observer.as_ref(),
+                            &failure_record,
                             attempt.context.started_at,
                         );
                         state.note_attempt_failure(&attempt.context, &error);
                         state.current_attempt = Some(next_attempt);
                         continue;
                     }
-                    let failure_meta = attempt_failure_meta(&attempt.context, &error);
-                    emit_attempt_failure(
-                        attempt.context.observer.as_ref(),
-                        &failure_meta,
+                    let failure_record = failed_attempt_record(
+                        attempt.context.provider_instance.clone(),
+                        attempt.context.provider,
+                        attempt.context.model.clone(),
                         attempt.context.target_index,
                         attempt.context.attempt_index,
+                        &error,
+                    );
+                    emit_attempt_failure(
+                        attempt.context.observer.as_ref(),
+                        &failure_record,
                         attempt.context.started_at,
                     );
                     state.note_attempt_failure(&attempt.context, &error);
@@ -104,24 +114,34 @@ pub(super) async fn drive_next(
                 if let Some(next_attempt) =
                     try_open_fallback_attempt(&mut state, &attempt.context, &error).await
                 {
-                    let failure_meta = attempt_failure_meta(&attempt.context, &error);
-                    emit_attempt_failure(
-                        attempt.context.observer.as_ref(),
-                        &failure_meta,
+                    let failure_record = failed_attempt_record(
+                        attempt.context.provider_instance.clone(),
+                        attempt.context.provider,
+                        attempt.context.model.clone(),
                         attempt.context.target_index,
                         attempt.context.attempt_index,
+                        &error,
+                    );
+                    emit_attempt_failure(
+                        attempt.context.observer.as_ref(),
+                        &failure_record,
                         attempt.context.started_at,
                     );
                     state.note_attempt_failure(&attempt.context, &error);
                     state.current_attempt = Some(next_attempt);
                     continue;
                 }
-                let failure_meta = attempt_failure_meta(&attempt.context, &error);
-                emit_attempt_failure(
-                    attempt.context.observer.as_ref(),
-                    &failure_meta,
+                let failure_record = failed_attempt_record(
+                    attempt.context.provider_instance.clone(),
+                    attempt.context.provider,
+                    attempt.context.model.clone(),
                     attempt.context.target_index,
                     attempt.context.attempt_index,
+                    &error,
+                );
+                emit_attempt_failure(
+                    attempt.context.observer.as_ref(),
+                    &failure_record,
                     attempt.context.started_at,
                 );
                 state.note_attempt_failure(&attempt.context, &error);
@@ -236,7 +256,12 @@ async fn try_open_fallback_attempt(
             .open_stream_attempt(execution_plan.clone())
             .await
         {
-            ProviderStreamAttemptOutcome::Opened { stream, meta } => {
+            ProviderStreamAttemptOutcome::Opened {
+                stream,
+                selected_model,
+                status_code,
+                request_id,
+            } => {
                 return Some(LiveAttempt {
                     stream: *stream,
                     context: AttemptContext {
@@ -245,20 +270,32 @@ async fn try_open_fallback_attempt(
                         started_at: attempt_started_at,
                         observer,
                         provider_instance: target.instance.clone(),
-                        provider: meta.provider,
-                        model: meta.model,
-                        request_id: meta.request_id,
-                        status_code: meta.status_code,
+                        provider: client.runtime.kind,
+                        model: selected_model,
+                        request_id,
+                        status_code,
                     },
                 });
             }
             ProviderStreamAttemptOutcome::Failure {
                 error: attempt_error,
-                meta,
+                selected_model,
             } => {
-                emit_attempt_failure(observer.as_ref(), &meta, index, index, attempt_started_at);
+                let failed_attempt_record = failed_attempt_record(
+                    target.instance.clone(),
+                    client.runtime.kind,
+                    selected_model.clone(),
+                    index,
+                    index,
+                    &attempt_error,
+                );
+                emit_attempt_failure(
+                    observer.as_ref(),
+                    &failed_attempt_record,
+                    attempt_started_at,
+                );
                 let provider = client.runtime.kind;
-                let model = execution_plan.provider_attempt.model;
+                let model = selected_model;
                 let request_id = attempt_error.request_id.clone();
                 let status_code = attempt_error.status_code;
                 let provider_instance = target.instance.clone();

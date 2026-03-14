@@ -132,28 +132,6 @@ pub struct RequestEndEvent {
     pub error_message: Option<String>,
 }
 
-/// Metadata captured for a single provider attempt.
-///
-/// This is used both for returned [`ResponseMeta`] and for observer event
-/// payload construction.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AttemptMeta {
-    /// Provider used for the attempt.
-    pub provider: ProviderKind,
-    /// Model selected for the attempt.
-    pub model: String,
-    /// Whether the attempt succeeded.
-    pub success: bool,
-    /// HTTP status code returned by the provider, when available.
-    pub status_code: Option<u16>,
-    /// Provider request identifier, when available.
-    pub request_id: Option<String>,
-    /// Error kind for failed attempts.
-    pub error_kind: Option<RuntimeErrorKind>,
-    /// Error message for failed attempts.
-    pub error_message: Option<String>,
-}
-
 /// Planning-only reason for skipping a candidate route attempt before
 /// provider execution begins.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -365,6 +343,55 @@ pub(crate) fn attempt_skipped_event(
         elapsed,
         reason: reason.clone(),
     }
+}
+
+pub(crate) fn attempt_success_event(
+    attempt: &AttemptRecord,
+    elapsed: Duration,
+) -> AttemptSuccessEvent {
+    let AttemptDisposition::Succeeded {
+        status_code,
+        request_id,
+    } = &attempt.disposition
+    else {
+        unreachable!("attempt_success_event requires AttemptDisposition::Succeeded");
+    };
+
+    attempt_success_event_fields(
+        attempt.provider_kind,
+        Some(attempt.model.clone()),
+        request_id.clone(),
+        attempt.target_index,
+        attempt.attempt_index,
+        elapsed,
+        *status_code,
+    )
+}
+
+pub(crate) fn attempt_failure_event(
+    attempt: &AttemptRecord,
+    elapsed: Duration,
+) -> AttemptFailureEvent {
+    let AttemptDisposition::Failed {
+        error_kind,
+        error_message,
+        request_id,
+        ..
+    } = &attempt.disposition
+    else {
+        unreachable!("attempt_failure_event requires AttemptDisposition::Failed");
+    };
+
+    attempt_failure_event_fields(
+        attempt.provider_kind,
+        Some(attempt.model.clone()),
+        request_id.clone(),
+        attempt.target_index,
+        attempt.attempt_index,
+        elapsed,
+        Some(*error_kind),
+        Some(error_message.clone()),
+    )
 }
 
 pub(crate) fn request_end_success_event(context: RequestEndContext) -> RequestEndEvent {

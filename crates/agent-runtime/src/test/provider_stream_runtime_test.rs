@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use agent_core::{
-    CanonicalStreamEnvelope, CanonicalStreamEvent, ContentPart, FinishReason, Message, ProviderKind,
-    RawStreamPayload, RawStreamTransport, Response, ResponseFormat, RuntimeWarning,
+    CanonicalStreamEnvelope, CanonicalStreamEvent, ContentPart, FinishReason, Message,
+    ProviderKind, RawStreamPayload, RawStreamTransport, Response, ResponseFormat, RuntimeWarning,
     StreamOutputItemEnd, StreamOutputItemStart, TaskRequest, ToolChoice,
 };
 use agent_providers::adapter::adapter_for;
@@ -134,9 +134,14 @@ async fn runtime_executes_openai_sse_plan_and_builds_response() {
         .await;
 
     match attempt {
-        ProviderAttemptOutcome::Success { response, meta } => {
-            assert_eq!(meta.status_code, Some(200));
-            assert_eq!(meta.request_id.as_deref(), Some("req_sse"));
+        ProviderAttemptOutcome::Success {
+            response,
+            status_code,
+            request_id,
+            ..
+        } => {
+            assert_eq!(status_code, Some(200));
+            assert_eq!(request_id.as_deref(), Some("req_sse"));
             assert_eq!(response.model, "gpt-5-mini");
             assert_eq!(
                 response.output.content,

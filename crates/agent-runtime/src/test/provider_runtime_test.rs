@@ -3,8 +3,8 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
 use agent_core::{
-    Message, ProviderCapabilities, ProviderDescriptor, ProviderFamilyId, ProviderKind,
-    Response, ResponseFormat, TaskRequest, ToolChoice,
+    Message, ProviderCapabilities, ProviderDescriptor, ProviderFamilyId, ProviderKind, Response,
+    ResponseFormat, TaskRequest, ToolChoice,
 };
 use agent_providers::adapter::{ProviderAdapter, adapter_for};
 use agent_providers::error::{AdapterError, ProviderErrorInfo};
@@ -86,9 +86,12 @@ async fn execute_attempt_uses_override_model_in_meta() {
         .await;
 
     match attempt {
-        ProviderAttemptOutcome::Failure { meta, error } => {
-            assert_eq!(meta.model, "override-model");
-            assert_eq!(meta.error_kind, Some(error.kind));
+        ProviderAttemptOutcome::Failure {
+            selected_model,
+            error,
+        } => {
+            assert_eq!(selected_model, "override-model");
+            assert_eq!(error.kind, RuntimeErrorKind::Transport);
         }
         ProviderAttemptOutcome::Success { .. } => panic!("expected transport failure"),
     }
@@ -112,9 +115,12 @@ async fn execute_attempt_uses_default_model_when_request_blank() {
         .await;
 
     match attempt {
-        ProviderAttemptOutcome::Failure { meta, error } => {
-            assert_eq!(meta.model, "default-model");
-            assert_eq!(meta.error_kind, Some(error.kind));
+        ProviderAttemptOutcome::Failure {
+            selected_model,
+            error,
+        } => {
+            assert_eq!(selected_model, "default-model");
+            assert_eq!(error.kind, RuntimeErrorKind::Transport);
         }
         ProviderAttemptOutcome::Success { .. } => panic!("expected transport failure"),
     }
@@ -164,10 +170,15 @@ async fn open_stream_attempt_reports_selected_model_and_response_meta() {
         .await;
 
     match attempt {
-        ProviderStreamAttemptOutcome::Opened { mut stream, meta } => {
-            assert_eq!(meta.model, "override-model");
-            assert_eq!(meta.status_code, Some(200));
-            assert_eq!(meta.request_id.as_deref(), Some("req_sse"));
+        ProviderStreamAttemptOutcome::Opened {
+            mut stream,
+            selected_model,
+            status_code,
+            request_id,
+        } => {
+            assert_eq!(selected_model, "override-model");
+            assert_eq!(status_code, Some(200));
+            assert_eq!(request_id.as_deref(), Some("req_sse"));
 
             while stream
                 .next_envelope()

@@ -176,23 +176,29 @@ impl AgentToolkit {
             let attempt = client.runtime.execute_attempt(execution_plan).await;
 
             match attempt {
-                ProviderAttemptOutcome::Success { response, meta } => {
-                    attempt_execution.emit_success(&meta, index);
-                    attempt_history.push(succeeded_attempt_record(
+                ProviderAttemptOutcome::Success {
+                    response,
+                    selected_model,
+                    status_code,
+                    request_id,
+                } => {
+                    let attempt_record = succeeded_attempt_record(
                         target.instance.clone(),
                         client.runtime.kind,
-                        meta.model.clone(),
+                        selected_model.clone(),
                         index,
                         index,
-                        meta.status_code,
-                        meta.request_id.clone(),
-                    ));
+                        status_code,
+                        request_id.clone(),
+                    );
+                    attempt_execution.emit_success(&attempt_record);
+                    attempt_history.push(attempt_record);
                     let response_meta = response_meta(
                         target.instance.clone(),
                         client.runtime.kind,
-                        meta.model.clone(),
-                        meta.status_code,
-                        meta.request_id.clone(),
+                        selected_model,
+                        status_code,
+                        request_id,
                         attempt_history,
                     );
                     let response_model = response_meta.selected_model.clone();
@@ -206,22 +212,26 @@ impl AgentToolkit {
                     );
                     return Ok((response, response_meta));
                 }
-                ProviderAttemptOutcome::Failure { error, meta } => {
-                    attempt_execution.emit_failure(&meta, index);
-                    attempt_history.push(failed_attempt_record(
+                ProviderAttemptOutcome::Failure {
+                    error,
+                    selected_model,
+                } => {
+                    let attempt_record = failed_attempt_record(
                         target.instance.clone(),
                         client.runtime.kind,
-                        meta.model.clone(),
+                        selected_model.clone(),
                         index,
                         index,
                         &error,
-                    ));
+                    );
+                    attempt_execution.emit_failure(&attempt_record);
+                    attempt_history.push(attempt_record);
                     let status_code = error.status_code;
                     let request_id = error.request_id.clone();
                     let error = error.with_executed_failure_meta(executed_failure_meta(
                         target.instance.clone(),
                         client.runtime.kind,
-                        meta.model,
+                        selected_model,
                         status_code,
                         request_id,
                         attempt_history.clone(),
@@ -365,10 +375,14 @@ impl AgentToolkit {
                 target,
                 index,
             );
-            let selected_model = execution_plan.provider_attempt.model.clone();
 
             match client.runtime.open_stream_attempt(execution_plan).await {
-                ProviderStreamAttemptOutcome::Opened { stream, meta } => {
+                ProviderStreamAttemptOutcome::Opened {
+                    stream,
+                    selected_model,
+                    status_code,
+                    request_id,
+                } => {
                     return Ok(MessageResponseStream::new_routed(RoutedStreamInit {
                         task: task.clone(),
                         toolkit: self,
@@ -387,31 +401,35 @@ impl AgentToolkit {
                                 started_at: attempt_execution.started_at,
                                 observer: attempt_execution.observer,
                                 provider_instance: target.instance.clone(),
-                                provider: meta.provider,
-                                model: meta.model,
-                                request_id: meta.request_id,
-                                status_code: meta.status_code,
+                                provider: client.runtime.kind,
+                                model: selected_model,
+                                request_id,
+                                status_code,
                             },
                         },
                         next_target_index: index + 1,
                     }));
                 }
-                ProviderStreamAttemptOutcome::Failure { error, meta } => {
-                    attempt_execution.emit_failure(&meta, index);
-                    attempt_history.push(failed_attempt_record(
+                ProviderStreamAttemptOutcome::Failure {
+                    error,
+                    selected_model,
+                } => {
+                    let attempt_record = failed_attempt_record(
                         target.instance.clone(),
                         client.runtime.kind,
-                        selected_model,
+                        selected_model.clone(),
                         index,
                         index,
                         &error,
-                    ));
+                    );
+                    attempt_execution.emit_failure(&attempt_record);
+                    attempt_history.push(attempt_record);
                     let status_code = error.status_code;
                     let request_id = error.request_id.clone();
                     let error = error.with_executed_failure_meta(executed_failure_meta(
                         target.instance.clone(),
                         client.runtime.kind,
-                        meta.model,
+                        selected_model,
                         status_code,
                         request_id,
                         attempt_history.clone(),

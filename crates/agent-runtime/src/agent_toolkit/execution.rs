@@ -12,10 +12,10 @@ use crate::route::Route;
 use crate::runtime_error::RuntimeError;
 use crate::target::Target;
 use crate::types::{
-    AttemptDisposition, AttemptRecord, RequestEndContext, attempt_failure_event_fields,
-    attempt_skipped_event, attempt_start_event, attempt_success_event_fields,
-    normalized_event_model, request_end_failure_event, request_end_success_event,
-    request_start_event, terminal_failure_error,
+    AttemptDisposition, AttemptRecord, RequestEndContext, attempt_failure_event,
+    attempt_skipped_event, attempt_start_event, attempt_success_event, normalized_event_model,
+    request_end_failure_event, request_end_success_event, request_start_event,
+    terminal_failure_error,
 };
 
 pub(super) struct PreparedExecution {
@@ -198,32 +198,15 @@ impl PreparedExecution {
 }
 
 impl AttemptExecution {
-    pub(super) fn emit_success(&self, meta: &crate::types::AttemptMeta, index: usize) {
-        let event = attempt_success_event_fields(
-            meta.provider,
-            Some(meta.model.clone()),
-            meta.request_id.clone(),
-            index,
-            index,
-            self.started_at.elapsed(),
-            meta.status_code,
-        );
+    pub(super) fn emit_success(&self, attempt: &crate::types::AttemptRecord) {
+        let event = attempt_success_event(attempt, self.started_at.elapsed());
         safe_call_observer(self.observer.as_ref(), |runtime_observer| {
             runtime_observer.on_attempt_success(&event);
         });
     }
 
-    pub(super) fn emit_failure(&self, meta: &crate::types::AttemptMeta, index: usize) {
-        let event = attempt_failure_event_fields(
-            meta.provider,
-            Some(meta.model.clone()),
-            meta.request_id.clone(),
-            index,
-            index,
-            self.started_at.elapsed(),
-            meta.error_kind,
-            meta.error_message.clone(),
-        );
+    pub(super) fn emit_failure(&self, attempt: &crate::types::AttemptRecord) {
+        let event = attempt_failure_event(attempt, self.started_at.elapsed());
         safe_call_observer(self.observer.as_ref(), |runtime_observer| {
             runtime_observer.on_attempt_failure(&event);
         });
