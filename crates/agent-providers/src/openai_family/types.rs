@@ -185,27 +185,3 @@ pub struct OpenAiResponsesBody {
     #[serde(default)]
     pub error: Option<OpenAiErrorEnvelope>,
 }
-
-/// Shared OpenAI-family Responses API streaming event envelope.
-#[allow(dead_code)]
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
-pub struct OpenAiResponsesStreamEvent {
-    #[serde(default, rename = "type")]
-    pub event_type: Option<String>,
-    #[serde(default)]
-    pub response: Option<OpenAiResponsesBody>,
-    #[serde(default)]
-    pub item: Option<Value>,
-    #[serde(default)]
-    pub part: Option<Value>,
-    #[serde(default)]
-    pub output_index: Option<u32>,
-    #[serde(default)]
-    pub content_index: Option<u32>,
-    #[serde(default)]
-    pub item_id: Option<String>,
-    #[serde(default)]
-    pub delta: Option<String>,
-    #[serde(default)]
-    pub sequence_number: Option<u64>,
-}

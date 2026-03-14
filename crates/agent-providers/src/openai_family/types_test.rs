@@ -1,10 +1,10 @@
 use serde_json::json;
 
 use crate::openai_family::types::{
-    OpenAiFunctionToolDefinition, OpenAiResponsesBody, OpenAiResponsesStreamEvent,
-    OpenAiTextFormat, OpenAiToolType, StructuredOutputFormat,
+    OpenAiFunctionToolDefinition, OpenAiResponsesBody, OpenAiTextFormat, OpenAiToolType,
+    StructuredOutputFormat,
 };
-use crate::test_fixtures::{load_decoded_success_fixture, load_streaming_success_fixture};
+use crate::test_fixtures::{load_decoded_success_fixture};
 
 #[test]
 fn structured_output_defaults_additional_properties_false() {
@@ -103,45 +103,6 @@ fn decoded_fixtures_deserialize_shared_responses_body() {
                 .as_ref()
                 .and_then(serde_json::Value::as_array)
                 .is_some_and(|output| !output.is_empty())
-        );
-    }
-}
-
-#[test]
-fn streaming_fixtures_deserialize_shared_responses_events() {
-    let fixtures = [
-        ("openai", "basic_chat", "gpt-5-mini"),
-        ("openai", "tool_call", "gpt-5-mini"),
-        ("openrouter", "basic_chat", "openai.gpt-5.4"),
-        ("openrouter", "tool_call", "openai.gpt-5.4"),
-    ];
-
-    for (provider, scenario, model) in fixtures {
-        let fixture = load_streaming_success_fixture(provider, scenario, model);
-        let events = fixture["stream"]["events"]
-            .as_array()
-            .expect("stream fixture should expose parsed events");
-
-        let mut parsed_count = 0usize;
-        for event in events {
-            let Some(data_json) = event.get("data_json") else {
-                continue;
-            };
-
-            let parsed: OpenAiResponsesStreamEvent = serde_json::from_value(data_json.clone())
-                .expect("stream event should deserialize into shared event");
-            assert!(
-                parsed
-                    .event_type
-                    .as_deref()
-                    .is_some_and(|event_type| !event_type.is_empty())
-            );
-            parsed_count += 1;
-        }
-
-        assert!(
-            parsed_count > 0,
-            "expected parsed stream events for fixture"
         );
     }
 }
