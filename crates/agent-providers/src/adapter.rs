@@ -8,20 +8,9 @@ use agent_core::{
     ProviderKind, Response, ResponseFormat,
 };
 
-use crate::anthropic_family::{
-    AnthropicDecodeEnvelope, AnthropicFamilyError, AnthropicFamilyErrorKind,
-};
 use crate::error::{AdapterError, ProviderErrorInfo};
-use crate::openai_family::{OpenAiDecodeEnvelope, OpenAiFamilyError, OpenAiFamilyErrorKind};
-use crate::platform::anthropic::{
-    request as anthropic_request, response as anthropic_response, stream as anthropic_stream,
-};
-use crate::platform::openai::{
-    request as openai_request, response as openai_response, stream as openai_stream,
-};
-use crate::platform::openrouter::{
-    request as openrouter_request, response as openrouter_response, stream as openrouter_stream,
-};
+use crate::family_codec::codec_for;
+use crate::overlay::overlay_for;
 use crate::request_plan::ProviderRequestPlan;
 use crate::streaming::ProviderStreamProjector;
 
@@ -170,89 +159,64 @@ fn openai_compatible_plan(
     execution: &ExecutionPlan,
     provider: ProviderKind,
 ) -> Result<ProviderRequestPlan, AdapterError> {
-    let family_options = execution
-        .provider_attempt
-        .native_options
-        .as_ref()
-        .and_then(|native| native.family.as_ref())
-        .and_then(|family| match family {
-            agent_core::FamilyOptions::OpenAiCompatible(options) => Some(options),
-            _ => None,
-        });
-    let provider_options = execution
-        .provider_attempt
-        .native_options
-        .as_ref()
-        .and_then(|native| native.provider.as_ref());
-    let mut encoded = openai_request::encode_family_request(
+    let codec = codec_for(ProviderFamilyId::OpenAiCompatible);
+    let overlay = overlay_for(provider);
+    let native_options = execution.provider_attempt.native_options.as_ref();
+    let mut encoded = codec
+        .encode_task(
+            &execution.task,
+            &execution.provider_attempt.model,
+            execution.response_mode,
+            native_options.and_then(|native| native.family.as_ref()),
+        )
+        .map_err(|error| rebind_adapter_error_provider(error, provider))?;
+    overlay.apply_provider_overlay(
         &execution.task,
         &execution.provider_attempt.model,
-        execution.response_mode,
-    )
-    .map_err(|error| rebind_adapter_error_provider(error, provider))?;
-    openai_request::apply_provider_overlay(
-        provider,
         &mut encoded,
-        family_options,
-        provider_options,
+        native_options.and_then(|native| native.provider.as_ref()),
     )?;
 
     Ok(encoded.into())
 }
 
 fn anthropic_plan(execution: &ExecutionPlan) -> Result<ProviderRequestPlan, AdapterError> {
-    let family_options = execution
-        .provider_attempt
-        .native_options
-        .as_ref()
-        .and_then(|native| native.family.as_ref())
-        .and_then(|family| match family {
-            agent_core::FamilyOptions::Anthropic(options) => Some(options),
-            _ => None,
-        });
-    let provider_options = execution
-        .provider_attempt
-        .native_options
-        .as_ref()
-        .and_then(|native| native.provider.as_ref());
-    let mut encoded = anthropic_request::encode_family_request(
+    let codec = codec_for(ProviderFamilyId::Anthropic);
+    let overlay = overlay_for(ProviderKind::Anthropic);
+    let native_options = execution.provider_attempt.native_options.as_ref();
+    let mut encoded = codec.encode_task(
         &execution.task,
         &execution.provider_attempt.model,
         execution.response_mode,
+        native_options.and_then(|native| native.family.as_ref()),
     )?;
-    anthropic_request::apply_provider_overlay(&mut encoded, family_options, provider_options)?;
+    overlay.apply_provider_overlay(
+        &execution.task,
+        &execution.provider_attempt.model,
+        &mut encoded,
+        native_options.and_then(|native| native.provider.as_ref()),
+    )?;
 
     Ok(encoded.into())
 }
 
 fn openrouter_plan(execution: &ExecutionPlan) -> Result<ProviderRequestPlan, AdapterError> {
-    let family_options = execution
-        .provider_attempt
-        .native_options
-        .as_ref()
-        .and_then(|native| native.family.as_ref())
-        .and_then(|family| match family {
-            agent_core::FamilyOptions::OpenAiCompatible(options) => Some(options),
-            _ => None,
-        });
-    let provider_options = execution
-        .provider_attempt
-        .native_options
-        .as_ref()
-        .and_then(|native| native.provider.as_ref());
-    let mut encoded = openai_request::encode_family_request(
+    let codec = codec_for(ProviderFamilyId::OpenAiCompatible);
+    let overlay = overlay_for(ProviderKind::OpenRouter);
+    let native_options = execution.provider_attempt.native_options.as_ref();
+    let mut encoded = codec
+        .encode_task(
+            &execution.task,
+            &execution.provider_attempt.model,
+            execution.response_mode,
+            native_options.and_then(|native| native.family.as_ref()),
+        )
+        .map_err(|error| rebind_adapter_error_provider(error, ProviderKind::OpenRouter))?;
+    overlay.apply_provider_overlay(
         &execution.task,
         &execution.provider_attempt.model,
-        execution.response_mode,
-    )
-    .map_err(|error| rebind_adapter_error_provider(error, ProviderKind::OpenRouter))?;
-    openrouter_request::apply_provider_overlay(
         &mut encoded,
-        &execution.provider_attempt.model,
-        execution.task.top_p,
-        &execution.task.stop,
-        family_options,
-        provider_options,
+        native_options.and_then(|native| native.provider.as_ref()),
     )?;
 
     Ok(encoded.into())
@@ -290,86 +254,24 @@ fn decode_response_with_layering(
     body: Value,
     requested_format: &ResponseFormat,
 ) -> Result<Response, AdapterError> {
-    if let Some(result) = decode_response_override(provider, body.clone(), requested_format) {
+    let overlay = overlay_for(provider);
+    let codec = codec_for(family);
+
+    if let Some(result) = overlay.decode_response_override(body.clone(), requested_format) {
         return result;
     }
 
-    match family {
-        ProviderFamilyId::OpenAiCompatible => {
-            crate::openai_family::decode::decode_openai_response(&OpenAiDecodeEnvelope {
-                body: body.clone(),
-                requested_response_format: requested_format.clone(),
-            })
-            .map_err(|error| refine_openai_family_decode_error(provider, family, &body, error))
-        }
-        ProviderFamilyId::Anthropic => {
-            crate::anthropic_family::decode::decode_anthropic_response(&AnthropicDecodeEnvelope {
-                body: body.clone(),
-                requested_response_format: requested_format.clone(),
-            })
-            .map_err(|error| refine_anthropic_family_decode_error(provider, family, &body, error))
-        }
-    }
-}
-
-fn decode_response_override(
-    provider: ProviderKind,
-    body: Value,
-    requested_format: &ResponseFormat,
-) -> Option<Result<Response, AdapterError>> {
-    match provider {
-        ProviderKind::OpenAi | ProviderKind::GenericOpenAiCompatible => {
-            openai_response::decode_response_override(provider, body, requested_format)
-        }
-        ProviderKind::Anthropic => {
-            anthropic_response::decode_response_override(body, requested_format)
-        }
-        ProviderKind::OpenRouter => {
-            openrouter_response::decode_response_override(body, requested_format)
-        }
-    }
-}
-
-fn refine_openai_family_decode_error(
-    provider: ProviderKind,
-    family: ProviderFamilyId,
-    body: &Value,
-    error: OpenAiFamilyError,
-) -> AdapterError {
-    let message = error.message().to_string();
-    apply_layered_error_info(
-        provider,
-        family,
-        body,
-        AdapterError::with_source(
-            map_openai_family_error_kind(error.kind()),
-            provider,
-            crate::error::AdapterOperation::DecodeResponse,
-            message,
-            error,
-        ),
-    )
-}
-
-fn refine_anthropic_family_decode_error(
-    provider: ProviderKind,
-    family: ProviderFamilyId,
-    body: &Value,
-    error: AnthropicFamilyError,
-) -> AdapterError {
-    let message = error.message().to_string();
-    apply_layered_error_info(
-        provider,
-        family,
-        body,
-        AdapterError::with_source(
-            map_anthropic_family_error_kind(error.kind()),
-            provider,
-            crate::error::AdapterOperation::DecodeResponse,
-            message,
-            error,
-        ),
-    )
+    codec
+        .decode_response(body.clone(), requested_format)
+        .map_err(|error| {
+            let family_info = codec.decode_error(&body);
+            let overlay_info = overlay.decode_provider_error(&body);
+            apply_layered_error_info(
+                rebind_adapter_error_provider(error, provider),
+                family_info,
+                overlay_info,
+            )
+        })
 }
 
 fn decode_error_with_layering(
@@ -377,15 +279,8 @@ fn decode_error_with_layering(
     family: ProviderFamilyId,
     body: &Value,
 ) -> Option<ProviderErrorInfo> {
-    let family_info = match family {
-        ProviderFamilyId::OpenAiCompatible => {
-            crate::openai_family::decode::decode_openai_error(body)
-        }
-        ProviderFamilyId::Anthropic => {
-            crate::anthropic_family::decode::decode_anthropic_error(body)
-        }
-    };
-    let overlay_info = decode_provider_error_override(provider, body);
+    let family_info = codec_for(family).decode_error(body);
+    let overlay_info = overlay_for(provider).decode_provider_error(body);
 
     match (family_info, overlay_info) {
         (Some(family_info), Some(overlay_info)) => Some(family_info.refined_with(overlay_info)),
@@ -395,26 +290,19 @@ fn decode_error_with_layering(
     }
 }
 
-fn decode_provider_error_override(
-    provider: ProviderKind,
-    body: &Value,
-) -> Option<ProviderErrorInfo> {
-    match provider {
-        ProviderKind::OpenAi | ProviderKind::GenericOpenAiCompatible => {
-            openai_response::decode_provider_error(body)
-        }
-        ProviderKind::Anthropic => anthropic_response::decode_provider_error(body),
-        ProviderKind::OpenRouter => openrouter_response::decode_provider_error(body),
-    }
-}
-
 fn apply_layered_error_info(
-    provider: ProviderKind,
-    family: ProviderFamilyId,
-    body: &Value,
     mut error: AdapterError,
+    family_info: Option<ProviderErrorInfo>,
+    overlay_info: Option<ProviderErrorInfo>,
 ) -> AdapterError {
-    if let Some(info) = decode_error_with_layering(provider, family, body) {
+    let info = match (family_info, overlay_info) {
+        (Some(family_info), Some(overlay_info)) => Some(family_info.refined_with(overlay_info)),
+        (Some(family_info), None) => Some(family_info),
+        (None, Some(overlay_info)) => Some(overlay_info),
+        (None, None) => None,
+    };
+
+    if let Some(info) = info {
         if let Some(kind) = info.kind {
             error.kind = kind;
         }
@@ -426,45 +314,7 @@ fn apply_layered_error_info(
         }
     }
 
-    match provider {
-        ProviderKind::OpenAi | ProviderKind::GenericOpenAiCompatible => {
-            openai_response::refine_family_decode_error(body, error)
-        }
-        ProviderKind::Anthropic => anthropic_response::refine_family_decode_error(body, error),
-        ProviderKind::OpenRouter => openrouter_response::refine_family_decode_error(body, error),
-    }
-}
-
-fn map_openai_family_error_kind(kind: OpenAiFamilyErrorKind) -> crate::error::AdapterErrorKind {
-    match kind {
-        OpenAiFamilyErrorKind::Validation => crate::error::AdapterErrorKind::Validation,
-        OpenAiFamilyErrorKind::Encode => crate::error::AdapterErrorKind::Encode,
-        OpenAiFamilyErrorKind::Decode => crate::error::AdapterErrorKind::Decode,
-        OpenAiFamilyErrorKind::Upstream => crate::error::AdapterErrorKind::Upstream,
-        OpenAiFamilyErrorKind::ProtocolViolation => {
-            crate::error::AdapterErrorKind::ProtocolViolation
-        }
-        OpenAiFamilyErrorKind::UnsupportedFeature => {
-            crate::error::AdapterErrorKind::UnsupportedFeature
-        }
-    }
-}
-
-fn map_anthropic_family_error_kind(
-    kind: AnthropicFamilyErrorKind,
-) -> crate::error::AdapterErrorKind {
-    match kind {
-        AnthropicFamilyErrorKind::Validation => crate::error::AdapterErrorKind::Validation,
-        AnthropicFamilyErrorKind::Encode => crate::error::AdapterErrorKind::Encode,
-        AnthropicFamilyErrorKind::Decode => crate::error::AdapterErrorKind::Decode,
-        AnthropicFamilyErrorKind::Upstream => crate::error::AdapterErrorKind::Upstream,
-        AnthropicFamilyErrorKind::ProtocolViolation => {
-            crate::error::AdapterErrorKind::ProtocolViolation
-        }
-        AnthropicFamilyErrorKind::UnsupportedFeature => {
-            crate::error::AdapterErrorKind::UnsupportedFeature
-        }
-    }
+    error
 }
 
 fn rebind_adapter_error_provider(mut error: AdapterError, provider: ProviderKind) -> AdapterError {
@@ -476,29 +326,14 @@ fn create_stream_projector_with_layering(
     provider: ProviderKind,
     family: ProviderFamilyId,
 ) -> Box<dyn ProviderStreamProjector> {
-    if let Some(projector) = create_stream_projector_override(provider) {
+    let overlay = overlay_for(provider);
+    let codec = codec_for(family);
+
+    if let Some(projector) = overlay.create_stream_projector_override() {
         return projector;
     }
 
-    match family {
-        ProviderFamilyId::OpenAiCompatible => {
-            Box::<openai_stream::OpenAiStreamProjector>::default()
-        }
-        ProviderFamilyId::Anthropic => Box::<anthropic_stream::AnthropicStreamProjector>::default(),
-    }
-}
-
-fn create_stream_projector_override(
-    provider: ProviderKind,
-) -> Option<Box<dyn ProviderStreamProjector>> {
-    match provider {
-        ProviderKind::OpenRouter => {
-            Some(Box::<openrouter_stream::OpenRouterStreamProjector>::default())
-        }
-        ProviderKind::OpenAi | ProviderKind::Anthropic | ProviderKind::GenericOpenAiCompatible => {
-            None
-        }
-    }
+    codec.create_stream_projector()
 }
 
 #[cfg(test)]

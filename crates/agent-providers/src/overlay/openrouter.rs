@@ -2,14 +2,17 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 
 use agent_core::{
-    OpenAiCompatibleOptions, OpenRouterOptions, ProviderOptions, ResponseMode, RuntimeWarning,
+    OpenRouterOptions, ProviderKind, ProviderOptions, Response, ResponseFormat, RuntimeWarning,
     TaskRequest,
 };
 
-use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
-use crate::openai_family::{OpenAiFamilyError, OpenAiFamilyErrorKind};
-use crate::platform::openai::request::encode_family_request;
+use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo};
+use crate::openai_family::OpenAiFamilyError;
 use crate::request_plan::EncodedFamilyRequest;
+use crate::streaming::ProviderStreamProjector;
+
+use super::ProviderOverlay;
+use super::openrouter_stream_projector::OpenRouterStreamProjector;
 
 const WARN_IGNORED_TOP_P: &str = "openai.encode.ignored_top_p";
 const WARN_IGNORED_STOP: &str = "openai.encode.ignored_stop";
@@ -22,8 +25,6 @@ pub(crate) struct OpenRouterOverrides {
     pub provider_preferences: Option<Value>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub plugins: Vec<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub parallel_tool_calls: Option<bool>,
     #[serde(skip_serializing)]
     pub frequency_penalty: Option<f32>,
     #[serde(skip_serializing)]
@@ -34,8 +35,6 @@ pub(crate) struct OpenRouterOverrides {
     pub logprobs: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_logprobs: Option<u8>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reasoning: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -61,25 +60,17 @@ pub(crate) struct OpenRouterOverrides {
 }
 
 impl OpenRouterOverrides {
-    fn from_options(
-        family_options: Option<&OpenAiCompatibleOptions>,
-        provider_options: Option<&ProviderOptions>,
-    ) -> Result<Self, AdapterError> {
+    fn from_options(provider_options: Option<&ProviderOptions>) -> Result<Self, AdapterError> {
         let mut overrides = Self::default();
-
-        if let Some(options) = family_options {
-            overrides.parallel_tool_calls = options.parallel_tool_calls;
-            overrides.reasoning = options.reasoning.clone();
-        }
 
         if let Some(provider) = provider_options {
             let ProviderOptions::OpenRouter(options) = provider else {
                 return Err(AdapterError::new(
                     AdapterErrorKind::Validation,
-                    agent_core::ProviderKind::OpenRouter,
+                    ProviderKind::OpenRouter,
                     AdapterOperation::PlanRequest,
                     format!(
-                        "OpenRouter adapter received mismatched provider native options for {:?}",
+                        "OpenRouter overlay received mismatched provider native options for {:?}",
                         provider.provider_kind()
                     ),
                 ));
@@ -110,50 +101,52 @@ fn apply_provider_options(overrides: &mut OpenRouterOverrides, options: &OpenRou
     overrides.debug = options.debug.clone();
 }
 
-pub(crate) fn apply_provider_overlay(
-    request: &mut EncodedFamilyRequest,
-    model_id: &str,
-    top_p: Option<f32>,
-    stop: &[String],
-    family_options: Option<&OpenAiCompatibleOptions>,
-    provider_options: Option<&ProviderOptions>,
-) -> Result<(), AdapterError> {
-    let overrides = OpenRouterOverrides::from_options(family_options, provider_options)?;
-    apply_openrouter_overrides(
-        model_id,
-        top_p,
-        stop,
-        &overrides,
-        &mut request.body,
-        &mut request.warnings,
-    )
-    .map_err(map_openrouter_plan_error)
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct OpenRouterOverlay;
+
+impl ProviderOverlay for OpenRouterOverlay {
+    fn apply_provider_overlay(
+        &self,
+        task: &TaskRequest,
+        model: &str,
+        request: &mut EncodedFamilyRequest,
+        provider_options: Option<&ProviderOptions>,
+    ) -> Result<(), AdapterError> {
+        let overrides = OpenRouterOverrides::from_options(provider_options)?;
+        apply_openrouter_overrides(
+            model,
+            task.top_p,
+            &task.stop,
+            &overrides,
+            &mut request.body,
+            &mut request.warnings,
+        )
+        .map_err(map_openrouter_plan_error)
+    }
+
+    fn decode_provider_error(&self, body: &Value) -> Option<ProviderErrorInfo> {
+        let envelope = crate::openai_family::decode::parse_openai_error_value(body)?;
+        Some(ProviderErrorInfo {
+            provider_code: envelope.code.or(envelope.error_type),
+            message: None,
+            kind: None,
+        })
+    }
+
+    fn decode_response_override(
+        &self,
+        _body: Value,
+        _requested_format: &ResponseFormat,
+    ) -> Option<Result<Response, AdapterError>> {
+        None
+    }
+
+    fn create_stream_projector_override(&self) -> Option<Box<dyn ProviderStreamProjector>> {
+        Some(Box::<OpenRouterStreamProjector>::default())
+    }
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
-pub(crate) fn plan_request(
-    task: &TaskRequest,
-    model: &str,
-    response_mode: ResponseMode,
-    overrides: &OpenRouterOverrides,
-) -> Result<crate::request_plan::ProviderRequestPlan, AdapterError> {
-    let mut request = encode_family_request(task, model, response_mode).map_err(|mut error| {
-        error.provider = agent_core::ProviderKind::OpenRouter;
-        error
-    })?;
-    apply_openrouter_overrides(
-        model,
-        task.top_p,
-        &task.stop,
-        overrides,
-        &mut request.body,
-        &mut request.warnings,
-    )
-    .map_err(map_openrouter_plan_error)?;
-    Ok(request.into())
-}
-
-fn apply_openrouter_overrides(
+pub(crate) fn apply_openrouter_overrides(
     model_id: &str,
     top_p: Option<f32>,
     stop: &[String],
@@ -245,21 +238,21 @@ fn insert_optional_f32(
 fn map_openrouter_plan_error(error: OpenAiFamilyError) -> AdapterError {
     let message = error.message().to_string();
     AdapterError::with_source(
-        map_spec_error_kind(error.kind()),
-        agent_core::ProviderKind::OpenRouter,
+        match error.kind() {
+            crate::openai_family::OpenAiFamilyErrorKind::Validation => AdapterErrorKind::Validation,
+            crate::openai_family::OpenAiFamilyErrorKind::Encode => AdapterErrorKind::Encode,
+            crate::openai_family::OpenAiFamilyErrorKind::Decode => AdapterErrorKind::Decode,
+            crate::openai_family::OpenAiFamilyErrorKind::Upstream => AdapterErrorKind::Upstream,
+            crate::openai_family::OpenAiFamilyErrorKind::ProtocolViolation => {
+                AdapterErrorKind::ProtocolViolation
+            }
+            crate::openai_family::OpenAiFamilyErrorKind::UnsupportedFeature => {
+                AdapterErrorKind::UnsupportedFeature
+            }
+        },
+        ProviderKind::OpenRouter,
         AdapterOperation::PlanRequest,
         message,
         error,
     )
-}
-
-fn map_spec_error_kind(kind: OpenAiFamilyErrorKind) -> AdapterErrorKind {
-    match kind {
-        OpenAiFamilyErrorKind::Validation => AdapterErrorKind::Validation,
-        OpenAiFamilyErrorKind::Encode => AdapterErrorKind::Encode,
-        OpenAiFamilyErrorKind::Decode => AdapterErrorKind::Decode,
-        OpenAiFamilyErrorKind::Upstream => AdapterErrorKind::Upstream,
-        OpenAiFamilyErrorKind::ProtocolViolation => AdapterErrorKind::ProtocolViolation,
-        OpenAiFamilyErrorKind::UnsupportedFeature => AdapterErrorKind::UnsupportedFeature,
-    }
 }

@@ -17,11 +17,10 @@ use agent_core::types::{
 use crate::anthropic_family::AnthropicDecodeEnvelope;
 use crate::anthropic_family::decode::decode_anthropic_response;
 use crate::error::{AdapterErrorKind, ProviderErrorInfo};
+use crate::family_codec::codec_for;
 use crate::openai_family::OpenAiDecodeEnvelope;
 use crate::openai_family::decode::decode_openai_response;
-use crate::platform::anthropic::request as anthropic_request;
-use crate::platform::openai::request as openai_request;
-use crate::platform::openrouter::request as openrouter_request;
+use crate::overlay::overlay_for;
 use crate::request_plan::TransportResponseFraming;
 use crate::streaming::ProviderStreamProjector;
 
@@ -101,6 +100,53 @@ fn execution_plan(
     }
 }
 
+fn compose_openai_compatible_request(
+    provider: ProviderKind,
+    task: &TaskRequest,
+    model: &str,
+    response_mode: ResponseMode,
+    native_options: Option<&NativeOptions>,
+) -> Result<crate::request_plan::ProviderRequestPlan, crate::error::AdapterError> {
+    let codec = codec_for(agent_core::ProviderFamilyId::OpenAiCompatible);
+    let overlay = overlay_for(provider);
+    let mut encoded = codec.encode_task(
+        task,
+        model,
+        response_mode,
+        native_options.and_then(|native| native.family.as_ref()),
+    )?;
+    overlay.apply_provider_overlay(
+        task,
+        model,
+        &mut encoded,
+        native_options.and_then(|native| native.provider.as_ref()),
+    )?;
+    Ok(encoded.into())
+}
+
+fn compose_anthropic_request(
+    task: &TaskRequest,
+    model: &str,
+    response_mode: ResponseMode,
+    native_options: Option<&NativeOptions>,
+) -> Result<crate::request_plan::ProviderRequestPlan, crate::error::AdapterError> {
+    let codec = codec_for(agent_core::ProviderFamilyId::Anthropic);
+    let overlay = overlay_for(ProviderKind::Anthropic);
+    let mut encoded = codec.encode_task(
+        task,
+        model,
+        response_mode,
+        native_options.and_then(|native| native.family.as_ref()),
+    )?;
+    overlay.apply_provider_overlay(
+        task,
+        model,
+        &mut encoded,
+        native_options.and_then(|native| native.provider.as_ref()),
+    )?;
+    Ok(encoded.into())
+}
+
 #[test]
 fn adapter_lookup_returns_expected_kinds() {
     assert_eq!(
@@ -167,11 +213,11 @@ fn openai_adapter_plan_request_matches_family_overlay_translation() {
         None,
     );
 
-    let translated = openai_request::plan_request(
+    let translated = compose_openai_compatible_request(
+        ProviderKind::OpenAi,
         &task,
         OPENAI_MODEL,
         ResponseMode::NonStreaming,
-        ProviderKind::OpenAi,
         None,
     )
     .expect("request planning should succeed");
@@ -200,7 +246,7 @@ fn anthropic_adapter_plan_request_matches_family_overlay_translation() {
     );
 
     let translated =
-        anthropic_request::plan_request(&task, ANTHROPIC_MODEL, ResponseMode::NonStreaming, None)
+        compose_anthropic_request(&task, ANTHROPIC_MODEL, ResponseMode::NonStreaming, None)
             .expect("planning should succeed");
     let adapter_plan = adapter_for(ProviderKind::Anthropic)
         .plan_request(&execution)
@@ -228,11 +274,12 @@ fn openrouter_adapter_plan_request_matches_family_overlay_translation() {
         None,
     );
 
-    let translated = openrouter_request::plan_request(
+    let translated = compose_openai_compatible_request(
+        ProviderKind::OpenRouter,
         &task,
         OPENAI_MODEL,
         ResponseMode::NonStreaming,
-        &openrouter_request::OpenRouterOverrides::default(),
+        None,
     )
     .expect("planning should succeed");
     let adapter_plan = adapter_for(ProviderKind::OpenRouter)

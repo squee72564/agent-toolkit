@@ -14,7 +14,13 @@
 pub mod adapter;
 pub mod anthropic_family;
 pub mod error;
+mod family_codec;
 pub mod openai_family;
-pub mod platform;
+mod overlay;
 pub mod request_plan;
 pub mod streaming;
+
+#[cfg(test)]
+mod test_fixtures;
+#[cfg(test)]
+mod test_fixtures_test;
