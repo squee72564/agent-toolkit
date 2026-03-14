@@ -4,9 +4,7 @@ use crate::openai_family::types::{
     OpenAiFunctionToolDefinition, OpenAiResponsesBody, OpenAiResponsesStreamEvent,
     OpenAiTextFormat, OpenAiToolType, StructuredOutputFormat,
 };
-use crate::platform::test_fixtures::{
-    load_decoded_success_fixture, load_streaming_success_fixture,
-};
+use crate::test_fixtures::{load_decoded_success_fixture, load_streaming_success_fixture};
 
 #[test]
 fn structured_output_defaults_additional_properties_false() {
