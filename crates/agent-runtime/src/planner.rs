@@ -17,14 +17,12 @@ use crate::types::{
     AttemptDisposition, AttemptRecord, RoutePlanningFailure, RoutePlanningFailureReason, SkipReason,
 };
 
-#[cfg_attr(not(test), allow(dead_code))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PlanningRejectionKind {
     StaticIncompatibility,
     AdapterPlanningRejected,
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
 #[derive(Debug, Clone)]
 pub(crate) struct PlanningRejection {
     pub(crate) kind: PlanningRejectionKind,

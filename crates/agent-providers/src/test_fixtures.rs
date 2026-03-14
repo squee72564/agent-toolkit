@@ -176,7 +176,6 @@ fn decoded_fixture_root(provider: &str) -> PathBuf {
     fixture_set_root(provider, FixtureSet::Decoded)
 }
 
-#[allow(dead_code)]
 pub(crate) fn streaming_fixture_root(provider: &str) -> PathBuf {
     fixture_set_root(provider, FixtureSet::Streaming)
 }
