@@ -101,3 +101,21 @@ all used appropriately, and if they are missing note it and how it affects the i
 - fixture tests remain green and preserve provider payload expectations
 - no `REFACTOR-SHIM:` markers remain
 - no migration-only compatibility shims from `REFACTOR.md` remain in shipped code
+
+## Closeout Status
+
+This cleanup slice is now closed in shipped code:
+
+- public `AttemptMeta` has been removed from `agent-runtime` and `agent`
+- executed observer/event helpers route through `AttemptRecord`-based metadata
+  construction rather than a legacy per-attempt metadata surface
+- `ResponseMeta`, `ExecutedFailureMeta`, and `RoutePlanningFailure` share the
+  target `AttemptRecord` history shape
+- no `REFACTOR-SHIM:` markers remain in shipped code
+- the required workspace verification suite passes:
+  - `cargo check --workspace --all-targets --locked`
+  - `cargo fmt --all`
+  - `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+  - `cargo clippy --workspace --lib --all-features -- -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic`
+  - `cargo test --workspace --all-targets --all-features -- --quiet`
+  - `RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --document-private-items`
