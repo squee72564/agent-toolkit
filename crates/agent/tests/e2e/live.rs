@@ -60,7 +60,7 @@ pub fn response_text(parts: &[ContentPart]) -> String {
 }
 
 pub fn assert_live_response_meta(meta: &ResponseMeta, provider: ProviderId) {
-    assert_eq!(meta.selected_provider, provider);
+    assert_eq!(meta.selected_provider_kind, provider);
     assert!(
         !meta.selected_model.trim().is_empty(),
         "expected selected model metadata to be populated"

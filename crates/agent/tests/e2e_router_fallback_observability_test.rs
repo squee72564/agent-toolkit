@@ -3,11 +3,11 @@ mod e2e;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use agent_toolkit::runtime::AttemptDisposition;
 use agent_toolkit::{
     AgentToolkit, AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
-    FallbackMode, FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig, ProviderId,
-    RequestEndEvent, RequestStartEvent, RetryPolicy, Route, RuntimeErrorKind, RuntimeObserver,
-    Target,
+    FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig, ProviderId, RequestEndEvent,
+    RequestStartEvent, RetryPolicy, Route, RuntimeErrorKind, RuntimeObserver, Target,
 };
 
 use e2e::fixtures::{FixtureProvider, FixtureScenario, load_fixture_json};
@@ -96,9 +96,7 @@ async fn fallback_retries_next_provider_on_status_rule_then_succeeds() {
         .build()
         .expect("build toolkit");
 
-    let fallback = FallbackPolicy::new()
-        .with_mode(FallbackMode::RulesOnly)
-        .with_rule(FallbackRule::retry_on_status(401));
+    let fallback = FallbackPolicy::new().with_rule(FallbackRule::retry_on_status(401));
 
     let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
         .with_fallback(Target::new(ProviderId::Anthropic))
@@ -116,12 +114,18 @@ async fn fallback_retries_next_provider_on_status_rule_then_succeeds() {
     .await
     .expect("fallback should succeed on anthropic");
 
-    assert_eq!(meta.selected_provider, ProviderId::Anthropic);
+    assert_eq!(meta.selected_provider_kind, ProviderId::Anthropic);
     assert_eq!(meta.attempts.len(), 2);
-    assert_eq!(meta.attempts[0].provider, ProviderId::OpenAi);
-    assert!(!meta.attempts[0].success);
-    assert_eq!(meta.attempts[1].provider, ProviderId::Anthropic);
-    assert!(meta.attempts[1].success);
+    assert_eq!(meta.attempts[0].provider_kind, ProviderId::OpenAi);
+    assert!(matches!(
+        meta.attempts[0].disposition,
+        AttemptDisposition::Failed { .. }
+    ));
+    assert_eq!(meta.attempts[1].provider_kind, ProviderId::Anthropic);
+    assert!(matches!(
+        meta.attempts[1].disposition,
+        AttemptDisposition::Succeeded { .. }
+    ));
 }
 
 #[tokio::test]
@@ -154,9 +158,7 @@ async fn fallback_exhaustion_returns_terminal_error_kind() {
         .build()
         .expect("build toolkit");
 
-    let fallback = FallbackPolicy::new()
-        .with_mode(FallbackMode::RulesOnly)
-        .with_rule(FallbackRule::retry_on_status(401));
+    let fallback = FallbackPolicy::new().with_rule(FallbackRule::retry_on_status(401));
 
     let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
         .with_fallback(Target::new(ProviderId::Anthropic))
@@ -221,7 +223,6 @@ async fn fallback_rule_retry_on_provider_code_is_honored() {
         .expect("build toolkit");
 
     let fallback = FallbackPolicy::new()
-        .with_mode(FallbackMode::RulesOnly)
         .with_rule(FallbackRule::retry_on_provider_code("rate_limit_exceeded"));
 
     let route = Route::to(Target::new(ProviderId::OpenAi).with_model("gpt-5-mini"))
@@ -240,7 +241,7 @@ async fn fallback_rule_retry_on_provider_code_is_honored() {
     .await
     .expect("provider-code fallback should succeed");
 
-    assert_eq!(meta.selected_provider, ProviderId::OpenRouter);
+    assert_eq!(meta.selected_provider_kind, ProviderId::OpenRouter);
     assert_eq!(meta.attempts.len(), 2);
 }
 

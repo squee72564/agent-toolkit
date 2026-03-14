@@ -29,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let completion = stream.finish().await?;
     println!("model: {}", completion.response.model);
-    println!("provider: {:?}", completion.meta.selected_provider);
+    println!("provider: {:?}", completion.meta.selected_provider_kind);
 
     Ok(())
 }

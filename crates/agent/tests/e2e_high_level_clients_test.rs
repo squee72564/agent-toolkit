@@ -46,7 +46,7 @@ async fn openai_messages_create_happy_path_uses_fixture_and_expected_request_sha
     .await
     .expect("openai request should succeed");
 
-    assert_eq!(meta.selected_provider, ProviderId::OpenAi);
+    assert_eq!(meta.selected_provider_kind, ProviderId::OpenAi);
     assert_eq!(meta.selected_model, "gpt-5-mini");
     assert_eq!(meta.status_code, Some(200));
     assert_eq!(meta.request_id.as_deref(), Some("req_openai_1"));
@@ -167,7 +167,7 @@ async fn openrouter_tool_enabled_flow_handles_tool_orchestration_and_meta() {
     .await
     .expect("first openrouter request succeeds");
 
-    assert_eq!(first_meta.selected_provider, ProviderId::OpenRouter);
+    assert_eq!(first_meta.selected_provider_kind, ProviderId::OpenRouter);
     assert_eq!(first_meta.selected_model, "openai.gpt-5.4");
 
     let next_input = orchestrate_tool_calls(&first_response, &mut conversation, &registry)
@@ -181,7 +181,7 @@ async fn openrouter_tool_enabled_flow_handles_tool_orchestration_and_meta() {
     .await
     .expect("second openrouter request succeeds");
 
-    assert_eq!(second_meta.selected_provider, ProviderId::OpenRouter);
+    assert_eq!(second_meta.selected_provider_kind, ProviderId::OpenRouter);
     assert_eq!(second_meta.status_code, Some(200));
     assert_eq!(second_meta.request_id.as_deref(), Some("or_req_2"));
 

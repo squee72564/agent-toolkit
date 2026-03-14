@@ -1,7 +1,7 @@
 use std::env;
 
 use agent_toolkit::{
-    AgentToolkit, ExecutionOptions, FallbackMode, FallbackPolicy, FallbackRule, MessageCreateInput,
+    AgentToolkit, ExecutionOptions, FallbackPolicy, FallbackRule, MessageCreateInput,
     ProviderConfig, ProviderId, Route, Target,
 };
 
@@ -30,7 +30,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
 
     let fallback_policy = FallbackPolicy::new()
-        .with_mode(FallbackMode::RulesOnly)
         .with_rule(FallbackRule::retry_on_status(429))
         .with_rule(FallbackRule::retry_on_provider_code("rate_limit_exceeded"));
     let task =
@@ -44,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create_task_with_meta(task, route, ExecutionOptions::default())
         .await?;
 
-    println!("selected_provider: {:?}", meta.selected_provider);
+    println!("selected_provider: {:?}", meta.selected_provider_kind);
     println!("selected_model: {}", meta.selected_model);
     println!("assistant: {}", response_text(&response.output.content));
 

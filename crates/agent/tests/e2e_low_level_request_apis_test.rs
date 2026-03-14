@@ -71,16 +71,16 @@ async fn create_task_with_meta_openai_uses_explicit_task_and_captures_shape() {
         .expect("build openai client");
 
     let task = explicit_task_with_text("hello from explicit request");
-    let (_response, meta) = with_test_timeout(client.messages().create_task_with_meta(
-        task,
-        Some("gpt-5-mini".to_string()),
-        ExecutionOptions::default(),
-    ))
+    let (_response, meta) = with_test_timeout(
+        client
+            .messages()
+            .create_task_with_meta(task, ExecutionOptions::default()),
+    )
     .await
     .expect("create_task_with_meta should succeed");
 
-    assert_eq!(meta.selected_provider, ProviderId::OpenAi);
-    assert_eq!(meta.selected_model, "gpt-5-mini");
+    assert_eq!(meta.selected_provider_kind, ProviderId::OpenAi);
+    assert_eq!(meta.selected_model, "ignored-default");
 
     let captured = server.captured_requests().await;
     assert_eq!(captured.len(), 1);
@@ -88,7 +88,7 @@ async fn create_task_with_meta_openai_uses_explicit_task_and_captures_shape() {
 
     assert_post_path(req, "/v1/responses");
     assert_auth_bearer(req, "openai-key");
-    assert_json_string(&req.body_json, "/model", "gpt-5-mini");
+    assert_json_string(&req.body_json, "/model", "ignored-default");
     assert_json_object_has_key(&req.body_json, "/tools/0", "name");
     assert_json_object_has_key(&req.body_json, "/tools/0", "parameters");
     assert_json_object_has_key(&req.body_json, "/metadata", "trace_id");
@@ -114,11 +114,11 @@ async fn create_task_with_meta_anthropic_uses_expected_auth_headers_and_tool_cho
         .expect("build anthropic client");
 
     let task = explicit_task_with_text("hello from explicit request");
-    let _ = with_test_timeout(client.messages().create_task_with_meta(
-        task,
-        Some("claude-sonnet-4-6".to_string()),
-        ExecutionOptions::default(),
-    ))
+    let _ = with_test_timeout(
+        client
+            .messages()
+            .create_task_with_meta(task, ExecutionOptions::default()),
+    )
     .await
     .expect("anthropic task should succeed");
 
@@ -158,16 +158,16 @@ async fn toolkit_execute_with_meta_honors_target_model_and_execution_headers() {
     let task = explicit_task_with_text("hello from explicit request");
     let route = Route::to(Target::new(ProviderId::OpenRouter).with_model("openai.gpt-5.4"));
     let mut execution = ExecutionOptions::default();
-    execution.transport.extra_headers.insert(
-        "transport.header.x-e2e-meta".to_string(),
-        "header-value".to_string(),
-    );
+    execution
+        .transport
+        .extra_headers
+        .insert("x-e2e-meta".to_string(), "header-value".to_string());
 
     let (_response, meta) = with_test_timeout(toolkit.execute_with_meta(task, route, execution))
         .await
         .expect("toolkit execute_with_meta should succeed");
 
-    assert_eq!(meta.selected_provider, ProviderId::OpenRouter);
+    assert_eq!(meta.selected_provider_kind, ProviderId::OpenRouter);
     assert_eq!(meta.selected_model, "openai.gpt-5.4");
 
     let captured = server.captured_requests().await;
@@ -204,16 +204,16 @@ async fn toolkit_execute_with_meta_honors_route_and_execution_headers() {
     let task = explicit_task();
     let route = Route::to(Target::new(ProviderId::OpenRouter).with_model("openai.gpt-5.4"));
     let mut execution = ExecutionOptions::default();
-    execution.transport.extra_headers.insert(
-        "transport.header.x-e2e-meta".to_string(),
-        "header-value".to_string(),
-    );
+    execution
+        .transport
+        .extra_headers
+        .insert("x-e2e-meta".to_string(), "header-value".to_string());
 
     let (_response, meta) = with_test_timeout(toolkit.execute_with_meta(task, route, execution))
         .await
         .expect("toolkit execute_with_meta should succeed");
 
-    assert_eq!(meta.selected_provider, ProviderId::OpenRouter);
+    assert_eq!(meta.selected_provider_kind, ProviderId::OpenRouter);
     assert_eq!(meta.selected_model, "openai.gpt-5.4");
 
     let captured = server.captured_requests().await;

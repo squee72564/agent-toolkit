@@ -58,14 +58,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (response, meta) = client
         .messages()
-        .create_task_with_meta(
-            task,
-            Some("gpt-5-mini".to_string()),
-            ExecutionOptions::default(),
-        )
+        .create_task_with_meta(task, ExecutionOptions::default())
         .await?;
 
-    println!("selected_provider: {:?}", meta.selected_provider);
+    println!("selected_provider: {:?}", meta.selected_provider_kind);
     println!("selected_model: {}", meta.selected_model);
     println!("assistant: {}", response_text(&response.output.content));
 
