@@ -117,7 +117,8 @@ async fn direct_streaming_yields_envelopes_and_finishes_with_meta() {
         ),
     )
     .await;
-    let client = test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
+    let client =
+        test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
 
     let mut stream = client
         .streaming()
@@ -160,7 +161,8 @@ async fn direct_streaming_finish_after_drain_returns_completion() {
         ),
     )
     .await;
-    let client = test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
+    let client =
+        test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
 
     let mut stream = client
         .streaming()
@@ -1138,7 +1140,8 @@ async fn direct_text_stream_yields_text_chunks_and_finishes_with_meta() {
         ),
     )
     .await;
-    let client = test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
+    let client =
+        test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
 
     let mut stream = client
         .streaming()
@@ -1289,7 +1292,8 @@ async fn text_stream_skips_non_text_envelopes_until_text_arrives() {
         ),
     )
     .await;
-    let client = test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
+    let client =
+        test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
 
     let mut stream = client
         .streaming()
@@ -1327,7 +1331,8 @@ async fn text_stream_finish_after_partial_consumption_preserves_full_response() 
         ),
     )
     .await;
-    let client = test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
+    let client =
+        test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
 
     let mut stream = client
         .streaming()
@@ -1367,7 +1372,8 @@ async fn text_stream_surfaces_terminal_error_after_emitting_prior_text() {
         ),
     )
     .await;
-    let client = test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
+    let client =
+        test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
 
     let mut stream = client
         .streaming()
@@ -1475,7 +1481,8 @@ async fn text_stream_finish_after_drain_returns_completion() {
         ),
     )
     .await;
-    let client = test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
+    let client =
+        test_streaming_provider_client(ProviderKind::OpenAi, &base_url, Some("gpt-5-mini"));
 
     let mut stream = client
         .streaming()

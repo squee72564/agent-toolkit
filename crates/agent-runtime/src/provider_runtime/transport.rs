@@ -1,7 +1,8 @@
 use agent_core::{ExecutionPlan, ProviderKind, Response, ResponseFormat, ResponseMode};
 use agent_providers::request_plan::ProviderRequestPlan;
 use agent_transport::{
-    HttpJsonResponse, HttpRequestBody, HttpResponse, TransportExecutionInput, TransportResponseFraming,
+    HttpJsonResponse, HttpRequestBody, HttpResponse, TransportExecutionInput,
+    TransportResponseFraming,
 };
 
 use crate::provider_runtime::{

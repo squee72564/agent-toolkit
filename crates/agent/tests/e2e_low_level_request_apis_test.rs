@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use agent_toolkit::{
     AgentToolkit, ContentPart, ExecutionOptions, Message, MessageCreateInput, MessageRole,
-    ProviderConfig, ProviderKind, ProviderInstanceId, Route, Target, TaskRequest, ToolChoice,
+    ProviderConfig, ProviderInstanceId, ProviderKind, Route, Target, TaskRequest, ToolChoice,
     ToolDefinition, anthropic, openai,
 };
 

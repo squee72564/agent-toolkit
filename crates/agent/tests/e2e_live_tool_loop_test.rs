@@ -18,7 +18,8 @@ use e2e::tooling::{
 
 #[tokio::test]
 async fn live_openai_envelope_stream_exposes_tool_call_deltas_and_final_tool_calls() {
-    let Some(api_key) = require_provider_api_key(ProviderKind::OpenAi, "live OpenAI tool loop test")
+    let Some(api_key) =
+        require_provider_api_key(ProviderKind::OpenAi, "live OpenAI tool loop test")
     else {
         return;
     };

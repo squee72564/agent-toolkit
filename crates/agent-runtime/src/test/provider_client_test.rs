@@ -253,7 +253,10 @@ async fn direct_provider_client_explicit_task_api_uses_execution_boundary() {
         meta.selected_provider_instance,
         crate::ProviderInstanceId::openai_default()
     );
-    assert_eq!(meta.selected_provider_kind, agent_core::ProviderKind::OpenAi);
+    assert_eq!(
+        meta.selected_provider_kind,
+        agent_core::ProviderKind::OpenAi
+    );
     assert_eq!(meta.selected_model, "gpt-5-mini");
     assert_eq!(meta.attempts.len(), 1);
 }
@@ -282,7 +285,10 @@ async fn direct_provider_client_explicit_attempt_api_uses_attempt_model_override
         meta.selected_provider_instance,
         crate::ProviderInstanceId::openai_default()
     );
-    assert_eq!(meta.selected_provider_kind, agent_core::ProviderKind::OpenAi);
+    assert_eq!(
+        meta.selected_provider_kind,
+        agent_core::ProviderKind::OpenAi
+    );
     assert_eq!(meta.selected_model, "gpt-5-mini");
     assert_eq!(meta.attempts.len(), 1);
 }

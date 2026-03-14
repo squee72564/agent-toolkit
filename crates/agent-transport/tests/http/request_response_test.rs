@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use agent_core::types::AuthStyle;
 use agent_transport::{
-    HttpRequestBody, HttpRequestOptions, HttpResponse, TransportExecutionInput, RetryPolicy,
+    HttpRequestBody, HttpRequestOptions, HttpResponse, RetryPolicy, TransportExecutionInput,
     TransportRequestInput, TransportResponseFraming,
 };
 use bytes::Bytes;

@@ -38,7 +38,8 @@ async fn collect_text_stream_completion(
 
 #[tokio::test]
 async fn live_openai_text_streaming_smoke_test() {
-    let Some(api_key) = require_provider_api_key(ProviderKind::OpenAi, "live OpenAI streaming test")
+    let Some(api_key) =
+        require_provider_api_key(ProviderKind::OpenAi, "live OpenAI streaming test")
     else {
         return;
     };

@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use agent_toolkit::{
     AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
-    MessageCreateInput, ProviderKind, ProviderInstanceId, RequestEndEvent, RequestStartEvent,
+    MessageCreateInput, ProviderInstanceId, ProviderKind, RequestEndEvent, RequestStartEvent,
     ResponseMode, Route, RuntimeObserver, Target, openai,
 };
 

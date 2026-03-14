@@ -6,8 +6,8 @@ use std::time::Duration;
 use agent_toolkit::runtime::AttemptDisposition;
 use agent_toolkit::{
     AgentToolkit, AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
-    FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig, ProviderKind,
-    ProviderInstanceId, RequestEndEvent, RequestStartEvent, RetryPolicy, Route, RuntimeErrorKind,
+    FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig, ProviderInstanceId,
+    ProviderKind, RequestEndEvent, RequestStartEvent, RetryPolicy, Route, RuntimeErrorKind,
     RuntimeObserver, Target,
 };
 

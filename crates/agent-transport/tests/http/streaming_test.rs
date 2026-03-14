@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use agent_core::types::AuthStyle;
 use agent_transport::{
-    HttpRequestBody, HttpRequestOptions, HttpResponse, TransportExecutionInput, RetryPolicy, SseLimits,
-    TimeoutStage, TransportError, TransportRequestInput, TransportResponseFraming,
+    HttpRequestBody, HttpRequestOptions, HttpResponse, RetryPolicy, SseLimits, TimeoutStage,
+    TransportError, TransportExecutionInput, TransportRequestInput, TransportResponseFraming,
 };
 use reqwest::StatusCode;
 use serde_json::{Value, json};
