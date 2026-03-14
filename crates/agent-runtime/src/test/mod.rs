@@ -21,7 +21,10 @@ use crate::target::Target;
 
 use super::*;
 
-mod agent_toolkit_test;
+mod agent_toolkit_builder_test;
+mod agent_toolkit_execution_test;
+mod agent_toolkit_routing_test;
+mod agent_toolkit_test_fixtures;
 mod client_native_options_test;
 mod clients_test;
 mod conversation_test;
@@ -32,11 +35,18 @@ mod planner_test;
 mod provider_client_test;
 mod provider_config_test;
 mod provider_runtime_test;
-mod provider_stream_runtime_test;
 mod registered_provider_test;
+mod stream_event_wrapping_test;
+mod stream_output_ordering_test;
+mod stream_response_building_test;
+mod stream_test_fixtures;
+mod stream_validation_test;
 mod route_attempts_test;
 mod runtime_error_test;
-mod streaming_api_test;
+mod streaming_direct_test;
+mod streaming_routed_test;
+mod streaming_test_fixtures;
+mod streaming_text_stream_test;
 mod types_test;
 
 fn runtime_error(
