@@ -1,6 +1,6 @@
 use agent_core::{CanonicalStreamEvent, ProviderKind, ProviderRawStreamEvent};
 use agent_providers::request_plan::{ProviderRequestPlan, TransportResponseFraming};
-use agent_providers::streaming::ProviderStreamProjector;
+use agent_providers::stream_projector::ProviderStreamProjector;
 use agent_transport::HttpRequestOptions;
 use reqwest::{Method, header::HeaderMap};
 use serde_json::json;

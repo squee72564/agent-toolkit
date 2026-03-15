@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::json;
 
-use crate::test_fixtures::{
+use crate::fixture_tests::helpers::{
     choose_valid_success_fixture, list_decoded_error_fixture_models, list_decoded_fixture_models,
     load_decoded_error_fixture_body, load_decoded_success_fixture,
     resolve_fixture_responses_root_from, validate_decoded_error_fixture_shape,

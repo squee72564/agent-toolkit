@@ -4,8 +4,8 @@ use serde_json::json;
 
 use agent_core::types::{ContentPart, ResponseFormat};
 
-use super::decode::decode_openai_response;
-use super::{OpenAiDecodeEnvelope, OpenAiFamilyError, OpenAiFamilyErrorKind};
+use crate::openai_family::decode::decode_openai_response;
+use crate::openai_family::{OpenAiDecodeEnvelope, OpenAiFamilyError, OpenAiFamilyErrorKind};
 
 #[test]
 fn decode_top_level_error_maps_to_upstream() {

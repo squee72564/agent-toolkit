@@ -7,7 +7,7 @@ use serde_json::Value;
 
 use crate::error::{AdapterError, ProviderErrorInfo};
 use crate::request_plan::EncodedFamilyRequest;
-use crate::streaming::ProviderStreamProjector;
+use crate::stream_projector::ProviderStreamProjector;
 
 mod anthropic;
 mod anthropic_stream_projector;
@@ -16,6 +16,9 @@ mod openai_compatible_stream_projector;
 
 pub(crate) use anthropic::AnthropicFamilyCodec;
 pub(crate) use openai_compatible::OpenAiCompatibleFamilyCodec;
+
+#[cfg(test)]
+mod tests;
 
 pub(crate) trait ProviderFamilyCodec: Debug + Sync {
     fn encode_task(
@@ -46,20 +49,3 @@ pub(crate) fn codec_for(family: ProviderFamilyId) -> &'static dyn ProviderFamily
         ProviderFamilyId::Anthropic => &ANTHROPIC_CODEC,
     }
 }
-
-#[cfg(test)]
-mod anthropic_decoded_fixtures_test;
-#[cfg(test)]
-mod anthropic_request_test;
-#[cfg(test)]
-mod anthropic_response_test;
-#[cfg(test)]
-mod anthropic_stream_test;
-#[cfg(test)]
-mod openai_compatible_decoded_fixtures_test;
-#[cfg(test)]
-mod openai_compatible_request_test;
-#[cfg(test)]
-mod openai_compatible_response_test;
-#[cfg(test)]
-mod openai_compatible_stream_test;

@@ -2,15 +2,20 @@ use std::collections::BTreeMap;
 
 use agent_core::types::{Message, ResponseFormat, TaskRequest, ToolChoice};
 
-use super::encode::encode_anthropic_request as encode_task_request;
-use super::{AnthropicEncodedRequest, AnthropicFamilyError};
+use crate::openai_family::encode::encode_openai_request as encode_task_request;
+use crate::openai_family::{OpenAiEncodedRequest, OpenAiFamilyError};
 
-pub const MODEL_ID: &str = "claude-sonnet-4.6";
+pub const MODEL_ID: &str = "gpt-4.1-mini";
 
-pub fn encode_anthropic_request(
-    task: TaskRequest,
-) -> Result<AnthropicEncodedRequest, AnthropicFamilyError> {
+pub fn encode_openai_request(task: TaskRequest) -> Result<OpenAiEncodedRequest, OpenAiFamilyError> {
     encode_task_request(&task, MODEL_ID)
+}
+
+pub fn encode_openai_request_with_model(
+    task: TaskRequest,
+    model_id: &str,
+) -> Result<OpenAiEncodedRequest, OpenAiFamilyError> {
+    encode_task_request(&task, model_id)
 }
 
 pub fn base_request(messages: Vec<Message>) -> TaskRequest {

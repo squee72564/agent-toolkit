@@ -18,11 +18,11 @@ pub(crate) enum FixtureSet {
     Streaming,
 }
 
-fn fixture_responses_root(provider: &str) -> PathBuf {
+pub(crate) fn fixture_responses_root(provider: &str) -> PathBuf {
     resolve_fixture_responses_root(provider)
 }
 
-fn assert_valid_fixture_segment(label: &str, value: &str) {
+pub(crate) fn assert_valid_fixture_segment(label: &str, value: &str) {
     assert!(
         !value.is_empty(),
         "invalid fixture {label} segment: empty value"
@@ -37,7 +37,7 @@ fn assert_valid_fixture_segment(label: &str, value: &str) {
     );
 }
 
-fn assert_valid_provider(provider: &str) {
+pub(crate) fn assert_valid_provider(provider: &str) {
     assert_valid_fixture_segment("provider", provider);
 }
 

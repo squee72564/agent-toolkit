@@ -4,9 +4,9 @@ use agent_core::{
 };
 use serde_json::Value;
 
-use super::openrouter_stream_projector::OpenRouterStreamProjector;
-use crate::streaming::ProviderStreamProjector;
-use crate::test_fixtures::load_streaming_success_fixture;
+use crate::fixture_tests::load_streaming_success_fixture;
+use crate::overlay::openrouter::openrouter_stream_projector::OpenRouterStreamProjector;
+use crate::stream_projector::ProviderStreamProjector;
 
 #[test]
 fn openrouter_stream_projector_completes_on_done_payload() {

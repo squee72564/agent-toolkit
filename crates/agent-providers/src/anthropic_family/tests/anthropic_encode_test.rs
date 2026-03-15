@@ -5,8 +5,8 @@ use agent_core::types::{
     ToolResult, ToolResultContent,
 };
 
-use super::AnthropicFamilyErrorKind;
 use super::anthropic_test_helpers::*;
+use crate::anthropic_family::AnthropicFamilyErrorKind;
 
 #[test]
 fn encode_basic_text_message() {

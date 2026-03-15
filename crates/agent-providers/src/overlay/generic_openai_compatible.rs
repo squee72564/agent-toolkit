@@ -2,10 +2,9 @@ use agent_core::{ProviderKind, ProviderOptions, Response, ResponseFormat, TaskRe
 use serde_json::Value;
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo};
+use crate::overlay::ProviderOverlay;
 use crate::request_plan::EncodedFamilyRequest;
-use crate::streaming::ProviderStreamProjector;
-
-use super::ProviderOverlay;
+use crate::stream_projector::ProviderStreamProjector;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct GenericOpenAiCompatibleOverlay;

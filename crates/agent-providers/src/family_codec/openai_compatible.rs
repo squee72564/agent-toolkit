@@ -14,7 +14,7 @@ use crate::openai_family::decode::{
 use crate::openai_family::encode::encode_openai_request;
 use crate::openai_family::{OpenAiDecodeEnvelope, OpenAiFamilyError, OpenAiFamilyErrorKind};
 use crate::request_plan::{EncodedFamilyRequest, TransportResponseFraming};
-use crate::streaming::ProviderStreamProjector;
+use crate::stream_projector::ProviderStreamProjector;
 
 use super::openai_compatible_stream_projector::OpenAiStreamProjector;
 

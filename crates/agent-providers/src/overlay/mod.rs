@@ -5,16 +5,13 @@ use serde_json::Value;
 
 use crate::error::{AdapterError, ProviderErrorInfo};
 use crate::request_plan::EncodedFamilyRequest;
-use crate::streaming::ProviderStreamProjector;
+use crate::stream_projector::ProviderStreamProjector;
 
 mod anthropic;
 mod generic_openai_compatible;
 mod openai;
 mod openrouter;
 mod openrouter_stream_projector;
-
-#[cfg(test)]
-pub(crate) use openrouter::OpenRouterOverrides;
 
 use anthropic::AnthropicOverlay;
 use generic_openai_compatible::GenericOpenAiCompatibleOverlay;
@@ -55,26 +52,3 @@ pub(crate) fn overlay_for(kind: ProviderKind) -> &'static dyn ProviderOverlay {
         ProviderKind::GenericOpenAiCompatible => &GENERIC_OPENAI_COMPATIBLE_OVERLAY,
     }
 }
-
-#[cfg(test)]
-mod anthropic_overlay_test;
-#[cfg(test)]
-mod anthropic_request_test;
-#[cfg(test)]
-mod anthropic_response_test;
-#[cfg(test)]
-mod openai_overlay_test;
-#[cfg(test)]
-mod openai_request_test;
-#[cfg(test)]
-mod openai_response_test;
-#[cfg(test)]
-mod openrouter_decoded_fixtures_test;
-#[cfg(test)]
-mod openrouter_overlay_test;
-#[cfg(test)]
-mod openrouter_request_test;
-#[cfg(test)]
-mod openrouter_response_test;
-#[cfg(test)]
-mod openrouter_stream_test;

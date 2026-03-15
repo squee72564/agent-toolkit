@@ -12,13 +12,7 @@ pub(crate) mod encode;
 mod schema_rules;
 
 #[cfg(test)]
-mod anthropic_decode_test;
-#[cfg(test)]
-mod anthropic_encode_test;
-#[cfg(test)]
-mod anthropic_schema_rules_test;
-#[cfg(test)]
-mod anthropic_test_helpers;
+mod tests;
 
 /// Encoded Anthropic request payload plus non-fatal planning warnings.
 #[derive(Debug, Clone, PartialEq)]

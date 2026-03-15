@@ -5,7 +5,9 @@ use agent_core::{
 };
 
 use crate::family_codec::codec_for;
-use crate::overlay::OpenRouterOverrides;
+use crate::overlay::openrouter::openrouter_overlay::{
+    OpenRouterOverrides, apply_openrouter_overrides,
+};
 use crate::overlay::overlay_for;
 use crate::request_plan::TransportResponseFraming;
 use reqwest::Method;
@@ -43,7 +45,7 @@ fn plan_request(
             error.provider = agent_core::ProviderKind::OpenRouter;
             error
         })?;
-    super::openrouter::apply_openrouter_overrides(
+    apply_openrouter_overrides(
         model,
         task.top_p,
         &task.stop,

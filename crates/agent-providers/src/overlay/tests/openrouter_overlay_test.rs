@@ -6,7 +6,9 @@ use agent_core::{
 use serde_json::{Map, json};
 
 use crate::family_codec::codec_for;
-use crate::overlay::OpenRouterOverrides;
+use crate::overlay::openrouter::openrouter_overlay::{
+    OpenRouterOverrides, apply_openrouter_overrides,
+};
 
 const MODEL_ID: &str = "openai/gpt-5-mini";
 
@@ -41,7 +43,7 @@ fn plan_request(
             error.provider = agent_core::ProviderKind::OpenRouter;
             error
         })?;
-    super::openrouter::apply_openrouter_overrides(
+    apply_openrouter_overrides(
         model,
         task.top_p,
         &task.stop,

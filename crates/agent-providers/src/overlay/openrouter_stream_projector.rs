@@ -4,7 +4,7 @@ use agent_core::{
 };
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
-use crate::streaming::ProviderStreamProjector;
+use crate::stream_projector::ProviderStreamProjector;
 
 #[derive(Debug, Default)]
 pub(crate) struct OpenRouterStreamProjector {

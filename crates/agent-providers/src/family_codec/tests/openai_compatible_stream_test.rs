@@ -1,7 +1,7 @@
 use agent_core::{CanonicalStreamEvent, FinishReason, ProviderKind, ProviderRawStreamEvent};
 
-use super::openai_compatible_stream_projector::OpenAiStreamProjector;
-use crate::streaming::ProviderStreamProjector;
+use crate::family_codec::openai_compatible_stream_projector::OpenAiStreamProjector;
+use crate::stream_projector::ProviderStreamProjector;
 
 #[test]
 fn openai_stream_projector_emits_started_and_completed_events() {
