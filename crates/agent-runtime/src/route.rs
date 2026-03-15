@@ -1,6 +1,6 @@
-use crate::attempt_spec::AttemptSpec;
+use crate::attempt::AttemptSpec;
 use crate::fallback::FallbackPolicy;
-use crate::planning_rejection_policy::PlanningRejectionPolicy;
+use crate::planner::PlanningRejectionPolicy;
 
 /// Ordered routed attempt chain for one logical call.
 #[derive(Debug, Clone, PartialEq)]

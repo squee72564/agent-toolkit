@@ -1,5 +1,6 @@
 use agent_core::TaskRequest;
 
+use crate::ResponseMode;
 use crate::agent_toolkit::AgentToolkit;
 use crate::execution_options::ExecutionOptions;
 use crate::message_create_input::MessageCreateInput;
@@ -39,7 +40,7 @@ impl RoutedStreamingApi<'_> {
     ) -> Result<MessageResponseStream, RuntimeError> {
         let task = input.into().into_task_request()?;
         let mut execution = execution;
-        execution.response_mode = crate::ResponseMode::Streaming;
+        execution.response_mode = ResponseMode::Streaming;
         self.toolkit.execute_stream(task, route, execution).await
     }
 

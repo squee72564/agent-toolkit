@@ -6,9 +6,8 @@ use agent_transport::{HttpTransport, RetryPolicy};
 use reqwest::header::HeaderName;
 
 use crate::observer::RuntimeObserver;
-use crate::provider_config::ProviderConfig;
+use crate::provider::{ProviderConfig, RegisteredProvider};
 use crate::provider_runtime::ProviderRuntime;
-use crate::registered_provider::RegisteredProvider;
 use crate::runtime_error::RuntimeError;
 
 #[derive(Clone, Default)]

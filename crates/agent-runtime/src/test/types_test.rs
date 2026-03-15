@@ -1,9 +1,13 @@
 use std::time::Duration;
 
 use super::*;
-use crate::types::{
-    RequestEndContext, attempt_failure_event_fields, attempt_success_event_fields,
-    normalized_event_model, request_end_failure_event, request_end_success_event, response_meta,
+use crate::observer::{attempt_failure_event_fields, attempt_success_event_fields};
+use crate::{
+    ProviderInstanceId,
+    types::{
+        RequestEndContext, normalized_event_model, request_end_failure_event,
+        request_end_success_event, response_meta,
+    },
 };
 
 #[test]
@@ -99,7 +103,7 @@ fn request_end_event_helpers_map_terminal_outcomes() {
 #[test]
 fn response_meta_helper_preserves_selected_attempt_and_order() {
     let first = AttemptRecord {
-        provider_instance: crate::ProviderInstanceId::anthropic_default(),
+        provider_instance: ProviderInstanceId::anthropic_default(),
         provider_kind: ProviderKind::Anthropic,
         model: "claude".to_string(),
         target_index: 0,
@@ -111,7 +115,7 @@ fn response_meta_helper_preserves_selected_attempt_and_order() {
         },
     };
     let second = AttemptRecord {
-        provider_instance: crate::ProviderInstanceId::openai_default(),
+        provider_instance: ProviderInstanceId::openai_default(),
         provider_kind: ProviderKind::OpenAi,
         model: "gpt-5-mini".to_string(),
         target_index: 1,
@@ -132,7 +136,7 @@ fn response_meta_helper_preserves_selected_attempt_and_order() {
 
     assert_eq!(
         meta.selected_provider_instance,
-        crate::ProviderInstanceId::openai_default()
+        ProviderInstanceId::openai_default()
     );
     assert_eq!(meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(meta.selected_model, "gpt-5-mini");

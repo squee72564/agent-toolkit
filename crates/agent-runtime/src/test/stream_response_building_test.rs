@@ -7,9 +7,10 @@ use agent_core::{
 use agent_providers::error::AdapterErrorKind;
 use serde_json::json;
 
-use crate::planner;
-use crate::provider_client::ProviderClient;
+use crate::provider::ProviderClient;
 use crate::provider_runtime::ProviderAttemptOutcome;
+use crate::provider_stream_runtime::StreamRuntimeError;
+use crate::{AttemptSpec, ExecutionOptions, ResponseMode, Target, planner};
 use crate::{MessageCreateInput, RuntimeErrorKind};
 
 use super::stream_test_fixtures::*;
@@ -24,9 +25,9 @@ async fn current_non_streaming_api_rejects_stream_requests() {
             MessageCreateInput::user("hello")
                 .into_task_request()
                 .expect("task request should build"),
-            crate::ExecutionOptions {
-                response_mode: crate::ResponseMode::Streaming,
-                ..crate::ExecutionOptions::default()
+            ExecutionOptions {
+                response_mode: ResponseMode::Streaming,
+                ..ExecutionOptions::default()
             },
         )
         .await
@@ -75,10 +76,10 @@ async fn runtime_executes_openai_sse_plan_and_builds_response() {
                     stop: Vec::new(),
                     metadata: BTreeMap::new(),
                 },
-                &crate::AttemptSpec::to(crate::Target::new(runtime.instance_id.clone())),
-                &crate::ExecutionOptions {
-                    response_mode: crate::ResponseMode::Streaming,
-                    ..crate::ExecutionOptions::default()
+                &AttemptSpec::to(Target::new(runtime.instance_id.clone())),
+                &ExecutionOptions {
+                    response_mode: ResponseMode::Streaming,
+                    ..ExecutionOptions::default()
                 },
             )
             .expect("planning should succeed"),
@@ -306,7 +307,7 @@ fn finalize_returns_upstream_error_when_failed_event_seen() {
     .expect_err("failed streams should return an error");
 
     match error {
-        crate::provider_stream_runtime::StreamRuntimeError::Adapter { error, .. } => {
+        StreamRuntimeError::Adapter { error, .. } => {
             assert_eq!(error.kind, AdapterErrorKind::Upstream);
             assert_eq!(error.message, "upstream exploded");
         }

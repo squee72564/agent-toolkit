@@ -9,7 +9,7 @@ use agent_core::{
 use agent_providers::adapter::{ProviderAdapter, adapter_for};
 use agent_providers::error::{AdapterError, ProviderErrorInfo};
 use agent_providers::request_plan::ProviderRequestPlan;
-use agent_providers::streaming::ProviderStreamProjector;
+use agent_providers::stream_projector::ProviderStreamProjector;
 use agent_transport::HttpRequestOptions;
 use agent_transport::{HttpResponseHead, TransportResponseFraming};
 use reqwest::{
@@ -20,12 +20,17 @@ use serde_json::{Value, json};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
-use crate::RuntimeErrorKind;
 use crate::planner;
-use crate::provider_client::ProviderClient;
+use crate::provider::ProviderClient;
 use crate::provider_runtime::{
     ProviderAttemptOutcome, ProviderRuntime, ProviderStreamAttemptOutcome,
     response_mode_mismatch_error,
+};
+use crate::test::default_instance_id;
+use crate::{
+    AttemptExecutionOptions, AttemptSpec, ExecutionOptions, ProviderConfig, ProviderInstanceId,
+    RegisteredProvider, ResponseMode, RuntimeErrorKind, Target, TransportOptions,
+    TransportTimeoutOverrides,
 };
 
 #[test]
@@ -81,7 +86,7 @@ async fn execute_attempt_uses_override_model_in_meta() {
             &runtime,
             test_task_request(),
             Some("override-model"),
-            crate::ExecutionOptions::default(),
+            ExecutionOptions::default(),
         ))
         .await;
 
@@ -110,7 +115,7 @@ async fn execute_attempt_uses_default_model_when_request_blank() {
             &runtime,
             test_task_request(),
             None,
-            crate::ExecutionOptions::default(),
+            ExecutionOptions::default(),
         ))
         .await;
 
@@ -132,10 +137,8 @@ fn direct_planner_fails_when_no_model_available() {
     let error = planner::plan_direct_attempt(
         &ProviderClient::new(runtime),
         &test_task_request(),
-        &crate::AttemptSpec::to(crate::Target::new(crate::test::default_instance_id(
-            ProviderKind::OpenAi,
-        ))),
-        &crate::ExecutionOptions::default(),
+        &AttemptSpec::to(Target::new(default_instance_id(ProviderKind::OpenAi))),
+        &ExecutionOptions::default(),
     )
     .expect_err("missing model must fail during planning");
 
@@ -162,9 +165,9 @@ async fn open_stream_attempt_reports_selected_model_and_response_meta() {
             &runtime,
             test_task_request(),
             Some("override-model"),
-            crate::ExecutionOptions {
-                response_mode: crate::ResponseMode::Streaming,
-                ..crate::ExecutionOptions::default()
+            ExecutionOptions {
+                response_mode: ResponseMode::Streaming,
+                ..ExecutionOptions::default()
             },
         ))
         .await;
@@ -220,9 +223,9 @@ async fn open_stream_attempt_copies_adapter_selected_method_path_headers_and_fra
             &runtime,
             test_task_request(),
             Some("override-model"),
-            crate::ExecutionOptions {
-                response_mode: crate::ResponseMode::Streaming,
-                ..crate::ExecutionOptions::default()
+            ExecutionOptions {
+                response_mode: ResponseMode::Streaming,
+                ..ExecutionOptions::default()
             },
         ))
         .await;
@@ -264,15 +267,15 @@ async fn open_stream_attempt_copies_adapter_selected_method_path_headers_and_fra
 
 #[test]
 fn planner_resolves_transport_headers_timeouts_and_retry_policy() {
-    let transport = crate::TransportOptions {
+    let transport = TransportOptions {
         request_id_header_override: Some("x-route-request-id".to_string()),
         extra_headers: BTreeMap::from([
             ("x-shared".to_string(), "route".to_string()),
             ("x-route-only".to_string(), "route-only".to_string()),
         ]),
     };
-    let execution = crate::AttemptExecutionOptions::default()
-        .with_timeout_overrides(crate::TransportTimeoutOverrides {
+    let execution = AttemptExecutionOptions::default()
+        .with_timeout_overrides(TransportTimeoutOverrides {
             request_timeout: Some(Duration::from_secs(3)),
             stream_setup_timeout: Some(Duration::from_secs(4)),
             stream_idle_timeout: Some(Duration::from_secs(5)),
@@ -286,7 +289,7 @@ fn planner_resolves_transport_headers_timeouts_and_retry_policy() {
         ProviderKind::OpenAi,
         "http://127.0.0.1:1",
         Some("model"),
-        |config| {
+        |config: ProviderConfig| {
             config
                 .with_request_timeout(Duration::from_secs(10))
                 .with_stream_timeout(Duration::from_secs(11))
@@ -301,14 +304,12 @@ fn planner_resolves_transport_headers_timeouts_and_retry_policy() {
 
     let execution_plan = planner::plan_routed_attempt(
         &ProviderClient::new(runtime),
-        &crate::AttemptSpec::to(
-            crate::Target::new(crate::ProviderInstanceId::openai_default()).with_model("model"),
-        )
-        .with_execution(execution),
+        &AttemptSpec::to(Target::new(ProviderInstanceId::openai_default()).with_model("model"))
+            .with_execution(execution),
         &test_task_request(),
-        &crate::ExecutionOptions {
+        &ExecutionOptions {
             transport,
-            ..crate::ExecutionOptions::default()
+            ..ExecutionOptions::default()
         },
     )
     .expect("planning should succeed");
@@ -344,9 +345,9 @@ fn direct_execution_plan(
     runtime: &ProviderRuntime,
     task: agent_core::TaskRequest,
     model_override: Option<&str>,
-    execution: crate::ExecutionOptions,
+    execution: ExecutionOptions,
 ) -> agent_core::ExecutionPlan {
-    let attempt = crate::AttemptSpec::to(crate::Target {
+    let attempt = AttemptSpec::to(Target {
         instance: runtime.instance_id.clone(),
         model: model_override.map(ToString::to_string),
     });
@@ -385,12 +386,12 @@ fn test_provider_runtime_with_adapter(
         .build()
         .expect("test client should build");
     let transport = agent_transport::HttpTransport::builder(client).build();
-    let instance_id = crate::test::default_instance_id(adapter.kind());
-    let mut config = crate::ProviderConfig::new("test-key").with_base_url(base_url);
+    let instance_id = default_instance_id(adapter.kind());
+    let mut config = ProviderConfig::new("test-key").with_base_url(base_url);
     if let Some(default_model) = default_model {
         config = config.with_default_model(default_model);
     }
-    let registered = crate::RegisteredProvider::new(instance_id.clone(), adapter.kind(), config);
+    let registered = RegisteredProvider::new(instance_id.clone(), adapter.kind(), config);
     let platform = registered
         .platform_config(adapter.descriptor())
         .expect("test platform should build");
@@ -410,7 +411,7 @@ fn test_provider_runtime_with(
     provider: ProviderKind,
     base_url: &str,
     default_model: Option<&str>,
-    configure: impl FnOnce(crate::ProviderConfig) -> crate::ProviderConfig,
+    configure: impl FnOnce(ProviderConfig) -> ProviderConfig,
 ) -> ProviderRuntime {
     let adapter = agent_providers::adapter::adapter_for(provider);
     let client = reqwest::Client::builder()
@@ -418,13 +419,13 @@ fn test_provider_runtime_with(
         .build()
         .expect("test client should build");
     let transport = agent_transport::HttpTransport::builder(client).build();
-    let instance_id = crate::test::default_instance_id(provider);
-    let mut config = crate::ProviderConfig::new("test-key").with_base_url(base_url);
+    let instance_id = default_instance_id(provider);
+    let mut config = ProviderConfig::new("test-key").with_base_url(base_url);
     if let Some(default_model) = default_model {
         config = config.with_default_model(default_model);
     }
     config = configure(config);
-    let registered = crate::RegisteredProvider::new(instance_id.clone(), provider, config);
+    let registered = RegisteredProvider::new(instance_id.clone(), provider, config);
     let platform = registered
         .platform_config(adapter.descriptor())
         .expect("test platform should build");

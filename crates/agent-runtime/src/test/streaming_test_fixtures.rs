@@ -6,9 +6,12 @@ use agent_transport::HttpTransport;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
+use crate::provider::ProviderClient;
+use crate::provider_runtime::ProviderRuntime;
+use crate::test::default_instance_id;
 use crate::{
     AttemptFailureEvent, AttemptSkippedEvent, AttemptStartEvent, AttemptSuccessEvent,
-    RequestEndEvent, RequestStartEvent, RuntimeObserver,
+    ProviderConfig, RegisteredProvider, RequestEndEvent, RequestStartEvent, RuntimeObserver,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -102,24 +105,24 @@ pub fn test_streaming_provider_client(
     provider: ProviderKind,
     base_url: &str,
     default_model: Option<&str>,
-) -> crate::provider_client::ProviderClient {
+) -> ProviderClient {
     let adapter = adapter_for(provider);
     let client = reqwest::Client::builder()
         .no_proxy()
         .build()
         .expect("test client should build");
     let transport = HttpTransport::builder(client).build();
-    let instance_id = crate::test::default_instance_id(provider);
-    let mut config = crate::ProviderConfig::new("test-key").with_base_url(base_url);
+    let instance_id = default_instance_id(provider);
+    let mut config = ProviderConfig::new("test-key").with_base_url(base_url);
     if let Some(default_model) = default_model {
         config = config.with_default_model(default_model);
     }
-    let registered = crate::RegisteredProvider::new(instance_id.clone(), provider, config);
+    let registered = RegisteredProvider::new(instance_id.clone(), provider, config);
     let platform = registered
         .platform_config(adapter.descriptor())
         .expect("test platform should build");
 
-    crate::provider_client::ProviderClient::new(crate::provider_runtime::ProviderRuntime {
+    ProviderClient::new(ProviderRuntime {
         instance_id,
         kind: provider,
         registered,

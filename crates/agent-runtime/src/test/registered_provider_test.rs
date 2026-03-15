@@ -1,11 +1,13 @@
 use reqwest::header::HeaderName;
 
+use crate::{ProviderInstanceId, clients::base_client_builder::BaseClientBuilder};
+
 use super::*;
 
 #[test]
 fn registered_provider_platform_config_uses_instance_request_id_override() {
     let registered = RegisteredProvider::new(
-        crate::ProviderInstanceId::openai_default(),
+        ProviderInstanceId::openai_default(),
         ProviderKind::OpenAi,
         ProviderConfig::new("test-key")
             .with_base_url("https://api.openai.com")
@@ -25,7 +27,7 @@ fn registered_provider_platform_config_uses_instance_request_id_override() {
 #[test]
 fn registered_provider_platform_config_supports_generic_openai_compatible_kind() {
     let registered = RegisteredProvider::new(
-        crate::ProviderInstanceId::generic_openai_compatible_default(),
+        ProviderInstanceId::generic_openai_compatible_default(),
         ProviderKind::GenericOpenAiCompatible,
         ProviderConfig::new("test-key").with_base_url("https://example.test/v1"),
     );
@@ -41,7 +43,7 @@ fn registered_provider_platform_config_supports_generic_openai_compatible_kind()
 
 #[test]
 fn base_client_builder_preserves_request_id_header_from_provider_config() {
-    let builder = crate::base_client_builder::BaseClientBuilder::from_provider_config(
+    let builder = BaseClientBuilder::from_provider_config(
         ProviderConfig::new("test-key")
             .with_base_url("https://api.openai.com")
             .with_request_id_header(HeaderName::from_static("x-instance-request-id")),

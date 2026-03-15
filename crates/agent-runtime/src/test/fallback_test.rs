@@ -1,5 +1,7 @@
 use super::*;
 
+use crate::ProviderInstanceId;
+
 fn should_retry(
     policy: &FallbackPolicy,
     error: &RuntimeError,
@@ -9,7 +11,7 @@ fn should_retry(
     policy.should_retry_next_target(
         error,
         provider_kind,
-        &crate::ProviderInstanceId::new(provider_instance),
+        &ProviderInstanceId::new(provider_instance),
     )
 }
 
@@ -138,16 +140,16 @@ fn fallback_rule_for_provider_kind_is_idempotent_for_duplicates() {
 #[test]
 fn fallback_rule_for_provider_instance_is_idempotent_for_duplicates() {
     let rule = FallbackRule::retry_on_status(429)
-        .for_provider_instance(crate::ProviderInstanceId::new("openai-a"))
-        .for_provider_instance(crate::ProviderInstanceId::new("openai-a"))
-        .for_provider_instance(crate::ProviderInstanceId::new("openai-b"));
+        .for_provider_instance(ProviderInstanceId::new("openai-a"))
+        .for_provider_instance(ProviderInstanceId::new("openai-a"))
+        .for_provider_instance(ProviderInstanceId::new("openai-b"));
 
     assert_eq!(rule.when.provider_instances.len(), 2);
     assert_eq!(
         rule.when.provider_instances,
         vec![
-            crate::ProviderInstanceId::new("openai-a"),
-            crate::ProviderInstanceId::new("openai-b")
+            ProviderInstanceId::new("openai-a"),
+            ProviderInstanceId::new("openai-b")
         ]
     );
 }
@@ -188,7 +190,7 @@ fn fallback_policy_rules_can_scope_to_provider_kind() {
 fn fallback_policy_rules_can_scope_to_provider_instance() {
     let policy = FallbackPolicy::default().with_rule(
         FallbackRule::retry_on_status(429)
-            .for_provider_instance(crate::ProviderInstanceId::new("openai-secondary")),
+            .for_provider_instance(ProviderInstanceId::new("openai-secondary")),
     );
 
     let error = runtime_error(
@@ -257,7 +259,7 @@ fn fallback_policy_rule_requires_all_match_conditions() {
             status_codes: vec![429],
             provider_codes: vec!["rate_limit_exceeded".to_string()],
             provider_kinds: vec![ProviderKind::OpenAi],
-            provider_instances: vec![crate::ProviderInstanceId::new("openai-default")],
+            provider_instances: vec![ProviderInstanceId::new("openai-default")],
         },
         action: FallbackAction::RetryNextTarget,
     });

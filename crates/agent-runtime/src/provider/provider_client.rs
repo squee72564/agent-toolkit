@@ -2,13 +2,14 @@ use std::{sync::Arc, time::Instant};
 
 use agent_core::{Response, TaskRequest};
 
-use crate::attempt_spec::AttemptSpec;
-use crate::direct_messages_api::DirectMessagesApi;
-use crate::direct_streaming_api::DirectStreamingApi;
+use crate::attempt::AttemptRecord;
+use crate::attempt::AttemptSpec;
+use crate::api::{DirectStreamingApi, DirectMessagesApi};
 use crate::execution_options::{ExecutionOptions, ResponseMode};
 use crate::message_create_input::MessageCreateInput;
-use crate::message_response_stream::{LiveAttempt, MessageResponseStream};
-use crate::observer::{resolve_observer_for_request, safe_call_observer};
+use crate::message_response_stream::{AttemptContext, LiveAttempt, MessageResponseStream};
+use crate::observer::{RuntimeObserver, resolve_observer_for_request, safe_call_observer};
+use crate::observer::{attempt_failure_event, attempt_start_event, attempt_success_event};
 use crate::planner;
 use crate::provider_runtime::{
     ProviderAttemptOutcome, ProviderRuntime, ProviderStreamAttemptOutcome,
@@ -16,10 +17,9 @@ use crate::provider_runtime::{
 use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
 use crate::target::Target;
 use crate::types::{
-    RequestEndContext, ResponseMeta, attempt_failure_event, attempt_start_event,
-    attempt_success_event, executed_failure_meta, failed_attempt_record, request_end_failure_event,
-    request_end_success_event, request_start_event, response_meta, succeeded_attempt_record,
-    terminal_failure_error,
+    RequestEndContext, ResponseMeta, executed_failure_meta, failed_attempt_record,
+    request_end_failure_event, request_end_success_event, request_start_event, response_meta,
+    succeeded_attempt_record, terminal_failure_error,
 };
 
 #[derive(Debug, Clone)]
@@ -30,7 +30,7 @@ pub(crate) struct ProviderClient {
 struct DirectRequestContext<'a> {
     request_started_at: Instant,
     attempt_started_at: Instant,
-    observer: Option<&'a Arc<dyn crate::observer::RuntimeObserver>>,
+    observer: Option<&'a Arc<dyn RuntimeObserver>>,
     request_model: Option<String>,
 }
 
@@ -237,7 +237,7 @@ impl ProviderClient {
                 stream_observer,
                 LiveAttempt {
                     stream: *stream,
-                    context: crate::message_response_stream::AttemptContext {
+                    context: AttemptContext {
                         target_index: 0,
                         attempt_index: 0,
                         started_at: context.attempt_started_at,
@@ -324,22 +324,14 @@ impl ProviderClient {
         }
     }
 
-    fn emit_attempt_success(
-        &self,
-        context: &DirectRequestContext<'_>,
-        attempt: &crate::types::AttemptRecord,
-    ) {
+    fn emit_attempt_success(&self, context: &DirectRequestContext<'_>, attempt: &AttemptRecord) {
         let event = attempt_success_event(attempt, context.attempt_started_at.elapsed());
         safe_call_observer(context.observer, |runtime_observer| {
             runtime_observer.on_attempt_success(&event);
         });
     }
 
-    fn emit_attempt_failure(
-        &self,
-        context: &DirectRequestContext<'_>,
-        attempt: &crate::types::AttemptRecord,
-    ) {
+    fn emit_attempt_failure(&self, context: &DirectRequestContext<'_>, attempt: &AttemptRecord) {
         let event = attempt_failure_event(attempt, context.attempt_started_at.elapsed());
         safe_call_observer(context.observer, |runtime_observer| {
             runtime_observer.on_attempt_failure(&event);
@@ -394,7 +386,7 @@ impl ProviderClient {
 }
 
 impl DirectRequestContext<'_> {
-    fn cloned_observer(&self) -> Option<Arc<dyn crate::observer::RuntimeObserver>> {
+    fn cloned_observer(&self) -> Option<Arc<dyn RuntimeObserver>> {
         self.observer.cloned()
     }
 }

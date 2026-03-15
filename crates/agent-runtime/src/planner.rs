@@ -7,15 +7,23 @@ use agent_core::{
 };
 
 use crate::agent_toolkit::AgentToolkit;
-use crate::attempt_spec::AttemptSpec;
+use crate::attempt::AttemptSpec;
+use crate::attempt::{AttemptDisposition, AttemptRecord, SkipReason};
 use crate::execution_options::ExecutionOptions;
-use crate::planning_rejection_policy::PlanningRejectionPolicy;
-use crate::provider_client::ProviderClient;
+use crate::provider::ProviderClient;
 use crate::route::Route;
 use crate::runtime_error::RuntimeError;
-use crate::types::{
-    AttemptDisposition, AttemptRecord, RoutePlanningFailure, RoutePlanningFailureReason, SkipReason,
-};
+use crate::types::{RoutePlanningFailure, RoutePlanningFailureReason};
+
+/// Routing behavior for attempt rejection during planning.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum PlanningRejectionPolicy {
+    /// Stop routing immediately when the current attempt is rejected during planning.
+    #[default]
+    FailFast,
+    /// Skip the rejected target and continue with the next configured attempt.
+    SkipRejectedTargets,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PlanningRejectionKind {
@@ -80,11 +88,11 @@ pub(crate) fn resolve_route_targets(
 }
 
 pub(crate) fn should_skip_planning_rejection(
-    policy: crate::PlanningRejectionPolicy,
+    policy: PlanningRejectionPolicy,
     index: usize,
     attempt_count: usize,
 ) -> bool {
-    policy == crate::PlanningRejectionPolicy::SkipRejectedTargets && index + 1 < attempt_count
+    policy == PlanningRejectionPolicy::SkipRejectedTargets && index + 1 < attempt_count
 }
 
 /// Outcome of planning a single fallback attempt during routed execution.

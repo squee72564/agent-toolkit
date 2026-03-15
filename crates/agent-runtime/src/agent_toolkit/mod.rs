@@ -2,21 +2,21 @@ use std::{collections::HashMap, sync::Arc};
 
 use agent_core::{ProviderInstanceId, Response, TaskRequest};
 
-use crate::attempt_spec::AttemptSpec;
+use crate::attempt::AttemptRecord;
+use crate::attempt::AttemptSpec;
 use crate::execution_options::{ExecutionOptions, ResponseMode};
 use crate::message_response_stream::{
     AttemptContext, LiveAttempt, MessageResponseStream, RoutedStreamInit,
 };
 use crate::observer::RuntimeObserver;
 use crate::planner;
-use crate::provider_client::ProviderClient;
+use crate::provider::ProviderClient;
 use crate::provider_runtime::{ProviderAttemptOutcome, ProviderStreamAttemptOutcome};
 use crate::route::Route;
-use crate::routed_messages_api::RoutedMessagesApi;
-use crate::routed_streaming_api::RoutedStreamingApi;
+use crate::api::{RoutedStreamingApi, RoutedMessagesApi};
 use crate::runtime_error::RuntimeError;
 use crate::types::{
-    AttemptRecord, ResponseMeta, executed_failure_meta, failed_attempt_record, response_meta,
+    ResponseMeta, executed_failure_meta, failed_attempt_record, response_meta,
     succeeded_attempt_record,
 };
 

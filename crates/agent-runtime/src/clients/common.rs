@@ -1,3 +1,6 @@
+use crate::clients::base_client_builder::BaseClientBuilder;
+use crate::runtime_error::RuntimeError;
+
 #[derive(Clone, Copy)]
 pub(super) struct ClientEnv {
     pub(super) api_key: &'static str,
@@ -20,9 +23,9 @@ impl ClientEnv {
 }
 
 pub(super) fn build_base_from_env(
-    mut builder: crate::base_client_builder::BaseClientBuilder,
+    mut builder: BaseClientBuilder,
     env: ClientEnv,
-) -> Result<crate::base_client_builder::BaseClientBuilder, crate::runtime_error::RuntimeError> {
+) -> Result<BaseClientBuilder, RuntimeError> {
     let _ = dotenvy::dotenv();
 
     builder.api_key = Some(require_env(env.api_key)?);
@@ -43,10 +46,9 @@ fn read_env(key: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
-fn require_env(key: &str) -> Result<String, crate::runtime_error::RuntimeError> {
-    read_env(key).ok_or_else(|| {
-        crate::runtime_error::RuntimeError::configuration(format!("missing required env var {key}"))
-    })
+fn require_env(key: &str) -> Result<String, RuntimeError> {
+    read_env(key)
+        .ok_or_else(|| RuntimeError::configuration(format!("missing required env var {key}")))
 }
 
 macro_rules! impl_provider_client {
@@ -66,23 +68,20 @@ macro_rules! impl_provider_client {
             /// Builds a client from provider-specific environment variables.
             ///
             /// A `.env` file is loaded if present.
-            pub fn from_env() -> Result<Self, crate::runtime_error::RuntimeError> {
+            pub fn from_env() -> Result<Self, $crate::runtime_error::RuntimeError> {
                 $builder {
-                    inner: super::common::build_base_from_env(
-                        crate::base_client_builder::BaseClientBuilder::default(),
-                        $env,
-                    )?,
+                    inner: super::common::build_base_from_env(BaseClientBuilder::default(), $env)?,
                 }
                 .build()
             }
 
             /// Returns the non-streaming API for this provider.
-            pub fn messages(&self) -> crate::direct_messages_api::DirectMessagesApi<'_> {
+            pub fn messages(&self) -> $crate::api::DirectMessagesApi<'_> {
                 self.inner.messages()
             }
 
             /// Returns the streaming API for this provider.
-            pub fn streaming(&self) -> crate::direct_streaming_api::DirectStreamingApi<'_> {
+            pub fn streaming(&self) -> $crate::api::DirectStreamingApi<'_> {
                 self.inner.streaming()
             }
 
@@ -90,8 +89,8 @@ macro_rules! impl_provider_client {
             pub async fn execute(
                 &self,
                 task: agent_core::TaskRequest,
-                execution: crate::execution_options::ExecutionOptions,
-            ) -> Result<agent_core::Response, crate::runtime_error::RuntimeError> {
+                execution: $crate::execution_options::ExecutionOptions,
+            ) -> Result<agent_core::Response, $crate::runtime_error::RuntimeError> {
                 self.inner.execute(task, execution).await
             }
 
@@ -99,10 +98,10 @@ macro_rules! impl_provider_client {
             pub async fn execute_with_meta(
                 &self,
                 task: agent_core::TaskRequest,
-                execution: crate::execution_options::ExecutionOptions,
+                execution: $crate::execution_options::ExecutionOptions,
             ) -> Result<
-                (agent_core::Response, crate::types::ResponseMeta),
-                crate::runtime_error::RuntimeError,
+                (agent_core::Response, $crate::types::ResponseMeta),
+                $crate::runtime_error::RuntimeError,
             > {
                 self.inner.execute_with_meta(task, execution).await
             }
@@ -112,9 +111,9 @@ macro_rules! impl_provider_client {
             pub async fn execute_on_attempt(
                 &self,
                 task: agent_core::TaskRequest,
-                attempt: crate::AttemptSpec,
-                execution: crate::execution_options::ExecutionOptions,
-            ) -> Result<agent_core::Response, crate::runtime_error::RuntimeError> {
+                attempt: $crate::AttemptSpec,
+                execution: $crate::execution_options::ExecutionOptions,
+            ) -> Result<agent_core::Response, $crate::runtime_error::RuntimeError> {
                 self.inner
                     .execute_on_attempt(task, attempt, execution)
                     .await
@@ -126,11 +125,11 @@ macro_rules! impl_provider_client {
             pub async fn execute_on_attempt_with_meta(
                 &self,
                 task: agent_core::TaskRequest,
-                attempt: crate::AttemptSpec,
-                execution: crate::execution_options::ExecutionOptions,
+                attempt: $crate::AttemptSpec,
+                execution: $crate::execution_options::ExecutionOptions,
             ) -> Result<
-                (agent_core::Response, crate::types::ResponseMeta),
-                crate::runtime_error::RuntimeError,
+                (agent_core::Response, $crate::types::ResponseMeta),
+                $crate::runtime_error::RuntimeError,
             > {
                 self.inner
                     .execute_on_attempt_with_meta(task, attempt, execution)
@@ -184,14 +183,14 @@ macro_rules! impl_provider_client {
             /// Sets a client-level observer.
             pub fn observer(
                 mut self,
-                observer: std::sync::Arc<dyn crate::observer::RuntimeObserver>,
+                observer: std::sync::Arc<dyn $crate::observer::RuntimeObserver>,
             ) -> Self {
                 self.inner.observer = Some(observer);
                 self
             }
 
             /// Builds the provider client.
-            pub fn build(self) -> Result<$client, crate::runtime_error::RuntimeError> {
+            pub fn build(self) -> Result<$client, $crate::runtime_error::RuntimeError> {
                 let provider_runtime = self.inner.build_runtime(
                     $provider,
                     match $provider {
@@ -210,7 +209,7 @@ macro_rules! impl_provider_client {
                     },
                 )?;
                 Ok($client {
-                    inner: crate::provider_client::ProviderClient::new(provider_runtime),
+                    inner: $crate::provider::ProviderClient::new(provider_runtime),
                 })
             }
         }

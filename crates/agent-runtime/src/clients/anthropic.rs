@@ -1,6 +1,6 @@
-use crate::base_client_builder::BaseClientBuilder;
+use crate::clients::base_client_builder::BaseClientBuilder;
 use crate::clients::common::{ClientEnv, impl_provider_client};
-use crate::provider_client::ProviderClient;
+use crate::provider::ProviderClient;
 use agent_core::{
     AnthropicFamilyOptions, AnthropicOptions, FamilyOptions, NativeOptions, ProviderKind,
     ProviderOptions, Response, TaskRequest,

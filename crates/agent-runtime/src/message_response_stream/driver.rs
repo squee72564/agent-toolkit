@@ -7,11 +7,12 @@ use crate::message_response_stream::state::{
     AttemptContext, CompletedAttemptContext, LiveAttempt, PendingCompletion, RoutingState,
     StreamDriverState,
 };
+use crate::observer::attempt_skipped_event;
 use crate::observer::{resolve_observer_for_request, safe_call_observer};
 use crate::planner;
 use crate::provider_runtime::ProviderStreamAttemptOutcome;
 use crate::runtime_error::RuntimeError;
-use crate::types::{attempt_skipped_event, failed_attempt_record, succeeded_attempt_record};
+use crate::types::{failed_attempt_record, succeeded_attempt_record};
 
 pub(super) enum DriveNextOutcome {
     Envelope(agent_core::CanonicalStreamEnvelope),

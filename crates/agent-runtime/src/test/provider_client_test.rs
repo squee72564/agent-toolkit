@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use crate::{
     AttemptFailureEvent, AttemptSpec, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
-    MessageCreateInput, RequestEndEvent, RequestStartEvent, RuntimeErrorKind, RuntimeObserver,
-    Target, openai,
+    MessageCreateInput, OpenAiClient, ProviderInstanceId, RequestEndEvent, RequestStartEvent,
+    RuntimeErrorKind, RuntimeObserver, Target, openai,
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -184,7 +184,7 @@ fn unused_local_url() -> String {
     format!("http://{addr}")
 }
 
-fn direct_client(base_url: String, observer: Arc<dyn RuntimeObserver>) -> crate::OpenAiClient {
+fn direct_client(base_url: String, observer: Arc<dyn RuntimeObserver>) -> OpenAiClient {
     openai()
         .api_key("test-key")
         .base_url(base_url)
@@ -251,7 +251,7 @@ async fn direct_provider_client_explicit_task_api_uses_execution_boundary() {
 
     assert_eq!(
         meta.selected_provider_instance,
-        crate::ProviderInstanceId::openai_default()
+        ProviderInstanceId::openai_default()
     );
     assert_eq!(
         meta.selected_provider_kind,
@@ -273,9 +273,7 @@ async fn direct_provider_client_explicit_attempt_api_uses_attempt_model_override
 
     let (_response, meta) = with_timeout(client.messages().execute_on_attempt_with_meta(
         task,
-        AttemptSpec::to(
-            Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5-mini"),
-        ),
+        AttemptSpec::to(Target::new(ProviderInstanceId::openai_default()).with_model("gpt-5-mini")),
         ExecutionOptions::default(),
     ))
     .await
@@ -283,7 +281,7 @@ async fn direct_provider_client_explicit_attempt_api_uses_attempt_model_override
 
     assert_eq!(
         meta.selected_provider_instance,
-        crate::ProviderInstanceId::openai_default()
+        ProviderInstanceId::openai_default()
     );
     assert_eq!(
         meta.selected_provider_kind,

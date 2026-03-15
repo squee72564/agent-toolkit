@@ -3,16 +3,12 @@ use agent_core::{
     ResponseFormat, RuntimeWarning,
 };
 use agent_providers::error::{AdapterError, AdapterErrorKind, AdapterOperation};
-use agent_providers::streaming::ProviderStreamProjector;
+use agent_providers::stream_projector::ProviderStreamProjector;
 use agent_transport::{HttpJsonResponse, HttpSseResponse, SseEvent};
 use serde_json::Value;
 
-mod finalize;
-mod reducer;
-mod structured_output;
-
-use self::finalize::finalize_stream_response;
-use self::reducer::StreamResponseState;
+use super::finalize::finalize_stream_response;
+use super::reducer::StreamResponseState;
 
 #[derive(Debug)]
 pub(crate) struct ProviderStreamRuntime {

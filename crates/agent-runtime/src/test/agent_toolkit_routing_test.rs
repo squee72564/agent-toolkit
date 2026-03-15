@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use agent_core::ProviderKind;
 
+use crate::{ProviderInstanceId, Route};
+
 use super::*;
 
 #[test]
@@ -12,7 +14,7 @@ fn router_requires_explicit_target_without_policy() {
     };
     let error = toolkit
         .resolve_route_targets(&Route {
-            primary: Target::new(crate::ProviderInstanceId::openai_default()).into(),
+            primary: Target::new(ProviderInstanceId::openai_default()).into(),
             fallbacks: Vec::new(),
             fallback_policy: FallbackPolicy::default(),
             planning_rejection_policy: PlanningRejectionPolicy::FailFast,
@@ -25,14 +27,14 @@ fn router_requires_explicit_target_without_policy() {
 fn resolve_route_targets_errors_for_unregistered_provider() {
     let toolkit = AgentToolkit {
         clients: HashMap::from([(
-            crate::ProviderInstanceId::openai_default(),
+            ProviderInstanceId::openai_default(),
             test_provider_client(ProviderKind::OpenAi),
         )]),
         observer: None,
     };
     let error = toolkit
         .resolve_route_targets(&Route::to(
-            Target::new(crate::ProviderInstanceId::openrouter_default()).with_model("openai/gpt-5"),
+            Target::new(ProviderInstanceId::openrouter_default()).with_model("openai/gpt-5"),
         ))
         .expect_err("unregistered provider should fail target resolution");
 
@@ -44,31 +46,29 @@ fn resolve_route_targets_deduplicates_primary_and_fallback_targets() {
     let toolkit = AgentToolkit {
         clients: HashMap::from([
             (
-                crate::ProviderInstanceId::openai_default(),
+                ProviderInstanceId::openai_default(),
                 test_provider_client(ProviderKind::OpenAi),
             ),
             (
-                crate::ProviderInstanceId::openrouter_default(),
+                ProviderInstanceId::openrouter_default(),
                 test_provider_client(ProviderKind::OpenRouter),
             ),
         ]),
         observer: None,
     };
 
-    let route = crate::Route::to(
-        Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5"),
-    )
-    .with_fallbacks(vec![
-        Target::new(crate::ProviderInstanceId::openai_default())
-            .with_model("gpt-5")
-            .into(),
-        Target::new(crate::ProviderInstanceId::openrouter_default())
-            .with_model("openai/gpt-5")
-            .into(),
-        Target::new(crate::ProviderInstanceId::openrouter_default())
-            .with_model("openai/gpt-5")
-            .into(),
-    ]);
+    let route = Route::to(Target::new(ProviderInstanceId::openai_default()).with_model("gpt-5"))
+        .with_fallbacks(vec![
+            Target::new(ProviderInstanceId::openai_default())
+                .with_model("gpt-5")
+                .into(),
+            Target::new(ProviderInstanceId::openrouter_default())
+                .with_model("openai/gpt-5")
+                .into(),
+            Target::new(ProviderInstanceId::openrouter_default())
+                .with_model("openai/gpt-5")
+                .into(),
+        ]);
 
     let targets = toolkit
         .resolve_route_targets(&route)
@@ -80,10 +80,10 @@ fn resolve_route_targets_deduplicates_primary_and_fallback_targets() {
             .map(|attempt| attempt.target)
             .collect::<Vec<_>>(),
         vec![
-            Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5"),
-            Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5"),
-            Target::new(crate::ProviderInstanceId::openrouter_default()).with_model("openai/gpt-5"),
-            Target::new(crate::ProviderInstanceId::openrouter_default()).with_model("openai/gpt-5"),
+            Target::new(ProviderInstanceId::openai_default()).with_model("gpt-5"),
+            Target::new(ProviderInstanceId::openai_default()).with_model("gpt-5"),
+            Target::new(ProviderInstanceId::openrouter_default()).with_model("openai/gpt-5"),
+            Target::new(ProviderInstanceId::openrouter_default()).with_model("openai/gpt-5"),
         ]
     );
 }
@@ -93,24 +93,22 @@ fn resolve_route_targets_preserves_attempt_order() {
     let toolkit = AgentToolkit {
         clients: HashMap::from([
             (
-                crate::ProviderInstanceId::openai_default(),
+                ProviderInstanceId::openai_default(),
                 test_provider_client(ProviderKind::OpenAi),
             ),
             (
-                crate::ProviderInstanceId::openrouter_default(),
+                ProviderInstanceId::openrouter_default(),
                 test_provider_client(ProviderKind::OpenRouter),
             ),
         ]),
         observer: None,
     };
 
-    let route = crate::Route::to(
-        Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5"),
-    )
-    .with_fallback(Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5"))
-    .with_fallback(
-        Target::new(crate::ProviderInstanceId::openrouter_default()).with_model("openai/gpt-5"),
-    );
+    let route = Route::to(Target::new(ProviderInstanceId::openai_default()).with_model("gpt-5"))
+        .with_fallback(Target::new(ProviderInstanceId::openai_default()).with_model("gpt-5"))
+        .with_fallback(
+            Target::new(ProviderInstanceId::openrouter_default()).with_model("openai/gpt-5"),
+        );
 
     let targets = toolkit
         .resolve_route_targets(&route)
@@ -122,9 +120,9 @@ fn resolve_route_targets_preserves_attempt_order() {
             .map(|attempt| attempt.target)
             .collect::<Vec<_>>(),
         vec![
-            Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5"),
-            Target::new(crate::ProviderInstanceId::openai_default()).with_model("gpt-5"),
-            Target::new(crate::ProviderInstanceId::openrouter_default()).with_model("openai/gpt-5"),
+            Target::new(ProviderInstanceId::openai_default()).with_model("gpt-5"),
+            Target::new(ProviderInstanceId::openai_default()).with_model("gpt-5"),
+            Target::new(ProviderInstanceId::openrouter_default()).with_model("openai/gpt-5"),
         ]
     );
 }

@@ -1,3 +1,4 @@
+use crate::ProviderInstanceId;
 use std::sync::Arc;
 
 use super::*;
@@ -22,7 +23,7 @@ fn builder_registers_openai_provider() {
     assert!(
         toolkit
             .clients
-            .contains_key(&crate::ProviderInstanceId::openai_default())
+            .contains_key(&ProviderInstanceId::openai_default())
     );
 }
 
@@ -36,7 +37,7 @@ fn builder_registers_anthropic_provider() {
     assert!(
         toolkit
             .clients
-            .contains_key(&crate::ProviderInstanceId::anthropic_default())
+            .contains_key(&ProviderInstanceId::anthropic_default())
     );
 }
 
@@ -50,7 +51,7 @@ fn builder_registers_openrouter_provider() {
     assert!(
         toolkit
             .clients
-            .contains_key(&crate::ProviderInstanceId::openrouter_default())
+            .contains_key(&ProviderInstanceId::openrouter_default())
     );
 }
 
@@ -67,7 +68,7 @@ fn builder_registers_custom_provider_instance() {
     assert!(
         toolkit
             .clients
-            .contains_key(&crate::ProviderInstanceId::new("openai-secondary"))
+            .contains_key(&ProviderInstanceId::new("openai-secondary"))
     );
 }
 
@@ -88,12 +89,12 @@ fn builder_supports_multiple_instances_for_same_provider_kind() {
     assert!(
         toolkit
             .clients
-            .contains_key(&crate::ProviderInstanceId::new("openai-primary"))
+            .contains_key(&ProviderInstanceId::new("openai-primary"))
     );
     assert!(
         toolkit
             .clients
-            .contains_key(&crate::ProviderInstanceId::new("openai-secondary"))
+            .contains_key(&ProviderInstanceId::new("openai-secondary"))
     );
 }
 
@@ -108,7 +109,7 @@ fn builder_propagates_observer_to_provider_runtime() {
 
     let client = toolkit
         .clients
-        .get(&crate::ProviderInstanceId::openai_default())
+        .get(&ProviderInstanceId::openai_default())
         .expect("openai client should be registered");
 
     assert!(toolkit.observer.is_some());

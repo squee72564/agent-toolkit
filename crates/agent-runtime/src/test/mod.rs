@@ -7,16 +7,14 @@ use agent_core::{
 };
 use agent_providers::adapter::{ProviderAdapter, adapter_for};
 use agent_providers::error::{AdapterError, ProviderErrorInfo};
-use agent_providers::streaming::ProviderStreamProjector;
+use agent_providers::stream_projector::ProviderStreamProjector;
 use agent_transport::HttpTransport;
 use reqwest::header::{HeaderMap, HeaderName};
 use serde_json::Value;
 use serde_json::json;
 
-use crate::provider_client::ProviderClient;
-use crate::provider_config::ProviderConfig;
+use crate::provider::{ProviderClient, ProviderConfig, RegisteredProvider};
 use crate::provider_runtime::ProviderRuntime;
-use crate::registered_provider::RegisteredProvider;
 use crate::target::Target;
 
 use super::*;

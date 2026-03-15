@@ -1,9 +1,9 @@
 use agent_core::{Response, TaskRequest};
 
-use crate::attempt_spec::AttemptSpec;
+use crate::attempt::AttemptSpec;
 use crate::execution_options::ExecutionOptions;
 use crate::message_create_input::MessageCreateInput;
-use crate::provider_client::ProviderClient;
+use crate::provider::ProviderClient;
 use crate::runtime_error::RuntimeError;
 use crate::types::ResponseMeta;
 

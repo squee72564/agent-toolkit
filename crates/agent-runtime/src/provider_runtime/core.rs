@@ -6,20 +6,18 @@ use agent_core::{
 };
 use agent_providers::error::AdapterOperation;
 use agent_providers::{
-    adapter::ProviderAdapter, error::AdapterError, streaming::ProviderStreamProjector,
+    adapter::ProviderAdapter, error::AdapterError, stream_projector::ProviderStreamProjector,
 };
 use agent_transport::{HttpJsonResponse, HttpSseResponse, HttpTransport, TransportResponseFraming};
 
+use crate::RuntimeErrorKind;
 use crate::observer::RuntimeObserver;
+use crate::provider::RegisteredProvider;
 use crate::provider_stream_runtime::{ProviderStreamRuntime, StreamRuntimeError};
-use crate::registered_provider::RegisteredProvider;
 use crate::runtime_error::RuntimeError;
 
-mod attempt;
-mod transport;
-
-use self::attempt::{PreparedAttempt, prepare_attempt};
-use self::transport::{
+use super::attempt::{PreparedAttempt, prepare_attempt};
+use super::transport::{
     execute_planned_non_streaming, open_planned_stream, plan_execution, validate_streaming_plan,
 };
 
@@ -74,13 +72,13 @@ pub(crate) enum ProviderStreamAttemptOutcome {
 }
 
 pub(crate) struct OpenedProviderStream {
-    provider: ProviderKind,
-    response: HttpSseResponse,
-    response_format: ResponseFormat,
-    prepended_warnings: Vec<RuntimeWarning>,
-    projector: Box<dyn ProviderStreamProjector>,
-    runtime: ProviderStreamRuntime,
-    transcript: Vec<CanonicalStreamEnvelope>,
+    pub(super) provider: ProviderKind,
+    pub(super) response: HttpSseResponse,
+    pub(super) response_format: ResponseFormat,
+    pub(super) prepended_warnings: Vec<RuntimeWarning>,
+    pub(super) projector: Box<dyn ProviderStreamProjector>,
+    pub(super) runtime: ProviderStreamRuntime,
+    pub(super) transcript: Vec<CanonicalStreamEnvelope>,
 }
 
 impl std::fmt::Debug for OpenedProviderStream {
@@ -199,7 +197,7 @@ impl ProviderRuntime {
         }
     }
 
-    fn runtime_error_from_adapter(
+    pub(crate) fn runtime_error_from_adapter(
         &self,
         mut adapter_error: AdapterError,
         response: Option<&HttpJsonResponse>,
@@ -219,7 +217,10 @@ impl ProviderRuntime {
     }
 }
 
-fn map_stream_runtime_error(provider: ProviderKind, error: StreamRuntimeError) -> RuntimeError {
+pub(super) fn map_stream_runtime_error(
+    provider: ProviderKind,
+    error: StreamRuntimeError,
+) -> RuntimeError {
     match error {
         StreamRuntimeError::Transport {
             error,
@@ -258,7 +259,7 @@ pub(crate) fn response_mode_mismatch_error(
     head: &agent_transport::HttpResponseHead,
 ) -> RuntimeError {
     RuntimeError {
-        kind: crate::RuntimeErrorKind::ProtocolViolation,
+        kind: RuntimeErrorKind::ProtocolViolation,
         message: format!(
             "transport contract violated for {provider:?}: expected {} response, got {actual_response_kind}",
             expected_response_kind_label(expected_mode)
@@ -272,7 +273,7 @@ pub(crate) fn response_mode_mismatch_error(
     }
 }
 
-fn expected_response_kind_label(mode: TransportResponseFraming) -> &'static str {
+pub(super) fn expected_response_kind_label(mode: TransportResponseFraming) -> &'static str {
     match mode {
         TransportResponseFraming::Json => "JSON",
         TransportResponseFraming::Sse => "SSE",
@@ -280,7 +281,7 @@ fn expected_response_kind_label(mode: TransportResponseFraming) -> &'static str 
     }
 }
 
-fn join_url(base_url: &str, endpoint_path: &str) -> String {
+pub(super) fn join_url(base_url: &str, endpoint_path: &str) -> String {
     format!(
         "{}/{}",
         base_url.trim_end_matches('/'),
@@ -288,14 +289,14 @@ fn join_url(base_url: &str, endpoint_path: &str) -> String {
     )
 }
 
-fn extract_provider_code(body: &serde_json::Value) -> Option<String> {
+pub(super) fn extract_provider_code(body: &serde_json::Value) -> Option<String> {
     body.get("error")
         .and_then(serde_json::Value::as_object)
         .and_then(|error| error.get("code").or_else(|| error.get("type")))
         .and_then(value_to_string)
 }
 
-fn value_to_string(value: &serde_json::Value) -> Option<String> {
+pub(super) fn value_to_string(value: &serde_json::Value) -> Option<String> {
     match value {
         serde_json::Value::String(value) if !value.trim().is_empty() => {
             Some(value.trim().to_string())
@@ -306,7 +307,7 @@ fn value_to_string(value: &serde_json::Value) -> Option<String> {
     }
 }
 
-fn prepend_encode_warnings(
+pub(super) fn prepend_encode_warnings(
     response: &mut Response,
     mut encode_warnings: Vec<agent_core::types::RuntimeWarning>,
 ) {

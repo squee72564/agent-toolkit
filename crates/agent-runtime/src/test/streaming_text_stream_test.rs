@@ -1,7 +1,11 @@
 use agent_core::{CanonicalStreamEnvelope, CanonicalStreamEvent, ProviderKind};
 use futures_util::StreamExt;
 
-use crate::{AgentToolkit, ExecutionOptions, MessageCreateInput, Route, RuntimeErrorKind, Target};
+use crate::message_text_stream::MessageTextStream;
+use crate::{
+    AgentToolkit, ExecutionOptions, MessageCreateInput, ProviderConfig, ProviderInstanceId,
+    ResponseMode, Route, RuntimeErrorKind, Target,
+};
 
 use super::streaming_test_fixtures::*;
 use super::*;
@@ -82,7 +86,7 @@ async fn routed_text_stream_yields_text_chunks_and_finishes_with_response_meta()
     .await;
     let toolkit = AgentToolkit::builder()
         .with_openai(
-            crate::ProviderConfig::new("test-key")
+            ProviderConfig::new("test-key")
                 .with_base_url(base_url)
                 .with_default_model("gpt-5-mini"),
         )
@@ -93,9 +97,9 @@ async fn routed_text_stream_yields_text_chunks_and_finishes_with_response_meta()
         .streaming()
         .create_with_options(
             MessageCreateInput::user("hello"),
-            Route::to(Target::new(crate::ProviderInstanceId::openai_default())),
+            Route::to(Target::new(ProviderInstanceId::openai_default())),
             ExecutionOptions {
-                response_mode: crate::ResponseMode::Streaming,
+                response_mode: ResponseMode::Streaming,
                 ..ExecutionOptions::default()
             },
         )
@@ -125,7 +129,7 @@ async fn routed_text_stream_yields_text_chunks_and_finishes_with_response_meta()
 fn text_stream_enqueues_multiple_text_deltas_from_one_envelope_in_order() {
     let mut pending = std::collections::VecDeque::new();
 
-    crate::message_text_stream::MessageTextStream::enqueue_text_deltas(
+    MessageTextStream::enqueue_text_deltas(
         &mut pending,
         CanonicalStreamEnvelope {
             raw: agent_core::ProviderRawStreamEvent::from_sse(
@@ -299,7 +303,7 @@ async fn text_stream_surfaces_terminal_error_after_emitting_prior_text() {
     let failure_meta = executed_failure_meta(&finish_error);
     assert_eq!(
         failure_meta.selected_provider_instance,
-        crate::ProviderInstanceId::openai_default()
+        ProviderInstanceId::openai_default()
     );
     assert_eq!(failure_meta.selected_provider_kind, ProviderKind::OpenAi);
     assert_eq!(failure_meta.selected_model, "gpt-5-mini");

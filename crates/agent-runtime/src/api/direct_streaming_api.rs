@@ -1,10 +1,10 @@
 use agent_core::TaskRequest;
 
-use crate::attempt_spec::AttemptSpec;
+use crate::attempt::AttemptSpec;
 use crate::execution_options::ExecutionOptions;
 use crate::message_create_input::MessageCreateInput;
 use crate::message_response_stream::MessageResponseStream;
-use crate::provider_client::ProviderClient;
+use crate::provider::ProviderClient;
 use crate::runtime_error::RuntimeError;
 
 /// Streaming API for a single provider client.

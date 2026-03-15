@@ -7,13 +7,15 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
 use crate::provider_runtime::ProviderRuntime;
-use crate::provider_stream_runtime::ProviderStreamRuntime;
+use crate::provider_stream_runtime::{ProviderStreamRuntime, StreamRuntimeError};
+use crate::test::default_instance_id;
+use crate::{ProviderConfig, RegisteredProvider};
 
 pub(super) fn response_from_events(
     response_format: ResponseFormat,
     streamed_events: Vec<CanonicalStreamEvent>,
     final_events: Vec<CanonicalStreamEvent>,
-) -> Result<Response, crate::provider_stream_runtime::StreamRuntimeError> {
+) -> Result<Response, StreamRuntimeError> {
     ProviderStreamRuntime::response_from_events_for_test(
         ProviderKind::OpenAi,
         &response_format,
@@ -43,12 +45,12 @@ pub(super) fn test_provider_runtime(
         .build()
         .expect("test client should build");
     let transport = agent_transport::HttpTransport::builder(client).build();
-    let instance_id = crate::test::default_instance_id(provider);
-    let mut config = crate::ProviderConfig::new("test-key").with_base_url(base_url);
+    let instance_id = default_instance_id(provider);
+    let mut config = ProviderConfig::new("test-key").with_base_url(base_url);
     if let Some(default_model) = default_model {
         config = config.with_default_model(default_model);
     }
-    let registered = crate::RegisteredProvider::new(instance_id.clone(), provider, config);
+    let registered = RegisteredProvider::new(instance_id.clone(), provider, config);
     let platform = registered
         .platform_config(adapter.descriptor())
         .expect("test platform should build");

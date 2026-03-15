@@ -1,6 +1,6 @@
 use agent_core::{PlatformConfig, ProviderDescriptor, ProviderInstanceId, ProviderKind};
 
-use crate::provider_config::ProviderConfig;
+use crate::provider::ProviderConfig;
 use crate::runtime_error::RuntimeError;
 
 /// Runtime registration record for one concrete provider instance.
