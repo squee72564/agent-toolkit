@@ -16,32 +16,62 @@ Load credentials from `.env` or your shell environment, then run:
 cargo run -p agent_toolkit --example basic_openai
 ```
 
-Recommended entry points:
+```mermaid
+flowchart TD
 
-- `basic_openai.rs`: smallest high-level request using `openai().messages().create(...)`.
-- `conversation.rs`: multi-turn conversation state with `Conversation`.
-- `streaming_text.rs`: high-level text streaming with `streaming().create(...).into_text_stream()`.
-- `tool_calling.rs`: manual tool loop with `ToolRegistry`, typed tools, and a follow-up request.
-- `routed_toolkit.rs`: `AgentToolkit` routing plus rule-based fallback across providers.
-- `explicit_request.rs`: lower-level explicit `Request` construction with `create_request_with_meta(...)`.
-- `kitchen_sink.rs`: observer hooks, envelope streaming, tool-call deltas, and manual tool execution in one example.
+%% Top API
+subgraph Public_API
+agent_toolkit["agent_toolkit"]
+end
 
-API guidance:
+%% Runtime orchestration
+subgraph Runtime
+agent_runtime["agent-runtime"]
+end
 
-- Most ergonomic path: provider builders like `openai()`, then `.messages()` or `.streaming()`.
-- Multi-provider routing path: `AgentToolkit::builder()`, `SendOptions`, `Target`, and `FallbackPolicy`.
-- Lower-level request path: construct an explicit `Request` when you need exact transport payload control.
+%% Provider layer
+subgraph Providers
+agent_providers["agent-providers"]
+end
 
-Typed tool authoring is supported via `ToolBuilder::typed_handler(...)`, which derives the input schema from Rust types by default. If `.schema(...)` is called after `.typed_handler(...)`, the manual schema wins.
+%% Infrastructure
+subgraph Infrastructure
+agent_transport["agent-transport"]
+agent_tools["agent-tools"]
+end
 
-Observer precedence is `SendOptions::with_observer(...)` > `AgentToolkit::builder().observer(...)` > provider-client builder `.observer(...)`. Observer callback panics are isolated and never propagate into request results.
+%% Core primitives
+subgraph Core
+agent_core["agent-core"]
+end
+
+
+%% Public API edges
+agent_toolkit --> agent_runtime
+agent_toolkit --> agent_providers
+agent_toolkit --> agent_tools
+agent_toolkit --> agent_transport
+agent_toolkit --> agent_core
+
+%% Runtime
+agent_runtime --> agent_providers
+agent_runtime --> agent_transport
+agent_runtime --> agent_core
+
+%% Providers
+agent_providers --> agent_transport
+agent_providers --> agent_core
+
+%% Tools
+agent_tools --> agent_core
+```
 
 ## Workspace Layout
 - `agent` (`agent_toolkit`): facade crate with public re-exports for core, runtime, providers, transport, and tools.
 - `agent-core`: provider-agnostic domain types and traits shared across crates, including canonical `ProviderId`.
-- `agent-providers`: provider-specific encode/decode/spec logic, static `ProviderAdapter` lookup boundary, and fixture datasets for validation tests.
+- `agent-providers`: provider-specific encode/decode/spec logic
 - `agent-runtime`: high-level clients (`openai()`, `anthropic()`, `openrouter()`), toolkit routing/fallback orchestration, and unified adapter-driven execution flow.
-- `agent-transport`: HTTP transport implementation with retry support, auth/header handling, generic request bodies, and JSON/SSE/bytes response helpers.
+- `agent-transport`: HTTP transport implementation, auth/header handling, generic request bodies, and JSON/SSE/bytes response helpers.
 - `agent-tools`: lightweight tool trait and registry primitives for tool integration.
 
 ## TODO 
@@ -53,6 +83,7 @@ Observer precedence is `SendOptions::with_observer(...)` > `AgentToolkit::builde
 
 This workspace uses deterministic release-readiness gates in CI:
 
+
 1. `cargo check --workspace --all-targets --locked`
 2. `cargo fmt --all`
 3. `cargo clippy --workspace --all-targets --all-features -- -D warnings`
@@ -60,7 +91,7 @@ This workspace uses deterministic release-readiness gates in CI:
 5. `cargo test --workspace --all-targets --all-features -- --quiet`
 6. `RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --document-private-items`
 
-`clippy::unwrap_used`, `clippy::expect_used`, and `clippy::panic` are intentionally enforced on non-test targets in this milestone. Existing test code remains outside full migration scope for now.
+`clippy::unwrap_used`, `clippy::expect_used`, and `clippy::panic` are intentionally enforced on non-test targets only.
 
 ## Deterministic vs live tests
 
