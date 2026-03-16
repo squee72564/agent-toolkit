@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 pub use agent_core::ResponseMode;
 
-use crate::observer::RuntimeObserver;
+use crate::observability::RuntimeObserver;
 
 /// Typed route-wide transport controls.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

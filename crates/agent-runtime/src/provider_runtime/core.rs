@@ -4,14 +4,15 @@ use agent_core::{
     CanonicalStreamEnvelope, ExecutionPlan, PlatformConfig, ProviderInstanceId, ProviderKind,
     Response, ResponseFormat, RuntimeWarning,
 };
-use agent_providers::error::AdapterOperation;
 use agent_providers::{
-    adapter::ProviderAdapter, error::AdapterError, stream_projector::ProviderStreamProjector,
+    adapter::ProviderAdapter,
+    error::{AdapterError, AdapterOperation},
+    stream_projector::ProviderStreamProjector,
 };
 use agent_transport::{HttpJsonResponse, HttpSseResponse, HttpTransport, TransportResponseFraming};
 
 use crate::RuntimeErrorKind;
-use crate::observer::RuntimeObserver;
+use crate::observability::RuntimeObserver;
 use crate::provider::RegisteredProvider;
 use crate::provider_stream_runtime::{ProviderStreamRuntime, StreamRuntimeError};
 use crate::runtime_error::RuntimeError;

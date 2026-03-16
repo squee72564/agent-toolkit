@@ -183,7 +183,7 @@ macro_rules! impl_provider_client {
             /// Sets a client-level observer.
             pub fn observer(
                 mut self,
-                observer: std::sync::Arc<dyn $crate::observer::RuntimeObserver>,
+                observer: std::sync::Arc<dyn $crate::observability::RuntimeObserver>,
             ) -> Self {
                 self.inner.observer = Some(observer);
                 self

@@ -1,16 +1,17 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::attempt::{AttemptDisposition, AttemptRecord};
 use crate::message_response_stream::state::{
     AttemptContext, CompletedAttemptContext, StreamDriverState,
 };
-use crate::observer::{RuntimeObserver, safe_call_observer};
-use crate::observer::{attempt_failure_event, attempt_start_event, attempt_success_event};
-use crate::runtime_error::RuntimeError;
-use crate::types::{
-    RequestEndContext, request_end_failure_event, request_end_success_event, terminal_failure_error,
+use crate::observability::{
+    RequestEndContext, RuntimeObserver, attempt_failure_event, attempt_start_event,
+    attempt_success_event, request_end_failure_event, request_end_success_event,
+    safe_call_observer,
 };
+use crate::routing::{AttemptDisposition, AttemptRecord};
+use crate::runtime_error::RuntimeError;
+use crate::types::terminal_failure_error;
 
 pub(super) fn emit_attempt_start(
     observer: Option<&Arc<dyn RuntimeObserver>>,

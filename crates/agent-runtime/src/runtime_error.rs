@@ -5,7 +5,8 @@ use std::error::Error as StdError;
 use std::sync::Arc;
 use thiserror::Error;
 
-use crate::types::{ExecutedFailureMeta, RoutePlanningFailure};
+use crate::routing::RoutePlanningFailure;
+use crate::types::ExecutedFailureMeta;
 
 /// Category of error surfaced by the runtime layer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

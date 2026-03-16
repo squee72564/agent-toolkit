@@ -2,24 +2,28 @@ use std::{sync::Arc, time::Instant};
 
 use agent_core::{Response, TaskRequest};
 
-use crate::attempt::AttemptRecord;
-use crate::attempt::AttemptSpec;
-use crate::api::{DirectStreamingApi, DirectMessagesApi};
+use crate::api::{DirectMessagesApi, DirectStreamingApi};
 use crate::execution_options::{ExecutionOptions, ResponseMode};
-use crate::message_create_input::MessageCreateInput;
+use crate::message::MessageCreateInput;
 use crate::message_response_stream::{AttemptContext, LiveAttempt, MessageResponseStream};
-use crate::observer::{RuntimeObserver, resolve_observer_for_request, safe_call_observer};
-use crate::observer::{attempt_failure_event, attempt_start_event, attempt_success_event};
-use crate::planner;
+use crate::observability::{
+    RequestEndContext, RuntimeObserver, attempt_failure_event, attempt_start_event,
+    attempt_success_event, request_end_failure_event, request_end_success_event,
+    request_start_event, resolve_observer_for_request, safe_call_observer,
+};
 use crate::provider_runtime::{
     ProviderAttemptOutcome, ProviderRuntime, ProviderStreamAttemptOutcome,
 };
+
+use crate::routing::{failed_attempt_record, succeeded_attempt_record};
 use crate::runtime_error::{RuntimeError, RuntimeErrorKind};
-use crate::target::Target;
-use crate::types::{
-    RequestEndContext, ResponseMeta, executed_failure_meta, failed_attempt_record,
-    request_end_failure_event, request_end_success_event, request_start_event, response_meta,
-    succeeded_attempt_record, terminal_failure_error,
+use crate::types::{ResponseMeta, executed_failure_meta, response_meta, terminal_failure_error};
+use crate::{
+    Target,
+    routing::{
+        attempt::{AttemptRecord, AttemptSpec},
+        planner,
+    },
 };
 
 #[derive(Debug, Clone)]

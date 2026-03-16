@@ -3,10 +3,11 @@ use std::{collections::HashMap, sync::Arc};
 use agent_core::{ProviderInstanceId, ProviderKind};
 
 use crate::agent_toolkit::AgentToolkit;
-use crate::clients::base_client_builder::BaseClientBuilder;
-use crate::observer::RuntimeObserver;
+use crate::clients::BaseClientBuilder;
+use crate::observability::RuntimeObserver;
 use crate::provider::{ProviderClient, ProviderConfig};
 use crate::runtime_error::RuntimeError;
+
 #[derive(Clone)]
 struct ProviderRegistration {
     kind: ProviderKind,

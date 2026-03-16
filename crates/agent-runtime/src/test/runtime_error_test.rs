@@ -1,5 +1,8 @@
-use super::*;
+use agent_core::ProviderKind;
 use agent_transport::{TimeoutStage, TransportError};
+
+use crate::test::terminal_failure_error;
+use crate::{RuntimeError, RuntimeErrorKind};
 
 #[test]
 fn runtime_error_clone_preserves_source_chain() {

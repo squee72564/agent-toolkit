@@ -5,7 +5,7 @@ use agent_providers::adapter::adapter_for;
 use agent_transport::{HttpTransport, RetryPolicy};
 use reqwest::header::HeaderName;
 
-use crate::observer::RuntimeObserver;
+use crate::observability::RuntimeObserver;
 use crate::provider::{ProviderConfig, RegisteredProvider};
 use crate::provider_runtime::ProviderRuntime;
 use crate::runtime_error::RuntimeError;

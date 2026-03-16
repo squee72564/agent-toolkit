@@ -1,14 +1,14 @@
 use std::time::Duration;
 
-use super::*;
-use crate::observer::{attempt_failure_event_fields, attempt_success_event_fields};
-use crate::{
-    ProviderInstanceId,
-    types::{
-        RequestEndContext, normalized_event_model, request_end_failure_event,
-        request_end_success_event, response_meta,
-    },
+use agent_core::{ProviderInstanceId, ProviderKind};
+
+use crate::RuntimeErrorKind;
+use crate::observability::{
+    RequestEndContext, attempt_failure_event_fields, attempt_success_event_fields,
+    request_end_failure_event, request_end_success_event,
 };
+use crate::routing::{AttemptDisposition, AttemptRecord, SkipReason};
+use crate::types::{normalized_event_model, response_meta};
 
 #[test]
 fn normalized_event_model_prefers_trimmed_target_model() {

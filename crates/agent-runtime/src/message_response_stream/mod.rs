@@ -7,10 +7,13 @@ use std::time::Instant;
 use agent_core::{CanonicalStreamEnvelope, Response};
 use futures_core::Stream;
 
-use crate::message_text_stream::MessageTextStream;
-use crate::observer::RuntimeObserver;
+use crate::message::MessageTextStream;
+use crate::observability::RuntimeObserver;
 use crate::runtime_error::RuntimeError;
 use crate::types::ResponseMeta;
+
+#[cfg(test)]
+mod tests;
 
 mod driver;
 mod events;

@@ -3,22 +3,19 @@ use std::time::Instant;
 
 use agent_core::ProviderKind;
 
-use super::AgentToolkit;
-use crate::attempt::AttemptSpec;
-use crate::attempt::{AttemptDisposition, AttemptRecord};
+use crate::agent_toolkit::AgentToolkit;
 use crate::execution_options::ExecutionOptions;
-use crate::observer::{
-    RuntimeObserver, attempt_failure_event, resolve_observer_for_request, safe_call_observer,
+use crate::observability::{
+    RequestEndContext, RuntimeObserver, attempt_failure_event, attempt_skipped_event,
+    attempt_start_event, attempt_success_event, request_end_failure_event,
+    request_end_success_event, request_start_event, resolve_observer_for_request,
+    safe_call_observer,
 };
-use crate::observer::{attempt_skipped_event, attempt_start_event, attempt_success_event};
-use crate::planner::SkippedPlannedAttempt;
-use crate::route::Route;
+use crate::routing::{
+    AttemptDisposition, AttemptRecord, AttemptSpec, Route, SkippedPlannedAttempt, Target,
+};
 use crate::runtime_error::RuntimeError;
-use crate::target::Target;
-use crate::types::{
-    RequestEndContext, normalized_event_model, request_end_failure_event,
-    request_end_success_event, request_start_event, terminal_failure_error,
-};
+use crate::types::{normalized_event_model, terminal_failure_error};
 
 pub(super) struct PreparedExecution {
     pub(super) request_started_at: Instant,

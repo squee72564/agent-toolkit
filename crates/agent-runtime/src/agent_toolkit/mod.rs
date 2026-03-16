@@ -2,26 +2,25 @@ use std::{collections::HashMap, sync::Arc};
 
 use agent_core::{ProviderInstanceId, Response, TaskRequest};
 
-use crate::attempt::AttemptRecord;
-use crate::attempt::AttemptSpec;
+use crate::api::{RoutedMessagesApi, RoutedStreamingApi};
 use crate::execution_options::{ExecutionOptions, ResponseMode};
 use crate::message_response_stream::{
     AttemptContext, LiveAttempt, MessageResponseStream, RoutedStreamInit,
 };
-use crate::observer::RuntimeObserver;
-use crate::planner;
+use crate::observability::{RuntimeObserver, resolve_observer_for_request};
 use crate::provider::ProviderClient;
 use crate::provider_runtime::{ProviderAttemptOutcome, ProviderStreamAttemptOutcome};
-use crate::route::Route;
-use crate::api::{RoutedStreamingApi, RoutedMessagesApi};
-use crate::runtime_error::RuntimeError;
-use crate::types::{
-    ResponseMeta, executed_failure_meta, failed_attempt_record, response_meta,
-    succeeded_attempt_record,
+use crate::routing::{
+    AttemptRecord, AttemptSpec, Route, failed_attempt_record, planner, succeeded_attempt_record,
 };
+use crate::runtime_error::RuntimeError;
+use crate::types::{ResponseMeta, executed_failure_meta, response_meta};
 
 mod builder;
 mod execution;
+
+#[cfg(test)]
+mod tests;
 
 pub use self::builder::AgentToolkitBuilder;
 use self::execution::PreparedExecution;
@@ -482,7 +481,7 @@ impl AgentToolkit {
         provider: ProviderInstanceId,
     ) -> Option<Arc<dyn RuntimeObserver>> {
         self.clients.get(&provider).and_then(|client| {
-            crate::observer::resolve_observer_for_request(
+            resolve_observer_for_request(
                 client.runtime.observer.as_ref(),
                 self.observer.as_ref(),
                 execution.observer.as_ref(),
