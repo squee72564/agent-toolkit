@@ -1,9 +1,11 @@
-use agent_core::{CanonicalStreamEvent, ProviderKind, ProviderRawStreamEvent};
-use agent_providers::interfaces::ProviderStreamProjector;
-use agent_providers::request_plan::{ProviderRequestPlan, TransportResponseFraming};
-use agent_transport::HttpRequestOptions;
 use reqwest::{Method, header::HeaderMap};
 use serde_json::json;
+
+use agent_core::{CanonicalStreamEvent, ProviderKind, ProviderRawStreamEvent};
+use agent_providers::{
+    AdapterError, ProviderRequestPlan, ProviderStreamProjector, TransportResponseFraming,
+};
+use agent_transport::HttpRequestOptions;
 
 #[derive(Default)]
 struct EchoProjector;
@@ -12,7 +14,7 @@ impl ProviderStreamProjector for EchoProjector {
     fn project(
         &mut self,
         raw: ProviderRawStreamEvent,
-    ) -> Result<Vec<CanonicalStreamEvent>, agent_providers::error::AdapterError> {
+    ) -> Result<Vec<CanonicalStreamEvent>, AdapterError> {
         Ok(vec![CanonicalStreamEvent::ResponseStarted {
             model: Some(format!("{:?}", raw.provider)),
             response_id: Some(raw.sequence.to_string()),

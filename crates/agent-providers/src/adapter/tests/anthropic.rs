@@ -6,14 +6,16 @@ use agent_core::types::{
     AuthStyle, NativeOptions, ProtocolKind, ProviderKind, ResponseFormat, ResponseMode, TaskRequest,
 };
 
-use crate::adapter::tests::shared::{base_task, execution_plan};
-use crate::anthropic_family::AnthropicDecodeEnvelope;
-use crate::anthropic_family::decode::decode_anthropic_response;
-use crate::error::AdapterErrorKind;
-use crate::adapter::adapter_for;
-use crate::interfaces::codec_for;
-use crate::interfaces::refinement_for;
-use crate::request_plan::TransportResponseFraming;
+use crate::{
+    adapter::{
+        adapter_for,
+        tests::shared::{base_task, execution_plan},
+    },
+    error::AdapterErrorKind,
+    families::anthropic::wire::{AnthropicDecodeEnvelope, decode::decode_anthropic_response},
+    interfaces::{codec_for, refinement_for},
+    request_plan::TransportResponseFraming,
+};
 
 const ANTHROPIC_MODEL: &str = "claude-sonnet-4-6";
 

@@ -1,13 +1,17 @@
 use std::collections::BTreeMap;
 
-use agent_core::{
-    ContentPart, Message, MessageRole, ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
-};
 use serde_json::{Map, json};
 
-use crate::interfaces::codec_for;
-use crate::refinement::openrouter::{
-    OpenRouterOverrides, apply_openrouter_overrides,
+use agent_core::{
+    ContentPart, Message, MessageRole, ProviderKind, ResponseFormat, ResponseMode, TaskRequest,
+    ToolChoice,
+};
+
+use crate::{
+    error::{AdapterErrorKind, AdapterOperation},
+    families::openai_compatible::wire::OpenAiFamilyErrorKind,
+    interfaces::codec_for,
+    providers::openrouter::refinement::{OpenRouterOverrides, apply_openrouter_overrides},
 };
 
 const MODEL_ID: &str = "openai/gpt-5-mini";
@@ -54,27 +58,15 @@ fn plan_request(
     .map_err(|error| {
         crate::error::AdapterError::with_source(
             match error.kind() {
-                crate::openai_family::OpenAiFamilyErrorKind::Validation => {
-                    crate::error::AdapterErrorKind::Validation
-                }
-                crate::openai_family::OpenAiFamilyErrorKind::Encode => {
-                    crate::error::AdapterErrorKind::Encode
-                }
-                crate::openai_family::OpenAiFamilyErrorKind::Decode => {
-                    crate::error::AdapterErrorKind::Decode
-                }
-                crate::openai_family::OpenAiFamilyErrorKind::Upstream => {
-                    crate::error::AdapterErrorKind::Upstream
-                }
-                crate::openai_family::OpenAiFamilyErrorKind::ProtocolViolation => {
-                    crate::error::AdapterErrorKind::ProtocolViolation
-                }
-                crate::openai_family::OpenAiFamilyErrorKind::UnsupportedFeature => {
-                    crate::error::AdapterErrorKind::UnsupportedFeature
-                }
+                OpenAiFamilyErrorKind::Validation => AdapterErrorKind::Validation,
+                OpenAiFamilyErrorKind::Encode => AdapterErrorKind::Encode,
+                OpenAiFamilyErrorKind::Decode => AdapterErrorKind::Decode,
+                OpenAiFamilyErrorKind::Upstream => AdapterErrorKind::Upstream,
+                OpenAiFamilyErrorKind::ProtocolViolation => AdapterErrorKind::ProtocolViolation,
+                OpenAiFamilyErrorKind::UnsupportedFeature => AdapterErrorKind::UnsupportedFeature,
             },
-            agent_core::ProviderKind::OpenRouter,
-            crate::error::AdapterOperation::PlanRequest,
+            ProviderKind::OpenRouter,
+            AdapterOperation::PlanRequest,
             error.message().to_string(),
             error,
         )

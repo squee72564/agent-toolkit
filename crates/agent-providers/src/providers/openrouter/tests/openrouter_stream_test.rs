@@ -1,12 +1,14 @@
+use serde_json::Value;
+
 use agent_core::{
     CanonicalStreamEvent, FinishReason, MessageRole, ProviderKind, ProviderRawStreamEvent,
     StreamOutputItemEnd, StreamOutputItemStart,
 };
-use serde_json::Value;
 
-use crate::fixture_tests::load_streaming_success_fixture;
-use crate::refinement::openrouter_stream_projector::OpenRouterStreamProjector;
-use crate::interfaces::ProviderStreamProjector;
+use crate::{
+    fixture_tests::load_streaming_success_fixture, interfaces::ProviderStreamProjector,
+    providers::openrouter::stream_projector::OpenRouterStreamProjector,
+};
 
 #[test]
 fn openrouter_stream_projector_completes_on_done_payload() {

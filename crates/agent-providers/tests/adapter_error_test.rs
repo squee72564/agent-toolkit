@@ -1,7 +1,7 @@
 use std::error::Error as StdError;
 
 use agent_core::types::ProviderKind;
-use agent_providers::error::{AdapterError, AdapterErrorKind, AdapterOperation};
+use agent_providers::{AdapterError, AdapterErrorKind, AdapterOperation};
 
 #[test]
 fn adapter_error_new_initializes_expected_defaults() {

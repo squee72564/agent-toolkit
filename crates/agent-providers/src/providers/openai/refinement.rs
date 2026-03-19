@@ -3,10 +3,12 @@ use agent_core::{
 };
 use serde_json::Value;
 
-use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo};
-use crate::interfaces::ProviderRefinement;
-use crate::interfaces::ProviderStreamProjector;
-use crate::request_plan::EncodedFamilyRequest;
+use crate::{
+    error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo},
+    families::openai_compatible::wire::decode::parse_openai_error_value,
+    interfaces::{ProviderRefinement, ProviderStreamProjector},
+    request_plan::EncodedFamilyRequest,
+};
 
 #[derive(Debug, Clone, Default, PartialEq)]
 struct OpenAiNativeOptionsOverrides {
@@ -69,9 +71,9 @@ impl OpenAiNativeOptionsOverrides {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct OpenAiOverlay;
+pub(crate) struct OpenAiRefinement;
 
-impl ProviderRefinement for OpenAiOverlay {
+impl ProviderRefinement for OpenAiRefinement {
     fn refine_request(
         &self,
         _task: &TaskRequest,
@@ -83,7 +85,7 @@ impl ProviderRefinement for OpenAiOverlay {
     }
 
     fn decode_provider_error(&self, body: &Value) -> Option<ProviderErrorInfo> {
-        let envelope = crate::openai_family::decode::parse_openai_error_value(body)?;
+        let envelope = parse_openai_error_value(body)?;
         Some(ProviderErrorInfo {
             provider_code: envelope.code.or(envelope.error_type),
             message: None,

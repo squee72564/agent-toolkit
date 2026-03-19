@@ -6,15 +6,12 @@ use reqwest::header::{HeaderMap, HeaderName};
 use serde_json::Value;
 
 use crate::{
-    error::{AdapterError, ProviderErrorInfo},
-    interfaces::{
-        ProviderAdapter, ProviderStreamProjector, codec_for, refinement_for,
-    },
     adapter::{
-        create_stream_projector_with_layering,
-        decode_error_with_layering, decode_response_with_layering, plan_request_with_layering,
-        rebind_adapter_error_provider,
+        create_stream_projector_with_layering, decode_error_with_layering,
+        decode_response_with_layering, plan_request_with_layering, rebind_adapter_error_provider,
     },
+    error::{AdapterError, ProviderErrorInfo},
+    interfaces::{ProviderAdapter, ProviderStreamProjector, codec_for, refinement_for},
     request_plan::ProviderRequestPlan,
 };
 

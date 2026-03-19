@@ -3,12 +3,15 @@ use serde_json::json;
 
 use agent_core::types::{AuthStyle, ProtocolKind, ProviderKind, ResponseFormat, ResponseMode};
 
-use crate::adapter::tests::shared::{base_task, compose_openai_compatible_request, execution_plan};
-use crate::error::AdapterErrorKind;
-use crate::adapter::adapter_for;
-use crate::openai_family::OpenAiDecodeEnvelope;
-use crate::openai_family::decode::decode_openai_response;
-use crate::request_plan::TransportResponseFraming;
+use crate::{
+    adapter::{
+        adapter_for,
+        tests::shared::{base_task, compose_openai_compatible_request, execution_plan},
+    },
+    error::AdapterErrorKind,
+    families::openai_compatible::wire::{OpenAiDecodeEnvelope, decode::decode_openai_response},
+    request_plan::TransportResponseFraming,
+};
 
 const OPENAI_MODEL: &str = "openai/gpt-5-mini";
 

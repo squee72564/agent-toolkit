@@ -1,14 +1,21 @@
 //! Provider protocol adapters and translation primitives for `agent-toolkit`.
 //!
 //! This crate sits between the provider-agnostic request/response model in
-//! `agent-core` and provider-specific wire protocols. It exposes:
+//! `agent-core` and provider-specific wire protocols. External consumers should
+//! treat this crate as a facade and prefer root-level imports such as
+//! [`adapter_for`], [`ProviderAdapter`], [`ProviderStreamProjector`],
+//! [`AdapterError`], and [`ProviderRequestPlan`] rather than depending on the
+//! internal module layout.
 //!
-//! - [`adapter`] for built-in provider adapters and adapter selection.
-//! - [`error`] for normalized adapter-layer errors.
-//! - [`request_plan`] for transport/response execution contracts.
-//!   stream events.
-//! - [`openai_family`] and [`anthropic_family`] for provider-family payload types
-//!   and spec-level error models.
+//! It exposes:
+//!
+//! - [`adapter_for`] to obtain the built-in adapter for a concrete provider.
+//! - [`ProviderAdapter`] and [`ProviderStreamProjector`] for runtime integration
+//!   boundaries.
+//! - [`AdapterError`], [`AdapterErrorKind`], [`AdapterOperation`], and
+//!   [`ProviderErrorInfo`] for normalized adapter-layer errors.
+//! - [`ProviderRequestPlan`] and [`TransportResponseFraming`] for the transport
+//!   request contract produced by adapters.
 //!
 //! Internally, built-in providers are composed in three layers:
 //!
@@ -18,17 +25,23 @@
 //! - refinement: provider-specific mutations and overrides layered on top of a
 //!   family codec
 //!
+//! Family-shared protocol implementations live under `families`, while
+//! provider-specific overlays live under `providers`.
+//!
 //! See `docs/provider-layering.md` for the full request and response flow.
 
-pub mod adapter;
-mod anthropic_family;
-pub mod error;
-mod family_codec;
-mod openai_family;
-mod refinement;
-pub mod request_plan;
+mod adapter;
+mod interfaces;
+mod request_plan;
 
-pub mod interfaces;
+mod error;
+mod families;
+mod providers;
+
+pub use adapter::adapter_for;
+pub use error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo};
+pub use interfaces::{ProviderAdapter, ProviderStreamProjector};
+pub use request_plan::{ProviderRequestPlan, TransportResponseFraming};
 
 #[cfg(test)]
 mod fixture_tests;

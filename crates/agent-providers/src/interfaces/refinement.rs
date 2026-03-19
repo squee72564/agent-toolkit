@@ -3,12 +3,16 @@ use std::fmt::Debug;
 use agent_core::{ProviderKind, ProviderOptions, Response, ResponseFormat, TaskRequest};
 use serde_json::Value;
 
-use crate::error::{AdapterError, ProviderErrorInfo};
-use crate::interfaces::ProviderStreamProjector;
-use crate::refinement::{
-    AnthropicOverlay, GenericOpenAiCompatibleOverlay, OpenAiOverlay, OpenRouterOverlay,
+use crate::{
+    error::{AdapterError, ProviderErrorInfo},
+    interfaces::ProviderStreamProjector,
+    providers::{
+        anthropic::refinement::AnthropicRefinement, openai::refinement::OpenAiRefinement,
+        openai_compatible::refinement::GenericOpenAiCompatibleRefinement,
+        openrouter::refinement::OpenRouterRefinement,
+    },
+    request_plan::EncodedFamilyRequest,
 };
-use crate::request_plan::EncodedFamilyRequest;
 
 /// Provider-specific refinement layer applied on top of a family codec.
 ///
@@ -34,17 +38,17 @@ pub(crate) trait ProviderRefinement: Debug + Sync {
     fn create_stream_projector_override(&self) -> Option<Box<dyn ProviderStreamProjector>>;
 }
 
-static OPENAI_OVERLAY: OpenAiOverlay = OpenAiOverlay;
-static ANTHROPIC_OVERLAY: AnthropicOverlay = AnthropicOverlay;
-static OPENROUTER_OVERLAY: OpenRouterOverlay = OpenRouterOverlay;
-static GENERIC_OPENAI_COMPATIBLE_OVERLAY: GenericOpenAiCompatibleOverlay =
-    GenericOpenAiCompatibleOverlay;
+static OPENAI_REFINEMENT: OpenAiRefinement = OpenAiRefinement;
+static ANTHROPIC_REFINEMENT: AnthropicRefinement = AnthropicRefinement;
+static OPENROUTER_REFINEMENT: OpenRouterRefinement = OpenRouterRefinement;
+static GENERIC_OPENAI_COMPATIBLE_REFINEMENT: GenericOpenAiCompatibleRefinement =
+    GenericOpenAiCompatibleRefinement;
 
 pub(crate) fn refinement_for(kind: ProviderKind) -> &'static dyn ProviderRefinement {
     match kind {
-        ProviderKind::OpenAi => &OPENAI_OVERLAY,
-        ProviderKind::Anthropic => &ANTHROPIC_OVERLAY,
-        ProviderKind::OpenRouter => &OPENROUTER_OVERLAY,
-        ProviderKind::GenericOpenAiCompatible => &GENERIC_OPENAI_COMPATIBLE_OVERLAY,
+        ProviderKind::OpenAi => &OPENAI_REFINEMENT,
+        ProviderKind::Anthropic => &ANTHROPIC_REFINEMENT,
+        ProviderKind::OpenRouter => &OPENROUTER_REFINEMENT,
+        ProviderKind::GenericOpenAiCompatible => &GENERIC_OPENAI_COMPATIBLE_REFINEMENT,
     }
 }

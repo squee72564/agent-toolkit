@@ -3,11 +3,12 @@ use agent_core::{
 };
 use serde_json::Value;
 
-use crate::anthropic_family::decode::parse_anthropic_error_value;
-use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo};
-use crate::interfaces::ProviderRefinement;
-use crate::interfaces::ProviderStreamProjector;
-use crate::request_plan::EncodedFamilyRequest;
+use crate::{
+    error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo},
+    families::anthropic::wire::decode::parse_anthropic_error_value,
+    interfaces::{ProviderRefinement, ProviderStreamProjector},
+    request_plan::EncodedFamilyRequest,
+};
 
 #[derive(Debug, Clone, Default, PartialEq)]
 struct AnthropicNativeOptionsOverrides {
@@ -55,9 +56,9 @@ impl AnthropicNativeOptionsOverrides {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct AnthropicOverlay;
+pub(crate) struct AnthropicRefinement;
 
-impl ProviderRefinement for AnthropicOverlay {
+impl ProviderRefinement for AnthropicRefinement {
     fn refine_request(
         &self,
         _task: &TaskRequest,

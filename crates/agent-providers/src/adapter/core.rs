@@ -1,10 +1,7 @@
 //! Built-in provider adapter implementations and adapter selection.
 use serde_json::Value;
 
-use agent_core::{
-    ExecutionPlan, ProviderFamilyId, ProviderKind,
-    Response, ResponseFormat,
-};
+use agent_core::{ExecutionPlan, ProviderFamilyId, ProviderKind, Response, ResponseFormat};
 
 use crate::{
     adapter::{
@@ -12,7 +9,7 @@ use crate::{
         anthropic_plan, openai_compatible_plan, openrouter_plan,
     },
     error::{AdapterError, ProviderErrorInfo},
-    interfaces::{codec_for, refinement_for, ProviderAdapter, ProviderStreamProjector},
+    interfaces::{ProviderAdapter, ProviderStreamProjector, codec_for, refinement_for},
     request_plan::ProviderRequestPlan,
 };
 

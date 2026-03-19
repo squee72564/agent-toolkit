@@ -6,13 +6,15 @@ use agent_core::{
     TaskRequest,
 };
 
-use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo};
-use crate::interfaces::ProviderStreamProjector;
-use crate::openai_family::OpenAiFamilyError;
-use crate::request_plan::EncodedFamilyRequest;
-
-use crate::interfaces::ProviderRefinement;
-use crate::refinement::openrouter_stream_projector::OpenRouterStreamProjector;
+use crate::{
+    error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo},
+    families::openai_compatible::wire::{
+        OpenAiFamilyError, OpenAiFamilyErrorKind, decode::parse_openai_error_value,
+    },
+    interfaces::{ProviderRefinement, ProviderStreamProjector},
+    providers::openrouter::stream_projector::OpenRouterStreamProjector,
+    request_plan::EncodedFamilyRequest,
+};
 
 const WARN_IGNORED_TOP_P: &str = "openai.encode.ignored_top_p";
 const WARN_IGNORED_STOP: &str = "openai.encode.ignored_stop";
@@ -102,9 +104,9 @@ fn apply_provider_options(overrides: &mut OpenRouterOverrides, options: &OpenRou
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct OpenRouterOverlay;
+pub(crate) struct OpenRouterRefinement;
 
-impl ProviderRefinement for OpenRouterOverlay {
+impl ProviderRefinement for OpenRouterRefinement {
     fn refine_request(
         &self,
         task: &TaskRequest,
@@ -125,7 +127,7 @@ impl ProviderRefinement for OpenRouterOverlay {
     }
 
     fn decode_provider_error(&self, body: &Value) -> Option<ProviderErrorInfo> {
-        let envelope = crate::openai_family::decode::parse_openai_error_value(body)?;
+        let envelope = parse_openai_error_value(body)?;
         Some(ProviderErrorInfo {
             provider_code: envelope.code.or(envelope.error_type),
             message: None,
@@ -239,16 +241,12 @@ fn map_openrouter_plan_error(error: OpenAiFamilyError) -> AdapterError {
     let message = error.message().to_string();
     AdapterError::with_source(
         match error.kind() {
-            crate::openai_family::OpenAiFamilyErrorKind::Validation => AdapterErrorKind::Validation,
-            crate::openai_family::OpenAiFamilyErrorKind::Encode => AdapterErrorKind::Encode,
-            crate::openai_family::OpenAiFamilyErrorKind::Decode => AdapterErrorKind::Decode,
-            crate::openai_family::OpenAiFamilyErrorKind::Upstream => AdapterErrorKind::Upstream,
-            crate::openai_family::OpenAiFamilyErrorKind::ProtocolViolation => {
-                AdapterErrorKind::ProtocolViolation
-            }
-            crate::openai_family::OpenAiFamilyErrorKind::UnsupportedFeature => {
-                AdapterErrorKind::UnsupportedFeature
-            }
+            OpenAiFamilyErrorKind::Validation => AdapterErrorKind::Validation,
+            OpenAiFamilyErrorKind::Encode => AdapterErrorKind::Encode,
+            OpenAiFamilyErrorKind::Decode => AdapterErrorKind::Decode,
+            OpenAiFamilyErrorKind::Upstream => AdapterErrorKind::Upstream,
+            OpenAiFamilyErrorKind::ProtocolViolation => AdapterErrorKind::ProtocolViolation,
+            OpenAiFamilyErrorKind::UnsupportedFeature => AdapterErrorKind::UnsupportedFeature,
         },
         ProviderKind::OpenRouter,
         AdapterOperation::PlanRequest,

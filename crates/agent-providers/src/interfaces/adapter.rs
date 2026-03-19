@@ -1,13 +1,12 @@
 //! Adapter Interface
 use serde_json::Value;
 
-use agent_core::{
-    ExecutionPlan, ProviderCapabilities, ProviderDescriptor, ProviderKind,
-    Response, ResponseFormat,
-};
 use crate::error::{AdapterError, ProviderErrorInfo};
 use crate::interfaces::ProviderStreamProjector;
 use crate::request_plan::ProviderRequestPlan;
+use agent_core::{
+    ExecutionPlan, ProviderCapabilities, ProviderDescriptor, ProviderKind, Response, ResponseFormat,
+};
 
 /// Runtime-facing boundary for one concrete provider integration.
 ///

@@ -32,7 +32,7 @@ pub struct EncodedFamilyRequest {
 /// Final adapter-produced request contract consumed by runtime.
 ///
 /// This is the fully refined transport contract returned by
-/// [`crate::adapter::ProviderAdapter::plan_request`].
+/// [`crate::interfaces::ProviderAdapter::plan_request`].
 #[derive(Debug, Clone)]
 pub struct ProviderRequestPlan {
     /// Serialized provider request body.

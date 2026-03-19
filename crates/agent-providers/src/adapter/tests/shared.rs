@@ -11,9 +11,9 @@ use agent_core::types::{
     ResponseFormat, ResponseMode, TaskRequest, ToolChoice, TransportTimeoutOverrides, Usage,
 };
 
-use crate::error::{AdapterError, AdapterErrorKind, ProviderErrorInfo};
-use crate::interfaces::{codec_for, refinement_for, ProviderStreamProjector};
 use crate::adapter::{adapter_for, all_builtin_adapters};
+use crate::error::{AdapterError, AdapterErrorKind, ProviderErrorInfo};
+use crate::interfaces::{ProviderStreamProjector, codec_for, refinement_for};
 
 pub(super) fn decode_error_with_composition_test_hook<Family, Refine>(
     family_decode: Family,
