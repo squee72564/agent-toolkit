@@ -6,19 +6,21 @@ use agent_transport::HttpRequestOptions;
 use reqwest::{Method, header::HeaderMap};
 use serde_json::Value;
 
-use crate::anthropic_family::decode::{
-    decode_anthropic_error, decode_anthropic_response, parse_anthropic_error_value,
+use crate::{
+    error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo},
+    families::anthropic::{
+        stream_projector::AnthropicStreamProjector,
+        wire::{
+            AnthropicDecodeEnvelope, AnthropicFamilyError, AnthropicFamilyErrorKind,
+            decode::{
+                decode_anthropic_error, decode_anthropic_response, parse_anthropic_error_value,
+            },
+            encode::encode_anthropic_request,
+        },
+    },
+    interfaces::{ProviderFamilyCodec, ProviderStreamProjector},
+    request_plan::{EncodedFamilyRequest, TransportResponseFraming},
 };
-use crate::anthropic_family::encode::encode_anthropic_request;
-use crate::anthropic_family::{
-    AnthropicDecodeEnvelope, AnthropicFamilyError, AnthropicFamilyErrorKind,
-};
-use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo};
-use crate::interfaces::ProviderFamilyCodec;
-use crate::interfaces::ProviderStreamProjector;
-use crate::request_plan::{EncodedFamilyRequest, TransportResponseFraming};
-
-use super::anthropic_stream_projector::AnthropicStreamProjector;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct AnthropicFamilyCodec;

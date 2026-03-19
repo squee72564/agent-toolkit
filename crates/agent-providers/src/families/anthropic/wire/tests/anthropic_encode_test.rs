@@ -6,7 +6,7 @@ use agent_core::types::{
 };
 
 use super::anthropic_test_helpers::*;
-use crate::anthropic_family::AnthropicFamilyErrorKind;
+use crate::families::anthropic::wire::AnthropicFamilyErrorKind;
 
 #[test]
 fn encode_basic_text_message() {

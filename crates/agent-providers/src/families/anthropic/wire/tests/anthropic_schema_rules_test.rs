@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::anthropic_family::schema_rules::{
+use crate::families::anthropic::wire::schema_rules::{
     canonicalize_json, extract_first_json_object, permissive_json_object_schema, stable_json_string,
 };
 

@@ -1,9 +1,13 @@
 use agent_core::{CanonicalStreamEvent, FinishReason, ProviderRawStreamEvent, Usage};
 
-use crate::error::AdapterError;
-use crate::interfaces::ProviderStreamProjector;
-use crate::openai_family::streaming::{project_output_item_added, project_output_item_done};
-use crate::openai_family::types::OpenAiResponsesBody;
+use crate::{
+    error::AdapterError,
+    families::openai_compatible::wire::{
+        streaming::{project_output_item_added, project_output_item_done},
+        types::OpenAiResponsesBody,
+    },
+    interfaces::ProviderStreamProjector,
+};
 
 #[derive(Debug, Default)]
 pub(crate) struct OpenAiStreamProjector {

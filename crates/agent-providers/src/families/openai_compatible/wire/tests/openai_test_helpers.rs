@@ -2,8 +2,9 @@ use std::collections::BTreeMap;
 
 use agent_core::types::{Message, ResponseFormat, TaskRequest, ToolChoice};
 
-use crate::openai_family::encode::encode_openai_request as encode_task_request;
-use crate::openai_family::{OpenAiEncodedRequest, OpenAiFamilyError};
+use crate::families::openai_compatible::wire::{
+    OpenAiEncodedRequest, OpenAiFamilyError, encode::encode_openai_request as encode_task_request,
+};
 
 pub const MODEL_ID: &str = "gpt-4.1-mini";
 

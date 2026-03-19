@@ -6,17 +6,19 @@ use agent_transport::HttpRequestOptions;
 use reqwest::{Method, header::HeaderMap};
 use serde_json::Value;
 
-use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo};
-use crate::interfaces::ProviderFamilyCodec;
-use crate::interfaces::ProviderStreamProjector;
-use crate::openai_family::decode::{
-    decode_openai_error, decode_openai_response, parse_openai_error_value,
+use crate::{
+    error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo},
+    families::openai_compatible::{
+        stream_projector::OpenAiStreamProjector,
+        wire::{
+            OpenAiDecodeEnvelope, OpenAiFamilyError, OpenAiFamilyErrorKind,
+            decode::{decode_openai_error, decode_openai_response, parse_openai_error_value},
+            encode::encode_openai_request,
+        },
+    },
+    interfaces::{ProviderFamilyCodec, ProviderStreamProjector},
+    request_plan::{EncodedFamilyRequest, TransportResponseFraming},
 };
-use crate::openai_family::encode::encode_openai_request;
-use crate::openai_family::{OpenAiDecodeEnvelope, OpenAiFamilyError, OpenAiFamilyErrorKind};
-use crate::request_plan::{EncodedFamilyRequest, TransportResponseFraming};
-
-use super::openai_compatible_stream_projector::OpenAiStreamProjector;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct OpenAiCompatibleFamilyCodec;

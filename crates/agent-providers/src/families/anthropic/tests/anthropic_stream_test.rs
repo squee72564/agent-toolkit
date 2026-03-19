@@ -4,9 +4,10 @@ use agent_core::{
 };
 use serde_json::Value;
 
-use crate::family_codec::anthropic_stream_projector::AnthropicStreamProjector;
-use crate::fixture_tests::load_streaming_success_fixture;
-use crate::interfaces::ProviderStreamProjector;
+use crate::{
+    families::anthropic::stream_projector::AnthropicStreamProjector,
+    fixture_tests::load_streaming_success_fixture, interfaces::ProviderStreamProjector,
+};
 
 #[test]
 fn anthropic_stream_projector_tracks_message_lifecycle() {

@@ -1,12 +1,14 @@
+use serde_json::Value;
+
 use agent_core::{
     CanonicalStreamEvent, FinishReason, ProviderKind, ProviderRawStreamEvent, StreamOutputItemEnd,
     StreamOutputItemStart,
 };
-use serde_json::Value;
 
-use crate::family_codec::openai_compatible_stream_projector::OpenAiStreamProjector;
-use crate::fixture_tests::load_streaming_success_fixture;
-use crate::interfaces::ProviderStreamProjector;
+use crate::{
+    families::openai_compatible::stream_projector::OpenAiStreamProjector,
+    fixture_tests::load_streaming_success_fixture, interfaces::ProviderStreamProjector,
+};
 
 #[test]
 fn openai_stream_projector_emits_started_and_completed_events() {

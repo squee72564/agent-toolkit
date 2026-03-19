@@ -1,10 +1,10 @@
 use serde_json::json;
 
-use crate::fixture_tests::load_decoded_success_fixture;
-use crate::openai_family::types::{
+use crate::families::openai_compatible::wire::types::{
     OpenAiFunctionToolDefinition, OpenAiResponsesBody, OpenAiTextFormat, OpenAiToolType,
     StructuredOutputFormat,
 };
+use crate::fixture_tests::load_decoded_success_fixture;
 
 #[test]
 fn structured_output_defaults_additional_properties_false() {

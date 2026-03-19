@@ -7,12 +7,14 @@ use agent_core::{
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::anthropic_family::streaming::{
-    parse_content_block_start, parse_message_delta, parse_message_start,
+use crate::{
+    error::AdapterError,
+    families::anthropic::wire::{
+        streaming::{parse_content_block_start, parse_message_delta, parse_message_start},
+        types::{AnthropicTextBlock, AnthropicToolUseBlock, AnthropicUsage},
+    },
+    interfaces::ProviderStreamProjector,
 };
-use crate::anthropic_family::types::{AnthropicTextBlock, AnthropicToolUseBlock, AnthropicUsage};
-use crate::error::AdapterError;
-use crate::interfaces::ProviderStreamProjector;
 
 #[derive(Debug, Clone)]
 enum AnthropicBlockState {

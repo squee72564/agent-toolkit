@@ -2,9 +2,10 @@ use std::collections::BTreeMap;
 
 use agent_core::types::{Message, ResponseFormat, TaskRequest, ToolChoice};
 
-use crate::anthropic_family::{AnthropicEncodedRequest, AnthropicFamilyError};
-
-use crate::anthropic_family::encode::encode_anthropic_request as encode_task_request;
+use crate::families::anthropic::wire::{
+    AnthropicEncodedRequest, AnthropicFamilyError,
+    encode::encode_anthropic_request as encode_task_request,
+};
 
 pub const MODEL_ID: &str = "claude-sonnet-4.6";
 
