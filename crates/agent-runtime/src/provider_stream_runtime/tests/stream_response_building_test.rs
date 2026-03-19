@@ -4,7 +4,7 @@ use agent_core::{
     CanonicalStreamEvent, ContentPart, FinishReason, Message, ProviderKind, ResponseFormat,
     StreamOutputItemEnd, StreamOutputItemStart, TaskRequest, ToolChoice,
 };
-use agent_providers::error::AdapterErrorKind;
+use agent_providers::AdapterErrorKind;
 use serde_json::json;
 
 use crate::provider::ProviderClient;

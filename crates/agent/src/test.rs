@@ -1,9 +1,11 @@
 use std::time::Duration;
 
+use agent_providers::AdapterErrorKind;
+
 use super::{
     AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, HttpJsonResponse, ProviderKind,
     RequestEndEvent, RequestStartEvent, RetryPolicy, RuntimeObserver, StreamCompletion, core,
-    message, protocols, request, response, runtime, tool, tools, transport,
+    message, request, response, runtime, tool, tools, transport,
 };
 
 #[test]
@@ -90,11 +92,10 @@ fn module_reexports_are_accessible() {
         agent_core::types::ProviderKind::Anthropic
     );
 
-    let adapter_error_kind: protocols::error::AdapterErrorKind =
-        protocols::error::AdapterErrorKind::Validation;
+    let adapter_error_kind: AdapterErrorKind = AdapterErrorKind::Validation;
     assert_eq!(
         adapter_error_kind,
-        agent_providers::error::AdapterErrorKind::Validation
+        agent_providers::AdapterErrorKind::Validation
     );
 
     let _default_retry_from_transport_mod = transport::RetryPolicy::default();

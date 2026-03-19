@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use agent_core::{ProviderInstanceId, ProviderKind};
-use agent_providers::adapter::adapter_for;
+use agent_providers::adapter_for;
 use agent_transport::{HttpTransport, RetryPolicy};
 use reqwest::header::HeaderName;
 

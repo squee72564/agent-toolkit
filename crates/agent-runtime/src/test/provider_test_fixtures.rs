@@ -6,9 +6,7 @@ use agent_core::{
     ProviderInstanceId, ProviderKind, Response, ResponseFormat,
 };
 use agent_providers::{
-    error::{AdapterError, ProviderErrorInfo},
-    interfaces::{ProviderAdapter, ProviderStreamProjector},
-    adapter::{adapter_for},
+    AdapterError, ProviderAdapter, ProviderErrorInfo, ProviderStreamProjector, adapter_for,
 };
 use agent_transport::HttpTransport;
 use reqwest::header::{HeaderMap, HeaderName};
@@ -246,7 +244,7 @@ impl ProviderAdapter for StreamingCapabilityTestAdapter {
     fn plan_request(
         &self,
         execution: &ExecutionPlan,
-    ) -> Result<agent_providers::request_plan::ProviderRequestPlan, AdapterError> {
+    ) -> Result<agent_providers::ProviderRequestPlan, AdapterError> {
         adapter_for(ProviderKind::OpenAi).plan_request(execution)
     }
 

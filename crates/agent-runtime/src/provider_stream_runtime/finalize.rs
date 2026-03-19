@@ -2,7 +2,7 @@ use agent_core::{
     AssistantOutput, CanonicalStreamEnvelope, CanonicalStreamEvent, ProviderKind, Response,
     ResponseFormat, RuntimeWarning,
 };
-use agent_providers::error::{AdapterError, AdapterErrorKind, AdapterOperation};
+use agent_providers::{AdapterError, AdapterErrorKind, AdapterOperation};
 use serde_json::json;
 
 use crate::provider_stream_runtime::StreamRuntimeError;

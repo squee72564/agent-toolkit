@@ -4,8 +4,7 @@ use agent_core::{
     CanonicalStreamEnvelope, CanonicalStreamEvent, ProviderKind, ProviderRawStreamEvent, Response,
     ResponseFormat, RuntimeWarning,
 };
-use agent_providers::error::{AdapterError, AdapterErrorKind, AdapterOperation};
-use agent_providers::interfaces::ProviderStreamProjector;
+use agent_providers::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderStreamProjector};
 use agent_transport::{HttpJsonResponse, HttpSseResponse, SseEvent};
 
 use crate::provider_stream_runtime::{StreamResponseState, finalize_stream_response};

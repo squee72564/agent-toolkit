@@ -4,11 +4,7 @@ use agent_core::{
     CanonicalStreamEnvelope, ExecutionPlan, PlatformConfig, ProviderInstanceId, ProviderKind,
     Response, ResponseFormat, RuntimeWarning,
 };
-use agent_providers::{
-    error::{AdapterError, AdapterOperation},
-    interfaces::ProviderAdapter,
-    interfaces::ProviderStreamProjector,
-};
+use agent_providers::{AdapterError, AdapterOperation, ProviderAdapter, ProviderStreamProjector};
 use agent_transport::{HttpJsonResponse, HttpSseResponse, HttpTransport, TransportResponseFraming};
 
 use crate::RuntimeErrorKind;

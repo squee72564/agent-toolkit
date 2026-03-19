@@ -1,5 +1,5 @@
 use agent_core::ProviderKind;
-use agent_providers::error::{AdapterError, AdapterErrorKind};
+use agent_providers::{AdapterError, AdapterErrorKind};
 use agent_transport::{TimeoutStage, TransportError};
 use std::error::Error as StdError;
 use std::sync::Arc;

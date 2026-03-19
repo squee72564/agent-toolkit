@@ -1,5 +1,5 @@
 use agent_core::{ExecutionPlan, ProviderKind, Response, ResponseFormat, ResponseMode};
-use agent_providers::request_plan::ProviderRequestPlan;
+use agent_providers::ProviderRequestPlan;
 use agent_transport::{
     HttpJsonResponse, HttpRequestBody, HttpResponse, TransportExecutionInput,
     TransportResponseFraming,

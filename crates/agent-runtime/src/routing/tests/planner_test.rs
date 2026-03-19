@@ -583,7 +583,7 @@ fn provider_client_with_default_model(
     provider: agent_core::ProviderKind,
     default_model: Option<&str>,
 ) -> ProviderClient {
-    let adapter = agent_providers::adapter::adapter_for(provider);
+    let adapter = agent_providers::adapter_for(provider);
     let client = reqwest::Client::builder()
         .no_proxy()
         .build()
