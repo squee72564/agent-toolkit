@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use crate::fixture_tests::load_streaming_success_fixture;
 use crate::refinement::openrouter_stream_projector::OpenRouterStreamProjector;
-use crate::stream_projector::ProviderStreamProjector;
+use crate::interfaces::ProviderStreamProjector;
 
 #[test]
 fn openrouter_stream_projector_completes_on_done_payload() {

@@ -4,9 +4,9 @@ use agent_core::{
 use serde_json::Value;
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo};
-use crate::refinement::ProviderRefinement;
+use crate::interfaces::ProviderRefinement;
 use crate::request_plan::EncodedFamilyRequest;
-use crate::stream_projector::ProviderStreamProjector;
+use crate::interfaces::ProviderStreamProjector;
 
 #[derive(Debug, Clone, Default, PartialEq)]
 struct OpenAiNativeOptionsOverrides {

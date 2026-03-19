@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use crate::family_codec::anthropic_stream_projector::AnthropicStreamProjector;
 use crate::fixture_tests::load_streaming_success_fixture;
-use crate::stream_projector::ProviderStreamProjector;
+use crate::interfaces::ProviderStreamProjector;
 
 #[test]
 fn anthropic_stream_projector_tracks_message_lifecycle() {

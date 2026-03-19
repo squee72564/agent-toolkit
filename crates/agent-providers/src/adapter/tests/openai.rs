@@ -3,7 +3,7 @@ use serde_json::json;
 
 use agent_core::types::{AuthStyle, ProtocolKind, ProviderKind, ResponseFormat, ResponseMode};
 
-use crate::adapter::adapter_for;
+use crate::interfaces::adapter_for;
 use crate::adapter::tests::shared::{base_task, compose_openai_compatible_request, execution_plan};
 use crate::error::AdapterErrorKind;
 use crate::openai_family::OpenAiDecodeEnvelope;

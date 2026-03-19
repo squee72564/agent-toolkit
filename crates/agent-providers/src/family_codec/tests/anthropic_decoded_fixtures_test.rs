@@ -3,7 +3,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use serde_json::{Value, json};
 
-use crate::adapter::adapter_for;
+use crate::interfaces::adapter_for;
 use crate::anthropic_family::AnthropicDecodeEnvelope;
 use crate::fixture_tests::{
     choose_valid_success_fixture, list_decoded_error_fixture_models,

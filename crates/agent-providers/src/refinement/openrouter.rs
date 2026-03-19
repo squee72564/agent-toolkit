@@ -9,9 +9,9 @@ use agent_core::{
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo};
 use crate::openai_family::OpenAiFamilyError;
 use crate::request_plan::EncodedFamilyRequest;
-use crate::stream_projector::ProviderStreamProjector;
+use crate::interfaces::ProviderStreamProjector;
 
-use crate::refinement::ProviderRefinement;
+use crate::interfaces::ProviderRefinement;
 use crate::refinement::openrouter_stream_projector::OpenRouterStreamProjector;
 
 const WARN_IGNORED_TOP_P: &str = "openai.encode.ignored_top_p";

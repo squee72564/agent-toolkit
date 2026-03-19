@@ -6,15 +6,12 @@ use reqwest::header::{HeaderMap, HeaderName};
 use serde_json::Value;
 
 use crate::{
-    adapter::{
-        ProviderAdapter, create_stream_projector_with_layering, decode_error_with_layering,
-        decode_response_with_layering, plan_request_with_layering, rebind_adapter_error_provider,
+    interfaces::{
+        ProviderAdapter, ProviderStreamProjector, create_stream_projector_with_layering, decode_error_with_layering,
+        decode_response_with_layering, plan_request_with_layering, rebind_adapter_error_provider, codec_for, refinement_for
     },
     error::{AdapterError, ProviderErrorInfo},
-    family_codec::codec_for,
-    refinement::refinement_for,
     request_plan::ProviderRequestPlan,
-    stream_projector::ProviderStreamProjector,
 };
 
 pub(crate) const OPENAI_BASE_URL: &str = "https://api.openai.com";

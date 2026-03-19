@@ -1,7 +1,7 @@
 use agent_core::{ContentPart, ResponseFormat};
 use serde_json::json;
 
-use crate::adapter::adapter_for;
+use crate::interfaces::adapter_for;
 use agent_core::ProviderKind;
 
 #[test]

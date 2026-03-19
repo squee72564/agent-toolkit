@@ -1,6 +1,6 @@
 use agent_core::{Message, ResponseFormat, ResponseMode, TaskRequest, ToolChoice};
 
-use crate::family_codec::codec_for;
+use crate::interfaces::codec_for;
 use crate::request_plan::TransportResponseFraming;
 use reqwest::Method;
 

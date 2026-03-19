@@ -3,7 +3,7 @@ use agent_core::{CanonicalStreamEvent, FinishReason, ProviderRawStreamEvent, Usa
 use crate::error::AdapterError;
 use crate::openai_family::streaming::{project_output_item_added, project_output_item_done};
 use crate::openai_family::types::OpenAiResponsesBody;
-use crate::stream_projector::ProviderStreamProjector;
+use crate::interfaces::ProviderStreamProjector;
 
 #[derive(Debug, Default)]
 pub(crate) struct OpenAiStreamProjector {

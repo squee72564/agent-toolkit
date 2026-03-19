@@ -14,9 +14,9 @@ use crate::anthropic_family::{
     AnthropicDecodeEnvelope, AnthropicFamilyError, AnthropicFamilyErrorKind,
 };
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo};
-use crate::family_codec::ProviderFamilyCodec;
+use crate::interfaces::ProviderFamilyCodec;
 use crate::request_plan::{EncodedFamilyRequest, TransportResponseFraming};
-use crate::stream_projector::ProviderStreamProjector;
+use crate::interfaces::ProviderStreamProjector;
 
 use super::anthropic_stream_projector::AnthropicStreamProjector;
 

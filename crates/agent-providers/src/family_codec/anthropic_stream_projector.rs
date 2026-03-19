@@ -12,7 +12,7 @@ use crate::anthropic_family::streaming::{
 };
 use crate::anthropic_family::types::{AnthropicTextBlock, AnthropicToolUseBlock, AnthropicUsage};
 use crate::error::AdapterError;
-use crate::stream_projector::ProviderStreamProjector;
+use crate::interfaces::ProviderStreamProjector;
 
 #[derive(Debug, Clone)]
 enum AnthropicBlockState {

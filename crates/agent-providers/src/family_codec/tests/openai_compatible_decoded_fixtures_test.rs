@@ -1,6 +1,6 @@
 use serde_json::{Value, json};
 
-use crate::adapter::adapter_for;
+use crate::interfaces::adapter_for;
 use crate::fixture_tests::{
     choose_valid_success_fixture, list_decoded_error_fixture_models,
     list_decoded_error_fixture_relpaths, list_decoded_fixture_models,

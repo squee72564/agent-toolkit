@@ -4,11 +4,11 @@ use agent_core::{
     ContentPart, Message, MessageRole, ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
 };
 
-use crate::family_codec::codec_for;
+use crate::interfaces::codec_for;
 use crate::refinement::openrouter::{
     OpenRouterOverrides, apply_openrouter_overrides,
 };
-use crate::refinement::refinement_for;
+use crate::interfaces::refinement_for;
 use crate::request_plan::TransportResponseFraming;
 use reqwest::Method;
 

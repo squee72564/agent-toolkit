@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use crate::family_codec::openai_compatible_stream_projector::OpenAiStreamProjector;
 use crate::fixture_tests::load_streaming_success_fixture;
-use crate::stream_projector::ProviderStreamProjector;
+use crate::interfaces::ProviderStreamProjector;
 
 #[test]
 fn openai_stream_projector_emits_started_and_completed_events() {

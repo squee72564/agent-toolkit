@@ -6,8 +6,8 @@ use agent_core::types::{
 };
 
 use crate::error::{AdapterErrorKind, AdapterOperation};
-use crate::family_codec::codec_for;
-use crate::refinement::refinement_for;
+use crate::interfaces::codec_for;
+use crate::interfaces::refinement_for;
 
 const MODEL_ID: &str = "gpt-4.1-mini";
 

@@ -1,6 +1,6 @@
 use crate::error::{AdapterErrorKind, AdapterOperation};
-use crate::family_codec::codec_for;
-use crate::refinement::refinement_for;
+use crate::interfaces::codec_for;
+use crate::interfaces::refinement_for;
 use agent_core::{
     AnthropicOptions, ContentPart, Message, MessageRole, OpenAiOptions, ProviderOptions,
     ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
