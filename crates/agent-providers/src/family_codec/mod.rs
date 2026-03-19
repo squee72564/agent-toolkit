@@ -20,6 +20,11 @@ pub(crate) use openai_compatible::OpenAiCompatibleFamilyCodec;
 #[cfg(test)]
 mod tests;
 
+/// Protocol-family translation boundary.
+///
+/// Family codecs encode semantic task requests into family-shaped transport
+/// requests, decode family-shaped responses back into canonical `Response`
+/// values, and provide the default family stream projector.
 pub(crate) trait ProviderFamilyCodec: Debug + Sync {
     fn encode_task(
         &self,

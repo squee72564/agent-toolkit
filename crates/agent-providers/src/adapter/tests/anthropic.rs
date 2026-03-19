@@ -12,7 +12,7 @@ use crate::anthropic_family::AnthropicDecodeEnvelope;
 use crate::anthropic_family::decode::decode_anthropic_response;
 use crate::error::AdapterErrorKind;
 use crate::family_codec::codec_for;
-use crate::overlay::overlay_for;
+use crate::refinement::refinement_for;
 use crate::request_plan::TransportResponseFraming;
 
 const ANTHROPIC_MODEL: &str = "claude-sonnet-4-6";
@@ -24,14 +24,14 @@ fn compose_anthropic_request(
     native_options: Option<&NativeOptions>,
 ) -> Result<crate::request_plan::ProviderRequestPlan, crate::error::AdapterError> {
     let codec = codec_for(agent_core::ProviderFamilyId::Anthropic);
-    let overlay = overlay_for(ProviderKind::Anthropic);
+    let refinement = refinement_for(ProviderKind::Anthropic);
     let mut encoded = codec.encode_task(
         task,
         model,
         response_mode,
         native_options.and_then(|native| native.family.as_ref()),
     )?;
-    overlay.apply_provider_overlay(
+    refinement.refine_request(
         task,
         model,
         &mut encoded,

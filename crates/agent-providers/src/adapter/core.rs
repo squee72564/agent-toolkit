@@ -9,10 +9,15 @@ use agent_core::{
 use crate::adapter::{anthropic_plan, openrouter_plan};
 use crate::error::{AdapterError, ProviderErrorInfo};
 use crate::family_codec::codec_for;
-use crate::overlay::overlay_for;
+use crate::refinement::refinement_for;
 use crate::request_plan::ProviderRequestPlan;
 use crate::stream_projector::ProviderStreamProjector;
 
+/// Runtime-facing boundary for one concrete provider integration.
+///
+/// Adapters compose a provider family codec with provider-specific refinements,
+/// then expose the final request-planning, response-decoding, and streaming
+/// entrypoints consumed by `agent-runtime`.
 pub trait ProviderAdapter: Sync + std::fmt::Debug {
     fn kind(&self) -> ProviderKind;
     fn descriptor(&self) -> &ProviderDescriptor;
@@ -88,10 +93,10 @@ pub(crate) fn decode_response_with_layering(
     body: Value,
     requested_format: &ResponseFormat,
 ) -> Result<Response, AdapterError> {
-    let overlay = overlay_for(provider);
+    let refinement = refinement_for(provider);
     let codec = codec_for(family);
 
-    if let Some(result) = overlay.decode_response_override(body.clone(), requested_format) {
+    if let Some(result) = refinement.decode_response_override(body.clone(), requested_format) {
         return result;
     }
 
@@ -99,7 +104,7 @@ pub(crate) fn decode_response_with_layering(
         .decode_response(body.clone(), requested_format)
         .map_err(|error| {
             let family_info = codec.decode_error(&body);
-            let overlay_info = overlay.decode_provider_error(&body);
+            let overlay_info = refinement.decode_provider_error(&body);
             apply_layered_error_info(
                 rebind_adapter_error_provider(error, provider),
                 family_info,
@@ -114,7 +119,7 @@ pub(crate) fn decode_error_with_layering(
     body: &Value,
 ) -> Option<ProviderErrorInfo> {
     let family_info = codec_for(family).decode_error(body);
-    let overlay_info = overlay_for(provider).decode_provider_error(body);
+    let overlay_info = refinement_for(provider).decode_provider_error(body);
 
     match (family_info, overlay_info) {
         (Some(family_info), Some(overlay_info)) => Some(family_info.refined_with(overlay_info)),
@@ -163,10 +168,10 @@ pub(crate) fn create_stream_projector_with_layering(
     provider: ProviderKind,
     family: ProviderFamilyId,
 ) -> Box<dyn ProviderStreamProjector> {
-    let overlay = overlay_for(provider);
+    let refinement = refinement_for(provider);
     let codec = codec_for(family);
 
-    if let Some(projector) = overlay.create_stream_projector_override() {
+    if let Some(projector) = refinement.create_stream_projector_override() {
         return projector;
     }
 

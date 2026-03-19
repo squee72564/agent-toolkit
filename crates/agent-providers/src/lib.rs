@@ -16,7 +16,7 @@ pub mod anthropic_family;
 pub mod error;
 mod family_codec;
 pub mod openai_family;
-mod overlay;
+mod refinement;
 pub mod request_plan;
 pub mod stream_projector;
 

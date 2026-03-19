@@ -12,7 +12,7 @@ use crate::{
     },
     error::{AdapterError, ProviderErrorInfo},
     family_codec::codec_for,
-    overlay::overlay_for,
+    refinement::refinement_for,
     request_plan::ProviderRequestPlan,
     stream_projector::ProviderStreamProjector,
 };
@@ -51,7 +51,7 @@ pub(crate) fn anthropic_plan(
     execution: &ExecutionPlan,
 ) -> Result<ProviderRequestPlan, AdapterError> {
     let codec = codec_for(ProviderFamilyId::Anthropic);
-    let overlay = overlay_for(ProviderKind::Anthropic);
+    let refinement = refinement_for(ProviderKind::Anthropic);
     let native_options = execution.provider_attempt.native_options.as_ref();
     let mut encoded = codec
         .encode_task(
@@ -61,7 +61,7 @@ pub(crate) fn anthropic_plan(
             native_options.and_then(|native| native.family.as_ref()),
         )
         .map_err(|error| rebind_adapter_error_provider(error, ProviderKind::Anthropic))?;
-    overlay.apply_provider_overlay(
+    refinement.refine_request(
         &execution.task,
         &execution.provider_attempt.model,
         &mut encoded,

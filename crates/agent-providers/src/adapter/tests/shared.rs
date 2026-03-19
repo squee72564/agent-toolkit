@@ -14,7 +14,7 @@ use agent_core::types::{
 use crate::adapter::{adapter_for, all_builtin_adapters};
 use crate::error::{AdapterError, AdapterErrorKind, ProviderErrorInfo};
 use crate::family_codec::codec_for;
-use crate::overlay::overlay_for;
+use crate::refinement::refinement_for;
 use crate::stream_projector::ProviderStreamProjector;
 
 pub(super) fn decode_error_with_composition_test_hook<Family, Overlay>(
@@ -145,14 +145,14 @@ pub(super) fn compose_openai_compatible_request(
     native_options: Option<&NativeOptions>,
 ) -> Result<crate::request_plan::ProviderRequestPlan, crate::error::AdapterError> {
     let codec = codec_for(agent_core::ProviderFamilyId::OpenAiCompatible);
-    let overlay = overlay_for(provider);
+    let refinement = refinement_for(provider);
     let mut encoded = codec.encode_task(
         task,
         model,
         response_mode,
         native_options.and_then(|native| native.family.as_ref()),
     )?;
-    overlay.apply_provider_overlay(
+    refinement.refine_request(
         task,
         model,
         &mut encoded,
