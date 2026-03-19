@@ -1,12 +1,12 @@
 use serde_json::{Value, json};
 
-use crate::interfaces::adapter_for;
 use crate::fixture_tests::{
     choose_valid_success_fixture, list_decoded_error_fixture_models,
     list_decoded_error_fixture_relpaths, list_decoded_fixture_models,
     load_decoded_error_fixture_body, load_decoded_success_fixture,
     validate_decoded_error_fixture_shape,
 };
+use crate::adapter::adapter_for;
 use crate::openai_family::OpenAiDecodeEnvelope;
 use agent_core::ProviderKind;
 use agent_core::types::{ContentPart, FinishReason, Response, ResponseFormat};

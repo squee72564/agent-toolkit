@@ -1,7 +1,7 @@
 use reqwest::header::HeaderName;
 
 use agent_core::{ProviderInstanceId, ProviderKind};
-use agent_providers::interfaces::adapter_for;
+use agent_providers::adapter::adapter_for;
 
 use crate::clients::BaseClientBuilder;
 use crate::provider::{ProviderConfig, RegisteredProvider};

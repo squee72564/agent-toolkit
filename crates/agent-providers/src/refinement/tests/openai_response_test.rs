@@ -1,4 +1,4 @@
-use crate::interfaces::adapter_for;
+use crate::adapter::adapter_for;
 use crate::error::{AdapterErrorKind, AdapterOperation};
 use agent_core::types::ProviderKind;
 use agent_core::{ContentPart, ResponseFormat};

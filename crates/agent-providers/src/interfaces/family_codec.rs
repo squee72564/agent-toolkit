@@ -7,8 +7,8 @@ use serde_json::Value;
 
 use crate::error::{AdapterError, ProviderErrorInfo};
 use crate::family_codec::{AnthropicFamilyCodec, OpenAiCompatibleFamilyCodec};
-use crate::request_plan::EncodedFamilyRequest;
 use crate::interfaces::ProviderStreamProjector;
+use crate::request_plan::EncodedFamilyRequest;
 
 /// Protocol-family translation boundary.
 ///

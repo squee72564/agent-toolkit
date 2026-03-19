@@ -6,9 +6,9 @@ use agent_core::{
     ProviderInstanceId, ProviderKind, Response, ResponseFormat,
 };
 use agent_providers::{
-    interfaces::{ProviderAdapter, adapter_for},
     error::{AdapterError, ProviderErrorInfo},
-    interfaces::ProviderStreamProjector,
+    interfaces::{ProviderAdapter, ProviderStreamProjector},
+    adapter::{adapter_for},
 };
 use agent_transport::HttpTransport;
 use reqwest::header::{HeaderMap, HeaderName};

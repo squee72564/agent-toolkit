@@ -3,9 +3,9 @@ use agent_core::{
 };
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation};
+use crate::interfaces::ProviderStreamProjector;
 use crate::openai_family::streaming::{project_output_item_added, project_output_item_done};
 use crate::openai_family::types::OpenAiResponsesBody;
-use crate::interfaces::ProviderStreamProjector;
 
 #[derive(Debug, Default)]
 pub(crate) struct OpenRouterStreamProjector {

@@ -7,9 +7,9 @@ use agent_core::{
 };
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo};
+use crate::interfaces::ProviderStreamProjector;
 use crate::openai_family::OpenAiFamilyError;
 use crate::request_plan::EncodedFamilyRequest;
-use crate::interfaces::ProviderStreamProjector;
 
 use crate::interfaces::ProviderRefinement;
 use crate::refinement::openrouter_stream_projector::OpenRouterStreamProjector;

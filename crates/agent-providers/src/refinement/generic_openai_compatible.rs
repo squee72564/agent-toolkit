@@ -3,8 +3,8 @@ use serde_json::Value;
 
 use crate::error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo};
 use crate::interfaces::ProviderRefinement;
-use crate::request_plan::EncodedFamilyRequest;
 use crate::interfaces::ProviderStreamProjector;
+use crate::request_plan::EncodedFamilyRequest;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct GenericOpenAiCompatibleOverlay;

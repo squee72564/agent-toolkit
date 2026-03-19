@@ -6,11 +6,11 @@ use agent_core::types::{
     AuthStyle, NativeOptions, ProtocolKind, ProviderKind, ResponseFormat, ResponseMode, TaskRequest,
 };
 
-use crate::interfaces::adapter_for;
 use crate::adapter::tests::shared::{base_task, execution_plan};
 use crate::anthropic_family::AnthropicDecodeEnvelope;
 use crate::anthropic_family::decode::decode_anthropic_response;
 use crate::error::AdapterErrorKind;
+use crate::adapter::adapter_for;
 use crate::interfaces::codec_for;
 use crate::interfaces::refinement_for;
 use crate::request_plan::TransportResponseFraming;

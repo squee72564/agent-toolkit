@@ -21,10 +21,10 @@
 //! See `docs/provider-layering.md` for the full request and response flow.
 
 pub mod adapter;
-pub mod anthropic_family;
+mod anthropic_family;
 pub mod error;
 mod family_codec;
-pub mod openai_family;
+mod openai_family;
 mod refinement;
 pub mod request_plan;
 
