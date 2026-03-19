@@ -5,9 +5,9 @@ use agent_core::{
     Response, ResponseFormat, RuntimeWarning,
 };
 use agent_providers::{
-    adapter::ProviderAdapter,
+    interfaces::ProviderAdapter,
     error::{AdapterError, AdapterOperation},
-    stream_projector::ProviderStreamProjector,
+    interfaces::ProviderStreamProjector,
 };
 use agent_transport::{HttpJsonResponse, HttpSseResponse, HttpTransport, TransportResponseFraming};
 

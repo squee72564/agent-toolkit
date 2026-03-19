@@ -15,10 +15,10 @@ use agent_core::{
     ProviderKind, Response, ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
 };
 use agent_providers::{
-    adapter::{ProviderAdapter, adapter_for},
+    interfaces::{ProviderAdapter, adapter_for},
     error::{AdapterError, ProviderErrorInfo},
     request_plan::ProviderRequestPlan,
-    stream_projector::ProviderStreamProjector,
+    interfaces::ProviderStreamProjector,
 };
 use agent_transport::{HttpRequestOptions, HttpResponseHead, TransportResponseFraming};
 
@@ -413,7 +413,7 @@ fn test_provider_runtime_with(
     default_model: Option<&str>,
     configure: impl FnOnce(ProviderConfig) -> ProviderConfig,
 ) -> ProviderRuntime {
-    let adapter = agent_providers::adapter::adapter_for(provider);
+    let adapter = agent_providers::interfaces::adapter_for(provider);
     let client = reqwest::Client::builder()
         .no_proxy()
         .build()
