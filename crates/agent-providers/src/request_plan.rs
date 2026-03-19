@@ -6,7 +6,7 @@ pub use agent_transport::TransportResponseFraming;
 use reqwest::{Method, header::HeaderMap};
 use serde_json::Value;
 
-/// Family-level intermediate request plan before provider overlay refinement.
+/// Family-level intermediate request plan before provider refinement.
 #[derive(Debug, Clone)]
 pub struct EncodedFamilyRequest {
     /// Serialized provider request body.

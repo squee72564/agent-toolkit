@@ -17,49 +17,51 @@ use crate::family_codec::codec_for;
 use crate::refinement::refinement_for;
 use crate::stream_projector::ProviderStreamProjector;
 
-pub(super) fn decode_error_with_composition_test_hook<Family, Overlay>(
+pub(super) fn decode_error_with_composition_test_hook<Family, Refine>(
     family_decode: Family,
-    overlay_decode: Overlay,
+    refine_error: Refine,
 ) -> Option<ProviderErrorInfo>
 where
     Family: FnOnce() -> Option<ProviderErrorInfo>,
-    Overlay: FnOnce() -> Option<ProviderErrorInfo>,
+    Refine: FnOnce() -> Option<ProviderErrorInfo>,
 {
     let family_info = family_decode();
-    let overlay_info = overlay_decode();
+    let refinement_info = refine_error();
 
-    match (family_info, overlay_info) {
-        (Some(family_info), Some(overlay_info)) => Some(family_info.refined_with(overlay_info)),
+    match (family_info, refinement_info) {
+        (Some(family_info), Some(refinement_info)) => {
+            Some(family_info.refined_with(refinement_info))
+        }
         (Some(family_info), None) => Some(family_info),
-        (None, Some(overlay_info)) => Some(overlay_info),
+        (None, Some(refinement_info)) => Some(refinement_info),
         (None, None) => None,
     }
 }
 
-pub(super) fn create_stream_projector_with_composition_test_hook<Overlay, Family>(
-    overlay_projector: Overlay,
+pub(super) fn create_stream_projector_with_composition_test_hook<Refine, Family>(
+    refine_projector: Refine,
     family_projector: Family,
 ) -> Box<dyn ProviderStreamProjector>
 where
-    Overlay: FnOnce() -> Option<Box<dyn ProviderStreamProjector>>,
+    Refine: FnOnce() -> Option<Box<dyn ProviderStreamProjector>>,
     Family: FnOnce() -> Box<dyn ProviderStreamProjector>,
 {
-    overlay_projector().unwrap_or_else(family_projector)
+    refine_projector().unwrap_or_else(family_projector)
 }
 
-pub(super) fn decode_response_with_composition_test_hook<Overlay, Family, Refine>(
+pub(super) fn decode_response_with_composition_test_hook<Override, Family, RefineError>(
     body: Value,
     requested_format: &ResponseFormat,
-    overlay_decode: Overlay,
+    refinement_override: Override,
     family_decode: Family,
-    refine_family_error: Refine,
+    refine_family_error: RefineError,
 ) -> Result<Response, AdapterError>
 where
-    Overlay: FnOnce(Value, &ResponseFormat) -> Option<Result<Response, AdapterError>>,
+    Override: FnOnce(Value, &ResponseFormat) -> Option<Result<Response, AdapterError>>,
     Family: FnOnce(Value, &ResponseFormat) -> Result<Response, AdapterError>,
-    Refine: FnOnce(AdapterError) -> AdapterError,
+    RefineError: FnOnce(AdapterError) -> AdapterError,
 {
-    if let Some(result) = overlay_decode(body.clone(), requested_format) {
+    if let Some(result) = refinement_override(body.clone(), requested_format) {
         return result;
     }
 
@@ -195,26 +197,26 @@ fn all_builtin_adapters_contains_all_known_providers() {
 }
 
 #[test]
-fn decode_response_uses_overlay_override_before_family_fallback() {
+fn decode_response_uses_refinement_override_before_family_fallback() {
     let format = ResponseFormat::Text;
     let call_order = Rc::new(RefCell::new(Vec::new()));
-    let overlay_order = Rc::clone(&call_order);
+    let refinement_order = Rc::clone(&call_order);
     let family_order = Rc::clone(&call_order);
 
     let response = decode_response_with_composition_test_hook(
         json!({ "ignored": true }),
         &format,
         move |_body, _requested_format| {
-            overlay_order.borrow_mut().push("overlay");
+            refinement_order.borrow_mut().push("refinement");
             Some(Ok(Response {
                 output: AssistantOutput {
                     content: vec![ContentPart::Text {
-                        text: "overlay".to_string(),
+                        text: "refinement".to_string(),
                     }],
                     structured_output: None,
                 },
                 usage: Usage::default(),
-                model: "overlay-model".to_string(),
+                model: "refinement-model".to_string(),
                 raw_provider_response: None,
                 finish_reason: FinishReason::Stop,
                 warnings: Vec::new(),
@@ -243,10 +245,10 @@ fn decode_response_uses_overlay_override_before_family_fallback() {
     assert_eq!(
         response.output.content,
         vec![ContentPart::Text {
-            text: "overlay".to_string(),
+            text: "refinement".to_string(),
         }]
     );
-    assert_eq!(&*call_order.borrow(), &["overlay"]);
+    assert_eq!(&*call_order.borrow(), &["refinement"]);
 }
 
 #[test]
@@ -270,7 +272,7 @@ fn decode_response_refines_family_error_after_family_decode_runs() {
             ))
         },
         move |mut error| {
-            refine_order.borrow_mut().push("overlay-refine");
+            refine_order.borrow_mut().push("refinement-refine");
             error.message = format!("refined: {}", error.message);
             error
         },
@@ -278,14 +280,14 @@ fn decode_response_refines_family_error_after_family_decode_runs() {
     .expect_err("decode should fail");
 
     assert_eq!(error.message, "refined: family failure");
-    assert_eq!(&*call_order.borrow(), &["family", "overlay-refine"]);
+    assert_eq!(&*call_order.borrow(), &["family", "refinement-refine"]);
 }
 
 #[test]
-fn decode_error_runs_family_before_overlay_refinement() {
+fn decode_error_runs_family_before_refinement_merge() {
     let call_order = Rc::new(RefCell::new(Vec::new()));
     let family_order = Rc::clone(&call_order);
-    let overlay_order = Rc::clone(&call_order);
+    let refinement_order = Rc::clone(&call_order);
 
     let info = decode_error_with_composition_test_hook(
         move || {
@@ -297,9 +299,9 @@ fn decode_error_runs_family_before_overlay_refinement() {
             })
         },
         move || {
-            overlay_order.borrow_mut().push("overlay");
+            refinement_order.borrow_mut().push("refinement");
             Some(ProviderErrorInfo {
-                provider_code: Some("overlay_code".to_string()),
+                provider_code: Some("refinement_code".to_string()),
                 message: None,
                 kind: None,
             })
@@ -307,14 +309,14 @@ fn decode_error_runs_family_before_overlay_refinement() {
     )
     .expect("error info should be present");
 
-    assert_eq!(&*call_order.borrow(), &["family", "overlay"]);
-    assert_eq!(info.provider_code.as_deref(), Some("overlay_code"));
+    assert_eq!(&*call_order.borrow(), &["family", "refinement"]);
+    assert_eq!(info.provider_code.as_deref(), Some("refinement_code"));
     assert_eq!(info.message.as_deref(), Some("family message"));
     assert_eq!(info.kind, Some(AdapterErrorKind::Upstream));
 }
 
 #[test]
-fn decode_error_overlay_fields_win_on_collision() {
+fn decode_error_refinement_fields_win_on_collision() {
     let info = decode_error_with_composition_test_hook(
         || {
             Some(ProviderErrorInfo {
@@ -325,15 +327,15 @@ fn decode_error_overlay_fields_win_on_collision() {
         },
         || {
             Some(ProviderErrorInfo {
-                provider_code: Some("overlay_code".to_string()),
-                message: Some("overlay message".to_string()),
+                provider_code: Some("refinement_code".to_string()),
+                message: Some("refinement message".to_string()),
                 kind: Some(AdapterErrorKind::Upstream),
             })
         },
     )
     .expect("error info should be present");
 
-    assert_eq!(info.provider_code.as_deref(), Some("overlay_code"));
-    assert_eq!(info.message.as_deref(), Some("overlay message"));
+    assert_eq!(info.provider_code.as_deref(), Some("refinement_code"));
+    assert_eq!(info.message.as_deref(), Some("refinement message"));
     assert_eq!(info.kind, Some(AdapterErrorKind::Upstream));
 }

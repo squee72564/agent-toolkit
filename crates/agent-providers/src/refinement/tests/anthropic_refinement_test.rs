@@ -26,7 +26,7 @@ fn base_task() -> TaskRequest {
 }
 
 #[test]
-fn anthropic_overlay_applies_provider_native_options() {
+fn anthropic_refinement_applies_provider_native_options() {
     let task = base_task();
     let mut encoded = codec_for(agent_core::ProviderFamilyId::Anthropic)
         .encode_task(&task, MODEL_ID, ResponseMode::NonStreaming, None)
@@ -41,13 +41,13 @@ fn anthropic_overlay_applies_provider_native_options() {
                 top_k: Some(8),
             })),
         )
-        .expect("overlay should succeed");
+        .expect("refinement should succeed");
 
     assert_eq!(encoded.body["top_k"], 8);
 }
 
 #[test]
-fn anthropic_overlay_rejects_mismatched_provider_options() {
+fn anthropic_refinement_rejects_mismatched_provider_options() {
     let task = base_task();
     let mut encoded = codec_for(agent_core::ProviderFamilyId::Anthropic)
         .encode_task(&task, MODEL_ID, ResponseMode::NonStreaming, None)
@@ -63,7 +63,7 @@ fn anthropic_overlay_rejects_mismatched_provider_options() {
                 store: Some(false),
             })),
         )
-        .expect_err("overlay should reject mismatched options");
+        .expect_err("refinement should reject mismatched options");
 
     assert_eq!(error.kind, AdapterErrorKind::Validation);
     assert_eq!(error.operation, AdapterOperation::PlanRequest);

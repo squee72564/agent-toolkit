@@ -70,7 +70,7 @@ impl OpenRouterOverrides {
                     ProviderKind::OpenRouter,
                     AdapterOperation::PlanRequest,
                     format!(
-                        "OpenRouter overlay received mismatched provider native options for {:?}",
+                        "OpenRouter refinement received mismatched provider native options for {:?}",
                         provider.provider_kind()
                     ),
                 ));

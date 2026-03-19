@@ -104,11 +104,11 @@ pub(crate) fn decode_response_with_layering(
         .decode_response(body.clone(), requested_format)
         .map_err(|error| {
             let family_info = codec.decode_error(&body);
-            let overlay_info = refinement.decode_provider_error(&body);
+            let refinement_info = refinement.decode_provider_error(&body);
             apply_layered_error_info(
                 rebind_adapter_error_provider(error, provider),
                 family_info,
-                overlay_info,
+                refinement_info,
             )
         })
 }
@@ -119,12 +119,14 @@ pub(crate) fn decode_error_with_layering(
     body: &Value,
 ) -> Option<ProviderErrorInfo> {
     let family_info = codec_for(family).decode_error(body);
-    let overlay_info = refinement_for(provider).decode_provider_error(body);
+    let refinement_info = refinement_for(provider).decode_provider_error(body);
 
-    match (family_info, overlay_info) {
-        (Some(family_info), Some(overlay_info)) => Some(family_info.refined_with(overlay_info)),
+    match (family_info, refinement_info) {
+        (Some(family_info), Some(refinement_info)) => {
+            Some(family_info.refined_with(refinement_info))
+        }
         (Some(family_info), None) => Some(family_info),
-        (None, Some(overlay_info)) => Some(overlay_info),
+        (None, Some(refinement_info)) => Some(refinement_info),
         (None, None) => None,
     }
 }
@@ -132,12 +134,14 @@ pub(crate) fn decode_error_with_layering(
 fn apply_layered_error_info(
     mut error: AdapterError,
     family_info: Option<ProviderErrorInfo>,
-    overlay_info: Option<ProviderErrorInfo>,
+    refinement_info: Option<ProviderErrorInfo>,
 ) -> AdapterError {
-    let info = match (family_info, overlay_info) {
-        (Some(family_info), Some(overlay_info)) => Some(family_info.refined_with(overlay_info)),
+    let info = match (family_info, refinement_info) {
+        (Some(family_info), Some(refinement_info)) => {
+            Some(family_info.refined_with(refinement_info))
+        }
         (Some(family_info), None) => Some(family_info),
-        (None, Some(overlay_info)) => Some(overlay_info),
+        (None, Some(refinement_info)) => Some(refinement_info),
         (None, None) => None,
     };
 

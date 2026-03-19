@@ -14,7 +14,7 @@ pub enum ProviderFamilyId {
     Anthropic,
 }
 
-/// Identifier for a concrete adapter and provider overlay.
+/// Identifier for a concrete adapter and provider refinement strategy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ProviderKind {
     /// OpenAI-hosted APIs.

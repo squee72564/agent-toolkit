@@ -22,7 +22,7 @@ fn descriptor_expose_expected_static_metadata() {
 }
 
 #[test]
-fn openai_adapter_plan_request_matches_family_overlay_translation() {
+fn openai_adapter_plan_request_matches_family_refinement_translation() {
     let task = base_task();
     let execution = execution_plan(
         ProviderKind::OpenAi,

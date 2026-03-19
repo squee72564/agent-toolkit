@@ -25,7 +25,7 @@ impl AnthropicNativeOptionsOverrides {
                     ProviderKind::Anthropic,
                     AdapterOperation::PlanRequest,
                     format!(
-                        "Anthropic overlay received mismatched provider native options for {:?}",
+                        "Anthropic refinement layer received mismatched provider native options for {:?}",
                         provider_options.provider_kind()
                     ),
                 ));

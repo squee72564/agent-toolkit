@@ -141,7 +141,7 @@ pub struct NativeOptions {
     /// Family-scoped controls consumed by the provider family codec.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub family: Option<FamilyOptions>,
-    /// Provider-scoped controls consumed by the concrete provider overlay.
+    /// Provider-scoped controls consumed by the concrete provider refinement layer.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<ProviderOptions>,
 }

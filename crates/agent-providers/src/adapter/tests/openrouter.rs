@@ -20,7 +20,7 @@ use crate::stream_projector::ProviderStreamProjector;
 const OPENAI_MODEL: &str = "openai/gpt-5-mini";
 
 #[test]
-fn openrouter_adapter_plan_request_matches_family_overlay_translation() {
+fn openrouter_adapter_plan_request_matches_family_refinement_translation() {
     let mut task = base_task();
     task.top_p = Some(0.5);
     task.stop = vec!["done".to_string()];
@@ -136,15 +136,17 @@ impl ProviderStreamProjector for MarkerProjector {
 }
 
 #[test]
-fn create_stream_projector_uses_overlay_override_before_family_fallback() {
+fn create_stream_projector_uses_refinement_override_before_family_fallback() {
     let call_order = Rc::new(RefCell::new(Vec::new()));
-    let overlay_order = Rc::clone(&call_order);
+    let refinement_order = Rc::clone(&call_order);
     let family_order = Rc::clone(&call_order);
 
     let mut projector = create_stream_projector_with_composition_test_hook(
         move || {
-            overlay_order.borrow_mut().push("overlay");
-            Some(Box::new(MarkerProjector { marker: "overlay" }))
+            refinement_order.borrow_mut().push("refinement");
+            Some(Box::new(MarkerProjector {
+                marker: "refinement",
+            }))
         },
         move || {
             family_order.borrow_mut().push("family");
@@ -163,18 +165,18 @@ fn create_stream_projector_uses_overlay_override_before_family_fallback() {
         ))
         .expect("projection should succeed");
 
-    assert_eq!(&*call_order.borrow(), &["overlay"]);
+    assert_eq!(&*call_order.borrow(), &["refinement"]);
     assert_eq!(
         events,
         vec![agent_core::CanonicalStreamEvent::ResponseStarted {
-            model: Some("overlay".to_string()),
+            model: Some("refinement".to_string()),
             response_id: None,
         }]
     );
 }
 
 #[test]
-fn openrouter_adapter_stream_projector_uses_overlay_override() {
+fn openrouter_adapter_stream_projector_uses_refinement_override() {
     let mut projector = adapter_for(ProviderKind::OpenRouter).create_stream_projector();
     let events = projector
         .project(agent_core::ProviderRawStreamEvent::from_sse(

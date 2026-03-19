@@ -33,7 +33,7 @@ impl OpenAiNativeOptionsOverrides {
                         ProviderKind::OpenAi,
                         AdapterOperation::PlanRequest,
                         format!(
-                            "OpenAI overlay received mismatched provider native options for {:?}",
+                            "OpenAI refinement layer received mismatched provider native options for {:?}",
                             other.provider_kind()
                         ),
                     ));

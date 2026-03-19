@@ -83,7 +83,7 @@ fn plan_request(
 }
 
 #[test]
-fn openrouter_overlay_preserves_openai_encode_warnings() {
+fn openrouter_refinement_preserves_openai_encode_warnings() {
     let mut task = base_task();
     task.top_p = Some(0.9);
     task.stop = vec!["DONE".to_string()];
@@ -116,7 +116,7 @@ fn openrouter_overlay_preserves_openai_encode_warnings() {
 }
 
 #[test]
-fn openrouter_overlay_reintroduces_top_p_and_stop_with_fallback_models() {
+fn openrouter_refinement_reintroduces_top_p_and_stop_with_fallback_models() {
     let overrides = OpenRouterOverrides {
         fallback_models: vec!["openai/gpt-4.1".to_string()],
         ..OpenRouterOverrides::default()
@@ -140,7 +140,7 @@ fn openrouter_overlay_reintroduces_top_p_and_stop_with_fallback_models() {
 }
 
 #[test]
-fn openrouter_overlay_applies_typed_overrides() {
+fn openrouter_refinement_applies_typed_overrides() {
     let mut task = base_task();
     task.max_output_tokens = Some(384);
     let overrides = OpenRouterOverrides {
@@ -157,7 +157,7 @@ fn openrouter_overlay_applies_typed_overrides() {
 }
 
 #[test]
-fn openrouter_overlay_omits_empty_serde_backed_overrides() {
+fn openrouter_refinement_omits_empty_serde_backed_overrides() {
     let overrides = OpenRouterOverrides {
         plugins: Vec::new(),
         modalities: Some(Vec::new()),
@@ -178,7 +178,7 @@ fn openrouter_overlay_omits_empty_serde_backed_overrides() {
 }
 
 #[test]
-fn openrouter_overlay_rejects_non_finite_frequency_penalty_override() {
+fn openrouter_refinement_rejects_non_finite_frequency_penalty_override() {
     let overrides = OpenRouterOverrides {
         frequency_penalty: Some(f32::NAN),
         ..OpenRouterOverrides::default()
@@ -195,7 +195,7 @@ fn openrouter_overlay_rejects_non_finite_frequency_penalty_override() {
 }
 
 #[test]
-fn openrouter_overlay_rejects_non_finite_presence_penalty_override() {
+fn openrouter_refinement_rejects_non_finite_presence_penalty_override() {
     let overrides = OpenRouterOverrides {
         presence_penalty: Some(f32::INFINITY),
         ..OpenRouterOverrides::default()
@@ -212,7 +212,7 @@ fn openrouter_overlay_rejects_non_finite_presence_penalty_override() {
 }
 
 #[test]
-fn openrouter_overlay_extra_overrides_take_precedence() {
+fn openrouter_refinement_extra_overrides_take_precedence() {
     let mut extra = Map::new();
     extra.insert("user".to_string(), json!("from-extra"));
     extra.insert("max_tokens".to_string(), json!(777));
