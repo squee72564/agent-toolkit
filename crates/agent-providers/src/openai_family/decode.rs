@@ -1,6 +1,11 @@
-use serde_json::{Map, Value};
+use serde::de::DeserializeOwned;
+use serde_json::Value;
 
-use super::types::{OpenAiErrorEnvelope, OpenAiResponsesBody};
+use super::types::{
+    OpenAiErrorEnvelope, OpenAiFunctionCallOutputItem, OpenAiMessageContentPart,
+    OpenAiMessageOutputItem, OpenAiReasoningOutputItem, OpenAiRefusalOutputItem,
+    OpenAiResponsesBody,
+};
 use super::{OpenAiDecodeEnvelope, OpenAiFamilyError};
 use crate::error::{AdapterErrorKind, ProviderErrorInfo};
 use agent_core::types::{
@@ -24,12 +29,6 @@ pub(crate) struct NormalizedOpenAiErrorEnvelope {
 pub(crate) fn decode_openai_response(
     payload: &OpenAiDecodeEnvelope,
 ) -> Result<Response, OpenAiFamilyError> {
-    let parsed: OpenAiResponsesBody =
-        serde_json::from_value(payload.body.clone()).map_err(|error| {
-            OpenAiFamilyError::decode(format!(
-                "failed to deserialize OpenAI-family response: {error}"
-            ))
-        })?;
     if !payload.body.is_object() {
         return Err(OpenAiFamilyError::decode(
             "response payload must be a JSON object",
@@ -41,6 +40,13 @@ pub(crate) fn decode_openai_response(
             || "openai response reported an error".to_string(),
         )));
     }
+
+    let parsed: OpenAiResponsesBody =
+        serde_json::from_value(payload.body.clone()).map_err(|error| {
+            OpenAiFamilyError::decode(format!(
+                "failed to deserialize OpenAI-family response: {error}"
+            ))
+        })?;
 
     let status = parsed
         .status
@@ -181,11 +187,24 @@ fn decode_output_item(
         .ok_or_else(|| OpenAiFamilyError::decode("output item missing type"))?;
 
     match item_type {
-        "message" => decode_output_message(item_obj, content, warnings),
-        "function_call" => decode_output_tool_call(item_obj, content, warnings),
-        "reasoning" => Ok(()),
+        "message" => decode_output_message(
+            &deserialize_wire::<OpenAiMessageOutputItem>(item, "output message item")?,
+            content,
+            warnings,
+        ),
+        "function_call" => decode_output_tool_call(
+            &deserialize_wire::<OpenAiFunctionCallOutputItem>(item, "function_call output item")?,
+            content,
+            warnings,
+        ),
+        "reasoning" => {
+            let _ = deserialize_wire::<OpenAiReasoningOutputItem>(item, "reasoning output item")?;
+            Ok(())
+        }
         "refusal" => {
-            if let Some(text) = extract_refusal_text(item_obj) {
+            let item = deserialize_wire::<OpenAiRefusalOutputItem>(item, "refusal output item")?;
+            if let Some(text) = extract_refusal_text(item.text.as_deref(), item.refusal.as_deref())
+            {
                 content.push(ContentPart::Text { text });
             }
             Ok(())
@@ -202,49 +221,54 @@ fn decode_output_item(
 }
 
 fn decode_output_message(
-    item_obj: &Map<String, Value>,
+    item: &OpenAiMessageOutputItem,
     content: &mut Vec<ContentPart>,
     warnings: &mut Vec<RuntimeWarning>,
 ) -> Result<(), OpenAiFamilyError> {
-    if let Some(parts) = item_obj.get("content").and_then(Value::as_array) {
-        for part in parts {
-            let Some(part_obj) = part.as_object() else {
-                return Err(OpenAiFamilyError::decode(
-                    "output message content part must be an object",
-                ));
-            };
+    for part in &item.content {
+        let Some(part_obj) = part.as_object() else {
+            return Err(OpenAiFamilyError::decode(
+                "output message content part must be an object",
+            ));
+        };
+        let Some(part_type) = part_obj.get("type").and_then(Value::as_str) else {
+            return Err(OpenAiFamilyError::decode(
+                "output message content part missing type",
+            ));
+        };
 
-            let Some(part_type) = part_obj.get("type").and_then(Value::as_str) else {
-                return Err(OpenAiFamilyError::decode(
-                    "output message content part missing type",
-                ));
-            };
+        match part_type {
+            "output_text" | "refusal" | "reasoning" => {
+                let part = deserialize_wire::<OpenAiMessageContentPart>(
+                    part,
+                    "output message content part",
+                )?;
 
-            match part_type {
-                "output_text" => {
-                    let text = part_obj
-                        .get("text")
-                        .and_then(Value::as_str)
-                        .unwrap_or_default();
-                    if !text.is_empty() {
-                        content.push(ContentPart::Text {
-                            text: text.to_string(),
-                        });
+                match part {
+                    OpenAiMessageContentPart::OutputText { .. } => {
+                        let text = part.output_text().unwrap_or_default();
+                        if !text.is_empty() {
+                            content.push(ContentPart::Text {
+                                text: text.to_string(),
+                            });
+                        }
+                    }
+                    OpenAiMessageContentPart::Reasoning => {}
+                    OpenAiMessageContentPart::Refusal { .. } => {
+                        if let Some(text) = part.refusal_text() {
+                            content.push(ContentPart::Text {
+                                text: text.to_string(),
+                            });
+                        }
                     }
                 }
-                "reasoning" => {}
-                "refusal" => {
-                    if let Some(text) = extract_refusal_text(part_obj) {
-                        content.push(ContentPart::Text { text });
-                    }
-                }
-                other => {
-                    push_warning(
-                        warnings,
-                        WARN_UNKNOWN_MESSAGE_PART,
-                        format!("ignored unknown output message content part type: {other}"),
-                    );
-                }
+            }
+            other => {
+                push_warning(
+                    warnings,
+                    WARN_UNKNOWN_MESSAGE_PART,
+                    format!("ignored unknown output message content part type: {other}"),
+                );
             }
         }
     }
@@ -253,15 +277,11 @@ fn decode_output_message(
 }
 
 fn decode_required_non_empty_str<'a>(
-    item_obj: &'a Map<String, Value>,
-    key: &str,
+    value: Option<&'a str>,
     missing_message: &str,
     blank_message: &str,
 ) -> Result<&'a str, OpenAiFamilyError> {
-    let value = item_obj
-        .get(key)
-        .and_then(Value::as_str)
-        .ok_or_else(|| OpenAiFamilyError::decode(missing_message))?;
+    let value = value.ok_or_else(|| OpenAiFamilyError::decode(missing_message))?;
 
     if value.trim().is_empty() {
         return Err(OpenAiFamilyError::decode(blank_message));
@@ -271,25 +291,22 @@ fn decode_required_non_empty_str<'a>(
 }
 
 fn decode_output_tool_call(
-    item_obj: &Map<String, Value>,
+    item: &OpenAiFunctionCallOutputItem,
     content: &mut Vec<ContentPart>,
     warnings: &mut Vec<RuntimeWarning>,
 ) -> Result<(), OpenAiFamilyError> {
     let call_id = decode_required_non_empty_str(
-        item_obj,
-        "call_id",
+        item.call_id.as_deref(),
         "function_call output item missing call_id",
         "function_call output item call_id must not be empty",
     )?;
     let name = decode_required_non_empty_str(
-        item_obj,
-        "name",
+        item.name.as_deref(),
         "function_call output item missing name",
         "function_call output item name must not be empty",
     )?;
     let arguments = decode_required_non_empty_str(
-        item_obj,
-        "arguments",
+        item.arguments.as_deref(),
         "function_call output item missing arguments",
         "function_call output item arguments must not be empty",
     )?;
@@ -317,15 +334,15 @@ fn decode_output_tool_call(
     Ok(())
 }
 
-fn extract_refusal_text(obj: &Map<String, Value>) -> Option<String> {
-    if let Some(text) = obj.get("text").and_then(Value::as_str) {
+fn extract_refusal_text(text: Option<&str>, refusal: Option<&str>) -> Option<String> {
+    if let Some(text) = text {
         let trimmed = text.trim();
         if !trimmed.is_empty() {
             return Some(trimmed.to_string());
         }
     }
 
-    if let Some(text) = obj.get("refusal").and_then(Value::as_str) {
+    if let Some(text) = refusal {
         let trimmed = text.trim();
         if !trimmed.is_empty() {
             return Some(trimmed.to_string());
@@ -333,6 +350,14 @@ fn extract_refusal_text(obj: &Map<String, Value>) -> Option<String> {
     }
 
     None
+}
+
+fn deserialize_wire<T>(value: &Value, label: &str) -> Result<T, OpenAiFamilyError>
+where
+    T: DeserializeOwned,
+{
+    serde_json::from_value(value.clone())
+        .map_err(|error| OpenAiFamilyError::decode(format!("invalid {label}: {error}")))
 }
 
 fn decode_structured_output(

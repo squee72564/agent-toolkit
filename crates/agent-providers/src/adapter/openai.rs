@@ -21,9 +21,12 @@ pub(crate) const OPENAI_BASE_URL: &str = "https://api.openai.com";
 pub(crate) const OPENAI_ENDPOINT_PATH: &str = "/v1/responses";
 
 #[derive(Debug, Clone, Copy)]
+/// Built-in adapter for the OpenAI Responses API.
 pub struct OpenAiAdapter;
 
 #[derive(Debug, Clone, Copy)]
+/// Built-in adapter for providers that follow the OpenAI-compatible family
+/// without additional provider-specific refinements.
 pub struct GenericOpenAiCompatibleAdapter;
 
 pub(crate) fn openai_descriptor() -> ProviderDescriptor {

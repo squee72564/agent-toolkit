@@ -229,6 +229,29 @@ fn decode_thinking_block_warns_and_skips_block() {
 }
 
 #[test]
+fn decode_redacted_thinking_block_warns_and_skips_block() {
+    let payload = AnthropicDecodeEnvelope {
+        body: json!({
+            "role": "assistant",
+            "model": "claude-sonnet-4.6",
+            "stop_reason": "end_turn",
+            "content": [{"type":"redacted_thinking","data":"hidden"}],
+            "usage": {"input_tokens": 1, "output_tokens": 1}
+        }),
+        requested_response_format: ResponseFormat::Text,
+    };
+
+    let response = decode_anthropic_response(&payload).expect("decode should succeed");
+    assert!(response.output.content.is_empty());
+    assert!(
+        response
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "anthropic.decode.unrepresentable_thinking_skipped")
+    );
+}
+
+#[test]
 fn decode_json_object_extracts_from_combined_text_fallback() {
     let payload = AnthropicDecodeEnvelope {
         body: json!({

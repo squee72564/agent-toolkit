@@ -10,6 +10,16 @@
 //!   stream events.
 //! - [`openai_family`] and [`anthropic_family`] for provider-family payload types
 //!   and spec-level error models.
+//!
+//! Internally, built-in providers are composed in three layers:
+//!
+//! - adapter: runtime-facing composition root for one concrete provider
+//! - family codec: protocol-family translation between canonical requests and
+//!   family-native payloads
+//! - refinement: provider-specific mutations and overrides layered on top of a
+//!   family codec
+//!
+//! See `docs/provider-layering.md` for the full request and response flow.
 
 pub mod adapter;
 pub mod anthropic_family;

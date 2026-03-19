@@ -21,6 +21,7 @@ pub(crate) const ANTHROPIC_BASE_URL: &str = "https://api.anthropic.com";
 pub(crate) const ANTHROPIC_ENDPOINT_PATH: &str = "/v1/messages";
 
 #[derive(Debug, Clone, Copy)]
+/// Built-in adapter for Anthropic's Messages API.
 pub struct AnthropicAdapter;
 
 pub(crate) fn anthropic_descriptor() -> ProviderDescriptor {

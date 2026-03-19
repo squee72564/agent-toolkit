@@ -4,7 +4,13 @@ use agent_core::{
     CanonicalStreamEvent, FinishReason, MessageRole, ProviderRawStreamEvent, StreamOutputItemEnd,
     StreamOutputItemStart, Usage,
 };
+use serde::de::DeserializeOwned;
+use serde_json::Value;
 
+use crate::anthropic_family::streaming::{
+    parse_content_block_start, parse_message_delta, parse_message_start,
+};
+use crate::anthropic_family::types::{AnthropicTextBlock, AnthropicToolUseBlock, AnthropicUsage};
 use crate::error::AdapterError;
 use crate::stream_projector::ProviderStreamProjector;
 
@@ -51,29 +57,29 @@ impl ProviderStreamProjector for AnthropicStreamProjector {
 
         match raw.sse_event_name() {
             Some("message_start") => {
-                if !self.response_started {
+                if !self.response_started
+                    && let Some(event) = parse_message_start(value)
+                {
                     self.response_started = true;
-                    let message = value.get("message");
                     events.push(CanonicalStreamEvent::ResponseStarted {
-                        model: message
-                            .and_then(|message| json_str(message, "model"))
-                            .map(ToOwned::to_owned),
-                        response_id: message
-                            .and_then(|message| json_str(message, "id"))
-                            .map(ToOwned::to_owned),
+                        model: event.message.model,
+                        response_id: event.message.id,
                     });
                 }
             }
             Some("content_block_start") => {
-                if let Some(index) = json_u32(value, "index")
-                    && let Some(block) = value.get("content_block")
-                {
-                    match json_str(block, "type") {
+                if let Some(event) = parse_content_block_start(value) {
+                    match json_str(&event.content_block, "type") {
                         Some("text") => {
+                            let Some(_block) =
+                                deserialize_wire::<AnthropicTextBlock>(&event.content_block)
+                            else {
+                                return Ok(events);
+                            };
                             self.blocks
-                                .insert(index, AnthropicBlockState::Text { item_id: None });
+                                .insert(event.index, AnthropicBlockState::Text { item_id: None });
                             events.push(CanonicalStreamEvent::OutputItemStarted {
-                                output_index: index,
+                                output_index: event.index,
                                 item: StreamOutputItemStart::Message {
                                     item_id: None,
                                     role: MessageRole::Assistant,
@@ -81,10 +87,15 @@ impl ProviderStreamProjector for AnthropicStreamProjector {
                             });
                         }
                         Some("tool_use") => {
-                            let name = json_str(block, "name").unwrap_or("").to_string();
-                            let tool_call_id = json_str(block, "id").map(ToOwned::to_owned);
+                            let Some(block) =
+                                deserialize_wire::<AnthropicToolUseBlock>(&event.content_block)
+                            else {
+                                return Ok(events);
+                            };
+                            let name = block.name.unwrap_or_default();
+                            let tool_call_id = block.id;
                             self.blocks.insert(
-                                index,
+                                event.index,
                                 AnthropicBlockState::ToolCall {
                                     item_id: None,
                                     tool_call_id: tool_call_id.clone(),
@@ -93,7 +104,7 @@ impl ProviderStreamProjector for AnthropicStreamProjector {
                                 },
                             );
                             events.push(CanonicalStreamEvent::OutputItemStarted {
-                                output_index: index,
+                                output_index: event.index,
                                 item: StreamOutputItemStart::ToolCall {
                                     item_id: None,
                                     tool_call_id,
@@ -176,11 +187,11 @@ impl ProviderStreamProjector for AnthropicStreamProjector {
                 }
             }
             Some("message_delta") => {
-                if let Some(usage) = value.get("usage").and_then(parse_anthropic_usage) {
-                    events.push(CanonicalStreamEvent::UsageUpdated { usage });
-                }
-                if let Some(delta) = value.get("delta") {
-                    self.stop_reason = parse_finish_reason(json_str(delta, "stop_reason"));
+                if let Some(event) = parse_message_delta(value) {
+                    if let Some(usage) = event.usage.as_ref().and_then(parse_anthropic_usage) {
+                        events.push(CanonicalStreamEvent::UsageUpdated { usage });
+                    }
+                    self.stop_reason = parse_finish_reason(event.delta.stop_reason.as_deref());
                 }
             }
             Some("message_stop") => {
@@ -210,14 +221,14 @@ impl ProviderStreamProjector for AnthropicStreamProjector {
     }
 }
 
-fn json_str<'a>(value: &'a serde_json::Value, key: &str) -> Option<&'a str> {
-    value.get(key).and_then(serde_json::Value::as_str)
+fn json_str<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
+    value.get(key).and_then(Value::as_str)
 }
 
-fn json_u32(value: &serde_json::Value, key: &str) -> Option<u32> {
+fn json_u32(value: &Value, key: &str) -> Option<u32> {
     value
         .get(key)
-        .and_then(serde_json::Value::as_u64)
+        .and_then(Value::as_u64)
         .and_then(|value| u32::try_from(value).ok())
 }
 
@@ -233,26 +244,24 @@ fn parse_finish_reason(reason: Option<&str>) -> Option<FinishReason> {
     }
 }
 
-fn parse_anthropic_usage(value: &serde_json::Value) -> Option<Usage> {
+fn parse_anthropic_usage(value: &Value) -> Option<Usage> {
+    let usage = deserialize_wire::<AnthropicUsage>(value)?;
     Some(Usage {
-        input_tokens: value
-            .get("input_tokens")
-            .and_then(serde_json::Value::as_u64),
-        output_tokens: value
-            .get("output_tokens")
-            .and_then(serde_json::Value::as_u64),
+        input_tokens: usage.input_tokens,
+        output_tokens: usage.output_tokens,
         cached_input_tokens: Some(
-            value
-                .get("cache_read_input_tokens")
-                .and_then(serde_json::Value::as_u64)
+            usage
+                .cache_read_input_tokens
                 .unwrap_or(0)
-                .saturating_add(
-                    value
-                        .get("cache_creation_input_tokens")
-                        .and_then(serde_json::Value::as_u64)
-                        .unwrap_or(0),
-                ),
+                .saturating_add(usage.cache_creation_input_tokens.unwrap_or(0)),
         ),
         total_tokens: None,
     })
+}
+
+fn deserialize_wire<T>(value: &Value) -> Option<T>
+where
+    T: DeserializeOwned,
+{
+    serde_json::from_value(value.clone()).ok()
 }

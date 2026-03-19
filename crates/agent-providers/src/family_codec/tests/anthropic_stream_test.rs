@@ -190,6 +190,63 @@ fn anthropic_stream_projector_maps_basic_chat_fixture_to_stop_completion() {
     );
 }
 
+#[test]
+fn anthropic_stream_projector_ignores_tool_use_caller_metadata() {
+    let mut projector = AnthropicStreamProjector::default();
+
+    let events = projector
+        .project(ProviderRawStreamEvent::from_sse(
+            ProviderKind::Anthropic,
+            1,
+            Some("content_block_start".to_string()),
+            None,
+            None,
+            r#"{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"tool_1","name":"calculator","input":{},"caller":{"type":"direct"}}}"#,
+        ))
+        .expect("projection should succeed");
+
+    assert_eq!(
+        events,
+        vec![CanonicalStreamEvent::OutputItemStarted {
+            output_index: 1,
+            item: StreamOutputItemStart::ToolCall {
+                item_id: None,
+                tool_call_id: Some("tool_1".to_string()),
+                name: "calculator".to_string(),
+            },
+        }]
+    );
+}
+
+#[test]
+fn anthropic_stream_projector_ignores_unknown_delta_subtypes() {
+    let mut projector = AnthropicStreamProjector::default();
+
+    projector
+        .project(ProviderRawStreamEvent::from_sse(
+            ProviderKind::Anthropic,
+            1,
+            Some("content_block_start".to_string()),
+            None,
+            None,
+            r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#,
+        ))
+        .expect("projection should succeed");
+
+    let events = projector
+        .project(ProviderRawStreamEvent::from_sse(
+            ProviderKind::Anthropic,
+            2,
+            Some("content_block_delta".to_string()),
+            None,
+            None,
+            r#"{"type":"content_block_delta","index":0,"delta":{"type":"future_delta","payload":"ignored"}}"#,
+        ))
+        .expect("projection should succeed");
+
+    assert!(events.is_empty());
+}
+
 fn fixture_events(fixture: &Value) -> Vec<(Option<String>, String)> {
     fixture
         .get("stream")

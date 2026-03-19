@@ -1,9 +1,8 @@
-use agent_core::{
-    CanonicalStreamEvent, FinishReason, MessageRole, ProviderRawStreamEvent, StreamOutputItemEnd,
-    StreamOutputItemStart, Usage,
-};
+use agent_core::{CanonicalStreamEvent, FinishReason, ProviderRawStreamEvent, Usage};
 
 use crate::error::AdapterError;
+use crate::openai_family::streaming::{project_output_item_added, project_output_item_done};
+use crate::openai_family::types::OpenAiResponsesBody;
 use crate::stream_projector::ProviderStreamProjector;
 
 #[derive(Debug, Default)]
@@ -28,11 +27,11 @@ impl ProviderStreamProjector for OpenAiStreamProjector {
             Some("response.created") | Some("response.in_progress") => {
                 if !self.response_started {
                     self.response_started = true;
+                    let response = parse_responses_body(value.get("response"));
                     events.push(CanonicalStreamEvent::ResponseStarted {
-                        model: value
-                            .get("response")
-                            .and_then(|response| json_str(response, "model"))
-                            .map(ToOwned::to_owned),
+                        model: response
+                            .as_ref()
+                            .and_then(|response| response.model.clone()),
                         response_id: value
                             .get("response")
                             .and_then(|response| json_str(response, "id"))
@@ -41,33 +40,8 @@ impl ProviderStreamProjector for OpenAiStreamProjector {
                 }
             }
             Some("response.output_item.added") => {
-                if let Some(output_index) = json_u32(value, "output_index")
-                    && let Some(item) = value.get("item")
-                {
-                    match json_str(item, "type") {
-                        Some("message") => events.push(CanonicalStreamEvent::OutputItemStarted {
-                            output_index,
-                            item: StreamOutputItemStart::Message {
-                                item_id: json_str(item, "id").map(ToOwned::to_owned),
-                                role: parse_message_role(json_str(item, "role"))
-                                    .unwrap_or(MessageRole::Assistant),
-                            },
-                        }),
-                        Some("function_call") => {
-                            if let Some(name) = json_str(item, "name") {
-                                events.push(CanonicalStreamEvent::OutputItemStarted {
-                                    output_index,
-                                    item: StreamOutputItemStart::ToolCall {
-                                        item_id: json_str(item, "id").map(ToOwned::to_owned),
-                                        tool_call_id: json_str(item, "call_id")
-                                            .map(ToOwned::to_owned),
-                                        name: name.to_string(),
-                                    },
-                                });
-                            }
-                        }
-                        _ => {}
-                    }
+                if let Some(event) = project_output_item_added(value) {
+                    events.push(event);
                 }
             }
             Some("response.output_text.delta") => {
@@ -94,59 +68,35 @@ impl ProviderStreamProjector for OpenAiStreamProjector {
                 }
             }
             Some("response.output_item.done") => {
-                if let Some(output_index) = json_u32(value, "output_index")
-                    && let Some(item) = value.get("item")
-                {
-                    match json_str(item, "type") {
-                        Some("message") => {
-                            events.push(CanonicalStreamEvent::OutputItemCompleted {
-                                output_index,
-                                item: StreamOutputItemEnd::Message {
-                                    item_id: json_str(item, "id").map(ToOwned::to_owned),
-                                },
-                            });
-                        }
-                        Some("function_call") => {
-                            if let Some(name) = json_str(item, "name") {
-                                events.push(CanonicalStreamEvent::OutputItemCompleted {
-                                    output_index,
-                                    item: StreamOutputItemEnd::ToolCall {
-                                        item_id: json_str(item, "id").map(ToOwned::to_owned),
-                                        tool_call_id: json_str(item, "call_id")
-                                            .map(ToOwned::to_owned),
-                                        name: name.to_string(),
-                                        arguments_json_text: json_str(item, "arguments")
-                                            .unwrap_or("")
-                                            .to_string(),
-                                    },
-                                });
-                            }
-                        }
-                        _ => {}
-                    }
+                if let Some(event) = project_output_item_done(value) {
+                    events.push(event);
                 }
             }
             Some("response.completed") => {
                 if let Some(response) = value.get("response") {
-                    if let Some(message) = response
-                        .get("error")
-                        .and_then(|error| json_str(error, "message"))
-                    {
-                        events.push(CanonicalStreamEvent::Failed {
-                            message: message.to_string(),
-                        });
+                    let parsed = parse_responses_body(Some(response));
+
+                    if let Some(message) = parsed.as_ref().and_then(parse_error_message) {
+                        events.push(CanonicalStreamEvent::Failed { message });
                         self.completed = true;
                         return Ok(events);
                     }
 
-                    if let Some(usage) = response.get("usage").and_then(parse_openai_usage) {
+                    if let Some(usage) = response
+                        .get("usage")
+                        .and_then(parse_openai_usage)
+                        .or_else(|| parsed.as_ref().and_then(parse_usage_from_body))
+                    {
                         events.push(CanonicalStreamEvent::UsageUpdated { usage });
                     }
 
                     if !self.completed {
                         self.completed = true;
                         events.push(CanonicalStreamEvent::Completed {
-                            finish_reason: infer_openai_finish_reason(response),
+                            finish_reason: parsed
+                                .as_ref()
+                                .map(infer_openai_finish_reason_from_body)
+                                .unwrap_or_else(|| infer_openai_finish_reason(response)),
                         });
                     }
                 }
@@ -181,16 +131,6 @@ fn json_u32(value: &serde_json::Value, key: &str) -> Option<u32> {
         .and_then(|value| u32::try_from(value).ok())
 }
 
-fn parse_message_role(role: Option<&str>) -> Option<MessageRole> {
-    match role {
-        Some("system") => Some(MessageRole::System),
-        Some("user") => Some(MessageRole::User),
-        Some("assistant") => Some(MessageRole::Assistant),
-        Some("tool") => Some(MessageRole::Tool),
-        _ => None,
-    }
-}
-
 fn parse_openai_usage(value: &serde_json::Value) -> Option<Usage> {
     Some(Usage {
         input_tokens: value
@@ -209,6 +149,41 @@ fn parse_openai_usage(value: &serde_json::Value) -> Option<Usage> {
     })
 }
 
+fn parse_responses_body(value: Option<&serde_json::Value>) -> Option<OpenAiResponsesBody> {
+    serde_json::from_value(value?.clone()).ok()
+}
+
+fn parse_error_message(response: &OpenAiResponsesBody) -> Option<String> {
+    response
+        .error
+        .as_ref()
+        .and_then(|error| error.message.as_ref())
+        .and_then(value_to_string)
+}
+
+fn parse_usage_from_body(response: &OpenAiResponsesBody) -> Option<Usage> {
+    response.usage.clone().map(Usage::from)
+}
+
+fn infer_openai_finish_reason_from_body(response: &OpenAiResponsesBody) -> FinishReason {
+    let has_function_call = response
+        .output
+        .as_ref()
+        .and_then(serde_json::Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .any(|item| json_str(item, "type") == Some("function_call"))
+        })
+        .unwrap_or(false);
+
+    if has_function_call {
+        FinishReason::ToolCalls
+    } else {
+        FinishReason::Stop
+    }
+}
+
 fn infer_openai_finish_reason(response: &serde_json::Value) -> FinishReason {
     let has_function_call = response
         .get("output")
@@ -224,5 +199,21 @@ fn infer_openai_finish_reason(response: &serde_json::Value) -> FinishReason {
         FinishReason::ToolCalls
     } else {
         FinishReason::Stop
+    }
+}
+
+fn value_to_string(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::String(text) => {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        }
+        serde_json::Value::Number(number) => Some(number.to_string()),
+        serde_json::Value::Bool(flag) => Some(flag.to_string()),
+        _ => None,
     }
 }

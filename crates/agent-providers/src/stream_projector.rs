@@ -18,6 +18,7 @@ pub trait ProviderStreamProjector: Send {
 
     /// Finalizes the projector after the raw stream ends.
     ///
+    /// Use this to flush buffered provider state into canonical terminal events.
     /// The default implementation emits no additional events.
     fn finish(&mut self) -> Result<Vec<CanonicalStreamEvent>, AdapterError> {
         Ok(Vec::new())

@@ -7,6 +7,10 @@ use reqwest::{Method, header::HeaderMap};
 use serde_json::Value;
 
 /// Family-level intermediate request plan before provider refinement.
+///
+/// Family codecs produce this shape after translating canonical task input into
+/// a protocol-family request. The provider refinement layer can then mutate it
+/// into the final [`ProviderRequestPlan`].
 #[derive(Debug, Clone)]
 pub struct EncodedFamilyRequest {
     /// Serialized provider request body.
@@ -26,6 +30,9 @@ pub struct EncodedFamilyRequest {
 }
 
 /// Final adapter-produced request contract consumed by runtime.
+///
+/// This is the fully refined transport contract returned by
+/// [`crate::adapter::ProviderAdapter::plan_request`].
 #[derive(Debug, Clone)]
 pub struct ProviderRequestPlan {
     /// Serialized provider request body.

@@ -69,6 +69,10 @@ impl ProviderErrorInfo {
 }
 
 /// Normalized adapter-layer error used by the runtime.
+///
+/// This is the common error type produced after family codecs and
+/// provider-specific refinements have been merged into one provider-facing
+/// failure.
 #[derive(Debug, Error)]
 #[error("{provider:?}::{operation:?}::{kind:?}: {message}")]
 pub struct AdapterError {

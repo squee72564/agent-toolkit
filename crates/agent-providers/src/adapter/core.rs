@@ -19,18 +19,25 @@ use crate::stream_projector::ProviderStreamProjector;
 /// then expose the final request-planning, response-decoding, and streaming
 /// entrypoints consumed by `agent-runtime`.
 pub trait ProviderAdapter: Sync + std::fmt::Debug {
+    /// Returns the concrete provider this adapter serves.
     fn kind(&self) -> ProviderKind;
+    /// Returns the provider descriptor used by routing and transport setup.
     fn descriptor(&self) -> &ProviderDescriptor;
+    /// Returns the advertised capabilities for this provider.
     fn capabilities(&self) -> &ProviderCapabilities {
         &self.descriptor().capabilities
     }
+    /// Converts an [`ExecutionPlan`] into the final provider request contract.
     fn plan_request(&self, execution: &ExecutionPlan) -> Result<ProviderRequestPlan, AdapterError>;
+    /// Decodes a non-streaming provider response body into canonical output.
     fn decode_response_json(
         &self,
         body: Value,
         requested_format: &ResponseFormat,
     ) -> Result<Response, AdapterError>;
+    /// Extracts provider-specific error metadata from a raw error body.
     fn decode_error(&self, body: &Value) -> Option<ProviderErrorInfo>;
+    /// Creates the stream projector used for this provider's streaming protocol.
     fn create_stream_projector(&self) -> Box<dyn ProviderStreamProjector>;
 }
 
@@ -40,6 +47,10 @@ static OPENROUTER_ADAPTER: super::OpenRouterAdapter = super::OpenRouterAdapter;
 static GENERIC_OPENAI_COMPATIBLE_ADAPTER: super::GenericOpenAiCompatibleAdapter =
     super::GenericOpenAiCompatibleAdapter;
 
+/// Returns the built-in adapter for a concrete provider kind.
+///
+/// The returned adapter is a process-wide singleton and can be reused across
+/// requests.
 pub fn adapter_for(kind: ProviderKind) -> &'static dyn ProviderAdapter {
     match kind {
         ProviderKind::OpenAi => &OPENAI_ADAPTER,

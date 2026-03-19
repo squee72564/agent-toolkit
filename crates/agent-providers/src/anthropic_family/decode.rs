@@ -1,3 +1,4 @@
+use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
 use crate::error::{AdapterErrorKind, ProviderErrorInfo};
@@ -6,6 +7,10 @@ use agent_core::types::{
 };
 
 use super::schema_rules::{canonicalize_json, extract_first_json_object, stable_json_string};
+use super::types::{
+    AnthropicErrorBody, AnthropicMessageBody, AnthropicRedactedThinkingBlock, AnthropicTextBlock,
+    AnthropicThinkingBlock, AnthropicToolUseBlock,
+};
 use super::{AnthropicDecodeEnvelope, AnthropicErrorEnvelope, AnthropicFamilyError};
 
 const WARN_UNKNOWN_CONTENT_BLOCK_MAPPED: &str =
@@ -21,10 +26,11 @@ const WARN_STRUCTURED_OUTPUT_PARSE_FAILED: &str = "anthropic.decode.structured_o
 pub(crate) fn decode_anthropic_response(
     payload: &AnthropicDecodeEnvelope,
 ) -> Result<Response, AnthropicFamilyError> {
-    let root = payload
-        .body
-        .as_object()
-        .ok_or_else(|| AnthropicFamilyError::decode("response payload must be a JSON object"))?;
+    if !payload.body.is_object() {
+        return Err(AnthropicFamilyError::decode(
+            "response payload must be a JSON object",
+        ));
+    }
 
     if let Some(error) = decode_anthropic_error(&payload.body) {
         return Err(AnthropicFamilyError::upstream(
@@ -34,15 +40,20 @@ pub(crate) fn decode_anthropic_response(
         ));
     }
 
-    let model = root
-        .get("model")
-        .and_then(Value::as_str)
-        .unwrap_or("<unknown-model>")
-        .to_string();
+    let parsed: AnthropicMessageBody =
+        serde_json::from_value(payload.body.clone()).map_err(|error| {
+            AnthropicFamilyError::decode(format!(
+                "failed to deserialize anthropic response: {error}"
+            ))
+        })?;
 
-    let role = root
-        .get("role")
-        .and_then(Value::as_str)
+    let model = parsed
+        .model
+        .unwrap_or_else(|| "<unknown-model>".to_string());
+
+    let role = parsed
+        .role
+        .as_deref()
         .ok_or_else(|| AnthropicFamilyError::decode("anthropic response missing role"))?;
     if role != "assistant" {
         return Err(AnthropicFamilyError::decode(format!(
@@ -50,9 +61,9 @@ pub(crate) fn decode_anthropic_response(
         )));
     }
 
-    let stop_reason = root
-        .get("stop_reason")
-        .and_then(Value::as_str)
+    let stop_reason = parsed
+        .stop_reason
+        .as_deref()
         .ok_or_else(|| AnthropicFamilyError::decode("anthropic response missing stop_reason"))?;
     if stop_reason.is_empty() {
         return Err(AnthropicFamilyError::decode(
@@ -60,16 +71,11 @@ pub(crate) fn decode_anthropic_response(
         ));
     }
 
-    let content_blocks = root
-        .get("content")
-        .and_then(Value::as_array)
-        .ok_or_else(|| AnthropicFamilyError::decode("anthropic response missing content array"))?;
-
     let mut warnings = Vec::new();
     let mut content = Vec::new();
     let mut text_blocks = Vec::new();
 
-    for block in content_blocks {
+    for block in &parsed.content {
         decode_content_block(block, &mut content, &mut text_blocks, &mut warnings)?;
     }
 
@@ -86,7 +92,7 @@ pub(crate) fn decode_anthropic_response(
         &text_blocks,
         &mut warnings,
     );
-    let usage = decode_usage(root.get("usage"), &mut warnings)?;
+    let usage = decode_usage(parsed.usage.as_ref(), &mut warnings)?;
     let finish_reason = map_finish_reason(stop_reason, &mut warnings);
 
     Ok(Response {
@@ -103,8 +109,7 @@ pub(crate) fn decode_anthropic_response(
 }
 
 pub(crate) fn decode_anthropic_error(body: &Value) -> Option<ProviderErrorInfo> {
-    let root = body.as_object()?;
-    let error = parse_anthropic_error_value(root)?;
+    let error = parse_anthropic_error_value(body.as_object()?)?;
     Some(ProviderErrorInfo {
         provider_code: None,
         message: Some(format_anthropic_error_message(&error)),
@@ -115,17 +120,18 @@ pub(crate) fn decode_anthropic_error(body: &Value) -> Option<ProviderErrorInfo> 
 pub(crate) fn parse_anthropic_error_value(
     root: &Map<String, Value>,
 ) -> Option<AnthropicErrorEnvelope> {
-    if let Some(top_level_type) = root.get("type").and_then(Value::as_str)
+    let parsed: AnthropicErrorBody = serde_json::from_value(Value::Object(root.clone())).ok()?;
+    if let Some(top_level_type) = parsed.body_type.as_deref()
         && top_level_type != "error"
     {
         return None;
     }
 
-    let error_obj = root.get("error")?.as_object()?;
-    let message = value_to_string(error_obj.get("message"))
+    let error_payload = parsed.error?;
+    let message = value_to_string(error_payload.message.as_ref())
         .unwrap_or_else(|| "anthropic response reported an error".to_string());
-    let error_type = value_to_string(error_obj.get("type"));
-    let request_id = value_to_string(root.get("request_id"));
+    let error_type = value_to_string(error_payload.error_type.as_ref());
+    let request_id = value_to_string(parsed.request_id.as_ref());
 
     Some(AnthropicErrorEnvelope {
         message,
@@ -176,19 +182,18 @@ fn decode_content_block(
     text_blocks: &mut Vec<String>,
     warnings: &mut Vec<RuntimeWarning>,
 ) -> Result<(), AnthropicFamilyError> {
-    let block_obj = block
+    let block_type = block
         .as_object()
-        .ok_or_else(|| AnthropicFamilyError::decode("anthropic content block must be object"))?;
-    let block_type = block_obj
-        .get("type")
+        .and_then(|block_obj| block_obj.get("type"))
         .and_then(Value::as_str)
         .ok_or_else(|| AnthropicFamilyError::decode("anthropic content block missing type"))?;
 
     match block_type {
         "text" => {
-            let text = block_obj
-                .get("text")
-                .and_then(Value::as_str)
+            let block = deserialize_wire::<AnthropicTextBlock>(block, "text content block")?;
+            let text = block
+                .text
+                .as_deref()
                 .ok_or_else(|| AnthropicFamilyError::decode("text content block missing text"))?;
             text_blocks.push(text.to_string());
             content.push(ContentPart::Text {
@@ -197,18 +202,18 @@ fn decode_content_block(
             Ok(())
         }
         "tool_use" => {
-            let id = block_obj
-                .get("id")
-                .and_then(Value::as_str)
+            let block = deserialize_wire::<AnthropicToolUseBlock>(block, "tool_use content block")?;
+            let id = block
+                .id
+                .as_deref()
                 .ok_or_else(|| AnthropicFamilyError::decode("tool_use block missing id"))?;
-            let name = block_obj
-                .get("name")
-                .and_then(Value::as_str)
+            let name = block
+                .name
+                .as_deref()
                 .ok_or_else(|| AnthropicFamilyError::decode("tool_use block missing name"))?;
-            let input = block_obj
-                .get("input")
-                .ok_or_else(|| AnthropicFamilyError::decode("tool_use block missing input"))?
-                .clone();
+            let input = block
+                .input
+                .ok_or_else(|| AnthropicFamilyError::decode("tool_use block missing input"))?;
             if !input.is_object() {
                 return Err(AnthropicFamilyError::decode(
                     "tool_use input must be a JSON object",
@@ -222,7 +227,22 @@ fn decode_content_block(
             ));
             Ok(())
         }
-        "thinking" | "redacted_thinking" => {
+        "thinking" => {
+            let _ = deserialize_wire::<AnthropicThinkingBlock>(block, "thinking content block")?;
+            push_warning(
+                warnings,
+                WARN_THINKING_SKIPPED,
+                format!(
+                    "anthropic content block type '{block_type}' is not representable and was skipped",
+                ),
+            );
+            Ok(())
+        }
+        "redacted_thinking" => {
+            let _ = deserialize_wire::<AnthropicRedactedThinkingBlock>(
+                block,
+                "redacted_thinking content block",
+            )?;
             push_warning(
                 warnings,
                 WARN_THINKING_SKIPPED,
@@ -434,4 +454,13 @@ fn push_warning(warnings: &mut Vec<RuntimeWarning>, code: &str, message: impl In
         code: code.to_string(),
         message: message.into(),
     });
+}
+
+fn deserialize_wire<T>(value: &Value, context: &str) -> Result<T, AnthropicFamilyError>
+where
+    T: DeserializeOwned,
+{
+    serde_json::from_value(value.clone()).map_err(|error| {
+        AnthropicFamilyError::decode(format!("failed to deserialize {context}: {error}"))
+    })
 }

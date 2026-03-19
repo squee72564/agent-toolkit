@@ -1,4 +1,15 @@
 //! Anthropic wire-format payload types and spec-level errors.
+//!
+//! This module defines the protocol-level request/response envelopes used by
+//! the Anthropic family codec. These types sit below the public adapter layer:
+//!
+//! - request encoders produce [`AnthropicEncodedRequest`]
+//! - response decoders consume [`AnthropicDecodeEnvelope`]
+//! - wire-format translation failures use [`AnthropicFamilyError`]
+//!
+//! Most runtime callers should interact with [`crate::adapter`] instead. Reach
+//! for this module when working on Anthropic-specific protocol translation or
+//! tests that validate Messages API payloads directly.
 
 use std::error::Error as StdError;
 
@@ -10,6 +21,8 @@ use agent_core::types::{ResponseFormat, RuntimeWarning};
 pub(crate) mod decode;
 pub(crate) mod encode;
 mod schema_rules;
+pub(crate) mod streaming;
+pub(crate) mod types;
 
 #[cfg(test)]
 mod tests;
@@ -39,6 +52,7 @@ pub(crate) struct AnthropicErrorEnvelope {
     pub request_id: Option<String>,
 }
 
+/// Category of Anthropic-family translation failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnthropicFamilyErrorKind {
     /// Caller input is invalid for the Anthropic wire contract.
@@ -58,25 +72,31 @@ pub enum AnthropicFamilyErrorKind {
 /// Anthropic wire-format error used inside provider translations.
 #[derive(Debug, Error)]
 pub enum AnthropicFamilyError {
+    /// Caller input could not be represented by the Anthropic contract.
     #[error("validation error: {message}")]
     Validation { message: String },
+    /// Building the outbound Anthropic payload failed.
     #[error("encode error: {message}")]
     Encode {
         message: String,
         #[source]
         source: Option<Box<dyn StdError + Send + Sync>>,
     },
+    /// Parsing or interpreting the inbound Anthropic payload failed.
     #[error("decode error: {message}")]
     Decode {
         message: String,
         #[source]
         source: Option<Box<dyn StdError + Send + Sync>>,
     },
+    /// The provider reported an application-level error payload.
     #[error("upstream error: {message}")]
     Upstream { message: String },
+    /// The payload shape or sequencing violated an expected protocol contract.
     #[error("protocol violation: {message}")]
     ProtocolViolation { message: String },
     #[allow(dead_code)]
+    /// The requested behavior is not supported by the Anthropic contract.
     #[error("unsupported feature: {message}")]
     UnsupportedFeature { message: String },
 }

@@ -1,4 +1,16 @@
 //! OpenAI-family wire-format payload types and spec-level errors.
+//!
+//! This module defines the protocol-level request/response envelopes used by
+//! the OpenAI-compatible family codec. These types sit below the public
+//! adapter layer:
+//!
+//! - request encoders produce [`OpenAiEncodedRequest`]
+//! - response decoders consume [`OpenAiDecodeEnvelope`]
+//! - wire-format translation failures use [`OpenAiFamilyError`]
+//!
+//! Most runtime callers should interact with [`crate::adapter`] instead. Reach
+//! for this module when working on family-level protocol translation or tests
+//! that validate OpenAI-compatible payloads directly.
 
 use std::error::Error as StdError;
 
@@ -10,6 +22,7 @@ use agent_core::types::{ResponseFormat, RuntimeWarning};
 pub(crate) mod decode;
 pub(crate) mod encode;
 mod schema_rules;
+pub(crate) mod streaming;
 pub(crate) mod types;
 
 #[cfg(test)]
@@ -33,6 +46,7 @@ pub struct OpenAiDecodeEnvelope {
     pub requested_response_format: ResponseFormat,
 }
 
+/// Category of OpenAI-family translation failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpenAiFamilyErrorKind {
     /// Caller input is invalid for the OpenAI-family wire contract.
@@ -52,25 +66,31 @@ pub enum OpenAiFamilyErrorKind {
 /// OpenAI-family wire-format error used inside provider translations.
 #[derive(Debug, Error)]
 pub enum OpenAiFamilyError {
+    /// Caller input could not be represented by the OpenAI-family contract.
     #[error("validation error: {message}")]
     Validation { message: String },
+    /// Building the outbound OpenAI-family payload failed.
     #[error("encode error: {message}")]
     Encode {
         message: String,
         #[source]
         source: Option<Box<dyn StdError + Send + Sync>>,
     },
+    /// Parsing or interpreting the inbound OpenAI-family payload failed.
     #[error("decode error: {message}")]
     Decode {
         message: String,
         #[source]
         source: Option<Box<dyn StdError + Send + Sync>>,
     },
+    /// The provider reported an application-level error payload.
     #[error("upstream error: {message}")]
     Upstream { message: String },
+    /// The payload shape or sequencing violated an expected protocol contract.
     #[error("protocol violation: {message}")]
     ProtocolViolation { message: String },
     #[allow(dead_code)]
+    /// The requested behavior is not supported by the OpenAI-family contract.
     #[error("unsupported feature: {message}")]
     UnsupportedFeature { message: String },
 }

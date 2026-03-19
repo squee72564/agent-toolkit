@@ -21,6 +21,10 @@ pub(crate) const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api";
 pub(crate) const OPENROUTER_ENDPOINT_PATH: &str = "/v1/responses";
 
 #[derive(Debug, Clone, Copy)]
+/// Built-in adapter for OpenRouter.
+///
+/// OpenRouter reuses the OpenAI-compatible family codec and adds
+/// provider-specific request/stream refinements on top.
 pub struct OpenRouterAdapter;
 
 pub(crate) fn openrouter_descriptor() -> ProviderDescriptor {
