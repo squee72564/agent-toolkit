@@ -24,5 +24,8 @@ serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 
+[dev-dependencies]
+agent-providers = { path = "../agent-providers", features = ["test-support"] }
+
 [lints]
 workspace = true

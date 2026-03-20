@@ -3,15 +3,15 @@
 //! This crate sits between the provider-agnostic request/response model in
 //! `agent-core` and provider-specific wire protocols. External consumers should
 //! treat this crate as a facade and prefer root-level imports such as
-//! [`adapter_for`], [`ProviderAdapter`], [`ProviderStreamProjector`],
+//! [`adapter_for`], [`ProviderAdapterHandle`], [`ProviderStreamProjectorHandle`],
 //! [`AdapterError`], and [`ProviderRequestPlan`] rather than depending on the
 //! internal module layout.
 //!
 //! It exposes:
 //!
 //! - [`adapter_for`] to obtain the built-in adapter for a concrete provider.
-//! - [`ProviderAdapter`] and [`ProviderStreamProjector`] for runtime integration
-//!   boundaries.
+//! - [`ProviderAdapterHandle`] and [`ProviderStreamProjectorHandle`] as the
+//!   closed runtime-facing provider contract.
 //! - [`AdapterError`], [`AdapterErrorKind`], [`AdapterOperation`], and
 //!   [`ProviderErrorInfo`] for normalized adapter-layer errors.
 //! - [`ProviderRequestPlan`] and [`TransportResponseFraming`] for the transport
@@ -31,6 +31,7 @@
 //! See `docs/provider-layering.md` for the full request and response flow.
 
 mod adapter;
+mod handles;
 mod interfaces;
 mod request_plan;
 
@@ -40,8 +41,11 @@ mod providers;
 
 pub use adapter::adapter_for;
 pub use error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo};
-pub use interfaces::{ProviderAdapter, ProviderStreamProjector};
+pub use handles::{ProviderAdapterHandle, ProviderStreamProjectorHandle};
 pub use request_plan::{ProviderRequestPlan, TransportResponseFraming};
+
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_support;
 
 #[cfg(test)]
 mod fixture_tests;

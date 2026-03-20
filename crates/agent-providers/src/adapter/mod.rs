@@ -1,10 +1,9 @@
 //! Built-in provider adapters and adapter selection.
 //!
 //! This module is the public entrypoint for runtime-facing provider integration.
-//! Call [`adapter_for`] to obtain the adapter for a concrete
-//! [`agent_core::ProviderKind`], then use
-//! [`crate::interfaces::ProviderAdapter`] to plan requests, decode responses,
-//! and create stream projectors.
+//! Call [`adapter_for`] to obtain the closed adapter handle for a concrete
+//! [`agent_core::ProviderKind`], then use that handle to plan requests, decode
+//! responses, and create stream projector handles.
 
 #[cfg(test)]
 mod tests;

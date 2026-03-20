@@ -1,26 +1,12 @@
 use reqwest::{Method, header::HeaderMap};
 use serde_json::json;
 
-use agent_core::{CanonicalStreamEvent, ProviderKind, ProviderRawStreamEvent};
-use agent_providers::{
-    AdapterError, ProviderRequestPlan, ProviderStreamProjector, TransportResponseFraming,
+use agent_core::{
+    CanonicalStreamEvent, ProviderCapabilities, ProviderDescriptor, ProviderFamilyId, ProviderKind,
+    ProviderRawStreamEvent,
 };
+use agent_providers::{ProviderRequestPlan, TransportResponseFraming, adapter_for};
 use agent_transport::HttpRequestOptions;
-
-#[derive(Default)]
-struct EchoProjector;
-
-impl ProviderStreamProjector for EchoProjector {
-    fn project(
-        &mut self,
-        raw: ProviderRawStreamEvent,
-    ) -> Result<Vec<CanonicalStreamEvent>, AdapterError> {
-        Ok(vec![CanonicalStreamEvent::ResponseStarted {
-            model: Some(format!("{:?}", raw.provider)),
-            response_id: Some(raw.sequence.to_string()),
-        }])
-    }
-}
 
 #[test]
 fn provider_request_plan_carries_transport_and_response_contract() {
@@ -41,15 +27,15 @@ fn provider_request_plan_carries_transport_and_response_contract() {
 }
 
 #[test]
-fn provider_stream_projector_trait_is_object_safe() {
-    let mut projector: Box<dyn ProviderStreamProjector> = Box::new(EchoProjector);
+fn provider_stream_projector_handle_projects_builtin_stream_events() {
+    let mut projector = adapter_for(ProviderKind::OpenAi).create_stream_projector();
     let raw = ProviderRawStreamEvent::from_sse(
         ProviderKind::OpenAi,
-        7,
+        1,
         Some("response.created".to_string()),
         Some("evt-1".to_string()),
         Some(250),
-        r#"{"type":"response.created"}"#,
+        r#"{"type":"response.created","response":{"id":"resp_1","model":"gpt-5-mini"}}"#,
     );
 
     let events = projector.project(raw).expect("projection should succeed");
@@ -57,8 +43,66 @@ fn provider_stream_projector_trait_is_object_safe() {
     assert_eq!(
         events,
         vec![CanonicalStreamEvent::ResponseStarted {
-            model: Some("OpenAi".to_string()),
-            response_id: Some("7".to_string()),
+            model: Some("gpt-5-mini".to_string()),
+            response_id: Some("resp_1".to_string()),
+        }]
+    );
+}
+
+#[cfg(feature = "test-support")]
+#[test]
+fn test_support_adapter_can_override_descriptor_and_delegate_builtin_behavior() {
+    let descriptor = ProviderDescriptor {
+        kind: ProviderKind::OpenAi,
+        family: ProviderFamilyId::OpenAiCompatible,
+        protocol: agent_core::ProtocolKind::OpenAI,
+        default_base_url: "https://api.openai.com",
+        endpoint_path: "/v1/responses",
+        default_auth_style: agent_core::AuthStyle::Bearer,
+        default_request_id_header: reqwest::header::HeaderName::from_static("x-request-id"),
+        default_headers: HeaderMap::new(),
+        capabilities: ProviderCapabilities {
+            supports_streaming: false,
+            supports_family_native_options: true,
+            supports_provider_native_options: true,
+        },
+    };
+
+    let adapter =
+        agent_providers::test_support::TestAdapterBuilder::new(descriptor, |_execution| {
+            Ok(ProviderRequestPlan {
+                body: json!({ "custom": true }),
+                warnings: Vec::new(),
+                method: Method::POST,
+                response_framing: TransportResponseFraming::Json,
+                endpoint_path_override: Some("/custom".to_string()),
+                provider_headers: HeaderMap::new(),
+                request_options: HttpRequestOptions::default(),
+            })
+        })
+        .delegate_to_builtin(ProviderKind::OpenAi)
+        .build();
+
+    assert!(!adapter.capabilities().supports_streaming);
+    assert_eq!(adapter.descriptor().endpoint_path, "/v1/responses");
+
+    let mut projector = adapter.create_stream_projector();
+    let events = projector
+        .project(ProviderRawStreamEvent::from_sse(
+            ProviderKind::OpenAi,
+            2,
+            Some("response.created".to_string()),
+            Some("evt-2".to_string()),
+            Some(250),
+            r#"{"type":"response.created","response":{"id":"resp_2","model":"gpt-5-mini"}}"#,
+        ))
+        .expect("delegated projector should succeed");
+
+    assert_eq!(
+        events,
+        vec![CanonicalStreamEvent::ResponseStarted {
+            model: Some("gpt-5-mini".to_string()),
+            response_id: Some("resp_2".to_string()),
         }]
     );
 }

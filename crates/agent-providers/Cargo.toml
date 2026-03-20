@@ -12,6 +12,9 @@ keywords.workspace = true
 categories.workspace = true
 description = "Provider protocol adapters and translations for agent-toolkit."
 
+[features]
+test-support = []
+
 [dependencies]
 agent-core = { path = "../agent-core" }
 agent-transport = { path = "../agent-transport" }

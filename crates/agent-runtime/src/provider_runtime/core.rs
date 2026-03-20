@@ -4,7 +4,9 @@ use agent_core::{
     CanonicalStreamEnvelope, ExecutionPlan, PlatformConfig, ProviderInstanceId, ProviderKind,
     Response, ResponseFormat, RuntimeWarning,
 };
-use agent_providers::{AdapterError, AdapterOperation, ProviderAdapter, ProviderStreamProjector};
+use agent_providers::{
+    AdapterError, AdapterOperation, ProviderAdapterHandle, ProviderStreamProjectorHandle,
+};
 use agent_transport::{HttpJsonResponse, HttpSseResponse, HttpTransport, TransportResponseFraming};
 
 use crate::RuntimeErrorKind;
@@ -23,7 +25,7 @@ pub(crate) struct ProviderRuntime {
     pub(crate) instance_id: ProviderInstanceId,
     pub(crate) kind: ProviderKind,
     pub(crate) registered: RegisteredProvider,
-    pub(crate) adapter: &'static dyn ProviderAdapter,
+    pub(crate) adapter: ProviderAdapterHandle,
     pub(crate) platform: PlatformConfig,
     pub(crate) transport: HttpTransport,
     pub(crate) observer: Option<Arc<dyn RuntimeObserver>>,
@@ -73,7 +75,7 @@ pub(crate) struct OpenedProviderStream {
     pub(super) response: HttpSseResponse,
     pub(super) response_format: ResponseFormat,
     pub(super) prepended_warnings: Vec<RuntimeWarning>,
-    pub(super) projector: Box<dyn ProviderStreamProjector>,
+    pub(super) projector: ProviderStreamProjectorHandle,
     pub(super) runtime: ProviderStreamRuntime,
     pub(super) transcript: Vec<CanonicalStreamEnvelope>,
 }
@@ -93,7 +95,7 @@ impl OpenedProviderStream {
             .runtime
             .next_envelope(
                 &mut self.response,
-                self.projector.as_mut(),
+                &mut self.projector,
                 AdapterOperation::ProjectStreamEvent,
             )
             .await
@@ -116,7 +118,7 @@ impl OpenedProviderStream {
     fn runtime_finalized(mut self) -> Result<(Response, HttpJsonResponse), StreamRuntimeError> {
         self.runtime.finalize_response(
             self.response,
-            self.projector.as_mut(),
+            &mut self.projector,
             &self.response_format,
             self.prepended_warnings,
             self.transcript,

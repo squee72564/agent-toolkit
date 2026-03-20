@@ -4,7 +4,9 @@ use agent_core::{
     CanonicalStreamEnvelope, CanonicalStreamEvent, ProviderKind, ProviderRawStreamEvent, Response,
     ResponseFormat, RuntimeWarning,
 };
-use agent_providers::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderStreamProjector};
+use agent_providers::{
+    AdapterError, AdapterErrorKind, AdapterOperation, ProviderStreamProjectorHandle,
+};
 use agent_transport::{HttpJsonResponse, HttpSseResponse, SseEvent};
 
 use crate::provider_stream_runtime::{StreamResponseState, finalize_stream_response};
@@ -40,7 +42,7 @@ impl ProviderStreamRuntime {
     pub(crate) async fn next_envelope(
         &mut self,
         response: &mut HttpSseResponse,
-        projector: &mut dyn ProviderStreamProjector,
+        projector: &mut ProviderStreamProjectorHandle,
         operation: AdapterOperation,
     ) -> Result<Option<CanonicalStreamEnvelope>, StreamRuntimeError> {
         let Some(sse_event) =
@@ -78,7 +80,7 @@ impl ProviderStreamRuntime {
     pub(crate) fn finalize_response(
         &mut self,
         response: HttpSseResponse,
-        projector: &mut dyn ProviderStreamProjector,
+        projector: &mut ProviderStreamProjectorHandle,
         response_format: &ResponseFormat,
         prepended_warnings: Vec<RuntimeWarning>,
         transcript: Vec<CanonicalStreamEnvelope>,

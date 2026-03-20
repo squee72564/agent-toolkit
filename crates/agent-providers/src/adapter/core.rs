@@ -9,6 +9,7 @@ use crate::{
         anthropic_plan, openai_compatible_plan, openrouter_plan,
     },
     error::{AdapterError, ProviderErrorInfo},
+    handles::ProviderAdapterHandle,
     interfaces::{ProviderAdapter, ProviderStreamProjector, codec_for, refinement_for},
     request_plan::ProviderRequestPlan,
 };
@@ -21,9 +22,13 @@ static GENERIC_OPENAI_COMPATIBLE_ADAPTER: GenericOpenAiCompatibleAdapter =
 
 /// Returns the built-in adapter for a concrete provider kind.
 ///
-/// The returned adapter is a process-wide singleton and can be reused across
-/// requests.
-pub fn adapter_for(kind: ProviderKind) -> &'static dyn ProviderAdapter {
+/// The returned handle wraps a process-wide singleton adapter implementation
+/// and can be reused across requests.
+pub fn adapter_for(kind: ProviderKind) -> ProviderAdapterHandle {
+    ProviderAdapterHandle::from_raw(adapter_impl_for(kind))
+}
+
+pub(crate) fn adapter_impl_for(kind: ProviderKind) -> &'static dyn ProviderAdapter {
     match kind {
         ProviderKind::OpenAi => &OPENAI_ADAPTER,
         ProviderKind::Anthropic => &ANTHROPIC_ADAPTER,

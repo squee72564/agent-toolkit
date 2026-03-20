@@ -6,17 +6,16 @@ use reqwest::{
     StatusCode,
     header::{HeaderMap, HeaderName, HeaderValue},
 };
-use serde_json::{Value, json};
+use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
 use agent_core::{
     Message, ProviderCapabilities, ProviderDescriptor, ProviderFamilyId, ProviderInstanceId,
-    ProviderKind, Response, ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
+    ProviderKind, ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
 };
 use agent_providers::{
-    AdapterError, ProviderAdapter, ProviderErrorInfo, ProviderRequestPlan, ProviderStreamProjector,
-    adapter_for,
+    ProviderAdapterHandle, ProviderRequestPlan, test_support::TestAdapterBuilder,
 };
 use agent_transport::{HttpRequestOptions, HttpResponseHead, TransportResponseFraming};
 
@@ -211,7 +210,7 @@ async fn open_stream_attempt_copies_adapter_selected_method_path_headers_and_fra
     )
     .await;
     let runtime = test_provider_runtime_with_adapter(
-        &TEST_STREAM_TRANSPORT_ADAPTER,
+        stream_transport_contract_adapter(),
         &base_url,
         Some("default-model"),
     );
@@ -375,7 +374,7 @@ fn test_provider_runtime(
 }
 
 fn test_provider_runtime_with_adapter(
-    adapter: &'static dyn ProviderAdapter,
+    adapter: ProviderAdapterHandle,
     base_url: &str,
     default_model: Option<&str>,
 ) -> ProviderRuntime {
@@ -484,40 +483,24 @@ struct CapturedHttpRequest {
     headers: BTreeMap<String, String>,
 }
 
-#[derive(Debug)]
-struct StreamTransportContractAdapter;
+fn stream_transport_contract_adapter() -> ProviderAdapterHandle {
+    static DESCRIPTOR: LazyLock<ProviderDescriptor> = LazyLock::new(|| ProviderDescriptor {
+        kind: ProviderKind::GenericOpenAiCompatible,
+        family: ProviderFamilyId::OpenAiCompatible,
+        protocol: agent_core::ProtocolKind::OpenAI,
+        default_base_url: "https://example.invalid",
+        endpoint_path: "/v1/default-stream",
+        default_auth_style: agent_core::AuthStyle::Bearer,
+        default_request_id_header: HeaderName::from_static("x-request-id"),
+        default_headers: HeaderMap::new(),
+        capabilities: ProviderCapabilities {
+            supports_streaming: true,
+            supports_family_native_options: false,
+            supports_provider_native_options: false,
+        },
+    });
 
-static TEST_STREAM_TRANSPORT_ADAPTER: StreamTransportContractAdapter =
-    StreamTransportContractAdapter;
-
-impl ProviderAdapter for StreamTransportContractAdapter {
-    fn kind(&self) -> ProviderKind {
-        ProviderKind::GenericOpenAiCompatible
-    }
-
-    fn descriptor(&self) -> &ProviderDescriptor {
-        static DESCRIPTOR: LazyLock<ProviderDescriptor> = LazyLock::new(|| ProviderDescriptor {
-            kind: ProviderKind::GenericOpenAiCompatible,
-            family: ProviderFamilyId::OpenAiCompatible,
-            protocol: agent_core::ProtocolKind::OpenAI,
-            default_base_url: "https://example.invalid",
-            endpoint_path: "/v1/default-stream",
-            default_auth_style: agent_core::AuthStyle::Bearer,
-            default_request_id_header: HeaderName::from_static("x-request-id"),
-            default_headers: HeaderMap::new(),
-            capabilities: ProviderCapabilities {
-                supports_streaming: true,
-                supports_family_native_options: false,
-                supports_provider_native_options: false,
-            },
-        });
-        &DESCRIPTOR
-    }
-
-    fn plan_request(
-        &self,
-        _execution: &agent_core::ExecutionPlan,
-    ) -> Result<ProviderRequestPlan, AdapterError> {
+    TestAdapterBuilder::new(DESCRIPTOR.clone(), |_execution| {
         let mut provider_headers = HeaderMap::new();
         provider_headers.insert(
             HeaderName::from_static("x-provider-test"),
@@ -533,23 +516,9 @@ impl ProviderAdapter for StreamTransportContractAdapter {
             provider_headers,
             request_options: HttpRequestOptions::sse_defaults(),
         })
-    }
-
-    fn decode_response_json(
-        &self,
-        body: Value,
-        requested_format: &ResponseFormat,
-    ) -> Result<Response, AdapterError> {
-        adapter_for(ProviderKind::OpenAi).decode_response_json(body, requested_format)
-    }
-
-    fn decode_error(&self, body: &Value) -> Option<ProviderErrorInfo> {
-        adapter_for(ProviderKind::OpenAi).decode_error(body)
-    }
-
-    fn create_stream_projector(&self) -> Box<dyn ProviderStreamProjector> {
-        adapter_for(ProviderKind::OpenAi).create_stream_projector()
-    }
+    })
+    .delegate_to_builtin(ProviderKind::OpenAi)
+    .build()
 }
 
 async fn spawn_capturing_sse_stub(

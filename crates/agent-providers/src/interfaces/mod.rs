@@ -8,7 +8,7 @@ mod family_codec;
 mod refinement;
 mod stream_projector;
 
-pub use adapter::ProviderAdapter;
+pub(crate) use adapter::ProviderAdapter;
 pub(crate) use family_codec::*;
 pub(crate) use refinement::*;
-pub use stream_projector::ProviderStreamProjector;
+pub(crate) use stream_projector::ProviderStreamProjector;
