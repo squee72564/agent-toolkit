@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 use std::env;
 
-use agent_toolkit::{
-    ContentPart, ExecutionOptions, Message, MessageCreateInput, MessageRole, ResponseFormat,
-    ToolChoice, ToolDefinition, openai,
-};
+use agent_toolkit::prelude::{Message, MessageCreateInput, MessageRole, ToolChoice, openai};
+use agent_toolkit::request::ResponseFormat;
+use agent_toolkit::runtime::ExecutionOptions;
+use agent_toolkit::{ContentPart, ToolDefinition};
 use serde_json::json;
 
 fn response_text(parts: &[ContentPart]) -> String {

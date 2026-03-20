@@ -15,11 +15,15 @@ description = "Facade crate re-exporting the agent-toolkit workspace APIs."
 [features]
 default = []
 live-tests = []
+openai = ["agent-runtime/openai"]
+anthropic = ["agent-runtime/anthropic"]
+openrouter = ["agent-runtime/openrouter"]
+providers-all = ["openai", "anthropic", "openrouter"]
 
 [dependencies]
 agent-core = { path = "../agent-core" }
 agent-providers = { path = "../agent-providers" }
-agent-runtime = { path = "../agent-runtime" }
+agent-runtime = { path = "../agent-runtime", default-features = false }
 agent-tools = { path = "../agent-tools" }
 agent-transport = { path = "../agent-transport" }
 
@@ -33,3 +37,31 @@ tokio.workspace = true
 
 [lints]
 workspace = true
+
+[[example]]
+name = "basic_openai"
+required-features = ["openai"]
+
+[[example]]
+name = "conversation"
+required-features = ["openai"]
+
+[[example]]
+name = "explicit_request"
+required-features = ["openai"]
+
+[[example]]
+name = "kitchen_sink"
+required-features = ["openai"]
+
+[[example]]
+name = "routed_toolkit"
+required-features = ["openai", "openrouter"]
+
+[[example]]
+name = "streaming_text"
+required-features = ["openai"]
+
+[[example]]
+name = "tool_calling"
+required-features = ["openai"]

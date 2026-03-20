@@ -1,8 +1,14 @@
-#![cfg(feature = "live-tests")]
+#![cfg(all(
+    feature = "live-tests",
+    feature = "openai",
+    feature = "anthropic",
+    feature = "openrouter"
+))]
 
 mod e2e;
 
-use agent_toolkit::{MessageCreateInput, ProviderKind, anthropic, openai, openrouter};
+use agent_toolkit::core::ProviderKind;
+use agent_toolkit::prelude::{MessageCreateInput, anthropic, openai, openrouter};
 use futures_util::StreamExt;
 
 use e2e::live::{
@@ -11,7 +17,7 @@ use e2e::live::{
 };
 
 async fn collect_text_stream_completion(
-    mut stream: agent_toolkit::MessageTextStream,
+    mut stream: agent_toolkit::runtime::MessageTextStream,
     provider: ProviderKind,
 ) {
     let mut streamed_text = String::new();

@@ -1,12 +1,13 @@
+#![cfg(all(feature = "openai", feature = "anthropic", feature = "openrouter"))]
+
 mod e2e;
 
 use std::collections::BTreeMap;
 
-use agent_toolkit::{
-    AgentToolkit, ContentPart, ExecutionOptions, Message, MessageCreateInput, MessageRole,
-    ProviderConfig, ProviderInstanceId, ProviderKind, Route, Target, TaskRequest, ToolChoice,
-    ToolDefinition, anthropic, openai,
-};
+use agent_toolkit::core::{MessageRole, ProviderInstanceId, ProviderKind};
+use agent_toolkit::prelude::{MessageCreateInput, Route, Target, ToolChoice, anthropic, openai};
+use agent_toolkit::runtime::{ExecutionOptions, ProviderConfig};
+use agent_toolkit::{AgentToolkit, ContentPart, Message, TaskRequest, ToolDefinition};
 
 use e2e::assertions::{
     assert_auth_api_key, assert_auth_bearer, assert_header, assert_json_object_has_key,

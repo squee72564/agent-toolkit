@@ -1,6 +1,6 @@
 use std::env;
 
-use agent_toolkit::{Conversation, openai};
+use agent_toolkit::prelude::{Conversation, openai};
 
 fn response_text(parts: &[agent_toolkit::ContentPart]) -> String {
     let mut text = String::new();

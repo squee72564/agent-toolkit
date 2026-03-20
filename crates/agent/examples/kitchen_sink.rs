@@ -2,12 +2,14 @@ use std::env;
 use std::io::{self, Write};
 use std::sync::Arc;
 
+use agent_toolkit::ContentPart;
 use agent_toolkit::core::{CanonicalStreamEvent, StreamOutputItemEnd, StreamOutputItemStart};
-use agent_toolkit::tools::{ToolBuilder, ToolRegistry, ToolRuntime};
-use agent_toolkit::{
-    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ContentPart, Conversation,
-    MessageCreateInput, RequestEndEvent, RequestStartEvent, RuntimeObserver, ToolChoice, openai,
+use agent_toolkit::prelude::{Conversation, MessageCreateInput, ToolChoice, openai};
+use agent_toolkit::runtime::{
+    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, RequestEndEvent,
+    RequestStartEvent, RuntimeObserver,
 };
+use agent_toolkit::tools::{ToolBuilder, ToolRegistry, ToolRuntime};
 use futures_util::StreamExt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

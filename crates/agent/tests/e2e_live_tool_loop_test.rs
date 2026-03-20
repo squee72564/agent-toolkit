@@ -1,11 +1,10 @@
-#![cfg(feature = "live-tests")]
+#![cfg(all(feature = "live-tests", feature = "openai"))]
 
 mod e2e;
 
-use agent_toolkit::{
-    ContentPart, Conversation, MessageCreateInput, ProviderKind, ToolChoice,
-    core::CanonicalStreamEvent, openai,
-};
+use agent_toolkit::ContentPart;
+use agent_toolkit::core::{CanonicalStreamEvent, ProviderKind};
+use agent_toolkit::prelude::{Conversation, MessageCreateInput, ToolChoice, openai};
 use futures_util::StreamExt;
 
 use e2e::live::{

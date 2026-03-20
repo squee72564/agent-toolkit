@@ -1,12 +1,14 @@
+#![cfg(all(feature = "openai", feature = "anthropic", feature = "openrouter"))]
+
 mod e2e;
 
 use std::time::Duration;
 
+use agent_toolkit::core::{AssistantOutput, FinishReason, ToolCall, Usage};
+use agent_toolkit::prelude::{anthropic, openai, openrouter};
+use agent_toolkit::runtime::RuntimeErrorKind;
 use agent_toolkit::tools::ToolRuntimeError;
-use agent_toolkit::{
-    AssistantOutput, ContentPart, Conversation, FinishReason, MessageCreateInput, RuntimeErrorKind,
-    ToolCall, Usage, anthropic, openai, openrouter,
-};
+use agent_toolkit::{ContentPart, Conversation, MessageCreateInput};
 
 use e2e::fixtures::{FixtureProvider, FixtureScenario, load_fixture_json};
 use e2e::mock_server::{MockResponse, MockServer, unused_local_url};

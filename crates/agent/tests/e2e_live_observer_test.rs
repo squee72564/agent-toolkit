@@ -1,13 +1,15 @@
-#![cfg(feature = "live-tests")]
+#![cfg(all(feature = "live-tests", feature = "openai"))]
 
 mod e2e;
 
 use std::sync::{Arc, Mutex};
 
-use agent_toolkit::{
-    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
-    MessageCreateInput, ProviderInstanceId, ProviderKind, RequestEndEvent, RequestStartEvent,
-    ResponseMode, Route, RuntimeObserver, Target, openai,
+use agent_toolkit::core::ProviderInstanceId;
+use agent_toolkit::core::ProviderKind;
+use agent_toolkit::prelude::{MessageCreateInput, Route, Target, openai};
+use agent_toolkit::runtime::{
+    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions, ProviderConfig,
+    RequestEndEvent, RequestStartEvent, ResponseMode, RuntimeObserver,
 };
 
 use e2e::live::{
@@ -158,7 +160,7 @@ async fn live_openai_routed_streaming_supports_per_call_observer_override() {
     let toolkit_observer_trait: Arc<dyn RuntimeObserver> = toolkit_observer.clone();
     let toolkit = agent_toolkit::AgentToolkit::builder()
         .with_openai(
-            agent_toolkit::ProviderConfig::new(api_key)
+            ProviderConfig::new(api_key)
                 .with_default_model(default_live_model(ProviderKind::OpenAi)),
         )
         .observer(toolkit_observer_trait)

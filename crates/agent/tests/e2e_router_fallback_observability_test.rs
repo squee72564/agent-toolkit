@@ -1,15 +1,20 @@
+#![cfg(all(feature = "openai", feature = "anthropic", feature = "openrouter"))]
+
 mod e2e;
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use agent_toolkit::AgentToolkit;
+use agent_toolkit::core::{ProviderInstanceId, ProviderKind};
+use agent_toolkit::prelude::{MessageCreateInput, Route, Target};
 use agent_toolkit::runtime::AttemptDisposition;
-use agent_toolkit::{
-    AgentToolkit, AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions,
-    FallbackPolicy, FallbackRule, MessageCreateInput, ProviderConfig, ProviderInstanceId,
-    ProviderKind, RequestEndEvent, RequestStartEvent, RetryPolicy, Route, RuntimeErrorKind,
-    RuntimeObserver, Target,
+use agent_toolkit::runtime::{
+    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, ExecutionOptions, FallbackPolicy,
+    FallbackRule, ProviderConfig, RequestEndEvent, RequestStartEvent, RuntimeError,
+    RuntimeErrorKind, RuntimeObserver,
 };
+use agent_toolkit::transport::RetryPolicy;
 
 use e2e::fixtures::{FixtureProvider, FixtureScenario, load_fixture_json};
 use e2e::mock_server::{MockResponse, MockServer};
@@ -182,7 +187,7 @@ async fn fallback_exhaustion_returns_terminal_error_kind() {
     assert_eq!(error.kind, RuntimeErrorKind::FallbackExhausted);
     let terminal = error
         .source_ref()
-        .and_then(|source| source.downcast_ref::<agent_toolkit::RuntimeError>())
+        .and_then(|source| source.downcast_ref::<RuntimeError>())
         .expect("fallback exhausted should carry terminal runtime error source");
     assert_eq!(terminal.kind, RuntimeErrorKind::Upstream);
 }

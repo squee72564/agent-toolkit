@@ -1,7 +1,7 @@
 use std::env;
 use std::io::{self, Write};
 
-use agent_toolkit::{MessageCreateInput, openai};
+use agent_toolkit::prelude::{MessageCreateInput, openai};
 use futures_util::StreamExt;
 
 #[tokio::main]

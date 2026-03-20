@@ -1,9 +1,8 @@
 use std::env;
 
-use agent_toolkit::{
-    AgentToolkit, ExecutionOptions, FallbackPolicy, FallbackRule, MessageCreateInput,
-    ProviderConfig, ProviderInstanceId, Route, Target,
-};
+use agent_toolkit::core::ProviderInstanceId;
+use agent_toolkit::prelude::{AgentToolkit, MessageCreateInput, Route, Target};
+use agent_toolkit::runtime::{ExecutionOptions, FallbackPolicy, FallbackRule, ProviderConfig};
 
 fn response_text(parts: &[agent_toolkit::ContentPart]) -> String {
     let mut text = String::new();

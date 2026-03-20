@@ -1,10 +1,12 @@
+#![cfg(all(feature = "openai", feature = "anthropic", feature = "openrouter"))]
+
 mod e2e;
 
 use std::time::Duration;
 
-use agent_toolkit::{
-    Conversation, MessageCreateInput, ProviderKind, ToolChoice, anthropic, openai, openrouter,
-};
+use agent_toolkit::core::ProviderKind;
+use agent_toolkit::prelude::{ToolChoice, anthropic, openai, openrouter};
+use agent_toolkit::{Conversation, MessageCreateInput};
 
 use e2e::assertions::{
     assert_auth_api_key, assert_auth_bearer, assert_header, assert_json_array_len_at_least,

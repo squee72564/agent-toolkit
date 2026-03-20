@@ -1,32 +1,38 @@
 //! Facade crate for the `agent-toolkit` workspace.
 //!
-//! This crate keeps the public entry point shallow:
+//! The crate is organized as layered disclosure:
 //!
-//! - use the root reexports for the common application-facing API
-//! - use the namespaced modules for organized access to the underlying crates
-//! - use the crate-specific docs for the detailed architecture and type behavior
+//! - use the root for provider-agnostic orchestration and conversation types
+//! - use [`prelude`] for ergonomic imports without recreating a fat facade
+//! - use namespaced modules when you need a specific subsystem
 //!
 //! The main namespaces are:
 //!
 //! - [`core`] for shared request, response, identity, planning, and streaming types
-//! - [`runtime`] for clients, routing, observers, and execution orchestration
-//! - [`protocols`] for provider adapters, codecs, and refinements
+//! - [`runtime`] for routing, observers, execution APIs, and provider configuration
+//! - [`protocols`] for provider adapters and provider-specific client helpers
 //! - [`transport`] for HTTP transport primitives
-//! - [`tools`] for tool registration and execution utilities
+//! - [`tools`] for tool definitions, registries, validation, and execution
 //!
-//! Most consumers should start with the root reexports for common types such as
-//! [`Route`], [`ExecutionOptions`], [`TaskRequest`], and [`HttpTransport`],
-//! then drop into a namespaced module like [`tools::ToolRegistry`] when they
-//! need a fuller view of a subsystem.
+//! Most consumers should start with the root exports such as [`AgentToolkit`],
+//! [`Route`], [`TaskRequest`], [`MessageCreateInput`], and [`Response`], then
+//! drop into [`prelude`] or a namespaced module when they need more control.
 
 /// Core request, response, and streaming types shared across the agent workspace.
 pub mod core {
     pub use agent_core::*;
 }
 
-/// Provider protocol adapters and translation primitives.
+/// Provider protocol adapters and provider-specific client helpers.
 pub mod protocols {
     pub use agent_providers::*;
+
+    #[cfg(feature = "anthropic")]
+    pub use agent_runtime::{AnthropicClient, AnthropicClientBuilder, anthropic};
+    #[cfg(feature = "openai")]
+    pub use agent_runtime::{OpenAiClient, OpenAiClientBuilder, openai};
+    #[cfg(feature = "openrouter")]
+    pub use agent_runtime::{OpenRouterClient, OpenRouterClientBuilder, openrouter};
 }
 
 /// Runtime clients and routing primitives.
@@ -39,8 +45,9 @@ pub mod transport {
     pub use agent_transport::*;
 }
 
-/// Tool registration, schema validation, and execution utilities.
+/// Tool definitions, registration, schema validation, and execution utilities.
 pub mod tools {
+    pub use agent_core::types::tool::*;
     pub use agent_tools::*;
 }
 
@@ -64,24 +71,15 @@ pub mod response {
     pub use agent_core::types::response::*;
 }
 
-/// Tool definitions and mixed-content message parts.
-pub mod tool {
-    pub use agent_core::types::tool::*;
-}
+/// Ergonomic imports for common direct-client and routed-client flows.
+pub mod prelude;
 
-pub use agent_core::types::*;
-pub use agent_runtime::{
-    AgentToolkit, AgentToolkitBuilder, AnthropicClient, AnthropicClientBuilder,
-    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, Conversation, DirectMessagesApi,
-    DirectStreamingApi, ExecutionOptions, FallbackAction, FallbackMatch, FallbackPolicy,
-    FallbackRule, MessageCreateInput, MessageResponseStream, MessageTextStream, OpenAiClient,
-    OpenAiClientBuilder, OpenRouterClient, OpenRouterClientBuilder, ProviderConfig,
-    RequestEndEvent, RequestStartEvent, ResponseMeta, ResponseMode, Route, RoutedMessagesApi,
-    RoutedStreamingApi, RuntimeError, RuntimeErrorKind, RuntimeObserver, StreamCompletion, Target,
-    TransportOptions, anthropic, openai, openrouter,
+pub use agent_core::{
+    ContentPart, Message, MessageRole, Response, TaskRequest, ToolCall, ToolChoice, ToolDefinition,
+    ToolResult, ToolResultContent,
 };
-pub use agent_transport::{
-    HttpJsonResponse, HttpTransport, HttpTransportBuilder, RetryPolicy, TransportError,
+pub use agent_runtime::{
+    AgentToolkit, AgentToolkitBuilder, Conversation, MessageCreateInput, Route, Target,
 };
 
 #[cfg(test)]

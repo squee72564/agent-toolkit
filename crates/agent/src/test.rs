@@ -2,25 +2,26 @@ use std::time::Duration;
 
 use agent_providers::AdapterErrorKind;
 
-use super::{
-    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, HttpJsonResponse, ProviderKind,
-    RequestEndEvent, RequestStartEvent, RetryPolicy, RuntimeObserver, StreamCompletion, core,
-    message, request, response, runtime, tool, tools, transport,
+use super::runtime::{
+    AttemptFailureEvent, AttemptStartEvent, AttemptSuccessEvent, RequestEndEvent,
+    RequestStartEvent, RuntimeObserver, StreamCompletion,
 };
+use super::transport::HttpJsonResponse;
+use super::{core, message, request, response, runtime, tools, transport};
 
 #[test]
 fn provider_id_reexport_matches_agent_core_type() {
     for provider_from_agent in [
-        ProviderKind::OpenAi,
-        ProviderKind::Anthropic,
-        ProviderKind::OpenRouter,
+        core::ProviderKind::OpenAi,
+        core::ProviderKind::Anthropic,
+        core::ProviderKind::OpenRouter,
     ] {
         let provider_from_core: agent_core::types::ProviderKind = provider_from_agent;
         let expected = match provider_from_agent {
-            ProviderKind::OpenAi => agent_core::types::ProviderKind::OpenAi,
-            ProviderKind::Anthropic => agent_core::types::ProviderKind::Anthropic,
-            ProviderKind::OpenRouter => agent_core::types::ProviderKind::OpenRouter,
-            ProviderKind::GenericOpenAiCompatible => {
+            core::ProviderKind::OpenAi => agent_core::types::ProviderKind::OpenAi,
+            core::ProviderKind::Anthropic => agent_core::types::ProviderKind::Anthropic,
+            core::ProviderKind::OpenRouter => agent_core::types::ProviderKind::OpenRouter,
+            core::ProviderKind::GenericOpenAiCompatible => {
                 agent_core::types::ProviderKind::GenericOpenAiCompatible
             }
         };
@@ -106,7 +107,7 @@ fn module_reexports_are_accessible() {
     let _platform_provider = core::types::ProviderKind::OpenAi;
     let _response_format = request::ResponseFormat::default();
     let _finish_reason = response::FinishReason::Stop;
-    let _tool_choice = tool::ToolChoice::Auto;
+    let _tool_choice = tools::ToolChoice::Auto;
 }
 
 #[test]
@@ -114,9 +115,9 @@ fn top_level_transport_reexports_are_constructible() {
     fn assert_debug_clone<T: std::fmt::Debug + Clone>() {}
 
     assert_debug_clone::<HttpJsonResponse>();
-    assert_debug_clone::<RetryPolicy>();
+    assert_debug_clone::<transport::RetryPolicy>();
 
-    let retry = RetryPolicy::default();
+    let retry = transport::RetryPolicy::default();
     assert_eq!(retry.max_attempts, 3);
     assert_eq!(retry.initial_backoff, Duration::from_millis(100));
     assert_eq!(retry.max_backoff, Duration::from_millis(2_000));
@@ -125,14 +126,16 @@ fn top_level_transport_reexports_are_constructible() {
 #[test]
 fn streaming_reexports_are_accessible() {
     fn assert_streaming_type<T>() {}
-    fn assert_text_conversion(stream: super::MessageResponseStream) -> super::MessageTextStream {
+    fn assert_text_conversion(
+        stream: runtime::MessageResponseStream,
+    ) -> runtime::MessageTextStream {
         stream.into_text_stream()
     }
 
-    assert_streaming_type::<super::DirectStreamingApi<'static>>();
-    assert_streaming_type::<super::RoutedStreamingApi<'static>>();
-    assert_streaming_type::<super::MessageResponseStream>();
-    assert_streaming_type::<super::MessageTextStream>();
+    assert_streaming_type::<runtime::DirectStreamingApi<'static>>();
+    assert_streaming_type::<runtime::RoutedStreamingApi<'static>>();
+    assert_streaming_type::<runtime::MessageResponseStream>();
+    assert_streaming_type::<runtime::MessageTextStream>();
     assert_streaming_type::<StreamCompletion>();
     let _ = assert_text_conversion;
 }

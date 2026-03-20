@@ -1,6 +1,6 @@
 use std::env;
 
-use agent_toolkit::{MessageCreateInput, openai};
+use agent_toolkit::prelude::{MessageCreateInput, openai};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

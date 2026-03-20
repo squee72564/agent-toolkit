@@ -2,7 +2,9 @@ use std::env;
 use std::future::Future;
 use std::time::Duration;
 
-use agent_toolkit::{ContentPart, ProviderKind, ResponseMeta};
+use agent_toolkit::ContentPart;
+use agent_toolkit::core::ProviderKind;
+use agent_toolkit::runtime::ResponseMeta;
 
 use super::timeout::with_timeout;
 
