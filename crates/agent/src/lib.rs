@@ -1,3 +1,24 @@
+//! Facade crate for the `agent-toolkit` workspace.
+//!
+//! This crate keeps the public entry point shallow:
+//!
+//! - use the root reexports for the common application-facing API
+//! - use the namespaced modules for organized access to the underlying crates
+//! - use the crate-specific docs for the detailed architecture and type behavior
+//!
+//! The main namespaces are:
+//!
+//! - [`core`] for shared request, response, identity, planning, and streaming types
+//! - [`runtime`] for clients, routing, observers, and execution orchestration
+//! - [`protocols`] for provider adapters, codecs, and refinements
+//! - [`transport`] for HTTP transport primitives
+//! - [`tools`] for tool registration and execution utilities
+//!
+//! Most consumers should start with the root reexports for common types such as
+//! [`Route`], [`ExecutionOptions`], [`TaskRequest`], and [`HttpTransport`],
+//! then drop into a namespaced module like [`tools::ToolRegistry`] when they
+//! need a fuller view of a subsystem.
+
 /// Core request, response, and streaming types shared across the agent workspace.
 pub mod core {
     pub use agent_core::*;
