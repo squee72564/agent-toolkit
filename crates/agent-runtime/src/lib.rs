@@ -32,10 +32,12 @@ pub use crate::agent_toolkit::{AgentToolkit, AgentToolkitBuilder};
 pub use crate::api::{
     DirectMessagesApi, DirectStreamingApi, RoutedMessagesApi, RoutedStreamingApi,
 };
-pub use crate::clients::{
-    AnthropicClient, AnthropicClientBuilder, OpenAiClient, OpenAiClientBuilder, OpenRouterClient,
-    OpenRouterClientBuilder, anthropic, openai, openrouter,
-};
+#[cfg(feature = "anthropic")]
+pub use crate::clients::{AnthropicClient, AnthropicClientBuilder, anthropic};
+#[cfg(feature = "openai")]
+pub use crate::clients::{OpenAiClient, OpenAiClientBuilder, openai};
+#[cfg(feature = "openrouter")]
+pub use crate::clients::{OpenRouterClient, OpenRouterClientBuilder, openrouter};
 pub use crate::execution_options::{ExecutionOptions, ResponseMode, TransportOptions};
 pub use crate::message::{Conversation, MessageCreateInput, MessageTextStream};
 pub use crate::message_response_stream::{MessageResponseStream, StreamCompletion};

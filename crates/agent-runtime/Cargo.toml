@@ -12,6 +12,12 @@ keywords.workspace = true
 categories.workspace = true
 description = "Runtime client builders and routing primitives for agent-toolkit."
 
+[features]
+default = ["openai", "anthropic", "openrouter"]
+openai = []
+anthropic = []
+openrouter = []
+
 [dependencies]
 agent-core = { path = "../agent-core" }
 agent-providers = { path = "../agent-providers" }

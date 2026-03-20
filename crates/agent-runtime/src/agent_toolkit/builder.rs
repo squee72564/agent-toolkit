@@ -26,24 +26,28 @@ pub struct AgentToolkitBuilder {
 
 impl AgentToolkitBuilder {
     /// Registers an OpenAI provider configuration.
+    #[cfg(feature = "openai")]
     pub fn with_openai(mut self, config: ProviderConfig) -> Self {
         self = self.with_openai_instance(ProviderInstanceId::openai_default(), config);
         self
     }
 
     /// Registers an Anthropic provider configuration.
+    #[cfg(feature = "anthropic")]
     pub fn with_anthropic(mut self, config: ProviderConfig) -> Self {
         self = self.with_anthropic_instance(ProviderInstanceId::anthropic_default(), config);
         self
     }
 
     /// Registers an OpenRouter provider configuration.
+    #[cfg(feature = "openrouter")]
     pub fn with_openrouter(mut self, config: ProviderConfig) -> Self {
         self = self.with_openrouter_instance(ProviderInstanceId::openrouter_default(), config);
         self
     }
 
     /// Registers an OpenAI provider configuration for a specific instance id.
+    #[cfg(feature = "openai")]
     pub fn with_openai_instance(
         mut self,
         instance_id: impl Into<ProviderInstanceId>,
@@ -54,6 +58,7 @@ impl AgentToolkitBuilder {
     }
 
     /// Registers an Anthropic provider configuration for a specific instance id.
+    #[cfg(feature = "anthropic")]
     pub fn with_anthropic_instance(
         mut self,
         instance_id: impl Into<ProviderInstanceId>,
@@ -64,6 +69,7 @@ impl AgentToolkitBuilder {
     }
 
     /// Registers an OpenRouter provider configuration for a specific instance id.
+    #[cfg(feature = "openrouter")]
     pub fn with_openrouter_instance(
         mut self,
         instance_id: impl Into<ProviderInstanceId>,
