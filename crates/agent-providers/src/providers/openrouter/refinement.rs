@@ -1,9 +1,8 @@
-use serde::Serialize;
 use serde_json::{Map, Value};
 
 use agent_core::{
-    OpenRouterOptions, ProviderKind, ProviderOptions, Response, ResponseFormat, RuntimeWarning,
-    TaskRequest,
+    OpenRouterOptions, OpenRouterTextVerbosity, ProviderKind, ProviderOptions, Response,
+    ResponseFormat, RuntimeWarning, TaskRequest,
 };
 
 use crate::{
@@ -16,49 +15,27 @@ use crate::{
     request_plan::EncodedFamilyRequest,
 };
 
-const WARN_IGNORED_TOP_P: &str = "openai.encode.ignored_top_p";
-const WARN_IGNORED_STOP: &str = "openai.encode.ignored_stop";
-
-#[derive(Debug, Clone, PartialEq, Default, Serialize)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub(crate) struct OpenRouterOverrides {
-    #[serde(skip_serializing)]
     pub fallback_models: Vec<String>,
-    #[serde(rename = "provider", skip_serializing_if = "Option::is_none")]
     pub provider_preferences: Option<Value>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub plugins: Vec<Value>,
-    #[serde(skip_serializing)]
-    pub frequency_penalty: Option<f32>,
-    #[serde(skip_serializing)]
-    pub presence_penalty: Option<f32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub logit_bias: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub logprobs: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Map<String, Value>,
+    pub top_k: Option<u32>,
     pub top_logprobs: Option<u8>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub seed: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub user: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub session_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub trace: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub route: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub max_tokens: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stop: Vec<String>,
+    pub seed: Option<i64>,
+    pub logit_bias: Map<String, Value>,
+    pub logprobs: Option<bool>,
+    pub frequency_penalty: Option<f32>,
+    pub presence_penalty: Option<f32>,
+    pub user: Option<String>,
+    pub session_id: Option<String>,
+    pub trace: Option<Value>,
+    pub text_verbosity: Option<OpenRouterTextVerbosity>,
     pub modalities: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub image_config: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub debug: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream_options: Option<Value>,
-    #[serde(skip_serializing)]
-    pub extra: Map<String, Value>,
 }
 
 impl OpenRouterOverrides {
@@ -88,19 +65,30 @@ fn apply_provider_options(overrides: &mut OpenRouterOverrides, options: &OpenRou
     overrides.fallback_models = options.fallback_models.clone();
     overrides.provider_preferences = options.provider_preferences.clone();
     overrides.plugins = options.plugins.clone();
+    overrides.metadata = options
+        .metadata
+        .iter()
+        .map(|(key, value)| (key.clone(), Value::String(value.clone())))
+        .collect();
+    overrides.top_k = options.top_k;
+    overrides.top_logprobs = options.top_logprobs;
+    overrides.max_tokens = options.max_tokens;
+    overrides.stop = options.stop.clone();
+    overrides.seed = options.seed;
+    overrides.logit_bias = options
+        .logit_bias
+        .iter()
+        .map(|(token_id, bias)| (token_id.clone(), Value::from(*bias)))
+        .collect();
+    overrides.logprobs = options.logprobs;
     overrides.frequency_penalty = options.frequency_penalty;
     overrides.presence_penalty = options.presence_penalty;
-    overrides.logit_bias = options.logit_bias.clone();
-    overrides.logprobs = options.logprobs;
-    overrides.top_logprobs = options.top_logprobs;
-    overrides.seed = options.seed;
     overrides.user = options.user.clone();
     overrides.session_id = options.session_id.clone();
     overrides.trace = options.trace.clone();
-    overrides.route = options.route.clone();
+    overrides.text_verbosity = options.text.as_ref().and_then(|text| text.verbosity);
     overrides.modalities = options.modalities.clone();
     overrides.image_config = options.image_config.clone();
-    overrides.debug = options.debug.clone();
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -109,21 +97,14 @@ pub(crate) struct OpenRouterRefinement;
 impl ProviderRefinement for OpenRouterRefinement {
     fn refine_request(
         &self,
-        task: &TaskRequest,
+        _task: &TaskRequest,
         model: &str,
         request: &mut EncodedFamilyRequest,
         provider_options: Option<&ProviderOptions>,
     ) -> Result<(), AdapterError> {
         let overrides = OpenRouterOverrides::from_options(provider_options)?;
-        apply_openrouter_overrides(
-            model,
-            task.top_p,
-            &task.stop,
-            &overrides,
-            &mut request.body,
-            &mut request.warnings,
-        )
-        .map_err(map_openrouter_plan_error)
+        apply_openrouter_overrides(model, &overrides, &mut request.body, &mut request.warnings)
+            .map_err(map_openrouter_plan_error)
     }
 
     fn decode_provider_error(&self, body: &Value) -> Option<ProviderErrorInfo> {
@@ -150,8 +131,6 @@ impl ProviderRefinement for OpenRouterRefinement {
 
 pub(crate) fn apply_openrouter_overrides(
     model_id: &str,
-    top_p: Option<f32>,
-    stop: &[String],
     overrides: &OpenRouterOverrides,
     request_body: &mut Value,
     warnings: &mut Vec<RuntimeWarning>,
@@ -160,32 +139,17 @@ pub(crate) fn apply_openrouter_overrides(
         OpenAiFamilyError::protocol_violation("encoded request body must be an object")
     })?;
 
-    let mut mapped_top_p = false;
-    if let Some(top_p) = top_p {
-        body.insert("top_p".to_string(), Value::from(top_p));
-        mapped_top_p = true;
-    }
+    let _ = warnings;
 
-    let mut mapped_stop = false;
-    if !stop.is_empty() {
-        body.insert(
-            "stop".to_string(),
-            Value::Array(stop.iter().cloned().map(Value::String).collect()),
-        );
-        mapped_stop = true;
-    }
-
-    if mapped_top_p || mapped_stop {
-        warnings.retain(|warning| {
-            if mapped_top_p && warning.code == WARN_IGNORED_TOP_P {
-                return false;
-            }
-            if mapped_stop && warning.code == WARN_IGNORED_STOP {
-                return false;
-            }
-            true
-        });
-    }
+    validate_metadata(&overrides.metadata)?;
+    validate_optional_range(overrides.frequency_penalty, "frequency_penalty", -2.0, 2.0)?;
+    validate_optional_range(overrides.presence_penalty, "presence_penalty", -2.0, 2.0)?;
+    validate_optional_length(&overrides.user, "user", 128)?;
+    validate_optional_length(&overrides.session_id, "session_id", 128)?;
+    validate_modalities(overrides.modalities.as_ref())?;
+    validate_top_logprobs(overrides.top_logprobs, overrides.logprobs)?;
+    validate_max_tokens(overrides.max_tokens, body.get("max_output_tokens"))?;
+    validate_logit_bias(&overrides.logit_bias)?;
 
     if !overrides.fallback_models.is_empty() {
         let mut models = vec![Value::String(model_id.to_string())];
@@ -202,25 +166,232 @@ pub(crate) fn apply_openrouter_overrides(
         }
     }
 
+    if let Some(provider_preferences) = overrides.provider_preferences.as_ref() {
+        body.insert("provider".to_string(), provider_preferences.clone());
+    }
+    if !overrides.plugins.is_empty() {
+        body.insert(
+            "plugins".to_string(),
+            Value::Array(overrides.plugins.clone()),
+        );
+    }
+    if !overrides.metadata.is_empty() {
+        body.insert(
+            "metadata".to_string(),
+            Value::Object(overrides.metadata.clone()),
+        );
+    }
+    insert_optional_u32(body, "top_k", overrides.top_k);
+    insert_optional_u8(body, "top_logprobs", overrides.top_logprobs);
+    insert_optional_u32(body, "max_tokens", overrides.max_tokens);
+    if !overrides.stop.is_empty() {
+        body.insert(
+            "stop".to_string(),
+            Value::Array(overrides.stop.iter().cloned().map(Value::String).collect()),
+        );
+    }
+    insert_optional_i64(body, "seed", overrides.seed);
+    if !overrides.logit_bias.is_empty() {
+        body.insert(
+            "logit_bias".to_string(),
+            Value::Object(overrides.logit_bias.clone()),
+        );
+    }
+    insert_optional_bool(body, "logprobs", overrides.logprobs);
     insert_optional_f32(body, "frequency_penalty", overrides.frequency_penalty)?;
     insert_optional_f32(body, "presence_penalty", overrides.presence_penalty)?;
-    let serialized_overrides = serde_json::to_value(overrides).map_err(|error| {
-        OpenAiFamilyError::protocol_violation(format!(
-            "failed to serialize OpenRouter overrides: {error}"
-        ))
-    })?;
-    let serialized_overrides = serialized_overrides.as_object().ok_or_else(|| {
-        OpenAiFamilyError::protocol_violation("serialized OpenRouter overrides must be an object")
-    })?;
-    for (key, value) in serialized_overrides {
-        body.insert(key.clone(), value.clone());
+    if let Some(user) = overrides.user.as_ref() {
+        body.insert("user".to_string(), Value::String(user.clone()));
     }
-
-    for (key, value) in &overrides.extra {
-        body.insert(key.clone(), value.clone());
+    if let Some(session_id) = overrides.session_id.as_ref() {
+        body.insert("session_id".to_string(), Value::String(session_id.clone()));
+    }
+    if let Some(trace) = overrides.trace.as_ref() {
+        body.insert("trace".to_string(), trace.clone());
+    }
+    merge_text_verbosity(body, overrides.text_verbosity)?;
+    if let Some(modalities) = overrides.modalities.as_ref() {
+        body.insert(
+            "modalities".to_string(),
+            Value::Array(modalities.iter().cloned().map(Value::String).collect()),
+        );
+    }
+    if let Some(image_config) = overrides.image_config.as_ref() {
+        body.insert("image_config".to_string(), image_config.clone());
     }
 
     Ok(())
+}
+
+fn validate_metadata(metadata: &Map<String, Value>) -> Result<(), OpenAiFamilyError> {
+    if metadata.len() > 16 {
+        return Err(OpenAiFamilyError::validation(
+            "OpenRouter metadata must contain at most 16 entries",
+        ));
+    }
+
+    for (key, value) in metadata {
+        if key.len() > 64 {
+            return Err(OpenAiFamilyError::validation(
+                "OpenRouter metadata keys must be at most 64 characters",
+            ));
+        }
+        if key.contains('[') || key.contains(']') {
+            return Err(OpenAiFamilyError::validation(
+                "OpenRouter metadata keys must not contain brackets",
+            ));
+        }
+        let Value::String(value) = value else {
+            return Err(OpenAiFamilyError::protocol_violation(
+                "OpenRouter metadata values must serialize as strings",
+            ));
+        };
+        if value.len() > 512 {
+            return Err(OpenAiFamilyError::validation(
+                "OpenRouter metadata values must be at most 512 characters",
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_optional_range(
+    value: Option<f32>,
+    field_name: &str,
+    min: f32,
+    max: f32,
+) -> Result<(), OpenAiFamilyError> {
+    let Some(value) = value else {
+        return Ok(());
+    };
+
+    if !value.is_finite() {
+        return Err(OpenAiFamilyError::validation(format!(
+            "{field_name} must be finite for OpenRouter"
+        )));
+    }
+
+    if !(min..=max).contains(&value) {
+        return Err(OpenAiFamilyError::validation(format!(
+            "{field_name} must be in {min}..={max} for OpenRouter"
+        )));
+    }
+
+    Ok(())
+}
+
+fn validate_optional_length(
+    value: &Option<String>,
+    field_name: &str,
+    max_len: usize,
+) -> Result<(), OpenAiFamilyError> {
+    if let Some(value) = value
+        && value.len() > max_len
+    {
+        return Err(OpenAiFamilyError::validation(format!(
+            "{field_name} must be at most {max_len} characters for OpenRouter"
+        )));
+    }
+
+    Ok(())
+}
+
+fn validate_modalities(modalities: Option<&Vec<String>>) -> Result<(), OpenAiFamilyError> {
+    let Some(modalities) = modalities else {
+        return Ok(());
+    };
+
+    for modality in modalities {
+        if modality != "text" && modality != "image" {
+            return Err(OpenAiFamilyError::validation(format!(
+                "OpenRouter modalities entries must be 'text' or 'image', got '{modality}'"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_top_logprobs(
+    top_logprobs: Option<u8>,
+    logprobs: Option<bool>,
+) -> Result<(), OpenAiFamilyError> {
+    let Some(top_logprobs) = top_logprobs else {
+        return Ok(());
+    };
+
+    if top_logprobs > 20 {
+        return Err(OpenAiFamilyError::validation(
+            "OpenRouter top_logprobs must be in 0..=20",
+        ));
+    }
+    if logprobs != Some(true) {
+        return Err(OpenAiFamilyError::validation(
+            "OpenRouter top_logprobs requires logprobs=true",
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_max_tokens(
+    max_tokens: Option<u32>,
+    max_output_tokens: Option<&Value>,
+) -> Result<(), OpenAiFamilyError> {
+    if max_tokens == Some(0) {
+        return Err(OpenAiFamilyError::validation(
+            "OpenRouter max_tokens must be greater than 0",
+        ));
+    }
+    if max_tokens.is_some() && max_output_tokens.is_some() {
+        return Err(OpenAiFamilyError::validation(
+            "OpenRouter max_tokens cannot be combined with family max_output_tokens",
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_logit_bias(logit_bias: &Map<String, Value>) -> Result<(), OpenAiFamilyError> {
+    for value in logit_bias.values() {
+        let Some(bias) = value.as_i64() else {
+            return Err(OpenAiFamilyError::protocol_violation(
+                "OpenRouter logit_bias values must serialize as integers",
+            ));
+        };
+        if !(-100..=100).contains(&bias) {
+            return Err(OpenAiFamilyError::validation(
+                "OpenRouter logit_bias values must be in -100..=100",
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn insert_optional_u32(body: &mut Map<String, Value>, key: &str, value: Option<u32>) {
+    if let Some(value) = value {
+        body.insert(key.to_string(), Value::from(value));
+    }
+}
+
+fn insert_optional_u8(body: &mut Map<String, Value>, key: &str, value: Option<u8>) {
+    if let Some(value) = value {
+        body.insert(key.to_string(), Value::from(value));
+    }
+}
+
+fn insert_optional_i64(body: &mut Map<String, Value>, key: &str, value: Option<i64>) {
+    if let Some(value) = value {
+        body.insert(key.to_string(), Value::from(value));
+    }
+}
+
+fn insert_optional_bool(body: &mut Map<String, Value>, key: &str, value: Option<bool>) {
+    if let Some(value) = value {
+        body.insert(key.to_string(), Value::Bool(value));
+    }
 }
 
 fn insert_optional_f32(
@@ -234,6 +405,31 @@ fn insert_optional_f32(
         })?;
         body.insert(key.to_string(), Value::Number(number));
     }
+    Ok(())
+}
+
+fn merge_text_verbosity(
+    body: &mut Map<String, Value>,
+    verbosity: Option<OpenRouterTextVerbosity>,
+) -> Result<(), OpenAiFamilyError> {
+    let Some(verbosity) = verbosity else {
+        return Ok(());
+    };
+
+    let text = body
+        .entry("text".to_string())
+        .or_insert_with(|| Value::Object(Map::new()));
+    let text = text.as_object_mut().ok_or_else(|| {
+        OpenAiFamilyError::protocol_violation("OpenRouter text payload must be an object")
+    })?;
+    let value = match verbosity {
+        OpenRouterTextVerbosity::Low => "low",
+        OpenRouterTextVerbosity::Medium => "medium",
+        OpenRouterTextVerbosity::High => "high",
+        OpenRouterTextVerbosity::Max => "max",
+    };
+    text.insert("verbosity".to_string(), Value::String(value.to_string()));
+
     Ok(())
 }
 

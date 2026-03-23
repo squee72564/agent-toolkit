@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
 
 use super::message::Message;
@@ -24,6 +22,21 @@ pub enum ResponseFormat {
 }
 
 /// Semantic request content independent of route selection and execution mode.
+///
+/// This type is semantic-only and intentionally limited to request intent that
+/// should survive provider selection unchanged. Keep tuning, token budgets,
+/// stop controls, metadata, and provider execution controls out of
+/// [`TaskRequest`].
+///
+/// Use [`crate::NativeOptions`] to express request controls:
+///
+/// - [`crate::FamilyOptions`] for controls shared by one provider family
+/// - [`crate::ProviderOptions`] for provider-native or router-native controls
+///
+/// Direct-provider runtime helpers accept these typed native options alongside
+/// semantic input, for example `openai().create_with_openai_options(...)`,
+/// `anthropic().create_with_anthropic_options(...)`, and
+/// `openrouter().create_with_openrouter_options(...)`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TaskRequest {
@@ -38,19 +51,4 @@ pub struct TaskRequest {
     /// Requested response encoding or structure.
     #[serde(default)]
     pub response_format: ResponseFormat,
-    /// Sampling temperature when supported by the provider.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub temperature: Option<f32>,
-    /// Nucleus sampling configuration when supported by the provider.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub top_p: Option<f32>,
-    /// Upper bound for generated output tokens when supported by the provider.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_output_tokens: Option<u32>,
-    /// Stop sequences to forward to providers that support them.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub stop: Vec<String>,
-    /// Request-scoped metadata intended for provider payloads.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub metadata: BTreeMap<String, String>,
 }

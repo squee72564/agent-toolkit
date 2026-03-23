@@ -2,8 +2,8 @@ use crate::error::{AdapterErrorKind, AdapterOperation};
 use crate::interfaces::codec_for;
 use crate::interfaces::refinement_for;
 use agent_core::{
-    ContentPart, Message, MessageRole, ProviderKind, ResponseFormat, ResponseMode, TaskRequest,
-    ToolChoice,
+    AnthropicFamilyOptions, ContentPart, FamilyOptions, Message, MessageRole, ProviderKind,
+    ProviderOptions, ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
 };
 
 fn base_task() -> TaskRequest {
@@ -15,11 +15,6 @@ fn base_task() -> TaskRequest {
         tools: Vec::new(),
         tool_choice: ToolChoice::Auto,
         response_format: ResponseFormat::Text,
-        temperature: None,
-        top_p: None,
-        max_output_tokens: None,
-        stop: Vec::new(),
-        metadata: std::collections::BTreeMap::new(),
     }
 }
 
@@ -27,20 +22,27 @@ fn plan_request(
     task: &TaskRequest,
     model: &str,
     response_mode: ResponseMode,
+    family_options: Option<&FamilyOptions>,
+    provider_options: Option<&ProviderOptions>,
 ) -> Result<crate::request_plan::ProviderRequestPlan, crate::error::AdapterError> {
     let mut encoded = codec_for(agent_core::ProviderFamilyId::Anthropic).encode_task(
         task,
         model,
         response_mode,
-        None,
+        family_options,
     )?;
-    refinement_for(ProviderKind::Anthropic).refine_request(task, model, &mut encoded, None)?;
+    refinement_for(ProviderKind::Anthropic).refine_request(
+        task,
+        model,
+        &mut encoded,
+        provider_options,
+    )?;
     Ok(encoded.into())
 }
 
 #[test]
 fn anthropic_request_error_maps_into_adapter_error() {
-    let adapter_error = plan_request(&base_task(), "", ResponseMode::NonStreaming)
+    let adapter_error = plan_request(&base_task(), "", ResponseMode::NonStreaming, None, None)
         .expect_err("planning should fail");
 
     assert_eq!(adapter_error.provider, ProviderKind::Anthropic);
@@ -52,7 +54,7 @@ fn anthropic_request_error_maps_into_adapter_error() {
 
 #[test]
 fn anthropic_request_error_preserves_source_chain() {
-    let adapter_error = plan_request(&base_task(), "", ResponseMode::NonStreaming)
+    let adapter_error = plan_request(&base_task(), "", ResponseMode::NonStreaming, None, None)
         .expect_err("planning should fail");
 
     let spec_source = adapter_error
@@ -62,4 +64,22 @@ fn anthropic_request_error_preserves_source_chain() {
         spec_source.to_string().contains("validation error"),
         "expected spec error context, got: {spec_source}"
     );
+}
+
+#[test]
+fn anthropic_request_plan_accepts_family_options_without_mutating_task() {
+    let family_options = FamilyOptions::Anthropic(AnthropicFamilyOptions {
+        thinking: Some(serde_json::json!({ "type": "disabled" })),
+    });
+
+    let encoded = plan_request(
+        &base_task(),
+        "claude-sonnet-4-6",
+        ResponseMode::NonStreaming,
+        Some(&family_options),
+        None,
+    )
+    .expect("planning should succeed");
+
+    assert_eq!(encoded.body["thinking"]["type"], "disabled");
 }

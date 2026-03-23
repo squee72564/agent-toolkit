@@ -12,11 +12,6 @@ fn base_task() -> TaskRequest {
         tools: Vec::new(),
         tool_choice: ToolChoice::Auto,
         response_format: ResponseFormat::Text,
-        temperature: None,
-        top_p: None,
-        max_output_tokens: None,
-        stop: Vec::new(),
-        metadata: Default::default(),
     }
 }
 

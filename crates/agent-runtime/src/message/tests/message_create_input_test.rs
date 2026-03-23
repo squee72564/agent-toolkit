@@ -19,18 +19,14 @@ fn message_input_requires_at_least_one_message() {
 
 #[test]
 fn message_input_task_request_contains_only_semantic_fields() {
-    let mut metadata = std::collections::BTreeMap::new();
-    metadata.insert("trace_id".to_string(), "abc123".to_string());
-
     let task = MessageCreateInput::from("hello")
-        .with_max_output_tokens(128)
-        .with_metadata(metadata.clone())
         .into_task_request()
         .expect("task request should be built");
 
     assert_eq!(task.messages.len(), 1);
-    assert_eq!(task.max_output_tokens, Some(128));
-    assert_eq!(task.metadata, metadata);
+    assert!(task.tools.is_empty());
+    assert_eq!(task.tool_choice, agent_core::ToolChoice::default());
+    assert_eq!(task.response_format, agent_core::ResponseFormat::default());
 }
 
 #[test]

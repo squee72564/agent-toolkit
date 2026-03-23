@@ -109,6 +109,10 @@ fn apply_family_options(
     };
 
     if let Some(options) = family_options {
+        validate_optional_range(options.temperature, "temperature", 0.0, 2.0)?;
+        validate_optional_range(options.top_p, "top_p", 0.0, 1.0)?;
+        validate_max_output_tokens(options.max_output_tokens)?;
+
         if let Some(parallel_tool_calls) = options.parallel_tool_calls {
             body.insert(
                 "parallel_tool_calls".to_string(),
@@ -118,6 +122,62 @@ fn apply_family_options(
         if let Some(reasoning) = options.reasoning.as_ref() {
             body.insert("reasoning".to_string(), reasoning.clone());
         }
+        if let Some(temperature) = options.temperature {
+            body.insert("temperature".to_string(), Value::from(temperature));
+        }
+        if let Some(top_p) = options.top_p {
+            body.insert("top_p".to_string(), Value::from(top_p));
+        }
+        if let Some(max_output_tokens) = options.max_output_tokens {
+            body.insert(
+                "max_output_tokens".to_string(),
+                Value::from(max_output_tokens),
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_optional_range(
+    value: Option<f32>,
+    field_name: &str,
+    min: f32,
+    max: f32,
+) -> Result<(), AdapterError> {
+    let Some(value) = value else {
+        return Ok(());
+    };
+
+    if !value.is_finite() {
+        return Err(AdapterError::new(
+            AdapterErrorKind::Validation,
+            ProviderKind::OpenAi,
+            AdapterOperation::PlanRequest,
+            format!("{field_name} must be finite"),
+        ));
+    }
+
+    if !(min..=max).contains(&value) {
+        return Err(AdapterError::new(
+            AdapterErrorKind::Validation,
+            ProviderKind::OpenAi,
+            AdapterOperation::PlanRequest,
+            format!("{field_name} must be in {min}..={max}"),
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_max_output_tokens(value: Option<u32>) -> Result<(), AdapterError> {
+    if matches!(value, Some(0)) {
+        return Err(AdapterError::new(
+            AdapterErrorKind::Validation,
+            ProviderKind::OpenAi,
+            AdapterOperation::PlanRequest,
+            "max_output_tokens must be greater than 0",
+        ));
     }
 
     Ok(())

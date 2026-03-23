@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use agent_core::{
     FamilyOptions, Message, NativeOptions, OpenAiCompatibleOptions, OpenAiOptions,
@@ -63,7 +63,16 @@ fn routed_planner_rejects_mismatched_native_provider() {
                 NativeOptions {
                     family: None,
                     provider: Some(ProviderOptions::Anthropic(agent_core::AnthropicOptions {
+                        temperature: None,
+                        top_p: None,
+                        max_tokens: None,
                         top_k: Some(8),
+                        stop_sequences: Vec::new(),
+                        metadata_user_id: None,
+                        output_config: None,
+                        service_tier: None,
+                        tool_choice: None,
+                        inference_geo: None,
                     })),
                 },
             ));
@@ -100,10 +109,15 @@ fn routed_planner_rejects_provider_native_layer_for_generic_openai_compatible() 
             family: Some(FamilyOptions::OpenAiCompatible(OpenAiCompatibleOptions {
                 parallel_tool_calls: Some(true),
                 reasoning: None,
+                temperature: Some(0.4),
+                top_p: Some(0.9),
+                max_output_tokens: Some(256),
             })),
             provider: Some(ProviderOptions::OpenAi(OpenAiOptions {
+                metadata: Default::default(),
                 service_tier: Some("priority".to_string()),
                 store: Some(true),
+                ..Default::default()
             })),
         }),
     );
@@ -251,11 +265,6 @@ fn routed_planner_classifies_adapter_planning_rejection() {
         tools: Vec::new(),
         tool_choice: ToolChoice::Auto,
         response_format: ResponseFormat::Text,
-        temperature: None,
-        top_p: None,
-        max_output_tokens: None,
-        stop: Vec::new(),
-        metadata: BTreeMap::new(),
     };
 
     let error = plan_routed_attempt(&client, &attempt, &task, &ExecutionOptions::default())
@@ -435,11 +444,6 @@ fn routed_planning_failure_uses_adapter_rejection_reason_when_any_attempt_reache
         tools: Vec::new(),
         tool_choice: ToolChoice::Auto,
         response_format: ResponseFormat::Text,
-        temperature: None,
-        top_p: None,
-        max_output_tokens: None,
-        stop: Vec::new(),
-        metadata: BTreeMap::new(),
     };
 
     let result = plan_routed_execution(
@@ -616,10 +620,5 @@ fn test_task_request() -> TaskRequest {
         tools: Vec::new(),
         tool_choice: ToolChoice::Auto,
         response_format: ResponseFormat::Text,
-        temperature: None,
-        top_p: None,
-        max_output_tokens: None,
-        stop: Vec::new(),
-        metadata: BTreeMap::new(),
     }
 }

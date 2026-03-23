@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
 use agent_core::{Message, ResponseFormat, TaskRequest, ToolChoice, ToolDefinition};
 
@@ -47,9 +47,15 @@ impl MessagesPayload {
 
 /// High-level task input used by the `messages` and `streaming` APIs.
 ///
-/// This builder normalizes into [`TaskRequest`] only.
-/// It keeps message storage ergonomic for direct construction and copy-on-write
-/// sharing with [`Conversation`].
+/// This builder normalizes into semantic [`TaskRequest`] values only. It keeps
+/// message storage ergonomic for direct construction and copy-on-write sharing
+/// with [`Conversation`], but it does not carry provider request controls.
+///
+/// Supply tuning, token budgets, metadata, stop controls, and other native
+/// request fields separately through the direct-provider helpers:
+/// `openai().create_with_openai_options(...)`,
+/// `anthropic().create_with_anthropic_options(...)`, and
+/// `openrouter().create_with_openrouter_options(...)`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MessageCreateInput {
     messages: MessagesPayload,
@@ -59,16 +65,6 @@ pub struct MessageCreateInput {
     pub tool_choice: ToolChoice,
     /// Requested response format.
     pub response_format: ResponseFormat,
-    /// Sampling temperature override.
-    pub temperature: Option<f32>,
-    /// Nucleus sampling override.
-    pub top_p: Option<f32>,
-    /// Maximum number of output tokens to generate.
-    pub max_output_tokens: Option<u32>,
-    /// Stop sequences for generation.
-    pub stop: Vec<String>,
-    /// Opaque request metadata forwarded to the provider adapter.
-    pub metadata: BTreeMap<String, String>,
 }
 
 impl MessageCreateInput {
@@ -84,11 +80,6 @@ impl MessageCreateInput {
             tools: Vec::new(),
             tool_choice: ToolChoice::default(),
             response_format: ResponseFormat::default(),
-            temperature: None,
-            top_p: None,
-            max_output_tokens: None,
-            stop: Vec::new(),
-            metadata: BTreeMap::new(),
         }
     }
 
@@ -101,11 +92,6 @@ impl MessageCreateInput {
             tools: Vec::new(),
             tool_choice: ToolChoice::default(),
             response_format: ResponseFormat::default(),
-            temperature: None,
-            top_p: None,
-            max_output_tokens: None,
-            stop: Vec::new(),
-            metadata: BTreeMap::new(),
         }
     }
 
@@ -148,40 +134,6 @@ impl MessageCreateInput {
         self
     }
 
-    /// Sets the sampling temperature.
-    pub fn with_temperature(mut self, temperature: f32) -> Self {
-        self.temperature = Some(temperature);
-        self
-    }
-
-    /// Sets the nucleus sampling parameter.
-    pub fn with_top_p(mut self, top_p: f32) -> Self {
-        self.top_p = Some(top_p);
-        self
-    }
-
-    /// Sets the maximum output token count.
-    pub fn with_max_output_tokens(mut self, max_output_tokens: u32) -> Self {
-        self.max_output_tokens = Some(max_output_tokens);
-        self
-    }
-
-    /// Replaces the stop sequences.
-    pub fn with_stop<I, S>(mut self, stop: I) -> Self
-    where
-        I: IntoIterator<Item = S>,
-        S: Into<String>,
-    {
-        self.stop = stop.into_iter().map(Into::into).collect();
-        self
-    }
-
-    /// Replaces the request metadata map.
-    pub fn with_metadata(mut self, metadata: BTreeMap<String, String>) -> Self {
-        self.metadata = metadata;
-        self
-    }
-
     /// Converts this input into a semantic task request.
     pub fn into_task_request(self) -> Result<TaskRequest, RuntimeError> {
         let MessageCreateInput {
@@ -189,11 +141,6 @@ impl MessageCreateInput {
             tools,
             tool_choice,
             response_format,
-            temperature,
-            top_p,
-            max_output_tokens,
-            stop,
-            metadata,
             ..
         } = self;
 
@@ -209,11 +156,6 @@ impl MessageCreateInput {
             tools,
             tool_choice,
             response_format,
-            temperature,
-            top_p,
-            max_output_tokens,
-            stop,
-            metadata,
         })
     }
 }

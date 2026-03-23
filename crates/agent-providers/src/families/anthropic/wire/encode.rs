@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use serde_json::{Map, Value, json};
 
@@ -12,9 +12,6 @@ use super::{AnthropicEncodedRequest, AnthropicFamilyError};
 
 const DEFAULT_MAX_TOKENS: u32 = 1024;
 
-const WARN_BOTH_TEMPERATURE_AND_TOP_P_SET: &str = "anthropic.encode.both_temperature_and_top_p_set";
-const WARN_DROPPED_UNSUPPORTED_METADATA_KEYS: &str =
-    "anthropic.encode.dropped_unsupported_metadata_keys";
 const WARN_DEFAULT_MAX_TOKENS_APPLIED: &str = "anthropic.encode.default_max_tokens_applied";
 
 #[derive(Debug, Clone, PartialEq)]
@@ -39,24 +36,12 @@ pub(crate) fn encode_anthropic_request(
     validate_request(task, model_id)?;
 
     let mut warnings = Vec::new();
-    if task.temperature.is_some() && task.top_p.is_some() {
-        push_warning(
-            &mut warnings,
-            WARN_BOTH_TEMPERATURE_AND_TOP_P_SET,
-            "Anthropic recommends setting temperature or top_p, but not both",
-        );
-    }
 
     let TaskRequest {
         messages,
         tools,
         tool_choice,
         response_format,
-        metadata,
-        temperature,
-        top_p,
-        max_output_tokens,
-        stop,
     } = task.clone();
 
     let (system, non_system_messages) = map_system_prefix(messages)?;
@@ -72,13 +57,12 @@ pub(crate) fn encode_anthropic_request(
     let tool_choice = map_tool_choice(&tools, &tool_choice)?;
     let tools = map_tools(tools)?;
     let output_config = map_response_format(response_format, &merged_messages)?;
-    let metadata = map_metadata(metadata, &mut warnings);
 
     let mut body = Map::new();
     body.insert("model".to_string(), Value::String(model_id.to_string()));
     body.insert(
         "max_tokens".to_string(),
-        Value::from(max_output_tokens.unwrap_or_else(|| {
+        Value::from({
             push_warning(
                 &mut warnings,
                 WARN_DEFAULT_MAX_TOKENS_APPLIED,
@@ -87,7 +71,7 @@ pub(crate) fn encode_anthropic_request(
                 ),
             );
             DEFAULT_MAX_TOKENS
-        })),
+        }),
     );
     body.insert(
         "messages".to_string(),
@@ -110,19 +94,6 @@ pub(crate) fn encode_anthropic_request(
     if let Some(output_config) = output_config {
         body.insert("output_config".to_string(), output_config);
     }
-    if !stop.is_empty() {
-        body.insert("stop_sequences".to_string(), json!(stop));
-    }
-    if let Some(temperature) = temperature {
-        body.insert("temperature".to_string(), json!(temperature));
-    }
-    if let Some(top_p) = top_p {
-        body.insert("top_p".to_string(), json!(top_p));
-    }
-    if let Some(metadata) = metadata {
-        body.insert("metadata".to_string(), metadata);
-    }
-
     Ok(AnthropicEncodedRequest {
         body: Value::Object(body),
         warnings,
@@ -132,36 +103,6 @@ pub(crate) fn encode_anthropic_request(
 fn validate_request(task: &TaskRequest, model_id: &str) -> Result<(), AnthropicFamilyError> {
     if model_id.trim().is_empty() {
         return Err(AnthropicFamilyError::validation("missing model_id"));
-    }
-
-    if task.max_output_tokens == Some(0) {
-        return Err(AnthropicFamilyError::validation(
-            "max_output_tokens must be at least 1 for Anthropic",
-        ));
-    }
-
-    if let Some(temperature) = task.temperature
-        && !(0.0..=1.0).contains(&temperature)
-    {
-        return Err(AnthropicFamilyError::validation(format!(
-            "temperature must be in [0.0, 1.0], got {temperature}",
-        )));
-    }
-
-    if let Some(top_p) = task.top_p
-        && !(0.0..=1.0).contains(&top_p)
-    {
-        return Err(AnthropicFamilyError::validation(format!(
-            "top_p must be in [0.0, 1.0], got {top_p}",
-        )));
-    }
-
-    for stop in &task.stop {
-        if stop.is_empty() {
-            return Err(AnthropicFamilyError::validation(
-                "stop sequences must not contain empty strings",
-            ));
-        }
     }
 
     validate_tool_choice(task)?;
@@ -617,30 +558,6 @@ fn validate_no_assistant_prefill(messages: &[WireMessage]) -> Result<(), Anthrop
         ));
     }
     Ok(())
-}
-
-fn map_metadata(
-    metadata: BTreeMap<String, String>,
-    warnings: &mut Vec<RuntimeWarning>,
-) -> Option<Value> {
-    let mut mapped_metadata = Map::new();
-    if let Some(user_id) = metadata.get("user_id") {
-        mapped_metadata.insert("user_id".to_string(), Value::String(user_id.clone()));
-    }
-
-    if metadata.keys().any(|key| key != "user_id") {
-        push_warning(
-            warnings,
-            WARN_DROPPED_UNSUPPORTED_METADATA_KEYS,
-            "anthropic metadata only supports user_id; unsupported keys dropped",
-        );
-    }
-
-    if mapped_metadata.is_empty() {
-        None
-    } else {
-        Some(Value::Object(mapped_metadata))
-    }
 }
 
 fn push_warning(warnings: &mut Vec<RuntimeWarning>, code: &str, message: impl Into<String>) {

@@ -2,8 +2,6 @@
 
 mod e2e;
 
-use std::collections::BTreeMap;
-
 use agent_toolkit::core::{MessageRole, ProviderInstanceId, ProviderKind};
 use agent_toolkit::prelude::{MessageCreateInput, Route, Target, ToolChoice, anthropic, openai};
 use agent_toolkit::runtime::{ExecutionOptions, ProviderConfig};
@@ -18,9 +16,6 @@ use e2e::mock_server::{MockResponse, MockServer};
 use e2e::timeout::with_test_timeout;
 
 fn explicit_task_with_text(text: &str) -> TaskRequest {
-    let mut metadata = BTreeMap::new();
-    metadata.insert("trace_id".to_string(), "trace-123".to_string());
-
     MessageCreateInput::new(vec![Message::new(
         MessageRole::User,
         vec![ContentPart::text(text)],
@@ -41,9 +36,6 @@ fn explicit_task_with_text(text: &str) -> TaskRequest {
         name: "raw_echo".to_string(),
     })
     .with_response_format(Default::default())
-    .with_temperature(0.2)
-    .with_max_output_tokens(128)
-    .with_metadata(metadata)
     .into_task_request()
     .expect("explicit task should build")
 }
@@ -92,7 +84,6 @@ async fn create_task_with_meta_openai_uses_explicit_task_and_captures_shape() {
     assert_json_string(&req.body_json, "/model", "ignored-default");
     assert_json_object_has_key(&req.body_json, "/tools/0", "name");
     assert_json_object_has_key(&req.body_json, "/tools/0", "parameters");
-    assert_json_object_has_key(&req.body_json, "/metadata", "trace_id");
 }
 
 #[tokio::test]

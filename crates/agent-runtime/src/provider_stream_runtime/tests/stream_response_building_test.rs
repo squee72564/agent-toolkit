@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use agent_core::{
     CanonicalStreamEvent, ContentPart, FinishReason, Message, ProviderKind, ResponseFormat,
     StreamOutputItemEnd, StreamOutputItemStart, TaskRequest, ToolChoice,
@@ -72,11 +70,6 @@ async fn runtime_executes_openai_sse_plan_and_builds_response() {
                     tools: Vec::new(),
                     tool_choice: ToolChoice::Auto,
                     response_format: ResponseFormat::Text,
-                    temperature: None,
-                    top_p: None,
-                    max_output_tokens: None,
-                    stop: Vec::new(),
-                    metadata: BTreeMap::new(),
                 },
                 &AttemptSpec::to(Target::new(runtime.instance_id.clone())),
                 &ExecutionOptions {

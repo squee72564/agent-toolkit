@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 
 use serde_json::{Map, Value, json};
 
@@ -20,11 +20,6 @@ pub(crate) struct OpenAiEncodeInput<'a> {
     pub(crate) tools: Vec<ToolDefinition>,
     pub(crate) tool_choice: ToolChoice,
     pub(crate) response_format: ResponseFormat,
-    pub(crate) temperature: Option<f32>,
-    pub(crate) top_p: Option<f32>,
-    pub(crate) max_output_tokens: Option<u32>,
-    pub(crate) stop: &'a [String],
-    pub(crate) metadata: BTreeMap<String, String>,
 }
 
 pub(crate) fn encode_openai_request(
@@ -37,11 +32,6 @@ pub(crate) fn encode_openai_request(
         tools: task.tools.clone(),
         tool_choice: task.tool_choice.clone(),
         response_format: task.response_format.clone(),
-        temperature: task.temperature,
-        top_p: task.top_p,
-        max_output_tokens: task.max_output_tokens,
-        stop: &task.stop,
-        metadata: task.metadata.clone(),
     })
 }
 
@@ -54,11 +44,6 @@ pub(crate) fn encode_openai_request_parts(
         tools,
         tool_choice,
         response_format,
-        temperature,
-        top_p,
-        max_output_tokens,
-        stop,
-        metadata,
     } = input;
 
     if model_id.trim().is_empty() {
@@ -87,34 +72,6 @@ pub(crate) fn encode_openai_request_parts(
     }
 
     body.insert("tool_choice".to_string(), tool_choice);
-
-    if let Some(temperature) = temperature {
-        body.insert("temperature".to_string(), json!(temperature));
-    }
-
-    if let Some(max_output_tokens) = max_output_tokens {
-        body.insert("max_output_tokens".to_string(), json!(max_output_tokens));
-    }
-
-    if !metadata.is_empty() {
-        body.insert("metadata".to_string(), json!(metadata));
-    }
-
-    if top_p.is_some() {
-        push_warning(
-            &mut warnings,
-            "openai.encode.ignored_top_p",
-            "top_p is currently not mapped for OpenAI Responses API and was ignored",
-        );
-    }
-
-    if !stop.is_empty() {
-        push_warning(
-            &mut warnings,
-            "openai.encode.ignored_stop",
-            "stop sequences are currently not mapped for OpenAI Responses API and were ignored",
-        );
-    }
 
     Ok(OpenAiEncodedRequest {
         body: Value::Object(body),

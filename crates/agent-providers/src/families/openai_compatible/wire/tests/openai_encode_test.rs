@@ -1,8 +1,8 @@
 use serde_json::json;
 
 use agent_core::types::{
-    ContentPart, Message, MessageRole, ResponseFormat, ToolCall, ToolChoice, ToolDefinition,
-    ToolResult, ToolResultContent,
+    ContentPart, Message, MessageRole, OpenAiCompatibleOptions, ResponseFormat, ToolCall,
+    ToolChoice, ToolDefinition, ToolResult, ToolResultContent,
 };
 
 use super::openai_test_helpers::*;
@@ -42,43 +42,24 @@ fn encode_warnings_empty_for_basic_request() {
 }
 
 #[test]
-fn encode_warns_when_top_p_ignored() {
-    let mut request = base_request(vec![Message {
-        role: MessageRole::User,
-        content: vec![ContentPart::Text {
-            text: "hello".to_string(),
-        }],
-    }]);
-    request.top_p = Some(0.8);
+fn planning_helper_applies_family_options_without_mutating_task() {
+    let request = base_request(vec![Message::user_text("hello")]);
 
-    let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
+    let planned = plan_openai_family_request(
+        &request,
+        agent_core::ResponseMode::NonStreaming,
+        Some(OpenAiCompatibleOptions {
+            temperature: Some(0.5),
+            top_p: Some(0.75),
+            max_output_tokens: Some(64),
+            ..OpenAiCompatibleOptions::default()
+        }),
+    )
+    .expect("planning should succeed");
 
-    assert!(
-        encoded
-            .warnings
-            .iter()
-            .any(|w| w.code == "openai.encode.ignored_top_p")
-    );
-}
-
-#[test]
-fn encode_warns_when_stop_ignored() {
-    let mut request = base_request(vec![Message {
-        role: MessageRole::User,
-        content: vec![ContentPart::Text {
-            text: "hello".to_string(),
-        }],
-    }]);
-    request.stop = vec!["END".to_string()];
-
-    let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
-
-    assert!(
-        encoded
-            .warnings
-            .iter()
-            .any(|w| w.code == "openai.encode.ignored_stop")
-    );
+    assert_eq!(planned.body["temperature"], json!(0.5));
+    assert_eq!(planned.body["top_p"], json!(0.75));
+    assert_eq!(planned.body["max_output_tokens"], json!(64));
 }
 
 #[test]
@@ -202,8 +183,6 @@ fn encode_emits_multiple_warnings_together() {
             text: "hello".to_string(),
         }],
     }]);
-    request.top_p = Some(0.8);
-    request.stop = vec!["END".to_string()];
     request.tools = vec![ToolDefinition {
         name: "lookup_weather".to_string(),
         description: None,
@@ -221,18 +200,6 @@ fn encode_emits_multiple_warnings_together() {
 
     let encoded = encode_openai_request(request.clone()).expect("encoding should succeed");
 
-    assert!(
-        encoded
-            .warnings
-            .iter()
-            .any(|w| w.code == "openai.encode.ignored_top_p")
-    );
-    assert!(
-        encoded
-            .warnings
-            .iter()
-            .any(|w| w.code == "openai.encode.ignored_stop")
-    );
     assert!(
         encoded
             .warnings

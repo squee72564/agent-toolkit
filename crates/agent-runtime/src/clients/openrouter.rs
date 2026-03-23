@@ -53,6 +53,16 @@ impl OpenRouterClient {
         attempt
     }
 
+    /// Executes a direct OpenRouter request with typed native options.
+    ///
+    /// `input` stays semantic-only (`messages`, tools, tool choice, response format).
+    /// OpenAI-compatible controls such as `temperature`, `top_p`, and
+    /// `max_output_tokens` belong in `family`; router-native controls such as
+    /// `provider_preferences`, penalties, metadata, plugins, routing/model
+    /// fallbacks, `top_logprobs`, `text.verbosity`, and approved parameter-doc
+    /// fields such as `max_tokens`, `stop`, `seed`, `logit_bias`, and
+    /// `logprobs` belong in `provider`. `fallback_models` is encoded to the
+    /// OpenRouter wire `models` array.
     pub async fn create_with_openrouter_options(
         &self,
         input: impl Into<MessageCreateInput>,

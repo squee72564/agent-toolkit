@@ -35,6 +35,10 @@ pub use message::MessageRole;
 pub use native_options::AnthropicFamilyOptions;
 /// Re-export of [`native_options::AnthropicOptions`].
 pub use native_options::AnthropicOptions;
+/// Re-export of [`native_options::AnthropicServiceTier`].
+pub use native_options::AnthropicServiceTier;
+/// Re-export of [`native_options::AnthropicToolChoiceOptions`].
+pub use native_options::AnthropicToolChoiceOptions;
 /// Re-export of [`native_options::FamilyOptions`].
 pub use native_options::FamilyOptions;
 /// Re-export of [`native_options::NativeOptions`].
@@ -43,8 +47,20 @@ pub use native_options::NativeOptions;
 pub use native_options::OpenAiCompatibleOptions;
 /// Re-export of [`native_options::OpenAiOptions`].
 pub use native_options::OpenAiOptions;
+/// Re-export of [`native_options::OpenAiPromptCacheRetention`].
+pub use native_options::OpenAiPromptCacheRetention;
+/// Re-export of [`native_options::OpenAiTextOptions`].
+pub use native_options::OpenAiTextOptions;
+/// Re-export of [`native_options::OpenAiTextVerbosity`].
+pub use native_options::OpenAiTextVerbosity;
+/// Re-export of [`native_options::OpenAiTruncation`].
+pub use native_options::OpenAiTruncation;
 /// Re-export of [`native_options::OpenRouterOptions`].
 pub use native_options::OpenRouterOptions;
+/// Re-export of [`native_options::OpenRouterTextOptions`].
+pub use native_options::OpenRouterTextOptions;
+/// Re-export of [`native_options::OpenRouterTextVerbosity`].
+pub use native_options::OpenRouterTextVerbosity;
 /// Re-export of [`native_options::ProviderOptions`].
 pub use native_options::ProviderOptions;
 /// Re-export of [`planning::ExecutionPlan`].

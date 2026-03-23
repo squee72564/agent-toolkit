@@ -1,8 +1,8 @@
 use serde_json::json;
 
 use agent_core::types::{
-    ContentPart, Message, MessageRole, ResponseFormat, ToolCall, ToolChoice, ToolDefinition,
-    ToolResult, ToolResultContent,
+    AnthropicFamilyOptions, ContentPart, Message, MessageRole, ResponseFormat, ToolCall,
+    ToolChoice, ToolDefinition, ToolResult, ToolResultContent,
 };
 
 use super::anthropic_test_helpers::*;
@@ -54,6 +54,22 @@ fn encode_system_prefix_mapping() {
     assert_eq!(encoded.body["system"][0]["text"], json!("sys-a"));
     assert_eq!(encoded.body["system"][1]["text"], json!("sys-b"));
     assert_eq!(encoded.body["messages"][0]["role"], json!("user"));
+}
+
+#[test]
+fn planning_helper_applies_family_options_without_mutating_task() {
+    let request = base_request(vec![Message::user_text("hello")]);
+
+    let planned = plan_anthropic_family_request(
+        &request,
+        agent_core::ResponseMode::NonStreaming,
+        Some(AnthropicFamilyOptions {
+            thinking: Some(json!({ "type": "disabled" })),
+        }),
+    )
+    .expect("planning should succeed");
+
+    assert_eq!(planned.body["thinking"]["type"], json!("disabled"));
 }
 
 #[test]
@@ -287,74 +303,6 @@ fn encode_rejects_invalid_tool_schema_or_name() {
         AnthropicFamilyErrorKind::Validation
     );
     assert!(bad_schema_error.message().contains("must be a JSON object"));
-}
-
-#[test]
-fn encode_rejects_temperature_out_of_range() {
-    let mut request = base_request(vec![Message {
-        role: MessageRole::User,
-        content: vec![ContentPart::Text {
-            text: "hello".to_string(),
-        }],
-    }]);
-    request.temperature = Some(1.1);
-
-    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Validation);
-    assert!(
-        error
-            .message()
-            .contains("temperature must be in [0.0, 1.0]")
-    );
-}
-
-#[test]
-fn encode_rejects_top_p_out_of_range() {
-    let mut request = base_request(vec![Message {
-        role: MessageRole::User,
-        content: vec![ContentPart::Text {
-            text: "hello".to_string(),
-        }],
-    }]);
-    request.top_p = Some(-0.1);
-
-    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Validation);
-    assert!(error.message().contains("top_p must be in [0.0, 1.0]"));
-}
-
-#[test]
-fn encode_rejects_zero_max_output_tokens() {
-    let mut request = base_request(vec![Message {
-        role: MessageRole::User,
-        content: vec![ContentPart::Text {
-            text: "hello".to_string(),
-        }],
-    }]);
-    request.max_output_tokens = Some(0);
-
-    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Validation);
-    assert!(
-        error
-            .message()
-            .contains("max_output_tokens must be at least 1")
-    );
-}
-
-#[test]
-fn encode_rejects_empty_stop_sequence() {
-    let mut request = base_request(vec![Message {
-        role: MessageRole::User,
-        content: vec![ContentPart::Text {
-            text: "hello".to_string(),
-        }],
-    }]);
-    request.stop = vec!["".to_string()];
-
-    let error = encode_anthropic_request(request.clone()).expect_err("encode should fail");
-    assert_eq!(error.kind(), AnthropicFamilyErrorKind::Validation);
-    assert!(error.message().contains("must not contain empty strings"));
 }
 
 #[test]
@@ -604,26 +552,6 @@ fn encode_maps_json_schema_response_format_to_output_config() {
 }
 
 #[test]
-fn encode_emits_warning_when_temperature_and_top_p_set() {
-    let mut request = base_request(vec![Message {
-        role: MessageRole::User,
-        content: vec![ContentPart::Text {
-            text: "hello".to_string(),
-        }],
-    }]);
-    request.temperature = Some(0.3);
-    request.top_p = Some(0.9);
-
-    let encoded = encode_anthropic_request(request.clone()).expect("encode should succeed");
-    assert!(
-        encoded
-            .warnings
-            .iter()
-            .any(|warning| warning.code == "anthropic.encode.both_temperature_and_top_p_set")
-    );
-}
-
-#[test]
 fn encode_emits_warning_when_default_max_tokens_applied() {
     let request = base_request(vec![Message {
         role: MessageRole::User,
@@ -639,30 +567,5 @@ fn encode_emits_warning_when_default_max_tokens_applied() {
             .warnings
             .iter()
             .any(|warning| warning.code == "anthropic.encode.default_max_tokens_applied")
-    );
-}
-
-#[test]
-fn encode_emits_warning_when_dropping_unsupported_metadata_keys() {
-    let mut request = base_request(vec![Message {
-        role: MessageRole::User,
-        content: vec![ContentPart::Text {
-            text: "hello".to_string(),
-        }],
-    }]);
-    request
-        .metadata
-        .insert("user_id".to_string(), "user-1".to_string());
-    request
-        .metadata
-        .insert("trace_id".to_string(), "trace-123".to_string());
-
-    let encoded = encode_anthropic_request(request.clone()).expect("encode should succeed");
-    assert_eq!(encoded.body["metadata"], json!({"user_id":"user-1"}));
-    assert!(
-        encoded
-            .warnings
-            .iter()
-            .any(|warning| warning.code == "anthropic.encode.dropped_unsupported_metadata_keys")
     );
 }

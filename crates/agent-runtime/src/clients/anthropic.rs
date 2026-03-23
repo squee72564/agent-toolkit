@@ -53,6 +53,14 @@ impl AnthropicClient {
         attempt
     }
 
+    /// Executes a direct Anthropic request with typed native options.
+    ///
+    /// `input` stays semantic-only (`messages`, tools, tool choice, response format).
+    /// Anthropic family controls such as `thinking` belong in `family`.
+    /// Anthropic provider controls such as `temperature`, `top_p`, `max_tokens`,
+    /// `top_k`, `stop_sequences`, `metadata_user_id`, `output_config`,
+    /// `service_tier`, `tool_choice.disable_parallel_tool_use`, and
+    /// `inference_geo` belong in `provider`.
     pub async fn create_with_anthropic_options(
         &self,
         input: impl Into<MessageCreateInput>,

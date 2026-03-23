@@ -4,7 +4,10 @@ use std::rc::Rc;
 use reqwest::Method;
 use serde_json::json;
 
-use agent_core::types::{ProviderKind, ResponseFormat, ResponseMode};
+use agent_core::types::{
+    FamilyOptions, NativeOptions, OpenAiCompatibleOptions, ProviderKind, ResponseFormat,
+    ResponseMode,
+};
 
 use crate::{
     adapter::{
@@ -24,15 +27,20 @@ const OPENAI_MODEL: &str = "openai/gpt-5-mini";
 
 #[test]
 fn openrouter_adapter_plan_request_matches_family_refinement_translation() {
-    let mut task = base_task();
-    task.top_p = Some(0.5);
-    task.stop = vec!["done".to_string()];
+    let task = base_task();
+    let native_options = NativeOptions {
+        family: Some(FamilyOptions::OpenAiCompatible(OpenAiCompatibleOptions {
+            top_p: Some(0.5),
+            ..OpenAiCompatibleOptions::default()
+        })),
+        provider: None,
+    };
     let execution = execution_plan(
         ProviderKind::OpenRouter,
         &task,
         OPENAI_MODEL,
         ResponseMode::NonStreaming,
-        None,
+        Some(native_options.clone()),
     );
 
     let translated = compose_openai_compatible_request(
@@ -40,7 +48,7 @@ fn openrouter_adapter_plan_request_matches_family_refinement_translation() {
         &task,
         OPENAI_MODEL,
         ResponseMode::NonStreaming,
-        None,
+        Some(&native_options),
     )
     .expect("planning should succeed");
     let adapter_plan = adapter_for(ProviderKind::OpenRouter)

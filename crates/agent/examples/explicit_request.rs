@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::env;
 
 use agent_toolkit::prelude::{Message, MessageCreateInput, MessageRole, ToolChoice, openai};
@@ -26,12 +25,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .default_model("gpt-5-mini")
         .build()?;
 
-    let mut metadata = BTreeMap::new();
-    metadata.insert(
-        "trace_id".to_string(),
-        "example-explicit-request".to_string(),
-    );
-
     let task = MessageCreateInput::new(vec![Message::new(
         MessageRole::User,
         vec![ContentPart::text(
@@ -52,8 +45,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }])
     .with_tool_choice(ToolChoice::Auto)
     .with_response_format(ResponseFormat::Text)
-    .with_max_output_tokens(128)
-    .with_metadata(metadata)
     .into_task_request()?;
 
     let (response, meta) = client

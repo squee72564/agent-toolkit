@@ -49,6 +49,14 @@ impl OpenAiClient {
         attempt
     }
 
+    /// Executes a direct OpenAI request with typed native options.
+    ///
+    /// `input` stays semantic-only (`messages`, tools, tool choice, response format).
+    /// Request controls such as `temperature`, `top_p`, and `max_output_tokens`
+    /// must be passed in `family`, and OpenAI-specific controls such as
+    /// `metadata`, `service_tier`, `store`, `prompt_cache_key`,
+    /// `prompt_cache_retention`, `truncation`, `text.verbosity`, and
+    /// `safety_identifier` must be passed in `provider`.
     pub async fn create_with_openai_options(
         &self,
         input: impl Into<MessageCreateInput>,

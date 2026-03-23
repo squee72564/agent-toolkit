@@ -97,22 +97,12 @@ fn conversation_to_input_and_into_input_preserve_messages() {
     assert!(to_input.tools.is_empty());
     assert_eq!(to_input.tool_choice, ToolChoice::default());
     assert_eq!(to_input.response_format, ResponseFormat::default());
-    assert!(to_input.temperature.is_none());
-    assert!(to_input.top_p.is_none());
-    assert!(to_input.max_output_tokens.is_none());
-    assert!(to_input.stop.is_empty());
-    assert!(to_input.metadata.is_empty());
 
     let into_input = conversation.clone().into_input();
     assert_eq!(into_input.messages(), conversation.messages());
     assert!(into_input.tools.is_empty());
     assert_eq!(into_input.tool_choice, ToolChoice::default());
     assert_eq!(into_input.response_format, ResponseFormat::default());
-    assert!(into_input.temperature.is_none());
-    assert!(into_input.top_p.is_none());
-    assert!(into_input.max_output_tokens.is_none());
-    assert!(into_input.stop.is_empty());
-    assert!(into_input.metadata.is_empty());
 }
 
 #[test]

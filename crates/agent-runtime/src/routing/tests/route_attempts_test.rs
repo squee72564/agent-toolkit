@@ -23,10 +23,14 @@ fn attempt_spec_builder_preserves_attempt_local_execution_state() {
         family: Some(FamilyOptions::OpenAiCompatible(OpenAiCompatibleOptions {
             parallel_tool_calls: Some(true),
             reasoning: None,
+            temperature: Some(0.2),
+            top_p: None,
+            max_output_tokens: Some(128),
         })),
-        provider: Some(ProviderOptions::OpenRouter(Box::new(
-            OpenRouterOptions::new().with_route("fallback"),
-        ))),
+        provider: Some(ProviderOptions::OpenRouter(Box::new(OpenRouterOptions {
+            fallback_models: vec!["fallback-model".to_string()],
+            ..OpenRouterOptions::default()
+        }))),
     };
 
     let attempt = AttemptSpec::to(Target::new(ProviderInstanceId::openrouter_default()))
@@ -45,6 +49,9 @@ fn route_builder_preserves_routing_and_attempt_state() {
         family: Some(FamilyOptions::OpenAiCompatible(OpenAiCompatibleOptions {
             parallel_tool_calls: Some(true),
             reasoning: None,
+            temperature: None,
+            top_p: Some(0.8),
+            max_output_tokens: None,
         })),
         provider: None,
     };
