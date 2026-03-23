@@ -55,14 +55,22 @@ impl OpenRouterClient {
 
     /// Executes a direct OpenRouter request with typed native options.
     ///
-    /// `input` stays semantic-only (`messages`, tools, tool choice, response format).
-    /// OpenAI-compatible controls such as `temperature`, `top_p`, and
-    /// `max_output_tokens` belong in `family`; router-native controls such as
-    /// `provider_preferences`, penalties, metadata, plugins, routing/model
-    /// fallbacks, `top_logprobs`, `text.verbosity`, and approved parameter-doc
-    /// fields such as `max_tokens`, `stop`, `seed`, `logit_bias`, and
-    /// `logprobs` belong in `provider`. `fallback_models` is encoded to the
-    /// OpenRouter wire `models` array.
+    /// `input` stays semantic-only (`messages`, tools, tool choice, response
+    /// format). OpenAI-compatible family controls such as
+    /// `parallel_tool_calls`, `reasoning`, `temperature`, `top_p`, and
+    /// `max_output_tokens` belong in `family`.
+    ///
+    /// Router-native controls such as `provider_preferences`, metadata,
+    /// plugins, penalties, `top_k`, `top_logprobs`, `text.verbosity`,
+    /// `fallback_models`, `modalities`, `image_config`, and the approved
+    /// parameter-doc-backed fields `max_tokens`, `stop`, `seed`, `logit_bias`,
+    /// and `logprobs` belong in `provider`. `fallback_models` is encoded to the
+    /// OpenRouter wire `models` array, and non-doc-backed `route` and `debug`
+    /// fields are intentionally not part of [`OpenRouterOptions`].
+    ///
+    /// Validation follows ownership in the current implementation: the
+    /// OpenAI-compatible family codec validates `family`, and the OpenRouter
+    /// provider refinement validates `provider`.
     pub async fn create_with_openrouter_options(
         &self,
         input: impl Into<MessageCreateInput>,
@@ -81,6 +89,8 @@ impl OpenRouterClient {
         .await
     }
 
+    /// Executes a semantic [`TaskRequest`] on the direct OpenRouter path with
+    /// separate family-scoped and provider-scoped native options.
     pub async fn execute_with_openrouter_options(
         &self,
         task: TaskRequest,
@@ -98,6 +108,11 @@ impl OpenRouterClient {
             .await
     }
 
+    /// Executes a streaming direct OpenRouter request with typed native
+    /// options.
+    ///
+    /// Ownership and validation rules are the same as
+    /// [`Self::create_with_openrouter_options`].
     pub async fn create_stream_with_openrouter_options(
         &self,
         input: impl Into<MessageCreateInput>,
@@ -119,6 +134,8 @@ impl OpenRouterClient {
         .await
     }
 
+    /// Executes a streaming semantic [`TaskRequest`] on the direct OpenRouter
+    /// path with separate family-scoped and provider-scoped native options.
     pub async fn execute_stream_with_openrouter_options(
         &self,
         task: TaskRequest,

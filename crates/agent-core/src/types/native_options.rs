@@ -7,9 +7,13 @@ use crate::{ProviderFamilyId, ProviderKind};
 
 /// Shared request controls owned by the OpenAI-compatible family codec.
 ///
-/// These fields are not semantic request intent. They are family-scoped
-/// controls that can be encoded consistently for the OpenAI-compatible request
-/// surface used by this repository.
+/// These fields are not semantic request intent. They are the narrow set of
+/// controls the repository treats as shared across the targeted
+/// OpenAI-compatible Responses surface used for OpenAI and OpenRouter.
+///
+/// Validation and encoding for this layer live in the OpenAI-compatible family
+/// codec rather than on [`crate::TaskRequest`] or in provider-specific
+/// refinements.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OpenAiCompatibleOptions {
@@ -33,7 +37,8 @@ pub struct OpenAiCompatibleOptions {
 /// Shared request controls owned by the Anthropic family codec.
 ///
 /// Anthropic-specific family controls stay here rather than on
-/// [`crate::TaskRequest`].
+/// [`crate::TaskRequest`]. Validation and encoding for this layer live in the
+/// Anthropic family codec.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AnthropicFamilyOptions {
@@ -43,31 +48,38 @@ pub struct AnthropicFamilyOptions {
 }
 
 /// OpenAI-specific request controls outside the shared task and family layers.
+///
+/// Use this type for OpenAI Responses controls that are provider-native rather
+/// than part of the shared OpenAI-compatible family contract. Validation and
+/// encoding for these fields live in the OpenAI provider refinement.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OpenAiOptions {
     /// Request metadata forwarded to OpenAI.
+    ///
+    /// This remains provider-scoped because metadata semantics are not
+    /// portable across providers.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub metadata: BTreeMap<String, String>,
-    /// Requested OpenAI service tier.
+    /// Requested OpenAI Responses `service_tier`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service_tier: Option<String>,
-    /// Whether the response should be stored by the provider.
+    /// Whether the response should be stored by OpenAI.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub store: Option<bool>,
-    /// Provider cache-bucketing key.
+    /// OpenAI Responses `prompt_cache_key`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_key: Option<String>,
-    /// Cache retention policy for prompt cache entries.
+    /// OpenAI Responses `prompt_cache_retention`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_cache_retention: Option<OpenAiPromptCacheRetention>,
-    /// Context overflow handling mode.
+    /// OpenAI Responses `truncation` mode.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub truncation: Option<OpenAiTruncation>,
-    /// Nested provider-specific text controls.
+    /// Nested OpenAI Responses `text` controls.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<OpenAiTextOptions>,
-    /// Abuse and safety correlation identifier.
+    /// OpenAI Responses `safety_identifier`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub safety_identifier: Option<String>,
 }
@@ -108,37 +120,41 @@ pub enum OpenAiTextVerbosity {
 }
 
 /// Anthropic-specific request controls outside the shared task and family layers.
+///
+/// Use this type for Anthropic Messages controls that are provider-native
+/// rather than semantic request intent. Validation and encoding for these
+/// fields live in the Anthropic provider refinement.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AnthropicOptions {
-    /// Provider-specific temperature control.
+    /// Anthropic Messages `temperature`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
-    /// Provider-specific nucleus sampling control.
+    /// Anthropic Messages `top_p`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_p: Option<f32>,
-    /// Provider-specific token budget control.
+    /// Anthropic Messages `max_tokens`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_tokens: Option<u32>,
-    /// Provider-specific top-k control.
+    /// Anthropic Messages `top_k`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_k: Option<u32>,
-    /// Provider-specific stop sequences.
+    /// Anthropic Messages `stop_sequences`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub stop_sequences: Vec<String>,
-    /// Provider-specific narrow metadata identifier.
+    /// Anthropic Messages `metadata.user_id`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata_user_id: Option<String>,
-    /// Provider-specific output shaping controls.
+    /// Anthropic Messages `output_config`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_config: Option<Value>,
-    /// Requested Anthropic service tier.
+    /// Anthropic Messages `service_tier`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service_tier: Option<AnthropicServiceTier>,
-    /// Provider-specific tool-choice overrides.
+    /// Anthropic Messages nested `tool_choice` overrides.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<AnthropicToolChoiceOptions>,
-    /// Provider-specific inference geography controls.
+    /// Anthropic Messages `inference_geo`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inference_geo: Option<Value>,
 }
@@ -155,7 +171,7 @@ pub enum AnthropicServiceTier {
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AnthropicToolChoiceOptions {
-    /// Controls whether Anthropic may execute tool calls in parallel.
+    /// Anthropic `tool_choice.disable_parallel_tool_use`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disable_parallel_tool_use: Option<bool>,
 }
@@ -163,67 +179,70 @@ pub struct AnthropicToolChoiceOptions {
 /// OpenRouter-specific request controls outside the shared task and family layers.
 ///
 /// This type covers both route-backed `/responses` controls and the approved
-/// parameter-doc-backed fields intentionally supported by the repo:
-/// `max_tokens`, `stop`, `seed`, `logit_bias`, and `logprobs`.
-/// Non-doc-backed `route` and `debug` fields remain intentionally absent.
+/// parameter-doc-backed Tier 2 fields intentionally supported by the
+/// repository: `max_tokens`, `stop`, `seed`, `logit_bias`, and `logprobs`.
+///
+/// Validation and encoding for these fields live in the OpenRouter provider
+/// refinement. Non-doc-backed `route` and `debug` fields remain intentionally
+/// absent.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OpenRouterOptions {
-    /// Router fallback models appended after the selected primary model.
+    /// Additional OpenRouter fallback models appended after the selected primary model.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fallback_models: Vec<String>,
-    /// Router provider selection preferences encoded as wire `provider`.
+    /// OpenRouter provider routing preferences encoded as wire `provider`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_preferences: Option<Value>,
-    /// OpenRouter plugin configuration objects.
+    /// OpenRouter `plugins`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub plugins: Vec<Value>,
-    /// Request metadata forwarded to OpenRouter.
+    /// OpenRouter request metadata.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub metadata: BTreeMap<String, String>,
-    /// Provider-specific top-k sampling control.
+    /// OpenRouter `top_k`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_k: Option<u32>,
-    /// Provider-specific output log-probability count.
+    /// OpenRouter `top_logprobs`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top_logprobs: Option<u8>,
-    /// Provider-specific maximum token budget from parameter docs.
+    /// OpenRouter `max_tokens` accepted from the broader parameter docs.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_tokens: Option<u32>,
-    /// Provider-specific stop sequences from parameter docs.
+    /// OpenRouter `stop` accepted from the broader parameter docs.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub stop: Vec<String>,
-    /// Provider-specific deterministic seed from parameter docs.
+    /// OpenRouter `seed` accepted from the broader parameter docs.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<i64>,
-    /// Provider-specific token-bias map from parameter docs.
+    /// OpenRouter `logit_bias` accepted from the broader parameter docs.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub logit_bias: BTreeMap<String, i32>,
-    /// Whether OpenRouter should return token log probabilities.
+    /// OpenRouter `logprobs` accepted from the broader parameter docs.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub logprobs: Option<bool>,
-    /// Provider-specific frequency penalty.
+    /// OpenRouter `frequency_penalty`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub frequency_penalty: Option<f32>,
-    /// Provider-specific presence penalty.
+    /// OpenRouter `presence_penalty`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub presence_penalty: Option<f32>,
-    /// Abuse/account attribution identifier.
+    /// OpenRouter `user`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
-    /// Observability session identifier.
+    /// OpenRouter `session_id`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
-    /// OpenRouter tracing payload.
+    /// OpenRouter `trace`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace: Option<Value>,
-    /// Nested provider-specific text controls.
+    /// Nested OpenRouter `text` controls.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<OpenRouterTextOptions>,
-    /// Output modalities requested from OpenRouter.
+    /// OpenRouter `modalities`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub modalities: Option<Vec<String>>,
-    /// Provider-specific image generation configuration.
+    /// OpenRouter `image_config`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub image_config: Option<Value>,
 }
@@ -251,7 +270,8 @@ pub enum OpenRouterTextVerbosity {
 ///
 /// Use this layer for controls shared by one provider family but not portable
 /// enough for [`crate::TaskRequest`]. Validation and encoding belong to the
-/// family codec that owns the fields.
+/// family codec that owns the fields, and each enum variant mirrors the family
+/// boundary used by request planning and adapter composition.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "family", rename_all = "snake_case")]
 pub enum FamilyOptions {
@@ -274,7 +294,8 @@ impl FamilyOptions {
 /// Use this layer for provider-native or router-native controls that should not
 /// be modeled as semantic request fields. Direct-provider runtime helpers accept
 /// these typed values via `create_with_*_options(...)` alongside semantic
-/// [`crate::TaskRequest`] input.
+/// [`crate::TaskRequest`] input, and provider refinements own validation plus
+/// last-mile request encoding for each variant.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "provider", rename_all = "snake_case")]
 pub enum ProviderOptions {

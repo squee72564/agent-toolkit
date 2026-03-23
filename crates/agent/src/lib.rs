@@ -17,6 +17,11 @@
 //! Most consumers should start with the root exports such as [`AgentToolkit`],
 //! [`Route`], [`TaskRequest`], [`MessageCreateInput`], and [`Response`], then
 //! drop into [`prelude`] or a namespaced module when they need more control.
+//!
+//! [`TaskRequest`] and [`MessageCreateInput`] are semantic request surfaces.
+//! Provider request controls such as tuning, metadata, and route-specific
+//! execution options live in typed native option structs on the direct-provider
+//! helpers exposed through [`protocols`].
 
 /// Core request, response, and streaming types shared across the agent workspace.
 pub mod core {

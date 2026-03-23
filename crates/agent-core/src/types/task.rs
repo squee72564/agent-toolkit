@@ -30,13 +30,21 @@ pub enum ResponseFormat {
 ///
 /// Use [`crate::NativeOptions`] to express request controls:
 ///
-/// - [`crate::FamilyOptions`] for controls shared by one provider family
+/// - [`crate::FamilyOptions`] for controls owned by one provider family codec
 /// - [`crate::ProviderOptions`] for provider-native or router-native controls
 ///
 /// Direct-provider runtime helpers accept these typed native options alongside
 /// semantic input, for example `openai().create_with_openai_options(...)`,
 /// `anthropic().create_with_anthropic_options(...)`, and
 /// `openrouter().create_with_openrouter_options(...)`.
+///
+/// In the current implementation, the semantic surface is intentionally
+/// limited to:
+///
+/// - `messages`
+/// - `tools`
+/// - `tool_choice`
+/// - `response_format`
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TaskRequest {

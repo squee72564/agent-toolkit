@@ -56,6 +56,14 @@ impl MessagesPayload {
 /// `openai().create_with_openai_options(...)`,
 /// `anthropic().create_with_anthropic_options(...)`, and
 /// `openrouter().create_with_openrouter_options(...)`.
+///
+/// This means `MessageCreateInput` is the ergonomic builder for the semantic
+/// request layer only:
+///
+/// - messages
+/// - tools
+/// - tool choice
+/// - response format
 #[derive(Debug, Clone, PartialEq)]
 pub struct MessageCreateInput {
     messages: MessagesPayload,
@@ -135,6 +143,11 @@ impl MessageCreateInput {
     }
 
     /// Converts this input into a semantic task request.
+    ///
+    /// This method validates only the semantic shape required by
+    /// [`TaskRequest`]. Provider-native request controls must be supplied
+    /// separately through [`agent_core::NativeOptions`] on the execution path
+    /// that owns them.
     pub fn into_task_request(self) -> Result<TaskRequest, RuntimeError> {
         let MessageCreateInput {
             messages,
