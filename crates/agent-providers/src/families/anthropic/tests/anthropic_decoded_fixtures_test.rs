@@ -69,7 +69,6 @@ fn fixture_smoke_anthropic_errors() -> Result<(), String> {
 }
 
 #[test]
-#[ignore]
 fn fixture_full_anthropic_success_sweep() -> Result<(), String> {
     for scenario in SUCCESS_SCENARIOS {
         let models = list_decoded_fixture_models(PROVIDER, scenario);
@@ -89,7 +88,6 @@ fn fixture_full_anthropic_success_sweep() -> Result<(), String> {
 }
 
 #[test]
-#[ignore]
 fn fixture_full_anthropic_errors_sweep() -> Result<(), String> {
     let relpaths = list_decoded_error_fixture_relpaths(PROVIDER);
     if relpaths.is_empty() {

@@ -80,7 +80,6 @@ fn fixture_smoke_openai_errors() -> Result<(), String> {
 }
 
 #[test]
-#[ignore]
 fn fixture_full_openai_success_sweep() {
     for scenario in SUCCESS_SCENARIOS {
         let models = list_decoded_fixture_models(PROVIDER, scenario);
@@ -98,7 +97,6 @@ fn fixture_full_openai_success_sweep() {
 }
 
 #[test]
-#[ignore]
 fn fixture_full_openai_errors_sweep() -> Result<(), String> {
     let relpaths = list_decoded_error_fixture_relpaths(PROVIDER);
     if relpaths.is_empty() {

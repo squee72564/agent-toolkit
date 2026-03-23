@@ -107,7 +107,6 @@ fn quarantined_openrouter_error_fixtures_are_still_invalid_upstream_errors() -> 
 }
 
 #[test]
-#[ignore]
 fn fixture_full_openrouter_success_sweep() {
     for scenario in SUCCESS_SCENARIOS {
         let models = list_decoded_fixture_models(PROVIDER, scenario);
@@ -143,7 +142,6 @@ fn fixture_full_openrouter_success_sweep() {
 }
 
 #[test]
-#[ignore]
 fn fixture_full_openrouter_errors_sweep() -> Result<(), String> {
     let relpaths = list_decoded_error_fixture_relpaths(PROVIDER);
     if relpaths.is_empty() {
