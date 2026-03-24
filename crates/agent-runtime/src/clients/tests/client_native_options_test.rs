@@ -1,10 +1,12 @@
 use std::time::Duration;
 
 use agent_core::{
-    AnthropicFamilyOptions, AnthropicOptions, AnthropicServiceTier, AnthropicThinking,
-    AnthropicThinkingBudget, AnthropicToolChoiceOptions, OpenAiCompatibleOptions, OpenAiOptions,
-    OpenAiPromptCacheRetention, OpenAiTextOptions, OpenAiTextVerbosity, OpenAiTruncation,
-    OpenRouterOptions, OpenRouterTextOptions, OpenRouterTextVerbosity,
+    AnthropicFamilyOptions, AnthropicOptions, AnthropicOutputConfig, AnthropicOutputEffort,
+    AnthropicServiceTier, AnthropicThinking, AnthropicThinkingBudget, AnthropicToolChoiceOptions,
+    OpenAiCompatibleOptions, OpenAiCompatibleReasoning, OpenAiCompatibleReasoningEffort,
+    OpenAiOptions, OpenAiPromptCacheRetention, OpenAiTextOptions, OpenAiTextVerbosity,
+    OpenAiTruncation, OpenRouterImageConfigValue, OpenRouterOptions, OpenRouterPlugin,
+    OpenRouterTextOptions, OpenRouterTextVerbosity, OpenRouterTrace, OpenRouterWebPlugin,
 };
 use serde_json::{Value, json};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -157,7 +159,10 @@ async fn openai_direct_helper_normalizes_typed_native_options_into_payload() {
         Some("gpt-5.1".to_string()),
         Some(OpenAiCompatibleOptions {
             parallel_tool_calls: Some(true),
-            reasoning: Some(json!({ "effort": "medium" })),
+            reasoning: Some(OpenAiCompatibleReasoning {
+                effort: Some(OpenAiCompatibleReasoningEffort::Medium),
+                summary: None,
+            }),
             temperature: Some(0.7),
             top_p: Some(0.8),
             max_output_tokens: Some(256),
@@ -216,7 +221,10 @@ async fn openrouter_direct_helper_normalizes_typed_native_options_into_payload()
         Some("openai/gpt-5.1".to_string()),
         Some(OpenAiCompatibleOptions {
             parallel_tool_calls: Some(true),
-            reasoning: Some(json!({ "effort": "low" })),
+            reasoning: Some(OpenAiCompatibleReasoning {
+                effort: Some(OpenAiCompatibleReasoningEffort::Low),
+                summary: None,
+            }),
             temperature: Some(0.65),
             top_p: Some(0.9),
             max_output_tokens: None,
@@ -224,7 +232,7 @@ async fn openrouter_direct_helper_normalizes_typed_native_options_into_payload()
         Some(OpenRouterOptions {
             fallback_models: vec!["openai/gpt-4.1-mini".to_string()],
             provider_preferences: Some(json!({ "order": ["openai"] })),
-            plugins: vec![json!({ "id": "web" })],
+            plugins: vec![OpenRouterPlugin::Web(OpenRouterWebPlugin::default())],
             metadata: std::collections::BTreeMap::from([(
                 "trace_id".to_string(),
                 "trace-789".to_string(),
@@ -240,12 +248,18 @@ async fn openrouter_direct_helper_normalizes_typed_native_options_into_payload()
             presence_penalty: Some(0.5),
             user: Some("user-123".to_string()),
             session_id: Some("session-456".to_string()),
-            trace: Some(json!({ "trace_id": "trace-789" })),
+            trace: Some(OpenRouterTrace {
+                trace_id: Some("trace-789".to_string()),
+                ..OpenRouterTrace::default()
+            }),
             text: Some(OpenRouterTextOptions {
                 verbosity: Some(OpenRouterTextVerbosity::Max),
             }),
             modalities: Some(vec!["text".to_string()]),
-            image_config: Some(json!({ "size": "1024x1024" })),
+            image_config: Some(std::collections::BTreeMap::from([(
+                "size".to_string(),
+                OpenRouterImageConfigValue::String("1024x1024".to_string()),
+            )])),
         }),
     ))
     .await
@@ -339,12 +353,15 @@ async fn anthropic_direct_helper_normalizes_typed_native_options_into_payload() 
             top_k: Some(8),
             stop_sequences: vec!["DONE".to_string(), "STOP".to_string()],
             metadata_user_id: Some("anthropic-user-1".to_string()),
-            output_config: Some(json!({ "effort": "high" })),
+            output_config: Some(AnthropicOutputConfig {
+                effort: Some(AnthropicOutputEffort::High),
+                format: None,
+            }),
             service_tier: Some(AnthropicServiceTier::StandardOnly),
             tool_choice: Some(AnthropicToolChoiceOptions {
                 disable_parallel_tool_use: Some(false),
             }),
-            inference_geo: Some(json!({ "type": "approximate", "region": "us" })),
+            inference_geo: Some("us".to_string()),
         }),
     ))
     .await
@@ -367,10 +384,7 @@ async fn anthropic_direct_helper_normalizes_typed_native_options_into_payload() 
         json!({ "user_id": "anthropic-user-1" })
     );
     assert_eq!(captured.body["service_tier"], "standard_only");
-    assert_eq!(
-        captured.body["inference_geo"],
-        json!({ "type": "approximate", "region": "us" })
-    );
+    assert_eq!(captured.body["inference_geo"], json!("us"));
     assert_eq!(
         captured.body.pointer("/output_config/effort"),
         Some(&json!("high"))

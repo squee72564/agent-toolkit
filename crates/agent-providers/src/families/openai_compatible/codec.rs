@@ -4,7 +4,7 @@ use agent_core::{
 };
 use agent_transport::HttpRequestOptions;
 use reqwest::{Method, header::HeaderMap};
-use serde_json::Value;
+use serde_json::{Value, to_value};
 
 use crate::{
     error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo},
@@ -120,7 +120,16 @@ fn apply_family_options(
             );
         }
         if let Some(reasoning) = options.reasoning.as_ref() {
-            body.insert("reasoning".to_string(), reasoning.clone());
+            let reasoning = to_value(reasoning).map_err(|error| {
+                AdapterError::with_source(
+                    AdapterErrorKind::Encode,
+                    ProviderKind::OpenAi,
+                    AdapterOperation::PlanRequest,
+                    "failed to serialize OpenAI-compatible reasoning configuration",
+                    error,
+                )
+            })?;
+            body.insert("reasoning".to_string(), reasoning);
         }
         if let Some(temperature) = options.temperature {
             body.insert("temperature".to_string(), Value::from(temperature));

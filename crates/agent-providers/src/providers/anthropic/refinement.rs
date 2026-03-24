@@ -1,8 +1,8 @@
 use agent_core::{
-    AnthropicOptions, AnthropicServiceTier, AnthropicToolChoiceOptions, ProviderKind,
-    ProviderOptions, Response, ResponseFormat, TaskRequest, ToolChoice,
+    AnthropicOptions, AnthropicOutputConfig, AnthropicServiceTier, AnthropicToolChoiceOptions,
+    ProviderKind, ProviderOptions, Response, ResponseFormat, TaskRequest, ToolChoice,
 };
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, to_value};
 
 use crate::{
     error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo},
@@ -19,10 +19,10 @@ struct AnthropicNativeOptionsOverrides {
     top_k: Option<u32>,
     stop_sequences: Vec<String>,
     metadata_user_id: Option<String>,
-    output_config: Option<Map<String, Value>>,
+    output_config: Option<AnthropicOutputConfig>,
     service_tier: Option<&'static str>,
     disable_parallel_tool_use: Option<bool>,
-    inference_geo: Option<Map<String, Value>>,
+    inference_geo: Option<String>,
 }
 
 impl AnthropicNativeOptionsOverrides {
@@ -60,14 +60,14 @@ impl AnthropicNativeOptionsOverrides {
             overrides.top_k = *top_k;
             overrides.stop_sequences = stop_sequences.clone();
             overrides.metadata_user_id = metadata_user_id.clone();
-            overrides.output_config = output_config.as_ref().map(parse_object).transpose()?;
+            overrides.output_config = output_config.clone();
             overrides.service_tier = service_tier.as_ref().map(service_tier_name);
             overrides.disable_parallel_tool_use = tool_choice.as_ref().and_then(
                 |AnthropicToolChoiceOptions {
                      disable_parallel_tool_use,
                  }| *disable_parallel_tool_use,
             );
-            overrides.inference_geo = inference_geo.as_ref().map(parse_object).transpose()?;
+            overrides.inference_geo = inference_geo.clone();
         }
 
         overrides.validate()?;
@@ -130,7 +130,7 @@ impl AnthropicNativeOptionsOverrides {
         if let Some(inference_geo) = self.inference_geo.as_ref() {
             body.insert(
                 "inference_geo".to_string(),
-                Value::Object(inference_geo.clone()),
+                Value::String(inference_geo.clone()),
             );
         }
         if let Some(output_config) = self.output_config.as_ref() {
@@ -167,26 +167,12 @@ impl AnthropicNativeOptionsOverrides {
             ));
         }
 
-        if let Some(output_config) = self.output_config.as_ref() {
-            if output_config.contains_key("format") {
-                return Err(validation_error(
-                    "Anthropic output_config.format is owned by semantic response_format",
-                ));
-            }
-
-            if let Some(effort) = output_config.get("effort") {
-                let Some(effort) = effort.as_str() else {
-                    return Err(validation_error(
-                        "Anthropic output_config.effort must be a string when provided",
-                    ));
-                };
-
-                if !matches!(effort, "low" | "medium" | "high" | "max") {
-                    return Err(validation_error(
-                        "Anthropic output_config.effort must be one of: low, medium, high, max",
-                    ));
-                }
-            }
+        if let Some(output_config) = self.output_config.as_ref()
+            && output_config.format.is_some()
+        {
+            return Err(validation_error(
+                "Anthropic output_config.format is owned by semantic response_format",
+            ));
         }
 
         Ok(())
@@ -198,12 +184,6 @@ fn service_tier_name(value: &AnthropicServiceTier) -> &'static str {
         AnthropicServiceTier::Auto => "auto",
         AnthropicServiceTier::StandardOnly => "standard_only",
     }
-}
-
-fn parse_object(value: &Value) -> Result<Map<String, Value>, AdapterError> {
-    value.as_object().cloned().ok_or_else(|| {
-        validation_error("Anthropic provider-native object fields must be JSON objects")
-    })
 }
 
 fn insert_f32(body: &mut Map<String, Value>, key: &str, value: f32) -> Result<(), AdapterError> {
@@ -268,8 +248,23 @@ fn validate_unit_interval(field: &str, value: Option<f32>) -> Result<(), Adapter
 
 fn merge_output_config(
     body: &mut Map<String, Value>,
-    output_config: &Map<String, Value>,
+    output_config: &AnthropicOutputConfig,
 ) -> Result<(), AdapterError> {
+    let output_config = to_value(output_config).map_err(|error| {
+        AdapterError::with_source(
+            AdapterErrorKind::Encode,
+            ProviderKind::Anthropic,
+            AdapterOperation::PlanRequest,
+            "failed to serialize Anthropic output_config",
+            error,
+        )
+    })?;
+    let Some(output_config) = output_config.as_object() else {
+        return Err(protocol_error(
+            "Anthropic provider-native output_config must serialize as an object",
+        ));
+    };
+
     match body.get_mut("output_config") {
         Some(Value::Object(existing)) => {
             for (key, value) in output_config {

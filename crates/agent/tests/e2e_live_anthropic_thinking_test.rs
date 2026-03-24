@@ -3,11 +3,11 @@
 mod e2e;
 
 use agent_toolkit::core::{
-    AnthropicFamilyOptions, AnthropicOptions, AnthropicThinking, AnthropicThinkingBudget,
-    AnthropicThinkingDisplay, FinishReason, ProviderKind, Response,
+    AnthropicFamilyOptions, AnthropicOptions, AnthropicOutputConfig, AnthropicOutputEffort,
+    AnthropicThinking, AnthropicThinkingBudget, AnthropicThinkingDisplay, FinishReason,
+    ProviderKind, Response,
 };
 use agent_toolkit::prelude::{MessageCreateInput, anthropic};
-use serde_json::json;
 
 use e2e::live::{require_provider_api_key, response_text, with_live_test_timeout};
 
@@ -93,7 +93,10 @@ async fn live_anthropic_adaptive_thinking_smoke_test() {
         }),
         Some(AnthropicOptions {
             max_tokens: Some(128),
-            output_config: Some(json!({ "effort": "low" })),
+            output_config: Some(AnthropicOutputConfig {
+                effort: Some(AnthropicOutputEffort::Low),
+                format: None,
+            }),
             ..AnthropicOptions::default()
         }),
     ))

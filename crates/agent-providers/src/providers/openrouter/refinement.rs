@@ -1,8 +1,9 @@
 use serde_json::{Map, Value};
 
 use agent_core::{
-    OpenRouterOptions, OpenRouterTextVerbosity, ProviderKind, ProviderOptions, Response,
-    ResponseFormat, RuntimeWarning, TaskRequest,
+    OpenRouterImageConfig, OpenRouterOptions, OpenRouterPlugin, OpenRouterTextVerbosity,
+    OpenRouterTrace, ProviderKind, ProviderOptions, Response, ResponseFormat, RuntimeWarning,
+    TaskRequest,
 };
 
 use crate::{
@@ -19,7 +20,7 @@ use crate::{
 pub(crate) struct OpenRouterOverrides {
     pub fallback_models: Vec<String>,
     pub provider_preferences: Option<Value>,
-    pub plugins: Vec<Value>,
+    pub plugins: Vec<OpenRouterPlugin>,
     pub metadata: Map<String, Value>,
     pub top_k: Option<u32>,
     pub top_logprobs: Option<u8>,
@@ -32,10 +33,10 @@ pub(crate) struct OpenRouterOverrides {
     pub presence_penalty: Option<f32>,
     pub user: Option<String>,
     pub session_id: Option<String>,
-    pub trace: Option<Value>,
+    pub trace: Option<OpenRouterTrace>,
     pub text_verbosity: Option<OpenRouterTextVerbosity>,
     pub modalities: Option<Vec<String>>,
-    pub image_config: Option<Value>,
+    pub image_config: Option<OpenRouterImageConfig>,
 }
 
 impl OpenRouterOverrides {
@@ -170,10 +171,8 @@ pub(crate) fn apply_openrouter_overrides(
         body.insert("provider".to_string(), provider_preferences.clone());
     }
     if !overrides.plugins.is_empty() {
-        body.insert(
-            "plugins".to_string(),
-            Value::Array(overrides.plugins.clone()),
-        );
+        let plugins = serialize_openrouter_object_array("plugins", &overrides.plugins)?;
+        body.insert("plugins".to_string(), Value::Array(plugins));
     }
     if !overrides.metadata.is_empty() {
         body.insert(
@@ -207,7 +206,10 @@ pub(crate) fn apply_openrouter_overrides(
         body.insert("session_id".to_string(), Value::String(session_id.clone()));
     }
     if let Some(trace) = overrides.trace.as_ref() {
-        body.insert("trace".to_string(), trace.clone());
+        body.insert(
+            "trace".to_string(),
+            serialize_openrouter_object("trace", trace)?,
+        );
     }
     merge_text_verbosity(body, overrides.text_verbosity)?;
     if let Some(modalities) = overrides.modalities.as_ref() {
@@ -217,10 +219,49 @@ pub(crate) fn apply_openrouter_overrides(
         );
     }
     if let Some(image_config) = overrides.image_config.as_ref() {
-        body.insert("image_config".to_string(), image_config.clone());
+        body.insert(
+            "image_config".to_string(),
+            serialize_openrouter_object("image_config", image_config)?,
+        );
     }
 
     Ok(())
+}
+
+fn serialize_openrouter_object_array<T: serde::Serialize>(
+    field_name: &str,
+    value: &T,
+) -> Result<Vec<Value>, OpenAiFamilyError> {
+    let value = serde_json::to_value(value).map_err(|error| {
+        OpenAiFamilyError::encode_with_source(
+            format!("failed to serialize OpenRouter {field_name}"),
+            error,
+        )
+    })?;
+    let Value::Array(value) = value else {
+        return Err(OpenAiFamilyError::protocol_violation(format!(
+            "OpenRouter {field_name} must serialize as an array"
+        )));
+    };
+    Ok(value)
+}
+
+fn serialize_openrouter_object<T: serde::Serialize>(
+    field_name: &str,
+    value: &T,
+) -> Result<Value, OpenAiFamilyError> {
+    let value = serde_json::to_value(value).map_err(|error| {
+        OpenAiFamilyError::encode_with_source(
+            format!("failed to serialize OpenRouter {field_name}"),
+            error,
+        )
+    })?;
+    if !value.is_object() {
+        return Err(OpenAiFamilyError::protocol_violation(format!(
+            "OpenRouter {field_name} must serialize as an object"
+        )));
+    }
+    Ok(value)
 }
 
 fn validate_metadata(metadata: &Map<String, Value>) -> Result<(), OpenAiFamilyError> {

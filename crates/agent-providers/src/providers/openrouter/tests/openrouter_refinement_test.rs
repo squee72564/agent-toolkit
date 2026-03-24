@@ -1,9 +1,10 @@
 use serde_json::json;
 
 use agent_core::{
-    ContentPart, FamilyOptions, Message, MessageRole, OpenAiCompatibleOptions, OpenRouterOptions,
-    OpenRouterTextOptions, OpenRouterTextVerbosity, ProviderKind, ProviderOptions, ResponseFormat,
-    ResponseMode, TaskRequest, ToolChoice,
+    ContentPart, FamilyOptions, Message, MessageRole, OpenAiCompatibleOptions,
+    OpenRouterImageConfigValue, OpenRouterOptions, OpenRouterPlugin, OpenRouterTextOptions,
+    OpenRouterTextVerbosity, OpenRouterTrace, OpenRouterWebPlugin, ProviderKind, ProviderOptions,
+    ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
 };
 
 use crate::{
@@ -111,7 +112,7 @@ fn openrouter_refinement_applies_typed_tier1_and_tier2_overrides() {
         None,
         Some(OpenRouterOptions {
             provider_preferences: Some(json!({ "order": ["openai"] })),
-            plugins: vec![json!({ "id": "web" })],
+            plugins: vec![OpenRouterPlugin::Web(OpenRouterWebPlugin::default())],
             metadata: std::collections::BTreeMap::from([(
                 "trace_id".to_string(),
                 "trace-1".to_string(),
@@ -127,12 +128,18 @@ fn openrouter_refinement_applies_typed_tier1_and_tier2_overrides() {
             presence_penalty: Some(0.5),
             user: Some("user-1".to_string()),
             session_id: Some("session-1".to_string()),
-            trace: Some(json!({ "trace_id": "trace-1" })),
+            trace: Some(OpenRouterTrace {
+                trace_id: Some("trace-1".to_string()),
+                ..OpenRouterTrace::default()
+            }),
             text: Some(OpenRouterTextOptions {
                 verbosity: Some(OpenRouterTextVerbosity::High),
             }),
             modalities: Some(vec!["text".to_string()]),
-            image_config: Some(json!({ "size": "1024x1024" })),
+            image_config: Some(std::collections::BTreeMap::from([(
+                "size".to_string(),
+                OpenRouterImageConfigValue::String("1024x1024".to_string()),
+            )])),
             ..OpenRouterOptions::default()
         }),
     )

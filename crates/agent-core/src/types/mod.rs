@@ -35,6 +35,14 @@ pub use message::MessageRole;
 pub use native_options::AnthropicFamilyOptions;
 /// Re-export of [`native_options::AnthropicOptions`].
 pub use native_options::AnthropicOptions;
+/// Re-export of [`native_options::AnthropicOutputConfig`].
+pub use native_options::AnthropicOutputConfig;
+/// Re-export of [`native_options::AnthropicOutputEffort`].
+pub use native_options::AnthropicOutputEffort;
+/// Re-export of [`native_options::AnthropicOutputFormat`].
+pub use native_options::AnthropicOutputFormat;
+/// Re-export of [`native_options::AnthropicOutputFormatType`].
+pub use native_options::AnthropicOutputFormatType;
 /// Re-export of [`native_options::AnthropicServiceTier`].
 pub use native_options::AnthropicServiceTier;
 /// Re-export of [`native_options::AnthropicThinking`].
@@ -51,6 +59,12 @@ pub use native_options::FamilyOptions;
 pub use native_options::NativeOptions;
 /// Re-export of [`native_options::OpenAiCompatibleOptions`].
 pub use native_options::OpenAiCompatibleOptions;
+/// Re-export of [`native_options::OpenAiCompatibleReasoning`].
+pub use native_options::OpenAiCompatibleReasoning;
+/// Re-export of [`native_options::OpenAiCompatibleReasoningEffort`].
+pub use native_options::OpenAiCompatibleReasoningEffort;
+/// Re-export of [`native_options::OpenAiCompatibleReasoningSummary`].
+pub use native_options::OpenAiCompatibleReasoningSummary;
 /// Re-export of [`native_options::OpenAiOptions`].
 pub use native_options::OpenAiOptions;
 /// Re-export of [`native_options::OpenAiPromptCacheRetention`].
@@ -61,12 +75,40 @@ pub use native_options::OpenAiTextOptions;
 pub use native_options::OpenAiTextVerbosity;
 /// Re-export of [`native_options::OpenAiTruncation`].
 pub use native_options::OpenAiTruncation;
+/// Re-export of [`native_options::OpenRouterAutoRouterPlugin`].
+pub use native_options::OpenRouterAutoRouterPlugin;
+/// Re-export of [`native_options::OpenRouterContextCompressionEngine`].
+pub use native_options::OpenRouterContextCompressionEngine;
+/// Re-export of [`native_options::OpenRouterContextCompressionPlugin`].
+pub use native_options::OpenRouterContextCompressionPlugin;
+/// Re-export of [`native_options::OpenRouterFileParserPdfEngine`].
+pub use native_options::OpenRouterFileParserPdfEngine;
+/// Re-export of [`native_options::OpenRouterFileParserPdfOptions`].
+pub use native_options::OpenRouterFileParserPdfOptions;
+/// Re-export of [`native_options::OpenRouterFileParserPlugin`].
+pub use native_options::OpenRouterFileParserPlugin;
+/// Re-export of [`native_options::OpenRouterImageConfig`].
+pub use native_options::OpenRouterImageConfig;
+/// Re-export of [`native_options::OpenRouterImageConfigValue`].
+pub use native_options::OpenRouterImageConfigValue;
+/// Re-export of [`native_options::OpenRouterModerationPlugin`].
+pub use native_options::OpenRouterModerationPlugin;
 /// Re-export of [`native_options::OpenRouterOptions`].
 pub use native_options::OpenRouterOptions;
+/// Re-export of [`native_options::OpenRouterPlugin`].
+pub use native_options::OpenRouterPlugin;
+/// Re-export of [`native_options::OpenRouterResponseHealingPlugin`].
+pub use native_options::OpenRouterResponseHealingPlugin;
 /// Re-export of [`native_options::OpenRouterTextOptions`].
 pub use native_options::OpenRouterTextOptions;
 /// Re-export of [`native_options::OpenRouterTextVerbosity`].
 pub use native_options::OpenRouterTextVerbosity;
+/// Re-export of [`native_options::OpenRouterTrace`].
+pub use native_options::OpenRouterTrace;
+/// Re-export of [`native_options::OpenRouterWebPlugin`].
+pub use native_options::OpenRouterWebPlugin;
+/// Re-export of [`native_options::OpenRouterWebPluginEngine`].
+pub use native_options::OpenRouterWebPluginEngine;
 /// Re-export of [`native_options::ProviderOptions`].
 pub use native_options::ProviderOptions;
 /// Re-export of [`planning::ExecutionPlan`].

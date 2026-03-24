@@ -22,7 +22,7 @@ pub struct OpenAiCompatibleOptions {
     pub parallel_tool_calls: Option<bool>,
     /// Family-scoped reasoning controls forwarded when supported.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub reasoning: Option<Value>,
+    pub reasoning: Option<OpenAiCompatibleReasoning>,
     /// Shared temperature control for OpenAI-compatible providers.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
@@ -32,6 +32,39 @@ pub struct OpenAiCompatibleOptions {
     /// Shared output token budget control for OpenAI-compatible providers.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_output_tokens: Option<u32>,
+}
+
+/// OpenAI-compatible reasoning controls for GPT-5 and o-series models.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OpenAiCompatibleReasoning {
+    /// Reasoning effort level requested from the model.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effort: Option<OpenAiCompatibleReasoningEffort>,
+    /// Reasoning summary detail level requested from the model.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<OpenAiCompatibleReasoningSummary>,
+}
+
+/// OpenAI-compatible reasoning effort levels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OpenAiCompatibleReasoningEffort {
+    None,
+    Minimal,
+    Low,
+    Medium,
+    High,
+    Xhigh,
+}
+
+/// OpenAI-compatible reasoning summary levels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OpenAiCompatibleReasoningSummary {
+    Auto,
+    Concise,
+    Detailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -186,7 +219,7 @@ pub struct AnthropicOptions {
     pub metadata_user_id: Option<String>,
     /// Anthropic Messages `output_config`.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub output_config: Option<Value>,
+    pub output_config: Option<AnthropicOutputConfig>,
     /// Anthropic Messages `service_tier`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service_tier: Option<AnthropicServiceTier>,
@@ -195,7 +228,47 @@ pub struct AnthropicOptions {
     pub tool_choice: Option<AnthropicToolChoiceOptions>,
     /// Anthropic Messages `inference_geo`.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub inference_geo: Option<Value>,
+    pub inference_geo: Option<String>,
+}
+
+/// Anthropic `output_config` settings.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AnthropicOutputConfig {
+    /// Anthropic `output_config.effort`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effort: Option<AnthropicOutputEffort>,
+    /// Anthropic `output_config.format`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<AnthropicOutputFormat>,
+}
+
+/// Anthropic `output_config.effort` levels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AnthropicOutputEffort {
+    Low,
+    Medium,
+    High,
+    Max,
+}
+
+/// Anthropic structured-output format options.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AnthropicOutputFormat {
+    /// JSON schema describing the requested format.
+    pub schema: Value,
+    /// Format discriminator.
+    #[serde(rename = "type")]
+    pub format_type: AnthropicOutputFormatType,
+}
+
+/// Anthropic output format types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AnthropicOutputFormatType {
+    #[serde(rename = "json_schema")]
+    JsonSchema,
 }
 
 /// Anthropic service-tier selection.
@@ -235,7 +308,7 @@ pub struct OpenRouterOptions {
     pub provider_preferences: Option<Value>,
     /// OpenRouter `plugins`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub plugins: Vec<Value>,
+    pub plugins: Vec<OpenRouterPlugin>,
     /// OpenRouter request metadata.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub metadata: BTreeMap<String, String>,
@@ -274,7 +347,7 @@ pub struct OpenRouterOptions {
     pub session_id: Option<String>,
     /// OpenRouter `trace`.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub trace: Option<Value>,
+    pub trace: Option<OpenRouterTrace>,
     /// Nested OpenRouter `text` controls.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<OpenRouterTextOptions>,
@@ -283,7 +356,149 @@ pub struct OpenRouterOptions {
     pub modalities: Option<Vec<String>>,
     /// OpenRouter `image_config`.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub image_config: Option<Value>,
+    pub image_config: Option<OpenRouterImageConfig>,
+}
+
+/// OpenRouter trace metadata.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OpenRouterTrace {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trace_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trace_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub span_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub generation_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_span_id: Option<String>,
+}
+
+/// OpenRouter provider-specific image configuration.
+pub type OpenRouterImageConfig = BTreeMap<String, OpenRouterImageConfigValue>;
+
+/// OpenRouter image configuration values.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum OpenRouterImageConfigValue {
+    String(String),
+    Number(f64),
+}
+
+/// OpenRouter plugins enabled for a request.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "id")]
+pub enum OpenRouterPlugin {
+    #[serde(rename = "auto-router")]
+    AutoRouter(OpenRouterAutoRouterPlugin),
+    #[serde(rename = "moderation")]
+    Moderation(OpenRouterModerationPlugin),
+    #[serde(rename = "web")]
+    Web(OpenRouterWebPlugin),
+    #[serde(rename = "file-parser")]
+    FileParser(OpenRouterFileParserPlugin),
+    #[serde(rename = "response-healing")]
+    ResponseHealing(OpenRouterResponseHealingPlugin),
+    #[serde(rename = "context-compression")]
+    ContextCompression(OpenRouterContextCompressionPlugin),
+}
+
+/// OpenRouter `auto-router` plugin settings.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OpenRouterAutoRouterPlugin {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed_models: Vec<String>,
+}
+
+/// OpenRouter `moderation` plugin settings.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OpenRouterModerationPlugin {}
+
+/// OpenRouter `web` plugin settings.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OpenRouterWebPlugin {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_results: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_prompt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub engine: Option<OpenRouterWebPluginEngine>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub include_domains: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude_domains: Vec<String>,
+}
+
+/// OpenRouter `web` plugin engines.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OpenRouterWebPluginEngine {
+    Native,
+    Exa,
+    Firecrawl,
+    Parallel,
+}
+
+/// OpenRouter `file-parser` plugin settings.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OpenRouterFileParserPlugin {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pdf: Option<OpenRouterFileParserPdfOptions>,
+}
+
+/// OpenRouter `file-parser.pdf` settings.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OpenRouterFileParserPdfOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub engine: Option<OpenRouterFileParserPdfEngine>,
+}
+
+/// OpenRouter `file-parser.pdf.engine` values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum OpenRouterFileParserPdfEngine {
+    #[serde(rename = "mistral-ocr")]
+    MistralOcr,
+    #[serde(rename = "pdf-text")]
+    PdfText,
+    #[serde(rename = "native")]
+    Native,
+}
+
+/// OpenRouter `response-healing` plugin settings.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OpenRouterResponseHealingPlugin {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+}
+
+/// OpenRouter `context-compression` plugin settings.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OpenRouterContextCompressionPlugin {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub engine: Option<OpenRouterContextCompressionEngine>,
+}
+
+/// OpenRouter `context-compression.engine` values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum OpenRouterContextCompressionEngine {
+    #[serde(rename = "middle-out")]
+    MiddleOut,
 }
 
 /// OpenRouter nested `text` request controls.

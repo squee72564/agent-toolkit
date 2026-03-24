@@ -1,8 +1,8 @@
 use serde_json::json;
 
 use agent_core::{
-    FamilyOptions, Message, OpenAiCompatibleOptions, ResponseFormat, ResponseMode, TaskRequest,
-    ToolChoice,
+    FamilyOptions, Message, OpenAiCompatibleOptions, OpenAiCompatibleReasoning,
+    OpenAiCompatibleReasoningEffort, ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
 };
 
 use crate::error::AdapterErrorKind;
@@ -67,7 +67,10 @@ fn openai_request_plan_enables_sse_for_streaming_requests() {
 fn openai_request_plan_applies_openai_compatible_family_options() {
     let family_options = FamilyOptions::OpenAiCompatible(OpenAiCompatibleOptions {
         parallel_tool_calls: Some(false),
-        reasoning: Some(json!({ "effort": "medium" })),
+        reasoning: Some(OpenAiCompatibleReasoning {
+            effort: Some(OpenAiCompatibleReasoningEffort::Medium),
+            summary: None,
+        }),
         temperature: Some(1.25),
         top_p: Some(0.85),
         max_output_tokens: Some(256),

@@ -2,9 +2,10 @@ use crate::error::{AdapterErrorKind, AdapterOperation};
 use crate::interfaces::codec_for;
 use crate::interfaces::refinement_for;
 use agent_core::{
-    AnthropicOptions, AnthropicServiceTier, AnthropicToolChoiceOptions, ContentPart, Message,
-    MessageRole, OpenAiOptions, ProviderOptions, ResponseFormat, ResponseMode, TaskRequest,
-    ToolChoice,
+    AnthropicOptions, AnthropicOutputConfig, AnthropicOutputEffort, AnthropicOutputFormat,
+    AnthropicOutputFormatType, AnthropicServiceTier, AnthropicToolChoiceOptions, ContentPart,
+    Message, MessageRole, OpenAiOptions, ProviderOptions, ResponseFormat, ResponseMode,
+    TaskRequest, ToolChoice,
 };
 use serde_json::json;
 
@@ -69,12 +70,15 @@ fn anthropic_refinement_applies_full_provider_native_matrix() {
             top_k: Some(8),
             stop_sequences: vec!["END".to_string()],
             metadata_user_id: Some("user-1".to_string()),
-            output_config: Some(json!({ "effort": "high" })),
+            output_config: Some(AnthropicOutputConfig {
+                effort: Some(AnthropicOutputEffort::High),
+                format: None,
+            }),
             service_tier: Some(AnthropicServiceTier::StandardOnly),
             tool_choice: Some(AnthropicToolChoiceOptions {
                 disable_parallel_tool_use: Some(false),
             }),
-            inference_geo: Some(json!({ "type": "approximate", "region": "us" })),
+            inference_geo: Some("us".to_string()),
         },
     )
     .expect("refinement should succeed");
@@ -92,10 +96,7 @@ fn anthropic_refinement_applies_full_provider_native_matrix() {
     assert_eq!(encoded.body["stop_sequences"], json!(["END"]));
     assert_eq!(encoded.body["metadata"], json!({ "user_id": "user-1" }));
     assert_eq!(encoded.body["service_tier"], "standard_only");
-    assert_eq!(
-        encoded.body["inference_geo"],
-        json!({ "type": "approximate", "region": "us" })
-    );
+    assert_eq!(encoded.body["inference_geo"], json!("us"));
     assert_eq!(
         encoded.body.pointer("/output_config/effort"),
         Some(&json!("high"))
@@ -244,43 +245,17 @@ fn anthropic_refinement_rejects_overlong_metadata_user_id() {
 }
 
 #[test]
-fn anthropic_refinement_rejects_non_object_output_config() {
-    let error = plan_with_provider_options(
-        &base_task(),
-        AnthropicOptions {
-            output_config: Some(json!("high")),
-            ..Default::default()
-        },
-    )
-    .expect_err("refinement should reject non-object output_config");
-
-    assert_eq!(error.kind, AdapterErrorKind::Validation);
-    assert!(error.message.contains("JSON objects"));
-}
-
-#[test]
-fn anthropic_refinement_rejects_invalid_output_config_effort() {
-    let error = plan_with_provider_options(
-        &base_task(),
-        AnthropicOptions {
-            output_config: Some(json!({ "effort": "extreme" })),
-            ..Default::default()
-        },
-    )
-    .expect_err("refinement should reject invalid output_config effort");
-
-    assert_eq!(error.kind, AdapterErrorKind::Validation);
-    assert!(error.message.contains("output_config.effort"));
-}
-
-#[test]
 fn anthropic_refinement_rejects_provider_owned_output_config_format() {
     let error = plan_with_provider_options(
         &base_task(),
         AnthropicOptions {
-            output_config: Some(json!({
-                "format": { "type": "json_schema", "schema": { "type": "object" } }
-            })),
+            output_config: Some(AnthropicOutputConfig {
+                effort: None,
+                format: Some(AnthropicOutputFormat {
+                    schema: json!({ "type": "object" }),
+                    format_type: AnthropicOutputFormatType::JsonSchema,
+                }),
+            }),
             ..Default::default()
         },
     )
@@ -288,21 +263,6 @@ fn anthropic_refinement_rejects_provider_owned_output_config_format() {
 
     assert_eq!(error.kind, AdapterErrorKind::Validation);
     assert!(error.message.contains("output_config.format"));
-}
-
-#[test]
-fn anthropic_refinement_rejects_non_object_inference_geo() {
-    let error = plan_with_provider_options(
-        &base_task(),
-        AnthropicOptions {
-            inference_geo: Some(json!("us")),
-            ..Default::default()
-        },
-    )
-    .expect_err("refinement should reject non-object inference_geo");
-
-    assert_eq!(error.kind, AdapterErrorKind::Validation);
-    assert!(error.message.contains("JSON objects"));
 }
 
 #[test]
@@ -350,4 +310,59 @@ fn anthropic_refinement_rejects_mismatched_provider_options() {
     assert_eq!(error.kind, AdapterErrorKind::Validation);
     assert_eq!(error.operation, AdapterOperation::PlanRequest);
     assert!(error.message.contains("mismatched provider native options"));
+}
+
+#[test]
+fn anthropic_output_config_rejects_invalid_effort_during_deserialization() {
+    let error = serde_json::from_value::<AnthropicOptions>(json!({
+        "output_config": { "effort": "extreme" }
+    }))
+    .expect_err("deserialization should fail");
+
+    assert!(error.to_string().contains("extreme"));
+}
+
+#[test]
+fn anthropic_output_config_rejects_non_object_during_deserialization() {
+    let error = serde_json::from_value::<AnthropicOptions>(json!({
+        "output_config": "high"
+    }))
+    .expect_err("deserialization should fail");
+
+    assert!(error.to_string().contains("invalid type"));
+}
+
+#[test]
+fn anthropic_output_config_rejects_unknown_format_type_during_deserialization() {
+    let error = serde_json::from_value::<AnthropicOptions>(json!({
+        "output_config": {
+            "format": {
+                "type": "xml",
+                "schema": { "type": "object" }
+            }
+        }
+    }))
+    .expect_err("deserialization should fail");
+
+    assert!(error.to_string().contains("xml"));
+}
+
+#[test]
+fn anthropic_inference_geo_deserializes_as_string() {
+    let options = serde_json::from_value::<AnthropicOptions>(json!({
+        "inference_geo": "us"
+    }))
+    .expect("deserialization should succeed");
+
+    assert_eq!(options.inference_geo.as_deref(), Some("us"));
+}
+
+#[test]
+fn anthropic_inference_geo_rejects_object_during_deserialization() {
+    let error = serde_json::from_value::<AnthropicOptions>(json!({
+        "inference_geo": { "region": "us" }
+    }))
+    .expect_err("deserialization should fail");
+
+    assert!(error.to_string().contains("string"));
 }
