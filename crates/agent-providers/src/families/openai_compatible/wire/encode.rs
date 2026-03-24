@@ -63,7 +63,6 @@ pub(crate) fn encode_openai_request_parts(
 
     let mut body = Map::new();
     body.insert("model".to_string(), Value::String(model_id.to_string()));
-    body.insert("store".to_string(), Value::Bool(false));
     body.insert("input".to_string(), Value::Array(input));
     body.insert("text".to_string(), json!({ "format": text_format }));
 

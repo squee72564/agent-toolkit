@@ -2,8 +2,9 @@ use crate::error::{AdapterErrorKind, AdapterOperation};
 use crate::interfaces::codec_for;
 use crate::interfaces::refinement_for;
 use agent_core::{
-    AnthropicFamilyOptions, ContentPart, FamilyOptions, Message, MessageRole, ProviderKind,
-    ProviderOptions, ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
+    AnthropicFamilyOptions, AnthropicOptions, AnthropicThinking, AnthropicToolChoiceOptions,
+    ContentPart, FamilyOptions, Message, MessageRole, ProviderKind, ProviderOptions,
+    ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
 };
 
 fn base_task() -> TaskRequest {
@@ -69,17 +70,68 @@ fn anthropic_request_error_preserves_source_chain() {
 #[test]
 fn anthropic_request_plan_accepts_family_options_without_mutating_task() {
     let family_options = FamilyOptions::Anthropic(AnthropicFamilyOptions {
-        thinking: Some(serde_json::json!({ "type": "disabled" })),
+        thinking: Some(AnthropicThinking::Disabled),
     });
+
+    let provider_options = ProviderOptions::Anthropic(AnthropicOptions {
+        temperature: Some(0.2),
+        max_tokens: Some(1024),
+        tool_choice: Some(AnthropicToolChoiceOptions {
+            disable_parallel_tool_use: Some(true),
+        }),
+        ..Default::default()
+    });
+
+    let task_clone = base_task().clone();
 
     let encoded = plan_request(
         &base_task(),
         "claude-sonnet-4-6",
         ResponseMode::NonStreaming,
         Some(&family_options),
+        Some(&provider_options),
+    )
+    .expect("planning should succeed");
+
+    assert_eq!(task_clone, base_task());
+
+    assert_eq!(encoded.body["thinking"]["type"], "disabled");
+    assert!(encoded.body.get("temperature").is_some());
+    assert!(encoded.body.get("max_tokens").is_some());
+}
+
+#[test]
+fn semantic_only_request_omits_max_tokens() {
+    let encoded = plan_request(
+        &base_task(),
+        "claude-sonnet-4-6",
+        ResponseMode::NonStreaming,
+        None,
         None,
     )
     .expect("planning should succeed");
 
-    assert_eq!(encoded.body["thinking"]["type"], "disabled");
+    assert!(encoded.body.get("max_tokens").is_none());
+}
+
+#[test]
+fn anthropic_request_plan_rejects_enabled_thinking_without_max_tokens() {
+    let family_options = FamilyOptions::Anthropic(AnthropicFamilyOptions {
+        thinking: Some(AnthropicThinking::Enabled {
+            budget_tokens: agent_core::AnthropicThinkingBudget::new(1024)
+                .expect("non-zero thinking budget"),
+            display: None,
+        }),
+    });
+
+    let error = plan_request(
+        &base_task(),
+        "claude-sonnet-4-6",
+        ResponseMode::NonStreaming,
+        Some(&family_options),
+        None,
+    )
+    .expect_err("planning should reject enabled thinking without max_tokens");
+
+    assert!(error.message.contains("requires max_tokens"));
 }

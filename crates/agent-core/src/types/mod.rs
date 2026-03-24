@@ -37,6 +37,12 @@ pub use native_options::AnthropicFamilyOptions;
 pub use native_options::AnthropicOptions;
 /// Re-export of [`native_options::AnthropicServiceTier`].
 pub use native_options::AnthropicServiceTier;
+/// Re-export of [`native_options::AnthropicThinking`].
+pub use native_options::AnthropicThinking;
+/// Re-export of [`native_options::AnthropicThinkingBudget`].
+pub use native_options::AnthropicThinkingBudget;
+/// Re-export of [`native_options::AnthropicThinkingDisplay`].
+pub use native_options::AnthropicThinkingDisplay;
 /// Re-export of [`native_options::AnthropicToolChoiceOptions`].
 pub use native_options::AnthropicToolChoiceOptions;
 /// Re-export of [`native_options::FamilyOptions`].

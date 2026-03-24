@@ -123,11 +123,12 @@ fn anthropic_refinement_does_not_encode_provider_controls_without_provider_optio
 
     assert!(encoded.body.get("temperature").is_none());
     assert!(encoded.body.get("top_p").is_none());
+    assert!(encoded.body.get("max_tokens").is_none());
     assert!(encoded.body.get("top_k").is_none());
     assert!(encoded.body.get("stop_sequences").is_none());
-    assert!(encoded.body.get("metadata").is_none());
-    assert!(encoded.body.get("service_tier").is_none());
+    assert!(encoded.body.get("metadata_user_id").is_none());
     assert!(encoded.body.get("output_config").is_none());
+    assert!(encoded.body.get("service_tier").is_none());
     assert!(encoded.body.get("inference_geo").is_none());
 }
 
@@ -174,6 +175,42 @@ fn anthropic_refinement_rejects_zero_max_tokens() {
 
     assert_eq!(error.kind, AdapterErrorKind::Validation);
     assert!(error.message.contains("max_tokens"));
+}
+
+#[test]
+fn anthropic_refinement_rejects_enabled_thinking_budget_that_meets_max_tokens() {
+    let task = base_task();
+    let family_options = agent_core::FamilyOptions::Anthropic(agent_core::AnthropicFamilyOptions {
+        thinking: Some(agent_core::AnthropicThinking::Enabled {
+            budget_tokens: agent_core::AnthropicThinkingBudget::new(1024)
+                .expect("non-zero thinking budget"),
+            display: None,
+        }),
+    });
+
+    let mut encoded = codec_for(agent_core::ProviderFamilyId::Anthropic)
+        .encode_task(
+            &task,
+            MODEL_ID,
+            ResponseMode::NonStreaming,
+            Some(&family_options),
+        )
+        .expect("family planning should succeed");
+
+    let error = refinement_for(agent_core::ProviderKind::Anthropic)
+        .refine_request(
+            &task,
+            MODEL_ID,
+            &mut encoded,
+            Some(&ProviderOptions::Anthropic(AnthropicOptions {
+                max_tokens: Some(1024),
+                ..AnthropicOptions::default()
+            })),
+        )
+        .expect_err("refinement should reject thinking budget that meets max_tokens");
+
+    assert_eq!(error.kind, AdapterErrorKind::Validation);
+    assert!(error.message.contains("less than max_tokens"));
 }
 
 #[test]

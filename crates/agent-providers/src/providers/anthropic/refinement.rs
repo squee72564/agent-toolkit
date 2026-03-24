@@ -89,6 +89,8 @@ impl AnthropicNativeOptionsOverrides {
             ));
         };
 
+        validate_thinking_budget(body, self.max_tokens)?;
+
         if let Some(temperature) = self.temperature {
             insert_f32(body, "temperature", temperature)?;
         }
@@ -208,6 +210,45 @@ fn insert_f32(body: &mut Map<String, Value>, key: &str, value: f32) -> Result<()
     let number = serde_json::Number::from_f64(f64::from(value))
         .ok_or_else(|| validation_error(format!("Anthropic {key} must be finite")))?;
     body.insert(key.to_string(), Value::Number(number));
+    Ok(())
+}
+
+fn validate_thinking_budget(
+    body: &Map<String, Value>,
+    max_tokens: Option<u32>,
+) -> Result<(), AdapterError> {
+    let Some(thinking) = body.get("thinking") else {
+        return Ok(());
+    };
+
+    let Some(thinking) = thinking.as_object() else {
+        return Err(protocol_error(
+            "Anthropic family request body must contain an object thinking field",
+        ));
+    };
+
+    if thinking.get("type").and_then(Value::as_str) != Some("enabled") {
+        return Ok(());
+    }
+
+    let Some(max_tokens) = max_tokens else {
+        return Err(validation_error(
+            "Anthropic enabled thinking requires max_tokens in provider options",
+        ));
+    };
+
+    let Some(budget_tokens) = thinking.get("budget_tokens").and_then(Value::as_u64) else {
+        return Err(protocol_error(
+            "Anthropic enabled thinking payload must include integer budget_tokens",
+        ));
+    };
+
+    if budget_tokens >= u64::from(max_tokens) {
+        return Err(validation_error(
+            "Anthropic thinking.budget_tokens must be less than max_tokens",
+        ));
+    }
+
     Ok(())
 }
 

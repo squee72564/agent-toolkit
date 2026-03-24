@@ -1,10 +1,10 @@
 use agent_core::{
-    AnthropicFamilyOptions, FamilyOptions, ProviderKind, Response, ResponseFormat, ResponseMode,
-    TaskRequest,
+    AnthropicFamilyOptions, AnthropicThinking, FamilyOptions, ProviderKind, Response,
+    ResponseFormat, ResponseMode, TaskRequest,
 };
 use agent_transport::HttpRequestOptions;
 use reqwest::{Method, header::HeaderMap};
-use serde_json::Value;
+use serde_json::{Value, to_value};
 
 use crate::{
     error::{AdapterError, AdapterErrorKind, AdapterOperation, ProviderErrorInfo},
@@ -113,10 +113,37 @@ fn apply_family_options(
     if let Some(options) = family_options
         && let Some(thinking) = options.thinking.as_ref()
     {
-        body.insert("thinking".to_string(), thinking.clone());
+        validate_thinking(thinking)?;
+        let thinking = to_value(thinking).map_err(|error| {
+            AdapterError::with_source(
+                AdapterErrorKind::Encode,
+                ProviderKind::Anthropic,
+                AdapterOperation::PlanRequest,
+                "failed to serialize Anthropic thinking configuration",
+                error,
+            )
+        })?;
+        body.insert("thinking".to_string(), thinking);
     }
 
     Ok(())
+}
+
+fn validate_thinking(thinking: &AnthropicThinking) -> Result<(), AdapterError> {
+    match thinking {
+        AnthropicThinking::Disabled | AnthropicThinking::Adaptive { .. } => Ok(()),
+        AnthropicThinking::Enabled { budget_tokens, .. } => {
+            if budget_tokens.get() < 1024 {
+                return Err(AdapterError::new(
+                    AdapterErrorKind::Validation,
+                    ProviderKind::Anthropic,
+                    AdapterOperation::PlanRequest,
+                    "Anthropic thinking.budget_tokens must be greater than or equal to 1024",
+                ));
+            }
+            Ok(())
+        }
+    }
 }
 
 fn map_anthropic_plan_error(error: AnthropicFamilyError) -> AdapterError {

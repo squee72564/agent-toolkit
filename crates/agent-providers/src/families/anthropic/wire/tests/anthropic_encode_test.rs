@@ -1,8 +1,9 @@
 use serde_json::json;
 
 use agent_core::types::{
-    AnthropicFamilyOptions, ContentPart, Message, MessageRole, ResponseFormat, ToolCall,
-    ToolChoice, ToolDefinition, ToolResult, ToolResultContent,
+    AnthropicFamilyOptions, AnthropicThinking, AnthropicThinkingBudget, AnthropicThinkingDisplay,
+    ContentPart, Message, MessageRole, ResponseFormat, ToolCall, ToolChoice, ToolDefinition,
+    ToolResult, ToolResultContent,
 };
 
 use super::anthropic_test_helpers::*;
@@ -20,7 +21,6 @@ fn encode_basic_text_message() {
     let encoded = encode_anthropic_request(request.clone()).expect("encode should succeed");
 
     assert_eq!(encoded.body["model"], json!("claude-sonnet-4.6"));
-    assert_eq!(encoded.body["max_tokens"], json!(1024));
     assert_eq!(encoded.body["messages"][0]["role"], json!("user"));
     assert_eq!(
         encoded.body["messages"][0]["content"][0]["type"],
@@ -64,12 +64,53 @@ fn planning_helper_applies_family_options_without_mutating_task() {
         &request,
         agent_core::ResponseMode::NonStreaming,
         Some(AnthropicFamilyOptions {
-            thinking: Some(json!({ "type": "disabled" })),
+            thinking: Some(AnthropicThinking::Disabled),
         }),
     )
     .expect("planning should succeed");
 
     assert_eq!(planned.body["thinking"]["type"], json!("disabled"));
+}
+
+#[test]
+fn planning_helper_serializes_adaptive_thinking_display() {
+    let request = base_request(vec![Message::user_text("hello")]);
+
+    let planned = plan_anthropic_family_request(
+        &request,
+        agent_core::ResponseMode::NonStreaming,
+        Some(AnthropicFamilyOptions {
+            thinking: Some(AnthropicThinking::Adaptive {
+                display: Some(AnthropicThinkingDisplay::Omitted),
+            }),
+        }),
+    )
+    .expect("planning should succeed");
+
+    assert_eq!(
+        planned.body["thinking"],
+        json!({ "type": "adaptive", "display": "omitted" })
+    );
+}
+
+#[test]
+fn planning_helper_rejects_enabled_thinking_budget_below_minimum() {
+    let request = base_request(vec![Message::user_text("hello")]);
+
+    let error = plan_anthropic_family_request(
+        &request,
+        agent_core::ResponseMode::NonStreaming,
+        Some(AnthropicFamilyOptions {
+            thinking: Some(AnthropicThinking::Enabled {
+                budget_tokens: AnthropicThinkingBudget::new(512).expect("non-zero thinking budget"),
+                display: None,
+            }),
+        }),
+    )
+    .expect_err("planning should reject too-small thinking budget");
+
+    assert_eq!(error.kind, crate::error::AdapterErrorKind::Validation);
+    assert!(error.message.contains("budget_tokens"));
 }
 
 #[test]
@@ -548,24 +589,5 @@ fn encode_maps_json_schema_response_format_to_output_config() {
             },
             "required": ["ok"]
         }))
-    );
-}
-
-#[test]
-fn encode_emits_warning_when_default_max_tokens_applied() {
-    let request = base_request(vec![Message {
-        role: MessageRole::User,
-        content: vec![ContentPart::Text {
-            text: "hello".to_string(),
-        }],
-    }]);
-    let encoded = encode_anthropic_request(request.clone()).expect("encode should succeed");
-
-    assert_eq!(encoded.body["max_tokens"], json!(1024));
-    assert!(
-        encoded
-            .warnings
-            .iter()
-            .any(|warning| warning.code == "anthropic.encode.default_max_tokens_applied")
     );
 }

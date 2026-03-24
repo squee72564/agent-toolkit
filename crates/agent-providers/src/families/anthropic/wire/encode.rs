@@ -3,16 +3,12 @@ use std::collections::BTreeSet;
 use serde_json::{Map, Value, json};
 
 use agent_core::types::{
-    ContentPart, Message, MessageRole, ResponseFormat, RuntimeWarning, TaskRequest, ToolChoice,
-    ToolDefinition, ToolResultContent,
+    ContentPart, Message, MessageRole, ResponseFormat, TaskRequest, ToolChoice, ToolDefinition,
+    ToolResultContent,
 };
 
 use super::schema_rules::{canonicalize_json, permissive_json_object_schema, stable_json_string};
 use super::{AnthropicEncodedRequest, AnthropicFamilyError};
-
-const DEFAULT_MAX_TOKENS: u32 = 1024;
-
-const WARN_DEFAULT_MAX_TOKENS_APPLIED: &str = "anthropic.encode.default_max_tokens_applied";
 
 #[derive(Debug, Clone, PartialEq)]
 struct WireMessage {
@@ -34,8 +30,6 @@ pub(crate) fn encode_anthropic_request(
     model_id: &str,
 ) -> Result<AnthropicEncodedRequest, AnthropicFamilyError> {
     validate_request(task, model_id)?;
-
-    let mut warnings = Vec::new();
 
     let TaskRequest {
         messages,
@@ -61,19 +55,6 @@ pub(crate) fn encode_anthropic_request(
     let mut body = Map::new();
     body.insert("model".to_string(), Value::String(model_id.to_string()));
     body.insert(
-        "max_tokens".to_string(),
-        Value::from({
-            push_warning(
-                &mut warnings,
-                WARN_DEFAULT_MAX_TOKENS_APPLIED,
-                format!(
-                    "max_output_tokens not set; defaulting to {DEFAULT_MAX_TOKENS} for Anthropic"
-                ),
-            );
-            DEFAULT_MAX_TOKENS
-        }),
-    );
-    body.insert(
         "messages".to_string(),
         Value::Array(
             merged_messages
@@ -96,7 +77,7 @@ pub(crate) fn encode_anthropic_request(
     }
     Ok(AnthropicEncodedRequest {
         body: Value::Object(body),
-        warnings,
+        warnings: vec![],
     })
 }
 
@@ -558,11 +539,4 @@ fn validate_no_assistant_prefill(messages: &[WireMessage]) -> Result<(), Anthrop
         ));
     }
     Ok(())
-}
-
-fn push_warning(warnings: &mut Vec<RuntimeWarning>, code: &str, message: impl Into<String>) {
-    warnings.push(RuntimeWarning {
-        code: code.to_string(),
-        message: message.into(),
-    });
 }

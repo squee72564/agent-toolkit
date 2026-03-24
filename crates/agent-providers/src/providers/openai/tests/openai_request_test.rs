@@ -112,6 +112,7 @@ fn openai_request_plan_does_not_encode_provider_controls_without_provider_option
     .expect("planning should succeed");
 
     assert!(encoded.body.get("metadata").is_none());
+    assert!(encoded.body.get("store").is_none());
     assert!(encoded.body.get("service_tier").is_none());
     assert!(encoded.body.get("prompt_cache_key").is_none());
     assert!(encoded.body.get("prompt_cache_retention").is_none());

@@ -1,10 +1,10 @@
 use std::time::Duration;
 
 use agent_core::{
-    AnthropicFamilyOptions, AnthropicOptions, AnthropicServiceTier, AnthropicToolChoiceOptions,
-    OpenAiCompatibleOptions, OpenAiOptions, OpenAiPromptCacheRetention, OpenAiTextOptions,
-    OpenAiTextVerbosity, OpenAiTruncation, OpenRouterOptions, OpenRouterTextOptions,
-    OpenRouterTextVerbosity,
+    AnthropicFamilyOptions, AnthropicOptions, AnthropicServiceTier, AnthropicThinking,
+    AnthropicThinkingBudget, AnthropicToolChoiceOptions, OpenAiCompatibleOptions, OpenAiOptions,
+    OpenAiPromptCacheRetention, OpenAiTextOptions, OpenAiTextVerbosity, OpenAiTruncation,
+    OpenRouterOptions, OpenRouterTextOptions, OpenRouterTextVerbosity,
 };
 use serde_json::{Value, json};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -288,6 +288,30 @@ async fn openrouter_direct_helper_normalizes_typed_native_options_into_payload()
 }
 
 #[tokio::test]
+async fn openai_direct_helper_omits_store_without_provider_option() {
+    let (base_url, captured) =
+        spawn_json_capture_stub("application/json", OPENAI_SUCCESS_BODY).await;
+    let client = openai()
+        .api_key("test-key")
+        .base_url(base_url)
+        .default_model("gpt-5-mini")
+        .build()
+        .expect("build openai client");
+
+    let _response = with_timeout(client.create_with_openai_options(
+        MessageCreateInput::user("hello"),
+        Some("gpt-5.1".to_string()),
+        Some(OpenAiCompatibleOptions::default()),
+        Some(OpenAiOptions::default()),
+    ))
+    .await
+    .expect("request should succeed");
+
+    let captured = captured.await.expect("captured request should arrive");
+    assert!(captured.body.get("store").is_none());
+}
+
+#[tokio::test]
 async fn anthropic_direct_helper_normalizes_typed_native_options_into_payload() {
     let (base_url, captured) =
         spawn_json_capture_stub("application/json", ANTHROPIC_SUCCESS_BODY).await;
@@ -302,12 +326,16 @@ async fn anthropic_direct_helper_normalizes_typed_native_options_into_payload() 
         MessageCreateInput::user("hello"),
         Some("claude-opus-4-1-20250805".to_string()),
         Some(AnthropicFamilyOptions {
-            thinking: Some(json!({ "type": "enabled", "budget_tokens": 128 })),
+            thinking: Some(AnthropicThinking::Enabled {
+                budget_tokens:
+                    AnthropicThinkingBudget::new(1024).expect("non-zero thinking budget"),
+                display: None,
+            }),
         }),
         Some(AnthropicOptions {
             temperature: Some(0.4),
             top_p: Some(0.6),
-            max_tokens: Some(777),
+            max_tokens: Some(2048),
             top_k: Some(8),
             stop_sequences: vec!["DONE".to_string(), "STOP".to_string()],
             metadata_user_id: Some("anthropic-user-1".to_string()),
@@ -327,11 +355,11 @@ async fn anthropic_direct_helper_normalizes_typed_native_options_into_payload() 
     assert_eq!(captured.body["model"], "claude-opus-4-1-20250805");
     assert_eq!(
         captured.body["thinking"],
-        json!({ "type": "enabled", "budget_tokens": 128 })
+        json!({ "type": "enabled", "budget_tokens": 1024 })
     );
     assert_json_number_close(&captured.body["temperature"], 0.4);
     assert_json_number_close(&captured.body["top_p"], 0.6);
-    assert_eq!(captured.body["max_tokens"], 777);
+    assert_eq!(captured.body["max_tokens"], 2048);
     assert_eq!(captured.body["top_k"], 8);
     assert_eq!(captured.body["stop_sequences"], json!(["DONE", "STOP"]));
     assert_eq!(
@@ -405,6 +433,69 @@ async fn anthropic_direct_helper_rejects_invalid_native_options_before_sending_r
     .expect_err("request should fail for invalid native options");
 
     assert!(error.to_string().contains("metadata.user_id"));
+}
+
+#[tokio::test]
+async fn anthropic_direct_helper_rejects_invalid_thinking_budget_before_sending_request() {
+    let (base_url, _captured) =
+        spawn_json_capture_stub("application/json", ANTHROPIC_SUCCESS_BODY).await;
+    let client = anthropic()
+        .api_key("test-key")
+        .base_url(base_url)
+        .default_model("claude-sonnet-4-6")
+        .build()
+        .expect("build anthropic client");
+
+    let error = with_timeout(client.create_with_anthropic_options(
+        MessageCreateInput::user("hello"),
+        Some("claude-opus-4-1-20250805".to_string()),
+        Some(AnthropicFamilyOptions {
+            thinking: Some(AnthropicThinking::Enabled {
+                budget_tokens: AnthropicThinkingBudget::new(512).expect("non-zero thinking budget"),
+                display: None,
+            }),
+        }),
+        Some(AnthropicOptions {
+            max_tokens: Some(2048),
+            ..AnthropicOptions::default()
+        }),
+    ))
+    .await
+    .expect_err("request should fail for invalid thinking budget");
+
+    assert!(error.to_string().contains("thinking.budget_tokens"));
+}
+
+#[tokio::test]
+async fn anthropic_direct_helper_rejects_thinking_budget_that_meets_or_exceeds_max_tokens() {
+    let (base_url, _captured) =
+        spawn_json_capture_stub("application/json", ANTHROPIC_SUCCESS_BODY).await;
+    let client = anthropic()
+        .api_key("test-key")
+        .base_url(base_url)
+        .default_model("claude-sonnet-4-6")
+        .build()
+        .expect("build anthropic client");
+
+    let error = with_timeout(client.create_with_anthropic_options(
+        MessageCreateInput::user("hello"),
+        Some("claude-opus-4-1-20250805".to_string()),
+        Some(AnthropicFamilyOptions {
+            thinking: Some(AnthropicThinking::Enabled {
+                budget_tokens:
+                    AnthropicThinkingBudget::new(2048).expect("non-zero thinking budget"),
+                display: None,
+            }),
+        }),
+        Some(AnthropicOptions {
+            max_tokens: Some(2048),
+            ..AnthropicOptions::default()
+        }),
+    ))
+    .await
+    .expect_err("request should fail when thinking budget reaches max_tokens");
+
+    assert!(error.to_string().contains("less than max_tokens"));
 }
 
 #[tokio::test]

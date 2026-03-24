@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, num::NonZeroU32};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -34,6 +34,45 @@ pub struct OpenAiCompatibleOptions {
     pub max_output_tokens: Option<u32>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AnthropicThinkingDisplay {
+    Summarized,
+    Omitted,
+}
+
+/// Anthropic extended-thinking budget in tokens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct AnthropicThinkingBudget(NonZeroU32);
+
+impl AnthropicThinkingBudget {
+    /// Creates a non-zero budget value.
+    pub fn new(value: u32) -> Option<Self> {
+        NonZeroU32::new(value).map(Self)
+    }
+
+    /// Returns the underlying token count.
+    pub fn get(self) -> u32 {
+        self.0.get()
+    }
+}
+
+/// Anthropic Messages `thinking` configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum AnthropicThinking {
+    Disabled,
+    Enabled {
+        budget_tokens: AnthropicThinkingBudget,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        display: Option<AnthropicThinkingDisplay>,
+    },
+    Adaptive {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        display: Option<AnthropicThinkingDisplay>,
+    },
+}
+
 /// Shared request controls owned by the Anthropic family codec.
 ///
 /// Anthropic-specific family controls stay here rather than on
@@ -44,7 +83,7 @@ pub struct OpenAiCompatibleOptions {
 pub struct AnthropicFamilyOptions {
     /// Family-scoped thinking controls forwarded when supported.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub thinking: Option<Value>,
+    pub thinking: Option<AnthropicThinking>,
 }
 
 /// OpenAI-specific request controls outside the shared task and family layers.
