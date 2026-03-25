@@ -31,6 +31,12 @@ pub use identity::ProviderKind;
 pub use message::Message;
 /// Re-export of [`message::MessageRole`].
 pub use message::MessageRole;
+/// Re-export of [`native_options::AnthropicCacheControl`].
+pub use native_options::AnthropicCacheControl;
+/// Re-export of [`native_options::AnthropicCacheControlTTL`].
+pub use native_options::AnthropicCacheControlTTL;
+/// Re-export of [`native_options::AnthropicCacheControlType`].
+pub use native_options::AnthropicCacheControlType;
 /// Re-export of [`native_options::AnthropicFamilyOptions`].
 pub use native_options::AnthropicFamilyOptions;
 /// Re-export of [`native_options::AnthropicOptions`].
@@ -69,6 +75,8 @@ pub use native_options::OpenAiCompatibleReasoningSummary;
 pub use native_options::OpenAiOptions;
 /// Re-export of [`native_options::OpenAiPromptCacheRetention`].
 pub use native_options::OpenAiPromptCacheRetention;
+/// Re-export of [`native_options::OpenAiServiceTier`].
+pub use native_options::OpenAiServiceTier;
 /// Re-export of [`native_options::OpenAiTextOptions`].
 pub use native_options::OpenAiTextOptions;
 /// Re-export of [`native_options::OpenAiTextVerbosity`].
