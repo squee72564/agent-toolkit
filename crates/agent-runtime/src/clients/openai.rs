@@ -56,9 +56,11 @@ impl OpenAiClient {
     /// contract, such as `parallel_tool_calls`, `reasoning`, `temperature`,
     /// `top_p`, and `max_output_tokens`, must be passed in `family`.
     ///
-    /// OpenAI-specific Responses controls such as `metadata`, `service_tier`,
-    /// `store`, `prompt_cache_key`, `prompt_cache_retention`, `truncation`,
-    /// `text.verbosity`, and `safety_identifier` must be passed in `provider`.
+    /// OpenAI-specific Responses controls such as `metadata`,
+    /// enum-typed `service_tier`, `store`, `prompt_cache_key`,
+    /// `prompt_cache_retention`, `truncation`, `text.verbosity`,
+    /// `safety_identifier`, `previous_response_id`, `top_logprobs`, and
+    /// `max_tool_calls` must be passed in `provider`.
     ///
     /// Validation follows ownership in the current implementation: the
     /// OpenAI-compatible family codec validates `family`, and the OpenAI

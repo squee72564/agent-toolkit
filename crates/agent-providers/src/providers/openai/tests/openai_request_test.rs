@@ -2,8 +2,9 @@ use std::collections::BTreeMap;
 
 use agent_core::types::{
     ContentPart, FamilyOptions, Message, MessageRole, OpenAiCompatibleOptions, OpenAiOptions,
-    OpenAiPromptCacheRetention, OpenAiTextOptions, OpenAiTextVerbosity, OpenAiTruncation,
-    ProviderKind, ProviderOptions, ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
+    OpenAiPromptCacheRetention, OpenAiServiceTier, OpenAiTextOptions, OpenAiTextVerbosity,
+    OpenAiTruncation, ProviderKind, ProviderOptions, ResponseFormat, ResponseMode, TaskRequest,
+    ToolChoice,
 };
 
 use crate::error::{AdapterErrorKind, AdapterOperation};
@@ -118,6 +119,9 @@ fn openai_request_plan_does_not_encode_provider_controls_without_provider_option
     assert!(encoded.body.get("prompt_cache_retention").is_none());
     assert!(encoded.body.get("truncation").is_none());
     assert!(encoded.body.get("safety_identifier").is_none());
+    assert!(encoded.body.get("previous_response_id").is_none());
+    assert!(encoded.body.get("top_logprobs").is_none());
+    assert!(encoded.body.get("max_tool_calls").is_none());
     assert!(encoded.body["text"].get("verbosity").is_none());
 }
 
@@ -125,7 +129,7 @@ fn openai_request_plan_does_not_encode_provider_controls_without_provider_option
 fn openai_request_plan_applies_provider_native_options_in_refinement() {
     let provider_options = ProviderOptions::OpenAi(OpenAiOptions {
         metadata: BTreeMap::from([("trace_id".to_string(), "trace-1".to_string())]),
-        service_tier: Some("flex".to_string()),
+        service_tier: Some(OpenAiServiceTier::Flex),
         store: Some(true),
         prompt_cache_key: Some("cache-key-1".to_string()),
         prompt_cache_retention: Some(OpenAiPromptCacheRetention::InMemory),
@@ -134,6 +138,9 @@ fn openai_request_plan_applies_provider_native_options_in_refinement() {
             verbosity: Some(OpenAiTextVerbosity::Medium),
         }),
         safety_identifier: Some("safe-1".to_string()),
+        previous_response_id: Some("resp_123".to_string()),
+        top_logprobs: Some(5),
+        max_tool_calls: Some(3),
     });
 
     let encoded = plan_request(
@@ -154,6 +161,9 @@ fn openai_request_plan_applies_provider_native_options_in_refinement() {
     assert_eq!(encoded.body["text"]["verbosity"], "medium");
     assert_eq!(encoded.body["text"]["format"]["type"], "text");
     assert_eq!(encoded.body["safety_identifier"], "safe-1");
+    assert_eq!(encoded.body["previous_response_id"], "resp_123");
+    assert_eq!(encoded.body["top_logprobs"], 5);
+    assert_eq!(encoded.body["max_tool_calls"], 3);
 }
 
 #[test]

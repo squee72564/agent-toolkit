@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use agent_core::{
     ContentPart, Message, MessageRole, OpenAiOptions, OpenAiPromptCacheRetention,
-    OpenAiTextOptions, OpenAiTextVerbosity, OpenAiTruncation, ProviderOptions, ResponseFormat,
-    ResponseMode, TaskRequest, ToolChoice,
+    OpenAiServiceTier, OpenAiTextOptions, OpenAiTextVerbosity, OpenAiTruncation, ProviderOptions,
+    ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
 };
 
 use crate::error::{AdapterErrorKind, AdapterOperation};
@@ -40,7 +40,7 @@ fn openai_refinement_applies_provider_native_options() {
             &mut encoded,
             Some(&ProviderOptions::OpenAi(OpenAiOptions {
                 metadata: BTreeMap::from([("trace_id".to_string(), "trace-1".to_string())]),
-                service_tier: Some("flex".to_string()),
+                service_tier: Some(OpenAiServiceTier::Flex),
                 store: Some(true),
                 prompt_cache_key: Some("cache-key-1".to_string()),
                 prompt_cache_retention: Some(OpenAiPromptCacheRetention::TwentyFourHours),
@@ -49,6 +49,9 @@ fn openai_refinement_applies_provider_native_options() {
                     verbosity: Some(OpenAiTextVerbosity::High),
                 }),
                 safety_identifier: Some("safe-1".to_string()),
+                previous_response_id: Some("resp_123".to_string()),
+                top_logprobs: Some(5),
+                max_tool_calls: Some(3),
             })),
         )
         .expect("refinement should succeed");
@@ -62,6 +65,9 @@ fn openai_refinement_applies_provider_native_options() {
     assert_eq!(encoded.body["text"]["verbosity"], "high");
     assert_eq!(encoded.body["text"]["format"]["type"], "text");
     assert_eq!(encoded.body["safety_identifier"], "safe-1");
+    assert_eq!(encoded.body["previous_response_id"], "resp_123");
+    assert_eq!(encoded.body["top_logprobs"], 5);
+    assert_eq!(encoded.body["max_tool_calls"], 3);
 }
 
 #[test]
@@ -87,6 +93,8 @@ fn openai_refinement_rejects_mismatched_provider_options() {
                 service_tier: None,
                 tool_choice: None,
                 inference_geo: None,
+                cache_control: None,
+                metadata: std::collections::BTreeMap::new(),
             })),
         )
         .expect_err("refinement should reject mismatched options");
@@ -197,4 +205,52 @@ fn openai_refinement_rejects_safety_identifier_longer_than_sixty_four_characters
     assert_eq!(error.kind, AdapterErrorKind::Validation);
     assert_eq!(error.operation, AdapterOperation::PlanRequest);
     assert!(error.message.contains("safety_identifier"));
+}
+
+#[test]
+fn openai_refinement_rejects_top_logprobs_greater_than_twenty() {
+    let task = base_task();
+    let mut encoded = codec_for(agent_core::ProviderFamilyId::OpenAiCompatible)
+        .encode_task(&task, MODEL_ID, ResponseMode::NonStreaming, None)
+        .expect("planning should succeed");
+
+    let error = refinement_for(agent_core::ProviderKind::OpenAi)
+        .refine_request(
+            &task,
+            MODEL_ID,
+            &mut encoded,
+            Some(&ProviderOptions::OpenAi(OpenAiOptions {
+                top_logprobs: Some(21),
+                ..Default::default()
+            })),
+        )
+        .expect_err("refinement should reject top_logprobs over 20");
+
+    assert_eq!(error.kind, AdapterErrorKind::Validation);
+    assert_eq!(error.operation, AdapterOperation::PlanRequest);
+    assert!(error.message.contains("top_logprobs"));
+}
+
+#[test]
+fn openai_refinement_rejects_zero_max_tool_calls() {
+    let task = base_task();
+    let mut encoded = codec_for(agent_core::ProviderFamilyId::OpenAiCompatible)
+        .encode_task(&task, MODEL_ID, ResponseMode::NonStreaming, None)
+        .expect("planning should succeed");
+
+    let error = refinement_for(agent_core::ProviderKind::OpenAi)
+        .refine_request(
+            &task,
+            MODEL_ID,
+            &mut encoded,
+            Some(&ProviderOptions::OpenAi(OpenAiOptions {
+                max_tool_calls: Some(0),
+                ..Default::default()
+            })),
+        )
+        .expect_err("refinement should reject max_tool_calls == 0");
+
+    assert_eq!(error.kind, AdapterErrorKind::Validation);
+    assert_eq!(error.operation, AdapterOperation::PlanRequest);
+    assert!(error.message.contains("max_tool_calls"));
 }

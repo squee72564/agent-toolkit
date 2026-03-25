@@ -2,12 +2,14 @@ use crate::error::{AdapterErrorKind, AdapterOperation};
 use crate::interfaces::codec_for;
 use crate::interfaces::refinement_for;
 use agent_core::{
-    AnthropicOptions, AnthropicOutputConfig, AnthropicOutputEffort, AnthropicOutputFormat,
-    AnthropicOutputFormatType, AnthropicServiceTier, AnthropicToolChoiceOptions, ContentPart,
-    Message, MessageRole, OpenAiOptions, ProviderOptions, ResponseFormat, ResponseMode,
-    TaskRequest, ToolChoice,
+    AnthropicCacheControl, AnthropicCacheControlTTL, AnthropicCacheControlType, AnthropicOptions,
+    AnthropicOutputConfig, AnthropicOutputEffort, AnthropicOutputFormat, AnthropicOutputFormatType,
+    AnthropicServiceTier, AnthropicToolChoiceOptions, ContentPart, Message, MessageRole,
+    OpenAiOptions, OpenAiServiceTier, ProviderOptions, ResponseFormat, ResponseMode, TaskRequest,
+    ToolChoice,
 };
 use serde_json::json;
+use std::collections::BTreeMap;
 
 const MODEL_ID: &str = "claude-sonnet-4-6";
 
@@ -75,10 +77,19 @@ fn anthropic_refinement_applies_full_provider_native_matrix() {
                 format: None,
             }),
             service_tier: Some(AnthropicServiceTier::StandardOnly),
-            tool_choice: Some(AnthropicToolChoiceOptions {
+            tool_choice: Some(AnthropicToolChoiceOptions::Tool {
                 disable_parallel_tool_use: Some(false),
+                name: "lookup_weather".to_string(),
             }),
             inference_geo: Some("us".to_string()),
+            cache_control: Some(AnthropicCacheControl {
+                type_: AnthropicCacheControlType::Ephemeral,
+                ttl: Some(AnthropicCacheControlTTL::OneHour),
+            }),
+            metadata: BTreeMap::from([
+                ("trace_id".to_string(), "trace-1".to_string()),
+                ("user_id".to_string(), "legacy".to_string()),
+            ]),
         },
     )
     .expect("refinement should succeed");
@@ -94,9 +105,16 @@ fn anthropic_refinement_applies_full_provider_native_matrix() {
     assert_eq!(encoded.body["max_tokens"], 256);
     assert_eq!(encoded.body["top_k"], 8);
     assert_eq!(encoded.body["stop_sequences"], json!(["END"]));
-    assert_eq!(encoded.body["metadata"], json!({ "user_id": "user-1" }));
+    assert_eq!(
+        encoded.body["metadata"],
+        json!({ "trace_id": "trace-1", "user_id": "user-1" })
+    );
     assert_eq!(encoded.body["service_tier"], "standard_only");
     assert_eq!(encoded.body["inference_geo"], json!("us"));
+    assert_eq!(
+        encoded.body["cache_control"],
+        json!({ "type": "ephemeral", "ttl": "1h" })
+    );
     assert_eq!(
         encoded.body.pointer("/output_config/effort"),
         Some(&json!("high"))
@@ -274,7 +292,7 @@ fn anthropic_refinement_rejects_tool_choice_override_for_none() {
     let error = plan_with_provider_options(
         &task,
         AnthropicOptions {
-            tool_choice: Some(AnthropicToolChoiceOptions {
+            tool_choice: Some(AnthropicToolChoiceOptions::Auto {
                 disable_parallel_tool_use: Some(true),
             }),
             ..Default::default()
@@ -283,7 +301,56 @@ fn anthropic_refinement_rejects_tool_choice_override_for_none() {
     .expect_err("refinement should reject tool_choice override for none");
 
     assert_eq!(error.kind, AdapterErrorKind::Validation);
-    assert!(error.message.contains("disable_parallel_tool_use"));
+    assert!(error.message.contains("tool_choice"));
+}
+
+#[test]
+fn anthropic_refinement_rejects_provider_tool_choice_type_mismatch() {
+    let task = base_task();
+    let error = plan_with_provider_options(
+        &task,
+        AnthropicOptions {
+            tool_choice: Some(AnthropicToolChoiceOptions::Any {
+                disable_parallel_tool_use: Some(false),
+            }),
+            ..Default::default()
+        },
+    )
+    .expect_err("refinement should reject provider tool_choice type mismatch");
+
+    assert_eq!(error.kind, AdapterErrorKind::Validation);
+    assert!(error.message.contains("tool_choice"));
+}
+
+#[test]
+fn anthropic_refinement_rejects_provider_tool_choice_name_mismatch() {
+    let task = TaskRequest {
+        tool_choice: ToolChoice::Specific {
+            name: "lookup_weather".to_string(),
+        },
+        response_format: ResponseFormat::Text,
+        tools: vec![agent_core::ToolDefinition {
+            name: "lookup_weather".to_string(),
+            description: None,
+            parameters_schema: json!({ "type": "object" }),
+        }],
+        ..base_task()
+    };
+
+    let error = plan_with_provider_options(
+        &task,
+        AnthropicOptions {
+            tool_choice: Some(AnthropicToolChoiceOptions::Tool {
+                disable_parallel_tool_use: Some(false),
+                name: "lookup_time".to_string(),
+            }),
+            ..Default::default()
+        },
+    )
+    .expect_err("refinement should reject provider tool_choice name mismatch");
+
+    assert_eq!(error.kind, AdapterErrorKind::Validation);
+    assert!(error.message.contains("tool_choice.name"));
 }
 
 #[test]
@@ -300,7 +367,7 @@ fn anthropic_refinement_rejects_mismatched_provider_options() {
             &mut encoded,
             Some(&ProviderOptions::OpenAi(OpenAiOptions {
                 metadata: std::collections::BTreeMap::new(),
-                service_tier: Some("flex".to_string()),
+                service_tier: Some(OpenAiServiceTier::Flex),
                 store: Some(false),
                 ..Default::default()
             })),

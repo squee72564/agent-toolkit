@@ -26,6 +26,17 @@ fn openai_compatible_reasoning_round_trips() {
 #[test]
 fn anthropic_output_config_round_trips() {
     let options = serde_json::from_value::<AnthropicOptions>(json!({
+        "tool_choice": {
+            "type": "any",
+            "disable_parallel_tool_use": true
+        },
+        "cache_control": {
+            "type": "ephemeral",
+            "ttl": "5m"
+        },
+        "metadata": {
+            "trace_id": "trace-1"
+        },
         "output_config": {
             "effort": "high",
             "format": {
@@ -41,6 +52,17 @@ fn anthropic_output_config_round_trips() {
     assert_eq!(
         serialized,
         json!({
+            "metadata": {
+                "trace_id": "trace-1"
+            },
+            "tool_choice": {
+                "type": "any",
+                "disable_parallel_tool_use": true
+            },
+            "cache_control": {
+                "type": "ephemeral",
+                "ttl": "5m"
+            },
             "output_config": {
                 "effort": "high",
                 "format": {

@@ -80,9 +80,17 @@ async fn live_anthropic_text_streaming_smoke_test() {
         .build()
         .expect("build anthropic client");
 
-    let stream = with_live_test_timeout(client.streaming().create(MessageCreateInput::user(
-        "Reply with one short sentence confirming this live streaming smoke test.",
-    )))
+    let stream = with_live_test_timeout(client.create_stream_with_anthropic_options(
+        MessageCreateInput::user(
+            "Reply with one short sentence confirming this live streaming smoke test.",
+        ),
+        None,
+        None,
+        Some(agent_toolkit::core::AnthropicOptions {
+            max_tokens: Some(128),
+            ..agent_toolkit::core::AnthropicOptions::default()
+        }),
+    ))
     .await
     .expect("anthropic stream should open")
     .into_text_stream();

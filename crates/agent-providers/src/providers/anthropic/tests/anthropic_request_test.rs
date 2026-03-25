@@ -76,7 +76,7 @@ fn anthropic_request_plan_accepts_family_options_without_mutating_task() {
     let provider_options = ProviderOptions::Anthropic(AnthropicOptions {
         temperature: Some(0.2),
         max_tokens: Some(1024),
-        tool_choice: Some(AnthropicToolChoiceOptions {
+        tool_choice: Some(AnthropicToolChoiceOptions::Auto {
             disable_parallel_tool_use: Some(true),
         }),
         ..Default::default()

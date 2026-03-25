@@ -61,9 +61,13 @@ impl AnthropicClient {
     ///
     /// Anthropic provider controls such as `temperature`, `top_p`,
     /// `max_tokens`, `top_k`, `stop_sequences`, `metadata_user_id`,
-    /// `output_config`, `service_tier`,
-    /// `tool_choice.disable_parallel_tool_use`, and `inference_geo` belong in
-    /// `provider`.
+    /// map-style `metadata`, `output_config`, `service_tier`, `cache_control`,
+    /// provider `tool_choice` overlays (for example
+    /// `disable_parallel_tool_use`), and `inference_geo` belong in `provider`.
+    ///
+    /// `TaskRequest.tool_choice` remains the semantic source of truth.
+    /// Provider `tool_choice` must be compatible with the semantic selection
+    /// and is treated as an Anthropic-specific overlay.
     ///
     /// Validation follows ownership in the current implementation: the
     /// Anthropic family codec validates `family`, and the Anthropic provider

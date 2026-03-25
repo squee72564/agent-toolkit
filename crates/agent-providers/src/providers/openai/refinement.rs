@@ -1,6 +1,7 @@
 use agent_core::{
-    OpenAiOptions, OpenAiPromptCacheRetention, OpenAiTextOptions, OpenAiTextVerbosity,
-    OpenAiTruncation, ProviderKind, ProviderOptions, Response, ResponseFormat, TaskRequest,
+    OpenAiOptions, OpenAiPromptCacheRetention, OpenAiServiceTier, OpenAiTextOptions,
+    OpenAiTextVerbosity, OpenAiTruncation, ProviderKind, ProviderOptions, Response, ResponseFormat,
+    TaskRequest,
 };
 use serde_json::Value;
 
@@ -14,13 +15,16 @@ use crate::{
 #[derive(Debug, Clone, Default, PartialEq)]
 struct OpenAiNativeOptionsOverrides {
     metadata: serde_json::Map<String, Value>,
-    service_tier: Option<String>,
+    service_tier: Option<&'static str>,
     store: Option<bool>,
     prompt_cache_key: Option<String>,
     prompt_cache_retention: Option<String>,
     truncation: Option<String>,
     text_verbosity: Option<String>,
     safety_identifier: Option<String>,
+    previous_response_id: Option<String>,
+    top_logprobs: Option<u32>,
+    max_tool_calls: Option<u32>,
 }
 
 impl OpenAiNativeOptionsOverrides {
@@ -38,12 +42,15 @@ impl OpenAiNativeOptionsOverrides {
                     truncation,
                     text,
                     safety_identifier,
+                    previous_response_id,
+                    top_logprobs,
+                    max_tool_calls,
                 }) => {
                     overrides.metadata = metadata
                         .iter()
                         .map(|(key, value)| (key.clone(), Value::String(value.clone())))
                         .collect();
-                    overrides.service_tier = service_tier.clone();
+                    overrides.service_tier = service_tier.as_ref().map(service_tier_name);
                     overrides.store = *store;
                     overrides.prompt_cache_key = prompt_cache_key.clone();
                     overrides.prompt_cache_retention = prompt_cache_retention
@@ -55,6 +62,9 @@ impl OpenAiNativeOptionsOverrides {
                         .and_then(|OpenAiTextOptions { verbosity }| verbosity.as_ref())
                         .map(text_verbosity_name);
                     overrides.safety_identifier = safety_identifier.clone();
+                    overrides.previous_response_id = previous_response_id.clone();
+                    overrides.top_logprobs = *top_logprobs;
+                    overrides.max_tool_calls = *max_tool_calls;
                 }
                 other => {
                     return Err(AdapterError::new(
@@ -72,6 +82,8 @@ impl OpenAiNativeOptionsOverrides {
 
         overrides.validate_metadata()?;
         overrides.validate_safety_identifier()?;
+        overrides.validate_top_logprobs()?;
+        overrides.validate_max_tool_calls()?;
 
         Ok(overrides)
     }
@@ -92,7 +104,7 @@ impl OpenAiNativeOptionsOverrides {
         if let Some(service_tier) = self.service_tier.as_ref() {
             body.insert(
                 "service_tier".to_string(),
-                Value::String(service_tier.clone()),
+                Value::String((*service_tier).to_string()),
             );
         }
         if let Some(store) = self.store {
@@ -117,6 +129,24 @@ impl OpenAiNativeOptionsOverrides {
             body.insert(
                 "safety_identifier".to_string(),
                 Value::String(safety_identifier.clone()),
+            );
+        }
+        if let Some(previous_response_id) = self.previous_response_id.as_ref() {
+            body.insert(
+                "previous_response_id".to_string(),
+                Value::String(previous_response_id.clone()),
+            );
+        }
+        if let Some(top_logprobs) = self.top_logprobs {
+            body.insert(
+                "top_logprobs".to_string(),
+                Value::Number(top_logprobs.into()),
+            );
+        }
+        if let Some(max_tool_calls) = self.max_tool_calls {
+            body.insert(
+                "max_tool_calls".to_string(),
+                Value::Number(max_tool_calls.into()),
             );
         }
         if let Some(verbosity) = self.text_verbosity.as_ref() {
@@ -187,6 +217,45 @@ impl OpenAiNativeOptionsOverrides {
         }
 
         Ok(())
+    }
+
+    fn validate_top_logprobs(&self) -> Result<(), AdapterError> {
+        if self
+            .top_logprobs
+            .is_some_and(|top_logprobs| top_logprobs > 20)
+        {
+            return Err(AdapterError::new(
+                AdapterErrorKind::Validation,
+                ProviderKind::OpenAi,
+                AdapterOperation::PlanRequest,
+                "OpenAI top_logprobs must be in range 0..=20",
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn validate_max_tool_calls(&self) -> Result<(), AdapterError> {
+        if self.max_tool_calls == Some(0) {
+            return Err(AdapterError::new(
+                AdapterErrorKind::Validation,
+                ProviderKind::OpenAi,
+                AdapterOperation::PlanRequest,
+                "OpenAI max_tool_calls must be greater than 0",
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+fn service_tier_name(value: &OpenAiServiceTier) -> &'static str {
+    match value {
+        OpenAiServiceTier::Auto => "auto",
+        OpenAiServiceTier::Default => "default",
+        OpenAiServiceTier::Flex => "flex",
+        OpenAiServiceTier::Scale => "scale",
+        OpenAiServiceTier::Priority => "priority",
     }
 }
 

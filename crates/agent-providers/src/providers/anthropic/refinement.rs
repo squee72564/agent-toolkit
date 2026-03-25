@@ -1,6 +1,7 @@
 use agent_core::{
-    AnthropicOptions, AnthropicOutputConfig, AnthropicServiceTier, AnthropicToolChoiceOptions,
-    ProviderKind, ProviderOptions, Response, ResponseFormat, TaskRequest, ToolChoice,
+    AnthropicCacheControl, AnthropicOptions, AnthropicOutputConfig, AnthropicServiceTier,
+    AnthropicToolChoiceOptions, ProviderKind, ProviderOptions, Response, ResponseFormat,
+    TaskRequest, ToolChoice,
 };
 use serde_json::{Map, Value, to_value};
 
@@ -19,10 +20,12 @@ struct AnthropicNativeOptionsOverrides {
     top_k: Option<u32>,
     stop_sequences: Vec<String>,
     metadata_user_id: Option<String>,
+    metadata: Map<String, Value>,
     output_config: Option<AnthropicOutputConfig>,
     service_tier: Option<&'static str>,
-    disable_parallel_tool_use: Option<bool>,
+    tool_choice: Option<AnthropicToolChoiceOptions>,
     inference_geo: Option<String>,
+    cache_control: Option<AnthropicCacheControl>,
 }
 
 impl AnthropicNativeOptionsOverrides {
@@ -41,6 +44,9 @@ impl AnthropicNativeOptionsOverrides {
                 service_tier,
                 tool_choice,
                 inference_geo,
+                cache_control,
+                metadata,
+                ..
             }) = provider_options
             else {
                 return Err(AdapterError::new(
@@ -60,14 +66,15 @@ impl AnthropicNativeOptionsOverrides {
             overrides.top_k = *top_k;
             overrides.stop_sequences = stop_sequences.clone();
             overrides.metadata_user_id = metadata_user_id.clone();
+            overrides.metadata = metadata
+                .iter()
+                .map(|(key, value)| (key.clone(), Value::String(value.clone())))
+                .collect();
             overrides.output_config = output_config.clone();
             overrides.service_tier = service_tier.as_ref().map(service_tier_name);
-            overrides.disable_parallel_tool_use = tool_choice.as_ref().and_then(
-                |AnthropicToolChoiceOptions {
-                     disable_parallel_tool_use,
-                 }| *disable_parallel_tool_use,
-            );
+            overrides.tool_choice = tool_choice.clone();
             overrides.inference_geo = inference_geo.clone();
+            overrides.cache_control = cache_control.clone();
         }
 
         overrides.validate()?;
@@ -115,11 +122,8 @@ impl AnthropicNativeOptionsOverrides {
                 ),
             );
         }
-        if let Some(metadata_user_id) = self.metadata_user_id.as_ref() {
-            body.insert(
-                "metadata".to_string(),
-                serde_json::json!({ "user_id": metadata_user_id }),
-            );
+        if let Some(metadata) = merge_metadata(&self.metadata, self.metadata_user_id.as_deref()) {
+            body.insert("metadata".to_string(), Value::Object(metadata));
         }
         if let Some(service_tier) = self.service_tier {
             body.insert(
@@ -133,11 +137,18 @@ impl AnthropicNativeOptionsOverrides {
                 Value::String(inference_geo.clone()),
             );
         }
+        if let Some(cache_control) = self.cache_control.as_ref() {
+            body.insert(
+                "cache_control".to_string(),
+                serialize_cache_control(cache_control)?,
+            );
+        }
         if let Some(output_config) = self.output_config.as_ref() {
             merge_output_config(body, output_config)?;
         }
-        if let Some(disable_parallel_tool_use) = self.disable_parallel_tool_use {
-            merge_tool_choice(task, body, disable_parallel_tool_use)?;
+        if let Some(tool_choice) = self.tool_choice.as_ref() {
+            // TODO: Revisit ownership if semantic tool_choice is moved out of TaskRequest.
+            merge_tool_choice(task, body, tool_choice)?;
         }
 
         Ok(())
@@ -290,14 +301,8 @@ fn merge_output_config(
 fn merge_tool_choice(
     task: &TaskRequest,
     body: &mut Map<String, Value>,
-    disable_parallel_tool_use: bool,
+    provider_tool_choice: &AnthropicToolChoiceOptions,
 ) -> Result<(), AdapterError> {
-    if matches!(task.tool_choice, ToolChoice::None) {
-        return Err(validation_error(
-            "Anthropic tool_choice.disable_parallel_tool_use requires a tool-capable semantic tool_choice",
-        ));
-    }
-
     let Some(tool_choice) = body.get_mut("tool_choice") else {
         return Err(protocol_error(
             "Anthropic family request body must contain a tool_choice field",
@@ -310,12 +315,139 @@ fn merge_tool_choice(
         ));
     };
 
-    tool_choice.insert(
-        "disable_parallel_tool_use".to_string(),
-        Value::Bool(disable_parallel_tool_use),
-    );
+    let override_spec = provider_tool_choice_override(provider_tool_choice);
+    validate_tool_choice_compatibility(task, tool_choice, override_spec)?;
+
+    if let Some(disable_parallel_tool_use) = override_spec.disable_parallel_tool_use {
+        tool_choice.insert(
+            "disable_parallel_tool_use".to_string(),
+            Value::Bool(disable_parallel_tool_use),
+        );
+    }
 
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ProviderToolChoiceOverride<'a> {
+    type_name: &'static str,
+    name: Option<&'a str>,
+    disable_parallel_tool_use: Option<bool>,
+}
+
+fn provider_tool_choice_override(
+    value: &AnthropicToolChoiceOptions,
+) -> ProviderToolChoiceOverride<'_> {
+    match value {
+        AnthropicToolChoiceOptions::Auto {
+            disable_parallel_tool_use,
+        } => ProviderToolChoiceOverride {
+            type_name: "auto",
+            name: None,
+            disable_parallel_tool_use: *disable_parallel_tool_use,
+        },
+        AnthropicToolChoiceOptions::Any {
+            disable_parallel_tool_use,
+        } => ProviderToolChoiceOverride {
+            type_name: "any",
+            name: None,
+            disable_parallel_tool_use: *disable_parallel_tool_use,
+        },
+        AnthropicToolChoiceOptions::Tool {
+            disable_parallel_tool_use,
+            name,
+        } => ProviderToolChoiceOverride {
+            type_name: "tool",
+            name: Some(name.as_str()),
+            disable_parallel_tool_use: *disable_parallel_tool_use,
+        },
+        AnthropicToolChoiceOptions::None => ProviderToolChoiceOverride {
+            type_name: "none",
+            name: None,
+            disable_parallel_tool_use: None,
+        },
+    }
+}
+
+fn semantic_tool_choice_name(task: &TaskRequest) -> Option<&str> {
+    match &task.tool_choice {
+        ToolChoice::Specific { name } => Some(name.as_str()),
+        _ => None,
+    }
+}
+
+fn semantic_tool_choice_type(task: &TaskRequest) -> &'static str {
+    match task.tool_choice {
+        ToolChoice::None => "none",
+        ToolChoice::Auto => "auto",
+        ToolChoice::Required => "any",
+        ToolChoice::Specific { .. } => "tool",
+    }
+}
+
+fn validate_tool_choice_compatibility(
+    task: &TaskRequest,
+    tool_choice: &Map<String, Value>,
+    override_spec: ProviderToolChoiceOverride<'_>,
+) -> Result<(), AdapterError> {
+    let Some(encoded_type) = tool_choice.get("type").and_then(Value::as_str) else {
+        return Err(protocol_error(
+            "Anthropic family request tool_choice must include a string type",
+        ));
+    };
+
+    let semantic_type = semantic_tool_choice_type(task);
+    if encoded_type != semantic_type || override_spec.type_name != semantic_type {
+        return Err(validation_error(
+            "Anthropic provider tool_choice must match semantic task tool_choice type",
+        ));
+    }
+
+    if let Some(override_name) = override_spec.name {
+        let Some(encoded_name) = tool_choice.get("name").and_then(Value::as_str) else {
+            return Err(protocol_error(
+                "Anthropic family request tool_choice type=tool must include a name",
+            ));
+        };
+        if semantic_tool_choice_name(task) != Some(override_name) || encoded_name != override_name {
+            return Err(validation_error(
+                "Anthropic provider tool_choice.name must match semantic task tool_choice name",
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn serialize_cache_control(cache_control: &AnthropicCacheControl) -> Result<Value, AdapterError> {
+    to_value(cache_control).map_err(|error| {
+        AdapterError::with_source(
+            AdapterErrorKind::Encode,
+            ProviderKind::Anthropic,
+            AdapterOperation::PlanRequest,
+            "failed to serialize Anthropic cache_control",
+            error,
+        )
+    })
+}
+
+fn merge_metadata(
+    metadata: &Map<String, Value>,
+    metadata_user_id: Option<&str>,
+) -> Option<Map<String, Value>> {
+    let mut merged = metadata.clone();
+    if let Some(metadata_user_id) = metadata_user_id {
+        merged.insert(
+            "user_id".to_string(),
+            Value::String(metadata_user_id.to_string()),
+        );
+    }
+
+    if merged.is_empty() {
+        None
+    } else {
+        Some(merged)
+    }
 }
 
 fn validation_error(message: impl Into<String>) -> AdapterError {

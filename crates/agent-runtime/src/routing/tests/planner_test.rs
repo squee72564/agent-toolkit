@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use agent_core::{
     FamilyOptions, Message, NativeOptions, OpenAiCompatibleOptions, OpenAiOptions,
-    ProviderInstanceId, ProviderOptions, ResponseFormat, ResponseMode, TaskRequest, ToolChoice,
+    OpenAiServiceTier, ProviderInstanceId, ProviderOptions, ResponseFormat, ResponseMode,
+    TaskRequest, ToolChoice,
 };
 
 use crate::agent_toolkit::AgentToolkit;
@@ -73,6 +74,8 @@ fn routed_planner_rejects_mismatched_native_provider() {
                         service_tier: None,
                         tool_choice: None,
                         inference_geo: None,
+                        cache_control: None,
+                        metadata: std::collections::BTreeMap::new(),
                     })),
                 },
             ));
@@ -115,7 +118,7 @@ fn routed_planner_rejects_provider_native_layer_for_generic_openai_compatible() 
             })),
             provider: Some(ProviderOptions::OpenAi(OpenAiOptions {
                 metadata: Default::default(),
-                service_tier: Some("priority".to_string()),
+                service_tier: Some(OpenAiServiceTier::Priority),
                 store: Some(true),
                 ..Default::default()
             })),

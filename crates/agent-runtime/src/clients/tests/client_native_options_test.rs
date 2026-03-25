@@ -1,12 +1,14 @@
 use std::time::Duration;
 
 use agent_core::{
+    AnthropicCacheControl, AnthropicCacheControlTTL, AnthropicCacheControlType,
     AnthropicFamilyOptions, AnthropicOptions, AnthropicOutputConfig, AnthropicOutputEffort,
     AnthropicServiceTier, AnthropicThinking, AnthropicThinkingBudget, AnthropicToolChoiceOptions,
     OpenAiCompatibleOptions, OpenAiCompatibleReasoning, OpenAiCompatibleReasoningEffort,
-    OpenAiOptions, OpenAiPromptCacheRetention, OpenAiTextOptions, OpenAiTextVerbosity,
-    OpenAiTruncation, OpenRouterImageConfigValue, OpenRouterOptions, OpenRouterPlugin,
-    OpenRouterTextOptions, OpenRouterTextVerbosity, OpenRouterTrace, OpenRouterWebPlugin,
+    OpenAiOptions, OpenAiPromptCacheRetention, OpenAiServiceTier, OpenAiTextOptions,
+    OpenAiTextVerbosity, OpenAiTruncation, OpenRouterImageConfigValue, OpenRouterOptions,
+    OpenRouterPlugin, OpenRouterTextOptions, OpenRouterTextVerbosity, OpenRouterTrace,
+    OpenRouterWebPlugin,
 };
 use serde_json::{Value, json};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -172,7 +174,7 @@ async fn openai_direct_helper_normalizes_typed_native_options_into_payload() {
                 "trace_id".to_string(),
                 "trace-1".to_string(),
             )]),
-            service_tier: Some("priority".to_string()),
+            service_tier: Some(OpenAiServiceTier::Priority),
             store: Some(true),
             prompt_cache_key: Some("cache-key-123".to_string()),
             prompt_cache_retention: Some(OpenAiPromptCacheRetention::TwentyFourHours),
@@ -181,6 +183,9 @@ async fn openai_direct_helper_normalizes_typed_native_options_into_payload() {
                 verbosity: Some(OpenAiTextVerbosity::Low),
             }),
             safety_identifier: Some("safe-id-123".to_string()),
+            previous_response_id: Some("resp_abc123".to_string()),
+            top_logprobs: Some(5),
+            max_tool_calls: Some(2),
         }),
     ))
     .await
@@ -203,6 +208,9 @@ async fn openai_direct_helper_normalizes_typed_native_options_into_payload() {
     assert_eq!(captured.body["text"]["verbosity"], "low");
     assert_eq!(captured.body["text"]["format"]["type"], "text");
     assert_eq!(captured.body["safety_identifier"], "safe-id-123");
+    assert_eq!(captured.body["previous_response_id"], "resp_abc123");
+    assert_eq!(captured.body["top_logprobs"], 5);
+    assert_eq!(captured.body["max_tool_calls"], 2);
 }
 
 #[tokio::test]
@@ -358,10 +366,18 @@ async fn anthropic_direct_helper_normalizes_typed_native_options_into_payload() 
                 format: None,
             }),
             service_tier: Some(AnthropicServiceTier::StandardOnly),
-            tool_choice: Some(AnthropicToolChoiceOptions {
+            tool_choice: Some(AnthropicToolChoiceOptions::Auto {
                 disable_parallel_tool_use: Some(false),
             }),
             inference_geo: Some("us".to_string()),
+            cache_control: Some(AnthropicCacheControl {
+                type_: AnthropicCacheControlType::Ephemeral,
+                ttl: Some(AnthropicCacheControlTTL::FiveMinute),
+            }),
+            metadata: std::collections::BTreeMap::from([
+                ("trace_id".to_string(), "trace-anthropic-1".to_string()),
+                ("user_id".to_string(), "legacy-user".to_string()),
+            ]),
         }),
     ))
     .await
@@ -381,10 +397,14 @@ async fn anthropic_direct_helper_normalizes_typed_native_options_into_payload() 
     assert_eq!(captured.body["stop_sequences"], json!(["DONE", "STOP"]));
     assert_eq!(
         captured.body["metadata"],
-        json!({ "user_id": "anthropic-user-1" })
+        json!({ "trace_id": "trace-anthropic-1", "user_id": "anthropic-user-1" })
     );
     assert_eq!(captured.body["service_tier"], "standard_only");
     assert_eq!(captured.body["inference_geo"], json!("us"));
+    assert_eq!(
+        captured.body["cache_control"],
+        json!({ "type": "ephemeral", "ttl": "5m" })
+    );
     assert_eq!(
         captured.body.pointer("/output_config/effort"),
         Some(&json!("high"))
